@@ -1,0 +1,8 @@
+[project]
+name = "assertiva"
+version = "0.1.0"
+description = "Adaptive Test Intelligence & Assurance for coding agents"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

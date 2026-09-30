@@ -37,6 +37,41 @@ When an E2E or large suite fails, find the first divergent stage, descend to the
 ### VERIFY — confidence expansion
 After a fix, rerun the reproducer, affected regression, relevant integration/E2E evidence, and broader/full gates when required by risk or release policy.
 
+### REFACTOR SAFETY — preserve behavior
+Evaluate whether a module or whole project has a strong enough behavioral safety net before structural change. Map important behaviors/contracts to tests and classify the refactor target as READY, READY_WITH_GAPS, NOT_READY, or UNKNOWN.
+
+## Design principles
+
+- **Evidence over green status.**
+- **Behavior over coverage percentage.**
+- **Deterministic-first core; heuristics/LLM inference are advisory and provenance-labeled.**
+- **Language/framework-neutral semantics; adapters translate capabilities instead of redefining policy.**
+- **Smallest sufficient evidence first; broader confidence when required.**
+- **Never weaken a test merely to make it pass.**
+- **Retries classify flakiness; they do not erase the first failure.**
+- **Selector uncertainty widens execution.**
+- **Raw evidence is retained; agent context is compressed.**
+- **Framework capability detection beats hardcoded `-vvv`.**
+- **Parameterized/data-driven invocations, structured errors, branch-aware coverage, property/fuzz evidence and dynamic tests are first-class evidence.**
+- **No hard dependency on Derivanta or any one runner/tool.**
+
+## Cross-language / cross-framework model
+
+The core works with normalized concepts rather than Python/Java/JS-specific syntax:
+
+```text
+suite
+→ test definition
+→ invocation / parameter case
+→ attempt / retry
+→ assertion / oracle
+→ result
+→ coverage / error / trace evidence
+→ revision + environment
+```
+
+Adapters map pytest, JUnit, Jest, Vitest, Playwright, xUnit/NUnit, Go/Rust/PHP/Ruby ecosystems, custom runners, and future frameworks into this model. Unknown frameworks must degrade conservatively and explicitly, never by silently inventing flags or assuming zero tests.
+
 ## Test Evidence Graph
 
 ```text
@@ -52,130 +87,49 @@ Requirement
 
 Useful relations include `depends_on`, `validates`, `covers`, `kills_mutant`, `reproduces`, `isolates`, and `composes_into`.
 
-Assertiva does **not** require a graph database. The graph is a semantic model that can be derived from source analysis, runtime coverage, Git history, test metadata, requirements, and CI evidence.
-
-## Progressive diagnostics
-
-```text
-D0 Summary
-D1 Failure
-D2 Context
-D3 Trace
-D4 Forensic
-```
-
-The agent starts compact and escalates only when the current hypothesis needs more evidence. Raw logs/traces remain retrievable artifacts rather than being discarded.
-
 ## Current status
 
-Assertiva is currently **M0: useful Agent Skill + specification + deterministic utilities**.
+Assertiva is currently **M0/M0.1: useful Agent Skill + deterministic semantic foundation**.
 
-Implemented now:
+Implemented/specification-level foundations include:
 - canonical `SKILL.md`;
-- architecture and evidence contracts;
-- human-readable eval catalog;
-- JSON schemas/examples for future tooling;
+- deterministic evidence tiers;
+- architecture/evidence/refactor contracts;
+- definition-vs-invocation identity;
+- parameterized/property/fuzz/error-contract semantics;
+- test modality guidance;
+- eval catalog;
+- JSON schemas/examples;
 - JUnit XML compact summarizer;
-- repository/spec validator;
-- CI for the deterministic utilities.
+- repository validator and CI.
 
-Specified but not yet implemented:
-- universal test discovery;
+Still planned:
+- universal discovery;
 - multi-language Test Impact Analysis engine;
 - automatic Test Evidence Graph construction;
-- framework adapters for pytest/Jest/Vitest/Playwright/JUnit/Gradle/.NET/etc.;
+- first-party framework adapters;
 - mutation orchestration;
 - historical flake/runtime/failure intelligence;
-- CLI/MCP service;
-- real multi-agent benchmark harness integration.
+- CLI/MCP;
+- empirical multi-stack benchmark harness.
 
-See [STATUS.md](STATUS.md) and [ROADMAP.md](ROADMAP.md).
-
-## Design principles
-
-- **Evidence over green status.**
-- **Behavior over coverage percentage.**
-- **Smallest sufficient evidence first; broader confidence when required.**
-- **Never weaken a test merely to make it pass.**
-- **Retries classify flakiness; they do not erase the first failure.**
-- **Selector uncertainty widens execution.**
-- **Raw evidence is retained; agent context is compressed.**
-- **Framework capability detection beats hardcoded `-vvv`.**
-- **Provider-neutral core; thin Claude/Codex/Cursor/MCP/CI adapters later.**
-- **No hard dependency on Derivanta, Chisel, testmon, Nx, Playwright, Stryker, PIT, or another external tool.**
-
-## Repository map
-
-```text
-SKILL.md                      canonical agent contract
-docs/                         architecture and engineering semantics
-references/                   runner/adaptor reference material
-schemas/                      machine-readable contracts
-scripts/                      deterministic utilities
-tests/                        tests for deterministic utilities
-evals/                        behavioral conformance cases
-examples/                     example structured evidence
-research/                     dated ecosystem benchmarks
-.github/workflows/            repository CI
-```
-
-## Ecosystem position
-
-Assertiva combines ideas that currently exist separately:
-
-- test impact analysis and code/test graphs;
-- changed-project/test selection;
-- mutation testing;
-- test smell analysis;
-- trace-on-failure diagnostics;
-- risk-based test strategy;
-- agent skill progressive disclosure;
-- compact structured evidence for LLM contexts.
-
-The differentiated goal is the **composition**:
-
-```text
-impact
--> test quality
--> evidence strength
--> failure localization
--> diagnostic cost
--> agent context cost
--> confidence expansion
-```
-
-See [research/2026-09-30-ecosystem-benchmark.md](research/2026-09-30-ecosystem-benchmark.md).
+See [STATUS.md](STATUS.md), [ROADMAP.md](ROADMAP.md), [docs/DETERMINISM_AND_EVIDENCE_TIERS.md](docs/DETERMINISM_AND_EVIDENCE_TIERS.md), and [docs/REFACTOR_SAFETY.md](docs/REFACTOR_SAFETY.md).
 
 ## Relationship with Derivanta
 
-Assertiva is independent. Derivanta can consume it as a specialized test-assurance implementation, but neither project should duplicate the other's semantic ownership or require the other to function.
-
-See [docs/DERIVANTA_INTEGRATION.md](docs/DERIVANTA_INTEGRATION.md).
+Assertiva is independent. Derivanta can consume it as a specialized test-assurance implementation.
 
 ## Non-goals
 
 Assertiva is not:
-- a universal replacement for pytest/Jest/Playwright/JUnit/etc.;
+- a universal replacement for test runners;
 - a coverage-percentage optimizer;
 - a mandate to run fewer tests at all costs;
 - a retry-until-green system;
 - a tool that assumes every failing test is correct;
 - a reason to replace release gates with selective testing;
-- a generic QA management suite.
-
-## Quick use as an Agent Skill
-
-Give an agent this repository or install/copy the skill according to the Agent Skills format, then ask for tasks such as:
-
-- "Audit whether this test suite is actually strong."
-- "Which tests should I run after this change?"
-- "This E2E failed; localize the smallest reproducer."
-- "Refactor this module without weakening confidence."
-- "Why is CI green if this behavior is still wrong?"
-- "Reduce test/trace token usage without hiding evidence."
-
-The canonical behavior is in [SKILL.md](SKILL.md).
+- a promise that 100% coverage makes refactoring impossible to break.
 
 ## License
 
-No license has been selected yet. The repository is currently private; choose a license deliberately before public distribution.
+No license has been selected yet.

@@ -13,6 +13,19 @@
 - [x] JUnit summarizer
 - [x] validator + CI
 
+## M0.1 — Deterministic semantic foundation
+- [x] evidence tiers E0–E4
+- [x] test definition vs invocation identity
+- [x] multi-metric coverage model
+- [x] parameterized/data-driven semantics
+- [x] property/fuzz/metamorphic reproducibility semantics
+- [x] structured error/validation contract model
+- [x] capability-driven adapter contract
+- [x] refactor readiness / whole-project safety model
+- [x] adversarial evals for parameter collapse, line-coverage overclaim, structured error drift, heuristic overreach and whole-project refactor safety
+- [ ] deterministic coverage report parsers
+- [ ] normalized schema validation in CI
+
 ## M1 — Deterministic adapters
 - [ ] pytest adapter
 - [ ] Jest/Vitest adapter
@@ -20,6 +33,11 @@
 - [ ] JUnit/Gradle/Maven adapter
 - [ ] .NET adapter
 - [ ] normalized discovery/result records
+- [ ] portable JUnit XML / TAP ingestion
+- [ ] LCOV / Cobertura / JaCoCo-style coverage ingestion
+- [ ] parameterized/dynamic invocation preservation
+- [ ] structured error normalization
+- [ ] property/fuzz seed/counterexample normalization
 - [ ] capability discovery instead of hardcoded verbosity
 - [ ] secret/redaction tests
 
@@ -33,7 +51,8 @@
 - [ ] Test Evidence Graph builder
 
 ## M3 — Suite quality intelligence
-- [ ] weak/no-op assertion heuristics
+- [ ] deterministic weak/no-op patterns where provable
+- [ ] advisory semantic weak-assertion analysis with provenance
 - [ ] mock-away heuristics
 - [ ] duplicate/redundancy analysis
 - [ ] fidelity/level classification

@@ -30,12 +30,32 @@ Assertiva does not replace test frameworks.
 5. raw evidence may stay outside model context with retrievable references.
 6. agent reasoning interprets oracle authority, uncertainty, and claim strength.
 
+## Deterministic core and advisory intelligence
+
+```text
+RAW ARTIFACTS
+   ↓
+DETERMINISTIC PARSERS / NORMALIZERS
+   ↓
+NORMALIZED EVIDENCE
+   ├─ deterministic selection / exact mappings
+   ├─ project-declared mappings/policy
+   └─ advisory heuristic/LLM analysis
+                    ↓
+             decision / expansion
+```
+
+Heuristic or LLM output must not silently become deterministic fact. Derived graph edges, findings and selection reasons carry evidence class and provenance.
+
 ## Core records
-- TestInventoryEntry — identity, level, framework, source, target/component, tags.
+- TestInventoryEntry — definition identity, runner/framework, source, level/fidelity, dynamic/parameterized characteristics and tags.
+- TestInvocation — concrete parameter/data/dynamic invocation identity plus attempt/retry.
 - TestRun — revision/environment/configuration, selection basis, status, timing.
 - FailureEvidence — assertion/exception/location/cluster/diagnostic level/artifact refs.
 - SelectionDecision — candidates, reasons, methods, limitations, expansion triggers.
-- TestEvidenceEdge — requirement/behavior/component/code/test/assertion/evidence/run relation.
+- TestEvidenceEdge — requirement/behavior/component/code/test/assertion/evidence/run relation with evidence class/provenance.
+- CoverageRecord — metric kind, totals, scope, exclusions, tool/version and artifact provenance.
+- ErrorExpectation — structured expected failure category/type/code/path/context/message policy.
 - SuiteFinding — weak-test/fidelity/redundancy/oracle gap with evidence.
 
 ## Trust model

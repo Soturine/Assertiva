@@ -39,3 +39,24 @@ Two tests can execute different files while proving the same thing. A slower dup
 - critical E2E-only rule with no useful isolating evidence;
 - meaningful mutation survivor;
 - tests removed during refactor without equivalent risk coverage.
+
+
+## Parameterization quality
+
+Parameterized/table-driven tests should preserve individual invocation identity when the runner exposes it. Audit whether material boundaries and invalid classes are represented, whether a failed row is replayable, and whether the parameter source is independent from the implementation under test.
+
+## Structured failure behavior
+
+Validation and error handling are behavior. Prefer stable structured semantics such as error type/code/path/location/context/status over incidental message-only equality unless wording itself is required.
+
+## Generative evidence
+
+Property, fuzz and metamorphic tests complement examples when input space is large. Preserve seeds, counterexamples, shrinking/minimization and corpora so failures remain reproducible.
+
+## Coverage quality
+
+Statement/line, branch/decision, condition, function/method, instruction and test-specific coverage answer different questions. None proves oracle adequacy by itself.
+
+## Refactor safety
+
+A suite should be judged partly by whether it can detect unintended behavioral drift during refactoring. High coverage with weak oracles is not a safety net. For consequential refactors, map important behaviors/contracts to credible detectors and challenge the suite with negative controls or mutation where proportionate.

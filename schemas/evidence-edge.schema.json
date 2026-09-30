@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva Evidence Edge",
+  "type": "object",
+  "required": [
+    "source",
+    "relation",
+    "target",
+    "evidence_class"
+  ],
+  "properties": {
+    "source": {
+      "type": "string"
+    },
+    "relation": {
+      "type": "string"
+    },
+    "target": {
+      "type": "string"
+    },
+    "evidence_class": {
+      "enum": [
+        "E0_RAW",
+        "E1_DETERMINISTIC_DERIVED",
+        "E2_DECLARED",
+        "E3_HEURISTIC",
+        "E4_INFERRED"
+      ]
+    },
+    "provenance": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

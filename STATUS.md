@@ -1,6 +1,6 @@
 # Status
 
-## Current milestone: M0
+## Current milestone: M0.1
 
 State: usable specification-first Agent Skill with small deterministic utilities.
 
@@ -14,18 +14,21 @@ State: usable specification-first Agent Skill with small deterministic utilities
 - token-aware evidence contract;
 - benchmark/research record;
 - human-readable eval cases;
-- schemas/examples;
+- normalized schemas for test inventory/invocation, coverage, error contracts, evidence edges, runs and selection;
+- deterministic evidence tiers (E0–E4);
+- parameterized/data-driven, property/fuzz, structured-error and multi-metric coverage semantics;
+- refactor-confidence/readiness model;
 - JUnit XML compact summarizer;
 - repository/spec validator;
 - deterministic utility tests and CI.
 
 ### Specified, not implemented
-- universal test discovery;
+- universal test discovery and dynamic/parameter invocation enumeration;
 - static/runtime Test Impact Analysis engine;
 - automatic dependency/Test Evidence Graph builder;
 - cross-run history and flake/runtime model;
 - mutation orchestration;
-- pytest/Jest/Vitest/Playwright/JUnit/Gradle/.NET adapters;
+- capability-driven adapters for arbitrary runners/frameworks; initial targets include pytest, Jest/Vitest, Playwright, JUnit/Gradle/Maven and .NET;
 - automatic E2E stage mapping;
 - CLI/MCP server;
 - executable multi-agent benchmark harness.

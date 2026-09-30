@@ -6,155 +6,142 @@ Use Assertiva when the task involves test-suite quality, affected-test selection
 
 Produce the greatest reasonable evidence of correctness at the lowest reasonable execution, investigation, and agent-context cost without weakening the claim being made.
 
-~~~text
+```text
 FAST FEEDBACK
 != REGRESSION CONFIDENCE
 != TEST QUALITY
-~~~
+```
 
-## Modes
+## Deterministic-first evidence policy
 
-### AUDIT
+Prefer deterministic, machine-verifiable evidence whenever possible.
+
+- **E0 RAW** — native runner/report/source artifact.
+- **E1 DETERMINISTIC_DERIVED** — reproducible parsed/normalized result.
+- **E2 DECLARED** — project-authored mapping/policy/metadata.
+- **E3 HEURISTIC** — fallible static/ranking/similarity/smell signal.
+- **E4 INFERRED** — semantic/LLM inference requiring supporting evidence.
+
+E3/E4 may rank, flag, cluster and propose. They must not silently suppress material tests or close consequential gates. When evidence is insufficient, widen execution or report UNKNOWN.
+
+## AUDIT
+
 Determine whether existing tests actually provide meaningful evidence.
 
 Inspect as applicable:
 - authoritative requirement/invariant/oracle;
 - assertion strength and observable effects;
-- missing negative, boundary, failure, recovery, concurrency, authorization, migration, and retry cases where material;
-- tests with no meaningful assertion;
-- tests coupled to implementation instead of contract;
-- mocks that replace the behavior/boundary being claimed;
-- integration fidelity;
+- negative/boundary/failure/recovery/concurrency/authorization/migration cases;
+- integration fidelity and suspicious mocks;
+- flaky/retry-dependent behavior;
 - duplicate/redundant tests;
-- fixtures hiding impossible/privileged state;
-- flaky or retry-dependent behavior;
-- critical behavior protected only by E2E;
-- E2E journeys with no useful lower-layer isolation;
-- giant opaque snapshots;
-- mutation, negative-control, differential, and independent evidence;
-- exact revision/environment/configuration/test-run provenance.
+- snapshots/goldens and update provenance;
+- parameterized/table/data-driven definitions and material invocations;
+- property-based/generative tests, seeds and minimized counterexamples;
+- fuzz corpora/crash reproducers;
+- structured validation/error contracts;
+- line/statement vs branch/condition/function/instruction coverage;
+- dynamic/generated tests;
+- async/concurrency/race assumptions;
+- mutation/negative-control/differential/independent evidence;
+- exact revision/environment/configuration/run provenance.
 
 Coverage and test count are diagnostics, not proof.
 
-### SELECT
-Choose candidate tests for the current change using the strongest available evidence from changed symbols, imports/dependencies, runtime coverage, test-to-code maps, contracts, critical journeys, past defects, ownership, Git history, and configuration/runtime relationships.
+## SELECT
 
-Always expose selector limitations. If impact data is incomplete, stale, dynamic, configuration-sensitive, or high-risk, broaden execution.
+Choose candidate tests using the strongest available evidence from changed symbols, dependency graphs, runtime test-to-code maps, contracts, critical journeys, Git history, known regressions and project-declared mappings.
 
-### RUN
-Run the smallest sufficient high-signal evidence first when project policy permits.
+Always expose limitations. Exact/deterministic mappings can exclude tests only within their proven scope. Heuristic/inferred impact should prioritize, not prove unaffectedness.
 
-~~~text
-change
--> impact hypotheses
--> cheap/high-signal tests
--> compact structured result
--> failure? localize + diagnose
--> fix
--> reproducer
--> affected regression
--> confidence expansion
-~~~
+## RUN
 
-Do not report a selected subset as full-suite or release proof.
+Run the smallest sufficient high-signal evidence first when policy permits. Do not report a selected subset as full-suite/release proof.
 
-### DIAGNOSE
-1. identify the exact failing check and first divergent stage;
-2. cluster likely shared failures before flooding context;
+## DIAGNOSE
+
+1. identify failing check and first divergent stage;
+2. cluster likely shared failures;
 3. find the smallest useful reproducer;
-4. descend from E2E to integration/contract/component/unit only when it isolates the same failure;
-5. increase diagnostics only as necessary;
+4. descend from E2E only when lower layers reproduce/isolate the same failure;
+5. escalate diagnostics D0→D4 only as needed;
 6. classify product defect, test/oracle defect, environment/infra defect, data problem, flake, or unresolved.
 
-After repair, return to composition-level evidence when the claim still depends on it.
+## VERIFY
 
-### VERIFY
-After a fix or refactor:
-1. rerun the minimal reproducer;
-2. rerun affected dependent tests;
+After a fix/refactor:
+1. rerun minimal reproducer;
+2. rerun affected dependents;
 3. run affected regression;
-4. run relevant integration/contract/E2E;
-5. run broader/full gates when risk, milestone, release policy, selector uncertainty, or project rules require them.
+4. run relevant contract/integration/E2E;
+5. run broader/full gates when risk, milestone/release policy, selector uncertainty, or project rules require them.
 
-## Progressive Diagnostic Escalation
+## Progressive diagnostics
 
-- D0 Summary — run identity, selected/executed/pass/fail/skip counts, duration.
-- D1 Failure — exact test, assertion, exception, source location.
-- D2 Context — expected/actual, relevant state, bounded logs, short traceback.
-- D3 Trace — selected full traceback/log/network/DB/browser trace/screenshots.
-- D4 Forensic — selective instrumentation, profiling, repeated executions, race/concurrency diagnostics.
+- D0 Summary
+- D1 Failure
+- D2 Context
+- D3 Trace
+- D4 Forensic
 
-Never assume -v, -vv, or -vvv mean the same thing across runners. Detect the framework and use native capabilities.
+Never assume `-v/-vv/-vvv` semantics are portable.
+
+## Test identity
+
+Do not collapse a parameterized/dynamic test definition into one boolean result when individual invocations are observable.
+
+```text
+suite → definition → invocation/data case → attempt/retry → result
+```
+
+Preserve stable IDs, sanitized parameter identity, matrix dimensions, attempt number and dynamic/partial-discovery status.
+
+## Structured errors
+
+Invalid-input behavior is part of the contract. Prefer stable structured fields such as category/type/code/path/location/context/status and sanitized input over brittle message-only assertions, unless exact wording is itself required.
+
+Pydantic ValidationError is one adapter-specific form, not a core dependency.
+
+## Coverage semantics
+
+Never reduce coverage to one percentage. Preserve metric kind, denominator, scope, exclusions, tool/version and aggregate-vs-test-specific context. Line coverage does not imply branch/condition coverage, and none of them proves oracle adequacy.
+
+## Property/fuzz/metamorphic evidence
+
+Preserve seed/replay token, run budget, counterexample, minimized/shrunk counterexample and corpus where available. Randomized success without replay data is weaker diagnostic evidence.
 
 ## Failure-guided E2E decomposition
 
-~~~text
-Checkout E2E
-  -> Login
-  -> Cart
-  -> Payment
-  -> Order
-
-FAIL: Payment
-  -> payment integration
-  -> payment contract
-  -> payment service/domain
-  -> gateway/repository boundary
-~~~
-
-Do not repeatedly rerun an expensive E2E when a smaller safe reproducer can localize the same stage. Do not permanently replace required E2E evidence with lower-level tests.
-
-## Test Evidence Graph
-
-~~~text
-Requirement
--> Behavior
--> Component
--> Code
--> Test
--> Assertion
--> Evidence
--> Run
-~~~
-
-Relations may include depends_on, validates, covers, kills_mutant, reproduces, isolates, and composes_into.
-
-Treat graph edges as evidence-bearing claims with provenance and limitations, not automatic truth.
-
-## Token-aware evidence
-
-Prefer compact structured summaries with raw evidence references. Never save tokens by hiding failures, skipped/not-run tests, retries, selector limitations, environment/configuration, exact revision, fidelity, contradictions, or residual unknowns.
-
-Raw logs/traces should remain retrievable when practical.
-
-## Flaky tests
-
-A retry is evidence about flakiness only if the first failure is preserved.
-
-Never retry until green and discard earlier failures; never inflate timeout as the default fix; never quarantine silently.
-
-## Test changes
-
-Never weaken a test merely to make it pass. A test may change when evidence shows the oracle/specification/test is wrong, stale, ambiguous, or intentionally superseded.
+Do not repeatedly rerun an expensive E2E when a smaller safe reproducer can isolate the same stage. After repair, return to the original composition-level evidence when the claim depends on it.
 
 ## Refactor safety
 
-Before consequential refactoring establish authoritative desired behavior. Use characterization tests when legacy behavior is unclear, mark known defects so characterization does not canonize them, and use differential/reference/golden/property tests when suitable.
+Before consequential refactoring, establish authoritative behavior and build a safety matrix mapping important behaviors/contracts to unit/property/characterization, integration/contract, E2E/composition and non-functional evidence as applicable.
 
-Use affected tests for fast feedback; expand regression/integration/E2E evidence before claiming preserved behavior.
+Classify readiness:
+- READY
+- READY_WITH_GAPS
+- NOT_READY
+- UNKNOWN
 
-## Selection expansion triggers
+A green suite or 100% line coverage does not make a refactor safe by itself. The question is whether meaningful unintended behavioral changes in the refactored scope would be detected.
 
-Broaden execution when material behavior depends on reflection/dynamic loading/plugins, feature flags/configuration, schema/migrations, generated assets/code, global/shared fixtures, external services/files/devices, concurrency/timing, security/safety/financial/irreversible behavior, stale impact data, semantic effects wider than the diff, or release/milestone policy.
+For whole-project refactors, inventory behavior slices as protected, weakly protected, characterization-only, integration-only, E2E-only, unprotected, or unknown before restructuring them.
 
-## Mutation and test-the-test
+Never weaken test expectations merely to make a refactor pass.
 
-Use mutation testing, negative controls, deliberate invariant violations, differential checks, or independent tests when test strength is uncertain. Do not require one mutation tool or universal mutation score.
+## Test-the-safety-net
+
+Where proportionate, challenge the suite with mutation testing, deliberate negative controls, known historical regressions, boundary perturbations, contract violations, property/metamorphic tests, or intentionally broken candidate implementations in a sandbox.
+
+## Token-aware evidence
+
+Prefer compact structured summaries with retrievable raw artifacts. Never save tokens by hiding failures, skips/not-run, retries, limitations, environment/configuration, revision, fidelity, contradictions or unknowns.
 
 ## Provider neutrality
 
-Keep the core usable with Claude Code, Codex, Cursor-like agents, CI jobs, local shells, or future clients. Provider-specific packaging should be thin.
+Core policy is framework/language/provider neutral. Adapters expose capabilities such as discovery, invocation enumeration, stable IDs, filtering, structured results, retries, coverage, traces, seeds and mutation evidence.
 
 ## Current maturity
 
-The skill contract is usable today. Universal discovery, impact-graph construction, framework adapters, mutation orchestration, historical intelligence, CLI/MCP, and executable eval harness are roadmap work and must not be claimed as implemented.
+The semantic contract is usable today. Universal discovery, impact graph construction, adapters, mutation orchestration, historical intelligence, CLI/MCP and executable eval harness remain roadmap work.

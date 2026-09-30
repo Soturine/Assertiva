@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva Adapter Capabilities",
+  "type": "object",
+  "required": [
+    "adapter_id",
+    "version",
+    "capabilities"
+  ],
+  "properties": {
+    "adapter_id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "framework": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "runner": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "SUPPORTED",
+          "UNSUPPORTED",
+          "UNKNOWN"
+        ]
+      }
+    },
+    "portable_formats": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

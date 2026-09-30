@@ -134,6 +134,20 @@ Never weaken test expectations merely to make a refactor pass.
 
 Where proportionate, challenge the suite with mutation testing, deliberate negative controls, known historical regressions, boundary perturbations, contract violations, property/metamorphic tests, or intentionally broken candidate implementations in a sandbox.
 
+## Harness, fidelity, observations, data and doubles
+
+Never infer test strength from a framework class, file suffix, or label alone. When integration/UI/API/database fidelity matters, read docs/TEST_HARNESS_AND_FIDELITY.md and record the actual process, transport, persistence, transaction, dependency, UI runtime, matrix and isolation boundaries.
+
+When auditing assertions, map them to behavior claims and observation surfaces using docs/ASSERTIONS_ORACLES_AND_OBSERVATION_SURFACES.md. Status/content/template/context/persistence/call/visual/accessibility observations prove different things.
+
+When fixtures, factories, Faker/generated data, shared setup, database seeds or order-dependence matter, use docs/TEST_DATA_FIXTURES_FACTORIES.md.
+
+When mocks, spies, fakes, patch/monkeypatch, virtual services or containers are involved, use docs/TEST_DOUBLES_PATCHING_AND_VIRTUALIZATION.md. Verify the seam actually used by the SUT and do not mock away the boundary a test claims to integrate.
+
+For HTTP/API/browser/component/mobile/web flows, use docs/WEB_API_UI_TESTING.md and preserve request, auth, state, rendering, accessibility, visual and platform-matrix claims independently.
+
+For implementation/productization of Assertiva itself, use docs/AGENT_SKILL_MCP_ARCHITECTURE.md: Skill owns policy, deterministic core owns reproducible processing, CLI is the default token-efficient agent surface, and MCP is optional for persistent state/graph/artifact/job workflows.
+
 ## Token-aware evidence
 
 Prefer compact structured summaries with retrievable raw artifacts. Never save tokens by hiding failures, skips/not-run, retries, limitations, environment/configuration, revision, fidelity, contradictions or unknowns.

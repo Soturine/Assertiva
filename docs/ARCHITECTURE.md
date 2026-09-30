@@ -56,6 +56,11 @@ Heuristic or LLM output must not silently become deterministic fact. Derived gra
 - TestEvidenceEdge — requirement/behavior/component/code/test/assertion/evidence/run relation with evidence class/provenance.
 - CoverageRecord — metric kind, totals, scope, exclusions, tool/version and artifact provenance.
 - ErrorExpectation — structured expected failure category/type/code/path/context/message policy.
+- TestHarness — actual process/transport/persistence/transaction/dependency/UI/isolation fidelity dimensions.
+- AssertionObservation — claim-facing observation surface and oracle source.
+- TestDataFixture — data source, scope, reset, seed/version and shared-state semantics.
+- TestDouble — dummy/stub/fake/spy/mock/patch/virtualizer/emulator target boundary and claim impact.
+- AdapterCapabilities — versioned SUPPORTED/UNSUPPORTED/UNKNOWN capability map.
 - SuiteFinding — weak-test/fidelity/redundancy/oracle gap with evidence.
 
 ## Trust model
@@ -65,3 +70,7 @@ When uncertainty is material, widen evidence.
 
 ## Security/privacy
 Diagnostics can expose secrets through locals, env vars, HTTP headers, DB payloads, screenshots, URLs and traces. Adapters should redact common secret classes, avoid dumping all locals by default, protect raw artifacts, and record that redaction occurred.
+
+## Product interfaces
+
+See [Agent Skill, CLI, and MCP Architecture](AGENT_SKILL_MCP_ARCHITECTURE.md) for the intended separation between skill policy, deterministic core, CLI, optional MCP, project state and raw evidence artifacts.

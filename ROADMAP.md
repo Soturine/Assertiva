@@ -22,6 +22,12 @@
 - [x] structured error/validation contract model
 - [x] capability-driven adapter contract
 - [x] refactor readiness / whole-project safety model
+- [x] harness/fidelity model independent from test labels
+- [x] assertion/oracle/observation-surface model
+- [x] fixture/factory/test-data lifecycle model
+- [x] test-double/patch/service-virtualization model
+- [x] web/API/UI/browser evidence model
+- [x] Skill + CLI + optional MCP architecture benchmark
 - [x] adversarial evals for parameter collapse, line-coverage overclaim, structured error drift, heuristic overreach and whole-project refactor safety
 - [ ] deterministic coverage report parsers
 - [ ] normalized schema validation in CI
@@ -68,9 +74,20 @@
 - [ ] duration/cost model
 - [ ] diagnostic escalation automation
 
+## M4.1 — Harness and runtime intelligence
+- [ ] automatic harness/fidelity classification with provenance
+- [ ] fixture lifecycle/shared-state detection
+- [ ] patch/mock seam tracing and unused setup detection
+- [ ] HTTP/UI observation-surface extraction
+- [ ] environment/browser/device matrix preservation
+- [ ] transaction-semantics capability detection
+
 ## M5 — Productization
 - [ ] CLI
-- [ ] MCP server
+- [ ] CLI-first local agent interface
+- [ ] optional MCP server with atomic paginated tools/resources
+- [ ] long-analysis job/task lifecycle and cancellation
+- [ ] revision-aware local evidence/history store
 - [ ] CI integration
 - [ ] provider adapters
 - [ ] persistent history

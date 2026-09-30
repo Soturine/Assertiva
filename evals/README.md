@@ -22,3 +22,16 @@ Grade behavior, evidence honesty and cost-aware reasoning, not whether an agent 
 - [Whole-project refactor safety gap](cases/WHOLE_PROJECT_REFACTOR_SAFETY_GAP.md)
 
 Future executable evaluation should preserve fixture, model/agent/provider, tool permissions, revision, budgets, result provenance and infrastructure-failure states.
+
+## Harness, doubles, web/UI, and agent-runtime cases
+
+- [Harness name does not prove fidelity](cases/HARNESS_NAME_FIDELITY_MISMATCH.md)
+- [Transaction harness masks commit behavior](cases/TRANSACTION_HARNESS_MASKS_COMMIT_BEHAVIOR.md)
+- [Wrong patch seam](cases/WRONG_PATCH_SEAM.md)
+- [Mock-away integration boundary](cases/MOCK_AWAY_INTEGRATION_BOUNDARY.md)
+- [Fixture state leak and order dependency](cases/FIXTURE_STATE_LEAK_ORDER_DEPENDENCY.md)
+- [HTTP status-only false green](cases/HTTP_STATUS_ONLY_FALSE_GREEN.md)
+- [Stale run verdict](cases/STALE_RUN_VERDICT.md)
+- [Platform matrix collapse](cases/PLATFORM_MATRIX_COLLAPSE.md)
+- [Snapshot auto-update regression](cases/SNAPSHOT_AUTO_UPDATE_REGRESSION.md)
+- [Visual/accessibility/behavior divergence](cases/VISUAL_ACCESSIBILITY_BEHAVIOR_DIVERGENCE.md)

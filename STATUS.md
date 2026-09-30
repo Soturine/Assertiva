@@ -18,6 +18,8 @@ State: usable specification-first Agent Skill with small deterministic utilities
 - deterministic evidence tiers (E0–E4);
 - parameterized/data-driven, property/fuzz, structured-error and multi-metric coverage semantics;
 - refactor-confidence/readiness model;
+- harness/fidelity, observation-surface, fixture/data-lifecycle, test-double and web/API/UI semantic models;
+- Skill/CLI/MCP product architecture and current ecosystem research;
 - JUnit XML compact summarizer;
 - repository/spec validator;
 - deterministic utility tests and CI.

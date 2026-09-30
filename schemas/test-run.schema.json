@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva Test Run",
+  "type": "object",
+  "required": ["run_id", "revision", "scope", "executed", "passed", "failed"],
+  "properties": {
+    "run_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "string", "minLength": 1},
+    "scope": {"enum": ["focused", "affected", "integration", "e2e", "full", "unknown"]},
+    "selector_methods": {"type": "array", "items": {"type": "string"}},
+    "selector_limitations": {"type": "array", "items": {"type": "string"}},
+    "executed": {"type": "integer", "minimum": 0},
+    "passed": {"type": "integer", "minimum": 0},
+    "failed": {"type": "integer", "minimum": 0},
+    "skipped": {"type": "integer", "minimum": 0},
+    "not_run": {"type": "integer", "minimum": 0},
+    "retried": {"type": "integer", "minimum": 0},
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "diagnostic_level": {"enum": ["D0", "D1", "D2", "D3", "D4"]},
+    "environment": {"type": "object"},
+    "artifacts": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

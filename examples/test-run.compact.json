@@ -1,0 +1,16 @@
+{
+  "run_id": "R183",
+  "revision": "abc123",
+  "scope": "affected",
+  "selector_methods": ["git-diff", "runtime-map"],
+  "selector_limitations": ["dynamic plugins not modeled"],
+  "executed": 381,
+  "passed": 379,
+  "failed": 2,
+  "skipped": 4,
+  "not_run": 812,
+  "retried": 0,
+  "duration_seconds": 31.8,
+  "diagnostic_level": "D1",
+  "artifacts": ["artifact://R183/raw-junit.xml"]
+}

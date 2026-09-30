@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva Selection Decision",
+  "type": "object",
+  "required": ["revision", "candidates", "limitations"],
+  "properties": {
+    "revision": {"type": "string"},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["test_id", "reasons"],
+        "properties": {
+          "test_id": {"type": "string"},
+          "reasons": {"type": "array", "items": {"type": "string"}},
+          "cost_hint": {"type": ["number", "null"], "minimum": 0}
+        }
+      }
+    },
+    "methods": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "confidence": {"enum": ["low", "medium", "high", "unknown"]},
+    "expansion_triggers": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

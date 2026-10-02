@@ -34,9 +34,15 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [x] high-line-coverage / weak-oracle contradiction
 - [x] line-vs-branch divergence
 - [x] wheel build + installed-artifact smoke in Assertiva CI
-- [ ] native `pytest --collect-only` adapter
-- [ ] collection errors, skip, xfail, markers and filters
+- [x] declaration -> materialization -> invocation -> attempt identity model
+- [x] expected-error / validation contract model
+- [ ] native pytest collection/result adapter
+- [ ] inherited/composed test materialization from native runner evidence
+- [ ] collection errors, skip, xfail, markers, assumptions and filters
 - [ ] parameterized/dynamic invocation preservation
+- [ ] expected-exception / rejection / warning adapter normalization
+- [ ] error status versus structured error/state-effect analysis
+- [ ] async rejection/error observation
 - [ ] source-tree vs wheel/sdist parity
 - [ ] migration/startup/health/container verification
 - [ ] local-vs-CI runtime/environment matrix
@@ -48,6 +54,7 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [ ] Playwright + semantic locator/accessibility evidence
 - [ ] JUnit/Gradle/Maven
 - [ ] .NET
+- [ ] runner-native inheritance/composition/parameterization mapping
 - [ ] LCOV/Cobertura/JaCoCo coverage ingestion
 - [ ] property/fuzz replay evidence
 - [ ] secret/redaction tests
@@ -69,6 +76,7 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 ## M3 — Impact intelligence
 - [ ] Git diff + symbol extraction
 - [ ] import/dependency graph
+- [ ] composition/inheritance/lifecycle dependency graph
 - [ ] runtime test-to-code evidence
 - [ ] conservative widening
 - [ ] monorepo affected-set
@@ -77,11 +85,13 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 
 ## M4 — Suite quality intelligence
 - [ ] stronger deterministic weak/no-op patterns
+- [ ] expected-error strength and validation-depth analysis
+- [ ] rollback/no-side-effect evidence for negative paths
 - [ ] provenance-labeled semantic weak-assertion analysis
+- [ ] shared oracle concentration across inherited/composed tests
 - [ ] mock-away heuristics
 - [ ] duplicate/redundancy analysis
-- [ ] mutation adapters (mutmut/Stryker/PIT-style)
-- [ ] negative-control challenge harness
+- [ ] mutation adapters
 - [ ] snapshot provenance
 - [ ] retry/timeout/first-failure analysis
 - [ ] defect-to-test history
@@ -112,6 +122,8 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [ ] .NET
 - [ ] Android/Gradle/JUnit
 - [ ] monorepo
+- [ ] inherited/composed test benchmark
+- [ ] expected-error and validation-path benchmark
 - [ ] CI-green/deploy-fail corpus
 - [ ] paired baseline vs Assertiva trials
 

@@ -9,6 +9,10 @@ Research records are dated evidence and benchmarks, not permanent Assertiva poli
 - [Agent Testing Skills and MCP Architecture](2026-09-30-agent-testing-skills-mcp-architecture.md) — Chisel, dotnet/TestFX skills, Cypress AI Toolkit, Android Skills, Playwright CLI/MCP, Anthropic skill/MCP patterns.
 - [Luiz Otávio Testing Case Studies](2026-09-30-luiz-otavio-testing-case-studies.md) — concrete Django and modern Vitest/Playwright examples, strengths, weaknesses and transferable patterns.
 
+## 2026-10-02
+
+- [Semantic UI and Browser Test Assurance](2026-10-02-semantic-ui-browser-assurance.md) — current Playwright, Testing Library, WAI-ARIA/WCAG and Android Compose evidence supporting provider-neutral semantic interface contracts, locator robustness, accessibility claim boundaries and cross-platform mapping.
+
 ## Rule
 
 When a mutable external tool changes, update or add a dated record instead of silently rewriting history. Promote only reusable, evidence-supported conclusions into canonical docs.

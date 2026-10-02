@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva UI Locator Evidence",
+  "type": "object",
+  "required": [
+    "record_id",
+    "platform",
+    "current_locator",
+    "contract_assessment",
+    "provenance"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string"
+    },
+    "test_invocation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_file": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "platform": {
+      "enum": [
+        "web",
+        "android_compose",
+        "android_view",
+        "ios",
+        "desktop",
+        "other",
+        "unknown"
+      ]
+    },
+    "framework": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "current_locator": {
+      "type": "object",
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "role",
+            "label",
+            "text",
+            "test_id",
+            "domain_attribute",
+            "css",
+            "xpath",
+            "position",
+            "semantic_matcher",
+            "native_identifier",
+            "other",
+            "unknown"
+          ]
+        },
+        "expression": {
+          "type": "string"
+        },
+        "user_facing": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "observed_contract": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "accessible_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visible_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "test_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "domain_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "states": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "contract_assessment": {
+      "type": "object",
+      "required": [
+        "coupling_class",
+        "finding_state"
+      ],
+      "properties": {
+        "coupling_class": {
+          "enum": [
+            "user_semantics",
+            "explicit_test_contract",
+            "domain_identity",
+            "visual_structure_contract",
+            "implementation_structure",
+            "positional_structure",
+            "unknown"
+          ]
+        },
+        "finding_state": {
+          "enum": [
+            "supported",
+            "candidate",
+            "not_a_finding",
+            "unknown"
+          ]
+        },
+        "reasoning": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "candidate_locators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "expression",
+          "evidence_class"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "expression": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "E0",
+              "E1",
+              "E2",
+              "E3",
+              "E4"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "mutation_challenge": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "mutation_kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "product_contract_preserved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "locator_survived": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "evidence_class"
+      ],
+      "properties": {
+        "evidence_class": {
+          "enum": [
+            "E0",
+            "E1",
+            "E2",
+            "E3",
+            "E4"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

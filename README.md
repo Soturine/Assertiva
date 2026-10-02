@@ -118,7 +118,7 @@ Still planned:
 - CLI/MCP;
 - empirical multi-stack benchmark harness.
 
-See [STATUS.md](STATUS.md), [ROADMAP.md](ROADMAP.md), [Determinism and Evidence Tiers](docs/DETERMINISM_AND_EVIDENCE_TIERS.md), [Refactor Safety](docs/REFACTOR_SAFETY.md), [Test Harness and Fidelity](docs/TEST_HARNESS_AND_FIDELITY.md), [Assertions/Oracles/Observation Surfaces](docs/ASSERTIONS_ORACLES_AND_OBSERVATION_SURFACES.md), and [Agent Skill/CLI/MCP Architecture](docs/AGENT_SKILL_MCP_ARCHITECTURE.md).
+Start with the [Documentation Portal](docs/README.md). Key owners include [Semantic UI and Browser Assurance](docs/SEMANTIC_UI_AND_BROWSER_ASSURANCE.md), [Determinism and Evidence Tiers](docs/DETERMINISM_AND_EVIDENCE_TIERS.md), [Refactor Safety](docs/REFACTOR_SAFETY.md), [Test Harness and Fidelity](docs/TEST_HARNESS_AND_FIDELITY.md), [Assertions/Oracles/Observation Surfaces](docs/ASSERTIONS_ORACLES_AND_OBSERVATION_SURFACES.md), and [Agent Skill/CLI/MCP Architecture](docs/AGENT_SKILL_MCP_ARCHITECTURE.md). See [STATUS.md](STATUS.md) and [ROADMAP.md](ROADMAP.md) for maturity.
 
 ## Relationship with Derivanta
 

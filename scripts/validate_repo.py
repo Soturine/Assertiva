@@ -8,8 +8,10 @@ REQUIRED = [
     'README.md','SKILL.md','STATUS.md','ROADMAP.md',
     'docs/ARCHITECTURE.md','docs/QUALITY_MODEL.md','docs/IMPACT_AND_SELECTION.md',
     'docs/FAILURE_LOCALIZATION.md','docs/EVIDENCE_CONTRACT.md','docs/REFACTOR_SAFETY.md',
+    'docs/SEMANTIC_UI_AND_BROWSER_ASSURANCE.md','docs/DERIVANTA_INTEGRATION.md','docs/README.md',
     'research/2026-09-30-ecosystem-benchmark.md','evals/README.md',
-    'schemas/test-run.schema.json','schemas/failure-cluster.schema.json','schemas/selection-decision.schema.json'
+    'schemas/test-run.schema.json','schemas/failure-cluster.schema.json','schemas/selection-decision.schema.json',
+    'schemas/assertion-observation.schema.json','schemas/ui-locator-evidence.schema.json','evals/CASE_SPEC.md'
 ]
 
 def main():
@@ -26,6 +28,23 @@ def main():
     for p in sorted((ROOT / 'evals/cases').glob('*.md')):
         if p.name not in eval_readme:
             errors.append('eval not registered: ' + str(p.relative_to(ROOT)))
+    structured_sections = [
+        '## Identity',
+        '## Context / fixture',
+        '## Prompt / task',
+        '## Expected behavior',
+        '## Prohibited behavior',
+        '## Evidence requirements',
+        '## Scoring dimensions',
+        '## Acceptable alternatives',
+        '## Pass condition',
+    ]
+    for p in sorted((ROOT / 'evals/cases').glob('*.md')):
+        body = p.read_text(encoding='utf-8')
+        if 'status: grader-ready' in body:
+            for section in structured_sections:
+                if section not in body:
+                    errors.append(f'grader-ready eval missing {section}: {p.relative_to(ROOT)}')
     for rel in [x for x in REQUIRED if x.endswith('.md')]:
         p = ROOT / rel
         if p.exists() and not p.read_text(encoding='utf-8').lstrip().startswith('# '):

@@ -36,6 +36,10 @@
 - [ ] pytest adapter
 - [ ] Jest/Vitest adapter
 - [ ] Playwright adapter
+- [ ] Playwright semantic-locator/accessibility-tree extraction
+- [ ] ARIA/accessibility snapshot normalization
+- [ ] locator robustness and implementation-coupling analysis
+- [ ] keyboard/focus evidence extraction
 - [ ] JUnit/Gradle/Maven adapter
 - [ ] .NET adapter
 - [ ] normalized discovery/result records
@@ -64,6 +68,9 @@
 - [ ] fidelity/level classification
 - [ ] mutation ingestion/orchestration
 - [ ] test-smell adapters
+- [ ] UI selector structural-mutation challenge harness
+- [ ] snapshot baseline provenance analysis
+- [ ] retry/timeout/first-failure flake analysis
 - [ ] defect-to-test history
 
 ## M4 — Failure intelligence

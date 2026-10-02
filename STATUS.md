@@ -20,6 +20,7 @@ State: usable specification-first Agent Skill with small deterministic utilities
 - refactor-confidence/readiness model;
 - harness/fidelity, observation-surface, fixture/data-lifecycle, test-double and web/API/UI semantic models;
 - semantic UI/browser assurance model covering locator contracts, accessibility-tree semantics, keyboard/focus, snapshot authority and retry/timeout evidence;
+- canonical Semantic UI/Browser owner, normalized locator-evidence schema/example, enriched assertion observations, Derivanta interoperability contract, dated research and grader-ready semantic UI evals;
 - Skill/CLI/MCP product architecture and current ecosystem research;
 - JUnit XML compact summarizer;
 - repository/spec validator;

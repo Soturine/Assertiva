@@ -35,3 +35,8 @@ Future executable evaluation should preserve fixture, model/agent/provider, tool
 - [Platform matrix collapse](cases/PLATFORM_MATRIX_COLLAPSE.md)
 - [Snapshot auto-update regression](cases/SNAPSHOT_AUTO_UPDATE_REGRESSION.md)
 - [Visual/accessibility/behavior divergence](cases/VISUAL_ACCESSIBILITY_BEHAVIOR_DIVERGENCE.md)
+- [Semantic locator vs implementation coupling](cases/SEMANTIC_LOCATOR_IMPLEMENTATION_COUPLING.md)
+- [Automated accessibility scan false confidence](cases/ARIA_SCAN_FALSE_CONFIDENCE.md)
+- [Keyboard and pointer behavior divergence](cases/KEYBOARD_POINTER_BEHAVIOR_DIVERGENCE.md)
+- [Selector survives non-behavioral refactor](cases/SELECTOR_SURVIVES_NONBEHAVIORAL_REFACTOR.md)
+- [Retry and timeout false repair](cases/RETRY_TIMEOUT_FALSE_REPAIR.md)

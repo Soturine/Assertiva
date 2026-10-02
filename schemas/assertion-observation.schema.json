@@ -63,6 +63,40 @@
         "string",
         "null"
       ]
+    },
+    "subsurface": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional more precise observation class such as accessible_name, semantic_state, keyboard_navigation, focus, visual_layout or persistence_readback."
+    },
+    "platform": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Normalized target platform, for example web, android_compose, android_view, ios, desktop or other."
+    },
+    "framework": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expected": {},
+    "actual": {},
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "additionalProperties": true

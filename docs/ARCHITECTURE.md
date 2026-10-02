@@ -1,6 +1,6 @@
 # Architecture
 
-Assertiva is a test-intelligence layer above existing runners and below agents/CI orchestration.
+Assertiva is a verification-intelligence and test-assurance layer above existing tools/runners and below agents/CI/CD orchestration. Tests are a major evidence source, not the only one.
 
 ~~~text
 Coding Agent / CI / Human
@@ -13,14 +13,15 @@ Audit   Select   Diagnose          Verify
   |       |        |                |
   +-------+--------+----------------+
           |
- normalized test/evidence model
+ normalized verification/evidence model
           |
- runner/framework adapters
+ capability-driven adapters
           |
-pytest / Jest / Vitest / Playwright / JUnit / Gradle / .NET / ...
+tests / lint / typecheck / build / package / schema / migration /
+security / hooks / CI/CD / startup / health / deploy / custom checks
 ~~~
 
-Assertiva does not replace test frameworks.
+Assertiva does not replace test frameworks, linters, build systems, CI/CD platforms, deployment systems or other validators. It normalizes and reasons over the evidence they produce.
 
 ## Layers
 1. SKILL.md owns agent behavior and claim boundaries.
@@ -48,6 +49,8 @@ NORMALIZED EVIDENCE
 Heuristic or LLM output must not silently become deterministic fact. Derived graph edges, findings and selection reasons carry evidence class and provenance.
 
 ## Core records
+- VerificationCheck — one discovered validation/gate/check with kind, command/tool, origin, scope, blocking semantics, evidence class and limitations.
+- VerificationSurface — the revision-scoped inventory of checks observed across local workflows, hooks, CI/CD, packaging and deployment.
 - TestInventoryEntry — definition identity, runner/framework, source, level/fidelity, dynamic/parameterized characteristics and tags.
 - TestInvocation — concrete parameter/data/dynamic invocation identity plus attempt/retry.
 - TestRun — revision/environment/configuration, selection basis, status, timing.
@@ -80,3 +83,14 @@ Diagnostics can expose secrets through locals, env vars, HTTP headers, DB payloa
 ## Product interfaces
 
 See [Agent Skill, CLI, and MCP Architecture](AGENT_SKILL_MCP_ARCHITECTURE.md) for the intended separation between skill policy, deterministic core, CLI, optional MCP, project state and raw evidence artifacts.
+
+
+## Universality boundary
+
+Assertiva's **core semantics are universal; adapter support is incremental**.
+
+The core must never contain policy such as "if pytest then confidence is X" or "GitHub Actions means CI is covered". Adapters may know native syntax and capabilities of a tool, runner, language or provider, but they normalize into generic records.
+
+When no dedicated adapter exists, Assertiva should preserve project-declared or observed commands as CUSTOM/UNKNOWN verification checks with provenance. Unknown support must widen uncertainty, not produce a fake pass.
+
+This allows projects in different languages and stacks to participate without forcing them into one framework vocabulary.

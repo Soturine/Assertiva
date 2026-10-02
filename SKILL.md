@@ -1,6 +1,6 @@
 # Assertiva — Adaptive Test Intelligence & Assurance
 
-Use Assertiva when the task involves test-suite quality, affected-test selection, failure diagnosis, E2E localization, regression evidence, CI/CD test execution, local-vs-pipeline parity, build/package/deploy verification gaps, test-output/context cost, flaky behavior, mutation/negative controls, or refactor safety.
+Use Assertiva when the task involves test-suite quality, verification-surface discovery, affected-test/check selection, failure diagnosis, E2E localization, regression evidence, CI/CD execution, local-vs-pipeline parity, build/package/deploy verification gaps, test-output/context cost, flaky behavior, mutation/negative controls, or refactor safety.
 
 ## Goal
 
@@ -52,14 +52,16 @@ Inspect as applicable:
 
 Coverage and test count are diagnostics, not proof.
 
-Also inspect the path that turns repository tests into delivery evidence:
-- which tests exist versus which tests CI/CD actually selects;
-- marker/filter/path exclusions, skips, xfails, retries and allowed-failure semantics;
+Also inspect the complete verification surface that turns repository state into delivery evidence:
+- tests, linters, type/static checks, schema/generated-code checks, migrations, localization/i18n checks, security scans, build/package/container/startup/health/deploy checks, hooks and project-specific commands;
+- which checks exist versus which checks local workflows, hooks and CI/CD actually execute;
+- path/marker/filter/project exclusions, skips, retries and allowed-failure/advisory semantics;
 - runtime/OS/browser/database/service matrix differences;
-- source-tree tests versus built/installed artifact behavior;
-- build, package, migration, container-start, health-check and deployment-smoke evidence where those claims matter.
+- source-tree validation versus built/installed/deployed artifact behavior.
 
-A repository containing a test does not prove the pipeline executed it. A green pipeline proves only the checks and environments that actually ran.
+Do not hardcode project names, one framework, one test runner or one CI provider into core policy. Tool-specific knowledge belongs in adapters. Unknown commands/checks remain explicit UNKNOWN/CUSTOM evidence until an adapter or declared project contract can classify them.
+
+A repository containing a check does not prove the delivery path executed it. A green pipeline proves only the checks and environments that actually ran.
 
 ## Optional integrations
 

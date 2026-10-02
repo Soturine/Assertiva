@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva Verification Check",
+  "type": "object",
+  "required": ["check_id", "kind", "origin", "gate"],
+  "properties": {
+    "check_id": {"type": "string", "minLength": 1},
+    "kind": {
+      "enum": ["TEST","LINT","FORMAT","STATIC_ANALYSIS","TYPECHECK","COVERAGE","MUTATION","BUILD","PACKAGE","SCHEMA","MIGRATION","GENERATED_CODE","LOCALIZATION","SECURITY","DEPENDENCY","CONTAINER","STARTUP","HEALTH","DEPLOY","CUSTOM","UNKNOWN"]
+    },
+    "origin": {
+      "enum": ["LOCAL","HOOK","CI","BUILD","PACKAGE","DEPLOY","DECLARED","OBSERVED","UNKNOWN"]
+    },
+    "gate": {
+      "enum": ["BLOCKING","ADVISORY","ALLOWED_FAILURE","UNKNOWN"]
+    },
+    "command": {"type": ["string","null"]},
+    "tool": {"type": ["string","null"]},
+    "scope": {"type": "array", "items": {"type": "string"}},
+    "source": {"type": ["string","null"]},
+    "adapter_id": {"type": ["string","null"]},
+    "evidence_tier": {"type": ["string","null"]},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "metadata": {"type": "object"}
+  },
+  "additionalProperties": true
+}

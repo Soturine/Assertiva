@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Generic Verification Surface core: language/framework/runner/CI-provider-neutral check model and adapter contract covering tests plus lint/type/build/package/schema/migration/localization/security/hooks/startup/health/deploy/custom verification.
+- Explicit no-hardcode boundary: tool-specific knowledge belongs in adapters; unsupported tooling is preserved as UNKNOWN/CUSTOM evidence instead of being guessed or ignored.
 - M0.2 executable assurance core: TDD-built pytest inventory, bounded GitHub Actions pytest-scope analysis, coverage.py JSON ingestion, false-green findings, technical-preview CLI, and wheel/install smoke in CI.
 - Pipeline/delivery assurance scope: repository tests vs actually selected CI tests, artifact/environment parity, and explicit green-claim boundaries.
 - FTD/FTE clarified as optional integrations rather than prerequisites.

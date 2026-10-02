@@ -25,7 +25,9 @@ It asks four related questions:
 3. **Does CI/CD actually execute the evidence the repository appears to have?**
 4. **What does a green result really prove — and what remains unverified?**
 
-Assertiva is not limited to Test Cases produced by Functional Test Designer. Existing pytest, Jest/Vitest, Playwright, JUnit, xUnit/NUnit and other test assets are first-class inputs as adapters become available. Coverage reports, fixtures/mocks, runner configuration, CI/CD commands and build/deploy evidence are part of the assurance problem too. FTD is an optional source of authority-rich Test Cases, not a prerequisite.
+Assertiva is not limited to Test Cases produced by Functional Test Designer and is not architecturally tied to Python, pytest, Django, Playwright, GitHub Actions, or any specific stack. Existing tests, validators, linters, type checkers, build/package steps, schema/migration checks, security checks, hooks, CI/CD gates and deployment verification are all first-class verification evidence through capability-driven adapters. FTD is an optional source of authority-rich Test Cases, not a prerequisite.
+
+Framework/tool-specific support grows adapter by adapter; the core stays language-, framework-, runner- and CI-provider-neutral. Unknown tooling must be preserved as UNKNOWN/CUSTOM evidence rather than guessed or silently ignored.
 
 ## Core capabilities
 
@@ -46,8 +48,11 @@ For browser/component UI tests, distinguish semantic role/name/state, keyboard/f
 
 Accessibility-tree and ARIA evidence are first-class observation surfaces, but zero automated accessibility findings do not prove complete accessibility. Snapshot updates require intent/provenance, and retries/timeouts do not erase the first failure.
 
+### VERIFICATION SURFACE — understand every gate
+Inventory the checks that can influence confidence or block delivery: tests, lint, type checks, format/static analysis, generated-code/schema checks, migrations, localization/i18n validation, security scans, build/package/container/startup/health/deploy checks, hooks and custom project commands. Preserve where each check runs, whether it is blocking/advisory/unknown, and what evidence it actually produces.
+
 ### PIPELINE & DELIVERY ASSURANCE — challenge false green
-Compare repository test inventory with the commands and environments actually observed in CI/CD. Surface omitted test scopes, runtime/browser/database matrix gaps, source-tree-vs-built-artifact gaps, migration/startup blind spots, and other cases where "all tests passed" does not represent the path that is deployed.
+Compare the repository verification surface with the commands and environments actually observed locally, in hooks, CI/CD and deployment. Surface omitted checks, narrowed scopes, matrix gaps, source-tree-vs-built-artifact gaps and other cases where one green stage does not represent the delivery path.
 
 ### REFACTOR SAFETY — preserve behavior
 Evaluate whether a module or whole project has a strong enough behavioral safety net before structural change. Map important behaviors/contracts to tests and classify the refactor target as READY, READY_WITH_GAPS, NOT_READY, or UNKNOWN.

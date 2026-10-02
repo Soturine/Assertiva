@@ -21,8 +21,10 @@
 - [x] Skill + CLI + optional MCP architecture benchmark
 
 ## M0.2 — Executable assurance core (active)
-TDD first: reproduce the false-green/evidence gap, then implement the smallest deterministic capability.
+TDD first: reproduce the false-green/evidence gap, then implement the smallest deterministic capability. Core contracts remain tool-neutral; concrete behavior lives in adapters.
 
+- [x] generic VerificationCheck / VerificationSurface model
+- [x] generic adapter protocol with SUPPORTED / UNSUPPORTED / UNKNOWN capability semantics
 - [x] Python package + technical-preview CLI
 - [x] static pytest definition inventory
 - [x] bounded GitHub Actions pytest command/scope discovery
@@ -51,6 +53,8 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [ ] secret/redaction tests
 
 ## M2 — CI/CD and delivery evidence
+- [ ] generic local/hook/CI/deploy verification-surface discovery
+- [ ] generic custom-command preservation when no first-party adapter exists
 - [ ] richer GitHub Actions semantic workflow model
 - [ ] Azure Pipelines
 - [ ] GitLab CI

@@ -2,10 +2,12 @@
 
 ## Current milestone: M0.2 — Executable Assurance Core
 
-State: first executable TDD vertical slice is implemented; broader cross-runner assurance remains incremental.
+State: first executable TDD vertical slice is implemented; the core model is now explicitly language/framework/runner/CI-provider neutral, while concrete support expands through adapters.
 
 ### Implemented
 - all M0/M0.1 semantic foundations: evidence tiers, test identity, coverage, harness/fidelity, assertions/oracles, fixtures/doubles, refactor safety and semantic UI/browser assurance;
+- generic `VerificationCheck` / `VerificationSurface` model for tests, lint, type/static checks, build/package, schema/migration, security, localization, startup/health/deploy and arbitrary custom checks;
+- generic adapter protocol: adapters discover/normalize capabilities and evidence without redefining assurance policy;
 - executable Python package `assertiva` and technical-preview CLI;
 - bounded static pytest definition inventory;
 - bounded GitHub Actions pytest command/scope discovery;
@@ -23,6 +25,8 @@ State: first executable TDD vertical slice is implemented; broader cross-runner 
 - dated research comparing TestSprite 2.1/current direction, Playwright Test Agents, Chisel, pytest/coverage.py and mutation tools.
 
 ### Claim boundary
+Python/pytest/GitHub Actions are the first executable reference adapters, **not the Assertiva architecture**. The core must not infer policy from a tool name, language, framework or CI provider.
+
 The current pytest inventory is static AST inventory, not native pytest collection. It can miss plugins, dynamic generation, runtime parameterization and collection-time behavior. The current GitHub Actions reader is a bounded command extractor, not a complete YAML/expression interpreter.
 
 Assertiva must report these limitations rather than claiming universal discovery.

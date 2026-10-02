@@ -36,6 +36,10 @@ Inspect as applicable:
 - flaky/retry-dependent behavior;
 - duplicate/redundant tests;
 - snapshots/goldens and update provenance;
+- UI/browser locator strategy and incidental DOM coupling;
+- semantic role/name/label/state and accessibility-tree evidence;
+- keyboard/focus behavior distinct from pointer interaction;
+- retry/timeout changes that may mask flakes or races;
 - parameterized/table/data-driven definitions and material invocations;
 - property-based/generative tests, seeds and minimized counterexamples;
 - fuzz corpora/crash reproducers;
@@ -147,6 +151,20 @@ When mocks, spies, fakes, patch/monkeypatch, virtual services or containers are 
 For HTTP/API/browser/component/mobile/web flows, use docs/WEB_API_UI_TESTING.md and preserve request, auth, state, rendering, accessibility, visual and platform-matrix claims independently.
 
 For implementation/productization of Assertiva itself, use docs/AGENT_SKILL_MCP_ARCHITECTURE.md: Skill owns policy, deterministic core owns reproducible processing, CLI is the default token-efficient agent surface, and MCP is optional for persistent state/graph/artifact/job workflows.
+
+## Semantic UI / browser assurance
+
+For browser/component UI tests, prefer assertions and locators tied to the intended user/product contract when such a contract exists. Native semantics come first; ARIA supplements semantics where needed and must not be added merely for test convenience.
+
+Treat role/name/state, keyboard/focus, interaction, visual output, browser storage/network state and backend effects as separate observation surfaces. Use explicit test IDs when user-facing semantics are insufficient or ambiguous rather than forcing fake semantics into the product.
+
+Flag positional DOM selectors, deep CSS chains and absolute XPath as potential implementation coupling when a stable product contract exists, but do not ban them when DOM/styling structure is itself the contract.
+
+A semantic/accessibility snapshot can detect regressions that visual snapshots miss; a visual snapshot can detect regressions semantic snapshots miss. Neither replaces the other.
+
+Automated accessibility scanners are partial evidence. Zero detected violations is not complete accessibility proof.
+
+Snapshot baseline updates require intent/provenance. Retries preserve first-failure evidence, and timeout inflation is not root-cause repair unless the authoritative latency contract changed.
 
 ## Token-aware evidence
 

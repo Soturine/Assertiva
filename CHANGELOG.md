@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Semantic UI/browser test assurance: product-contract locator guidance, accessibility-tree/role/name/state observations, keyboard/focus evidence, selector robustness under non-behavioral refactors, snapshot update provenance, automated accessibility-scan claim boundaries, and retry/timeout first-failure discipline.
 - Harness/Fidelity model separating test labels from actual process, transport, persistence, transaction, dependency, UI and isolation boundaries.
 - Assertion/Oracle/Observation Surface model covering protocol, context/content, persistence, events, DOM/accessibility, visual, telemetry, performance and security evidence.
 - Fixture/factory/test-data lifecycle and test-double/patch/service-virtualization guidance.

@@ -1,0 +1,63 @@
+{
+  "record_id": "locator-delete-project",
+  "test_invocation_id": "delete-project-chromium",
+  "source_file": "tests/delete-project.spec.ts",
+  "platform": "web",
+  "framework": "playwright",
+  "current_locator": {
+    "kind": "css",
+    "expression": ".card > div:nth-child(3) > button:nth-child(2)",
+    "user_facing": false,
+    "notes": [
+      "depends on incidental wrapper and position"
+    ]
+  },
+  "observed_contract": {
+    "role": "button",
+    "accessible_name": "Excluir projeto",
+    "label": null,
+    "visible_text": null,
+    "test_id": null,
+    "domain_identity": "delete-project",
+    "states": {}
+  },
+  "contract_assessment": {
+    "coupling_class": "positional_structure",
+    "finding_state": "candidate",
+    "reasoning": [
+      "stable role/name identity is observable",
+      "current selector changes when a harmless wrapper is inserted"
+    ],
+    "limitations": [
+      "candidate semantic locator has not yet been executed"
+    ]
+  },
+  "candidate_locators": [
+    {
+      "kind": "role",
+      "expression": "getByRole('button', { name: 'Excluir projeto' })",
+      "rationale": "follows the observed user-facing semantic contract",
+      "evidence_class": "E3"
+    }
+  ],
+  "mutation_challenge": {
+    "applied": false,
+    "mutation_kind": null,
+    "product_contract_preserved": null,
+    "locator_survived": null,
+    "evidence_refs": []
+  },
+  "evidence_refs": [
+    "dom:delete-project",
+    "a11y:delete-project"
+  ],
+  "provenance": {
+    "evidence_class": "E3",
+    "revision": "example",
+    "method": "static locator + semantic surface comparison",
+    "tool_version": null,
+    "limitations": [
+      "illustrative example only"
+    ]
+  }
+}

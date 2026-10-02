@@ -16,7 +16,9 @@ Normalize assertions by what they observe, not by framework method name:
 - routing/URL resolution/redirect/history;
 - template/view/component selection;
 - render context/model/view-data;
-- rendered content/DOM/accessibility tree;
+- rendered content/DOM;
+- accessibility tree / role / accessible name / semantic state;
+- keyboard/focus behavior and input-modality interaction;
 - visual pixels/layout/reference image;
 - browser/storage/session/cache state;
 - filesystem/network/device state;
@@ -53,6 +55,26 @@ Patterns from real Django suites map cleanly to generic observation surfaces:
 - LiveServer + Selenium -> browser-visible composition.
 
 The same categories apply to Spring model/view assertions, ASP.NET Razor/view data, Rails request/system specs, React Testing Library, Playwright, Cypress, native mobile UI tests, or custom protocols.
+
+## UI observation composition
+
+For a human-facing UI, avoid collapsing multiple surfaces into one generic "UI passed" claim.
+
+Example:
+
+```text
+button "Save"
+  semantic: role=button, name=Save
+  interaction: click/keyboard activation works
+  state: pending -> saved
+  visual: intended appearance/layout
+  persistence: saved value reads back
+  network: expected request/effect occurred
+```
+
+A role/name assertion proves semantic exposure, not persistence. A click proves an interaction path, not that the resulting backend effect is correct. A screenshot proves pixels/layout at a state, not keyboard behavior. An accessibility-rule scan proves only the rules and scope it actually evaluated.
+
+Semantic locators can therefore be both a testability mechanism and an observation of product semantics, but locator success alone is not a complete behavior oracle.
 
 ## Assertion quality
 

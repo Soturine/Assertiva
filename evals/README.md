@@ -2,6 +2,8 @@
 
 These cases specify behavioral expectations for future executable evaluation. They are not yet an automated benchmark harness.
 
+Cases marked **grader-ready** use [CASE_SPEC.md](CASE_SPEC.md) with explicit evidence, scoring, alternatives and pass conditions. Legacy compact cases remain specified until promoted.
+
 Grade behavior, evidence honesty and cost-aware reasoning, not whether an agent repeats Assertiva terminology.
 
 ## Cases

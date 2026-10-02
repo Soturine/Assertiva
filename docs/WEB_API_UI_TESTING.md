@@ -46,6 +46,39 @@ Useful surfaces include:
 
 Simulated DOM environments are fast but do not fully represent browser layout/engine behavior. Real-browser component testing raises fidelity at additional cost.
 
+## Semantic UI contracts and locator strategy
+
+For UI tests, identify the user-observable contract before choosing a locator. Accessibility semantics are product behavior; they are not merely automation hooks.
+
+Prefer, where appropriate:
+1. semantic role + accessible name, associated label, or equivalent platform semantics;
+2. stable visible/domain identity;
+3. explicit test contract such as `data-testid` when product semantics are insufficient or ambiguous;
+4. stable domain attributes that are intentionally part of the contract;
+5. incidental DOM structure, positional CSS, `nth-child`, or absolute XPath only when structure itself is what the test intends to observe.
+
+This is not a universal ranking score. A CSS/class assertion is valid when styling/class output is itself the behavior. A test ID may be the cleanest contract for repeated/virtualized/otherwise ambiguous elements. Do not add ARIA solely to manufacture a convenient test locator.
+
+Useful semantic evidence includes:
+- role and accessible name;
+- selected/expanded/checked/pressed/disabled/invalid/busy state;
+- keyboard activation and navigation;
+- focus entry/order/containment/restore;
+- status/error announcements;
+- landmarks and reading structure where relevant.
+
+Browser frameworks may expose role/label locators, accessibility/ARIA snapshots, accessibility-tree inspection, traces, screenshots/video, network events and storage state. Keep those evidence surfaces distinct.
+
+### Structural robustness
+
+Where proportionate, test whether a UI test survives a non-behavioral refactor such as wrapper insertion, class renaming, or internal layout composition while the same product contract remains. Failure under such a change is evidence of possible implementation coupling, not automatically a product regression.
+
+The inverse is also important: a material role/name/state/keyboard/focus/user-visible behavior change should be detectable even when screenshots remain unchanged.
+
+### Automated accessibility scanners
+
+Rule engines such as axe-style scanners are valuable detectors. A scan with zero violations is **not** proof of complete accessibility conformance or successful use with representative assistive technology. Preserve the exact ruleset/version/scope and combine with semantic, keyboard/focus, and manual evidence when the claim requires it.
+
 ## Browser/E2E
 
 Browser tests can verify:
@@ -58,6 +91,18 @@ Browser tests can verify:
 - real client-server composition.
 
 Keep E2E focused on composition/user journeys. Use lower layers for exhaustive domain partitions when they provide the same behavioral detector more cheaply.
+
+## Snapshot and golden evidence
+
+Snapshots are change detectors, not self-authorizing oracles. Preserve why the baseline is authoritative, what changed, and who/what accepted the update.
+
+A bulk/automatic snapshot refresh after failure must not be reported as a fix without evidence that the new output is intended. Broad snapshots that mix unrelated state can have poor review signal; narrower semantic, visual-region, or domain assertions may be stronger.
+
+## Retry, timeout, and browser flake evidence
+
+Preserve attempt identity and first-failure evidence. A passing retry does not erase the original failure.
+
+Timeout increases may be valid when an authoritative latency/performance envelope changed, but are not a default repair for races, missing synchronization, asynchronous completion, environment instability, or slow regressions.
 
 ## Visual vs accessibility vs interaction
 

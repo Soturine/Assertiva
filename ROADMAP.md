@@ -27,6 +27,10 @@
 - [x] fixture/factory/test-data lifecycle model
 - [x] test-double/patch/service-virtualization model
 - [x] web/API/UI/browser evidence model
+- [x] canonical semantic UI/browser assurance owner
+- [x] UI locator evidence schema + example
+- [x] semantic UI grader-ready eval contract/cases
+- [x] cross-platform semantic mapping and Derivanta interoperability contract
 - [x] Skill + CLI + optional MCP architecture benchmark
 - [x] adversarial evals for parameter collapse, line-coverage overclaim, structured error drift, heuristic overreach and whole-project refactor safety
 - [ ] deterministic coverage report parsers

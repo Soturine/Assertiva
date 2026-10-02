@@ -37,6 +37,11 @@ When an E2E or large suite fails, find the first divergent stage, descend to the
 ### VERIFY — confidence expansion
 After a fix, rerun the reproducer, affected regression, relevant integration/E2E evidence, and broader/full gates when required by risk or release policy.
 
+### SEMANTIC UI ASSURANCE — test the user contract
+For browser/component UI tests, distinguish semantic role/name/state, keyboard/focus behavior, interaction, visual output, storage/network state and backend effects. Detect locators coupled to incidental DOM structure, preserve legitimate test-ID/structural contracts, and challenge UI tests with non-behavioral structural mutations when useful.
+
+Accessibility-tree and ARIA evidence are first-class observation surfaces, but zero automated accessibility findings do not prove complete accessibility. Snapshot updates require intent/provenance, and retries/timeouts do not erase the first failure.
+
 ### REFACTOR SAFETY — preserve behavior
 Evaluate whether a module or whole project has a strong enough behavioral safety net before structural change. Map important behaviors/contracts to tests and classify the refactor target as READY, READY_WITH_GAPS, NOT_READY, or UNKNOWN.
 

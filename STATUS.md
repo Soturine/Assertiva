@@ -19,6 +19,7 @@ State: usable specification-first Agent Skill with small deterministic utilities
 - parameterized/data-driven, property/fuzz, structured-error and multi-metric coverage semantics;
 - refactor-confidence/readiness model;
 - harness/fidelity, observation-surface, fixture/data-lifecycle, test-double and web/API/UI semantic models;
+- semantic UI/browser assurance model covering locator contracts, accessibility-tree semantics, keyboard/focus, snapshot authority and retry/timeout evidence;
 - Skill/CLI/MCP product architecture and current ecosystem research;
 - JUnit XML compact summarizer;
 - repository/spec validator;
@@ -31,6 +32,7 @@ State: usable specification-first Agent Skill with small deterministic utilities
 - cross-run history and flake/runtime model;
 - mutation orchestration;
 - capability-driven adapters for arbitrary runners/frameworks; initial targets include pytest, Jest/Vitest, Playwright, JUnit/Gradle/Maven and .NET;
+- executable semantic-locator/accessibility-tree extraction, selector-robustness mutation and browser flake analysis;
 - automatic E2E stage mapping;
 - CLI/MCP server;
 - executable multi-agent benchmark harness.

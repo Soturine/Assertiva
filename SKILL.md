@@ -1,6 +1,6 @@
 # Assertiva — Adaptive Test Intelligence & Assurance
 
-Use Assertiva when the task involves test-suite quality, affected-test selection, failure diagnosis, E2E localization, regression evidence, test-output/context cost, flaky behavior, mutation/negative controls, or refactor safety.
+Use Assertiva when the task involves test-suite quality, affected-test selection, failure diagnosis, E2E localization, regression evidence, CI/CD test execution, local-vs-pipeline parity, build/package/deploy verification gaps, test-output/context cost, flaky behavior, mutation/negative controls, or refactor safety.
 
 ## Goal
 
@@ -51,6 +51,19 @@ Inspect as applicable:
 - exact revision/environment/configuration/run provenance.
 
 Coverage and test count are diagnostics, not proof.
+
+Also inspect the path that turns repository tests into delivery evidence:
+- which tests exist versus which tests CI/CD actually selects;
+- marker/filter/path exclusions, skips, xfails, retries and allowed-failure semantics;
+- runtime/OS/browser/database/service matrix differences;
+- source-tree tests versus built/installed artifact behavior;
+- build, package, migration, container-start, health-check and deployment-smoke evidence where those claims matter.
+
+A repository containing a test does not prove the pipeline executed it. A green pipeline proves only the checks and environments that actually ran.
+
+## Optional integrations
+
+Functional Test Designer is an optional source of authority-rich Test Cases. Preserve its oracle/provenance when present, but Assertiva must work normally on projects that only have pytest/Jest/Playwright/JUnit/etc. Functional Test Executor is also optional and applies when Azure Test Plans fetch/publication is part of the workflow. See docs/FTD_FTE_INTEROPERABILITY.md.
 
 ## SELECT
 
@@ -176,4 +189,4 @@ Core policy is framework/language/provider neutral. Adapters expose capabilities
 
 ## Current maturity
 
-The semantic contract is usable today. Universal discovery, impact graph construction, adapters, mutation orchestration, historical intelligence, CLI/MCP and executable eval harness remain roadmap work.
+The semantic contract is usable today and M0.2 has begun the executable core. A TDD-built bounded pytest/GitHub Actions audit, coverage.py JSON ingestion and a technical-preview `assertiva audit-pytest` CLI are implemented. Native runner collection/execution, universal adapters, impact graphs, mutation orchestration, historical intelligence, full CLI/MCP productization and multi-stack executable benchmarks remain roadmap work.

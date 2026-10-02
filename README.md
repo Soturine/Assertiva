@@ -18,10 +18,14 @@ FAST FEEDBACK
 != TEST QUALITY
 ```
 
-It asks both:
+It asks four related questions:
 
 1. **Are these tests actually good?**
 2. **Which tests and diagnostics do we need right now?**
+3. **Does CI/CD actually execute the evidence the repository appears to have?**
+4. **What does a green result really prove — and what remains unverified?**
+
+Assertiva is not limited to Test Cases produced by Functional Test Designer. Existing pytest, Jest/Vitest, Playwright, JUnit, xUnit/NUnit and other test assets are first-class inputs as adapters become available. Coverage reports, fixtures/mocks, runner configuration, CI/CD commands and build/deploy evidence are part of the assurance problem too. FTD is an optional source of authority-rich Test Cases, not a prerequisite.
 
 ## Core capabilities
 
@@ -41,6 +45,9 @@ After a fix, rerun the reproducer, affected regression, relevant integration/E2E
 For browser/component UI tests, distinguish semantic role/name/state, keyboard/focus behavior, interaction, visual output, storage/network state and backend effects. Detect locators coupled to incidental DOM structure, preserve legitimate test-ID/structural contracts, and challenge UI tests with non-behavioral structural mutations when useful.
 
 Accessibility-tree and ARIA evidence are first-class observation surfaces, but zero automated accessibility findings do not prove complete accessibility. Snapshot updates require intent/provenance, and retries/timeouts do not erase the first failure.
+
+### PIPELINE & DELIVERY ASSURANCE — challenge false green
+Compare repository test inventory with the commands and environments actually observed in CI/CD. Surface omitted test scopes, runtime/browser/database matrix gaps, source-tree-vs-built-artifact gaps, migration/startup blind spots, and other cases where "all tests passed" does not represent the path that is deployed.
 
 ### REFACTOR SAFETY — preserve behavior
 Evaluate whether a module or whole project has a strong enough behavioral safety net before structural change. Map important behaviors/contracts to tests and classify the refactor target as READY, READY_WITH_GAPS, NOT_READY, or UNKNOWN.
@@ -94,7 +101,17 @@ Useful relations include `depends_on`, `validates`, `covers`, `kills_mutant`, `r
 
 ## Current status
 
-Assertiva is currently **M0/M0.1: useful Agent Skill + deterministic semantic foundation**.
+Assertiva is currently **M0.2: executable assurance core (active)**.
+
+The first TDD vertical slice is executable. It inventories pytest-style definitions without importing the target project, compares them with observed GitHub Actions pytest scopes, ingests coverage.py JSON, and surfaces conservative false-green signals such as smoke-dominant suites, weak oracles, line-vs-branch divergence, and tests present in the repository but outside observed CI scope.
+
+```bash
+python -m pip install -e .
+assertiva audit-pytest . --output json
+assertiva audit-pytest . --coverage-json coverage.json
+```
+
+See [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Pipeline & Delivery Assurance](docs/PIPELINE_AND_DELIVERY_ASSURANCE.md).
 
 Implemented/specification-level foundations include:
 - canonical `SKILL.md`;
@@ -109,6 +126,9 @@ Implemented/specification-level foundations include:
 - repository validator and CI.
 
 Still planned:
+- native pytest collection/result evidence, parameterized invocations, skip/xfail/markers/filters;
+- package/container/startup/deployment parity checks;
+- Azure Pipelines/GitLab CI/Jenkins adapters;
 - universal discovery;
 - multi-language Test Impact Analysis engine;
 - automatic Test Evidence Graph construction;

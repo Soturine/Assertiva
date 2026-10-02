@@ -1,121 +1,114 @@
 # Roadmap
 
-## M0 — Skill foundation
+## M0 — Skill foundation ✅
 - [x] provider-neutral SKILL.md
-- [x] quality model
-- [x] adaptive execution protocol
-- [x] diagnostics D0–D4
-- [x] E2E decomposition
+- [x] quality model and adaptive execution protocol
+- [x] diagnostics D0–D4 and E2E decomposition
 - [x] Test Evidence Graph semantics
-- [x] schemas/examples
-- [x] benchmark research
-- [x] eval catalog
-- [x] JUnit summarizer
-- [x] validator + CI
+- [x] schemas/examples/evals/research
+- [x] JUnit summarizer + validator + CI
 
-## M0.1 — Deterministic semantic foundation
+## M0.1 — Deterministic semantic foundation ✅
 - [x] evidence tiers E0–E4
-- [x] test definition vs invocation identity
-- [x] multi-metric coverage model
-- [x] parameterized/data-driven semantics
-- [x] property/fuzz/metamorphic reproducibility semantics
-- [x] structured error/validation contract model
+- [x] definition vs invocation identity
+- [x] multi-metric coverage
+- [x] parameterized/property/fuzz/error semantics
 - [x] capability-driven adapter contract
-- [x] refactor readiness / whole-project safety model
-- [x] harness/fidelity model independent from test labels
-- [x] assertion/oracle/observation-surface model
-- [x] fixture/factory/test-data lifecycle model
-- [x] test-double/patch/service-virtualization model
-- [x] web/API/UI/browser evidence model
-- [x] canonical semantic UI/browser assurance owner
-- [x] UI locator evidence schema + example
-- [x] semantic UI grader-ready eval contract/cases
-- [x] cross-platform semantic mapping and Derivanta interoperability contract
+- [x] refactor readiness
+- [x] harness/fidelity, assertions/oracles, fixtures/doubles
+- [x] web/API/UI/browser evidence
+- [x] semantic UI/browser assurance
 - [x] Skill + CLI + optional MCP architecture benchmark
-- [x] adversarial evals for parameter collapse, line-coverage overclaim, structured error drift, heuristic overreach and whole-project refactor safety
-- [ ] deterministic coverage report parsers
-- [ ] normalized schema validation in CI
 
-## M1 — Deterministic adapters
-- [ ] pytest adapter
-- [ ] Jest/Vitest adapter
-- [ ] Playwright adapter
-- [ ] Playwright semantic-locator/accessibility-tree extraction
-- [ ] ARIA/accessibility snapshot normalization
-- [ ] locator robustness and implementation-coupling analysis
-- [ ] keyboard/focus evidence extraction
-- [ ] JUnit/Gradle/Maven adapter
-- [ ] .NET adapter
-- [ ] normalized discovery/result records
-- [ ] portable JUnit XML / TAP ingestion
-- [ ] LCOV / Cobertura / JaCoCo-style coverage ingestion
+## M0.2 — Executable assurance core (active)
+TDD first: reproduce the false-green/evidence gap, then implement the smallest deterministic capability.
+
+- [x] Python package + technical-preview CLI
+- [x] static pytest definition inventory
+- [x] bounded GitHub Actions pytest command/scope discovery
+- [x] CI execution-gap detection
+- [x] coverage.py JSON line/branch ingestion
+- [x] smoke-dominant / weak-oracle signals
+- [x] high-line-coverage / weak-oracle contradiction
+- [x] line-vs-branch divergence
+- [x] wheel build + installed-artifact smoke in Assertiva CI
+- [ ] native `pytest --collect-only` adapter
+- [ ] collection errors, skip, xfail, markers and filters
 - [ ] parameterized/dynamic invocation preservation
-- [ ] structured error normalization
-- [ ] property/fuzz seed/counterexample normalization
-- [ ] capability discovery instead of hardcoded verbosity
+- [ ] source-tree vs wheel/sdist parity
+- [ ] migration/startup/health/container verification
+- [ ] local-vs-CI runtime/environment matrix
+- [ ] adversarial CI-green/deploy-fail fixture corpus
+
+## M1 — Deterministic runner adapters
+- [ ] pytest execution/result adapter
+- [ ] Jest/Vitest
+- [ ] Playwright + semantic locator/accessibility evidence
+- [ ] JUnit/Gradle/Maven
+- [ ] .NET
+- [ ] LCOV/Cobertura/JaCoCo coverage ingestion
+- [ ] property/fuzz replay evidence
 - [ ] secret/redaction tests
 
-## M2 — Impact intelligence
+## M2 — CI/CD and delivery evidence
+- [ ] richer GitHub Actions semantic workflow model
+- [ ] Azure Pipelines
+- [ ] GitLab CI
+- [ ] Jenkins/generic command graph
+- [ ] build/package artifact identity
+- [ ] Docker/container build + startup
+- [ ] migration/assets/startup checks
+- [ ] preview/staging/deploy health evidence
+- [ ] runtime/OS/browser/database/service matrix gaps
+- [ ] tested-artifact vs deployed-artifact lineage
+
+## M3 — Impact intelligence
 - [ ] Git diff + symbol extraction
 - [ ] import/dependency graph
-- [ ] runtime coverage/test-to-code ingestion
-- [ ] selector confidence/limitations
+- [ ] runtime test-to-code evidence
 - [ ] conservative widening
-- [ ] monorepo affected-set support
-- [ ] Test Evidence Graph builder
+- [ ] monorepo affected-set
+- [ ] automatic Test Evidence Graph
+- [ ] Chisel-style incremental graph/history ideas without treating opaque risk scores as proof
 
-## M3 — Suite quality intelligence
-- [ ] deterministic weak/no-op patterns where provable
-- [ ] advisory semantic weak-assertion analysis with provenance
+## M4 — Suite quality intelligence
+- [ ] stronger deterministic weak/no-op patterns
+- [ ] provenance-labeled semantic weak-assertion analysis
 - [ ] mock-away heuristics
 - [ ] duplicate/redundancy analysis
-- [ ] fidelity/level classification
-- [ ] mutation ingestion/orchestration
-- [ ] test-smell adapters
-- [ ] UI selector structural-mutation challenge harness
-- [ ] snapshot baseline provenance analysis
-- [ ] retry/timeout/first-failure flake analysis
+- [ ] mutation adapters (mutmut/Stryker/PIT-style)
+- [ ] negative-control challenge harness
+- [ ] snapshot provenance
+- [ ] retry/timeout/first-failure analysis
 - [ ] defect-to-test history
 
-## M4 — Failure intelligence
+## M5 — Failure intelligence + governed verification
 - [ ] failure fingerprinting/clustering
-- [ ] E2E stage mapping
-- [ ] smallest-reproducer suggestions
-- [ ] flake/history tracking
-- [ ] duration/cost model
-- [ ] diagnostic escalation automation
+- [ ] E2E stage mapping and smallest reproducer
+- [ ] flake/history and duration/cost
+- [ ] progressive diagnostic automation
+- [ ] safe healing: execution mechanics may change; oracle does not silently change
+- [ ] reproduce → fix/heal → affected regression → broader required gate
 
-## M4.1 — Harness and runtime intelligence
-- [ ] automatic harness/fidelity classification with provenance
-- [ ] fixture lifecycle/shared-state detection
-- [ ] patch/mock seam tracing and unused setup detection
-- [ ] HTTP/UI observation-surface extraction
-- [ ] environment/browser/device matrix preservation
-- [ ] transaction-semantics capability detection
-
-## M5 — Productization
-- [ ] CLI
-- [ ] CLI-first local agent interface
-- [ ] optional MCP server with atomic paginated tools/resources
-- [ ] long-analysis job/task lifecycle and cancellation
-- [ ] revision-aware local evidence/history store
-- [ ] CI integration
-- [ ] provider adapters
-- [ ] persistent history
+## M6 — Productization
+- [ ] stable CLI
+- [ ] optional MCP server
+- [ ] revision-aware local evidence store
+- [ ] CI provider integrations
 - [ ] project policy/config
+- [ ] optional FTD import bridge
+- [ ] optional FTE/Azure bridge
 
-## M6 — Empirical validation
+## M7 — Empirical validation
+- [ ] Python/pytest
+- [ ] JS/Jest/Vitest
+- [ ] Playwright
+- [ ] Django
+- [ ] Java/JUnit
+- [ ] .NET
+- [ ] Android/Gradle/JUnit
+- [ ] monorepo
+- [ ] CI-green/deploy-fail corpus
 - [ ] paired baseline vs Assertiva trials
-- [ ] Python/pytest benchmark
-- [ ] JS/Jest/Vitest benchmark
-- [ ] Playwright benchmark
-- [ ] Android/Gradle/JUnit benchmark
-- [ ] Java benchmark
-- [ ] .NET benchmark
-- [ ] Django benchmark
-- [ ] monorepo benchmark
-- [ ] measure tokens, runtime, reruns, CI work, defect recall, false positives
-- [ ] adversarial selector-blind-spot fixtures
-- [ ] prospective real-project dogfood
 
 Milestones may reopen when new evidence exposes reusable gaps.

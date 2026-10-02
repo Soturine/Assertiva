@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- M0.2 executable assurance core: TDD-built pytest inventory, bounded GitHub Actions pytest-scope analysis, coverage.py JSON ingestion, false-green findings, technical-preview CLI, and wheel/install smoke in CI.
+- Pipeline/delivery assurance scope: repository tests vs actually selected CI tests, artifact/environment parity, and explicit green-claim boundaries.
+- FTD/FTE clarified as optional integrations rather than prerequisites.
+- Dated benchmark research covering TestSprite 2.1/current CLI direction, Playwright Test Agents, Chisel, pytest/coverage.py and mutation tooling.
 - Semantic UI/browser documentation closure: canonical owner, documentation portal, cross-platform semantic mapping, normalized locator-evidence schema/example, enriched assertion observations, grader-ready eval contract/cases, deeper Derivanta interoperability, dated ecosystem research, and validator enforcement.
 - Semantic UI/browser test assurance: product-contract locator guidance, accessibility-tree/role/name/state observations, keyboard/focus evidence, selector robustness under non-behavioral refactors, snapshot update provenance, automated accessibility-scan claim boundaries, and retry/timeout first-failure discipline.
 - Harness/Fidelity model separating test labels from actual process, transport, persistence, transaction, dependency, UI and isolation boundaries.

@@ -63,6 +63,41 @@ Do not hardcode project names, one framework, one test runner or one CI provider
 
 A repository containing a check does not prove the delivery path executed it. A green pipeline proves only the checks and environments that actually ran.
 
+## User intent and write boundaries
+
+Keep the user-facing interaction simple.
+
+- **AUDIT** means inspect, measure, execute permitted verification, find gaps and recommend improvements. It must not modify project files.
+- **IMPROVE** means audit first, then build candidate changes outside the original project, verify the candidate, present baseline-vs-candidate evidence, and request approval before applying anything.
+
+Do not expose internal implementation details such as temporary workspaces, worktrees, patch staging or post-apply checks as separate everyday modes unless troubleshooting requires it.
+
+Runtime enforcement is required:
+- audit keeps the project read-only;
+- improve writes only to isolated candidate state until approval;
+- application is limited to the approved change set;
+- stale source changes must block unsafe blind overwrite.
+
+Reports/artifacts should default to Assertiva-owned storage outside the audited repository so read-only use does not dirty the working tree.
+
+## Reporting contract
+
+Produce one Assurance Report model for both workflows.
+
+For AUDIT, report CURRENT + FINDINGS + RECOMMENDATIONS + UNKNOWNS.
+
+For IMPROVE, report BASELINE vs CANDIDATE, then APPLIED only after approval and post-apply verification.
+
+Prefer evidence delta over a synthetic quality score:
+- improved;
+- unchanged;
+- regressed;
+- unknown.
+
+The HTML surface should include accessible charts and textual/table equivalents, filters, expandable findings, provenance/limitations, verification-surface views, coverage/test-quality statistics, change-set summaries and a final "What does green prove?" section.
+
+Candidate metrics are candidate evidence, not current-project evidence.
+
 ## Optional integrations
 
 Functional Test Designer is an optional source of authority-rich Test Cases. Preserve its oracle/provenance when present, but Assertiva must work normally on projects that only have pytest/Jest/Playwright/JUnit/etc. Functional Test Executor is also optional and applies when Azure Test Plans fetch/publication is part of the workflow. See docs/FTD_FTE_INTEROPERABILITY.md.

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva Assurance Report",
+  "type": "object",
+  "required": ["report_version", "project", "states", "findings", "claim_boundary"],
+  "properties": {
+    "report_version": {"type": "string"},
+    "project": {
+      "type": "object",
+      "properties": {
+        "name": {"type": ["string", "null"]},
+        "revision": {"type": ["string", "null"]},
+        "dirty": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "states": {
+      "type": "object",
+      "properties": {
+        "current": {"type": ["object", "null"]},
+        "baseline": {"type": ["object", "null"]},
+        "candidate": {"type": ["object", "null"]},
+        "applied": {"type": ["object", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "findings": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "evidence_delta": {
+      "type": "object",
+      "properties": {
+        "improved": {"type": "array", "items": {"type": "object"}},
+        "unchanged": {"type": "array", "items": {"type": "object"}},
+        "regressed": {"type": "array", "items": {"type": "object"}},
+        "unknown": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": true
+    },
+    "change_set": {
+      "type": ["object", "null"]
+    },
+    "claim_boundary": {
+      "type": "object",
+      "required": ["observed", "not_evidenced"],
+      "properties": {
+        "observed": {"type": "array", "items": {"type": "string"}},
+        "not_evidenced": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "provenance": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

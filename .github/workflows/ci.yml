@@ -18,7 +18,7 @@ jobs:
       - run: python scripts/validate_repo.py
       - run: pytest -q
       - name: Build wheel
-        run: python -m build --wheel --no-isolation
+        run: python -m build --wheel
       - name: Smoke installed artifact
         run: |
           python -m venv .wheel-smoke

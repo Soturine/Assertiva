@@ -22,7 +22,10 @@ State: first executable TDD vertical slice is implemented; the core model is now
   - `HIGH_COVERAGE_WEAK_ORACLE`;
 - TDD tests for discovery, CI-scope gaps, smoke-dominant suites and coverage/oracle contradictions;
 - Assertiva CI now builds a wheel and smoke-runs the installed CLI from outside the source tree;
-- dated research comparing TestSprite 2.1/current direction, Playwright Test Agents, Chisel, pytest/coverage.py and mutation tools.
+- dated research comparing TestSprite 2.1/current direction, Playwright Test Agents, Chisel, pytest/coverage.py and mutation tools;
+- product UX contract reduced to two user-facing workflows: `audit` and `improve`;
+- read-only audit / isolated-candidate / approval-gated application policy;
+- HTML Assurance Report information architecture covering current/baseline/candidate/applied evidence, charts, findings, Evidence Delta and "What does green prove?".
 
 ### Claim boundary
 Python/pytest/GitHub Actions are the first executable reference adapters, **not the Assertiva architecture**. The core must not infer policy from a tool name, language, framework or CI provider.
@@ -32,6 +35,9 @@ The current pytest inventory is static AST inventory, not native pytest collecti
 Assertiva must report these limitations rather than claiming universal discovery.
 
 ### Next
+- implement stable `assertiva audit` over the generic Verification Surface;
+- implement `assertiva improve` candidate generation/verification without touching the original project before approval;
+- implement the responsive accessible HTML Assurance Report after the visual reference is finalized;
 - native pytest collection/result adapter;
 - parameterized invocations, skip/xfail/markers/filters;
 - package/source-tree parity and startup/migration/container checks;

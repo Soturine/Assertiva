@@ -36,6 +36,9 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [x] wheel build + installed-artifact smoke in Assertiva CI
 - [x] declaration -> materialization -> invocation -> attempt identity model
 - [x] expected-error / validation contract model
+- [x] two-command product UX contract: audit / improve
+- [x] read-only audit and isolated candidate write policy
+- [x] HTML Assurance Report information architecture and evidence-delta model
 - [ ] native pytest collection/result adapter
 - [ ] inherited/composed test materialization from native runner evidence
 - [ ] collection errors, skip, xfail, markers, assumptions and filters
@@ -105,6 +108,16 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [ ] reproduce → fix/heal → affected regression → broader required gate
 
 ## M6 — Productization
+- [ ] stable `assertiva audit` command
+- [ ] stable `assertiva improve` command
+- [ ] runtime-enforced read-only audit policy
+- [ ] isolated candidate workspace + stale-source protection
+- [ ] approval-gated patch application
+- [ ] responsive accessible HTML Assurance Report
+- [ ] baseline/candidate/applied report comparison
+- [ ] charts + textual/table equivalents
+- [ ] report filters, expandable findings and raw artifact links
+- [ ] Evidence Delta and "What does green prove?" sections
 - [ ] stable CLI
 - [ ] optional MCP server
 - [ ] revision-aware local evidence store

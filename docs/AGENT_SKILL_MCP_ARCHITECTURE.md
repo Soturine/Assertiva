@@ -117,3 +117,40 @@ For MCP/CLI:
 ## Skill packaging
 
 If distributed through a modern skill-capable MCP server, Assertiva can publish SKILL.md alongside tools/resources. The core should still remain usable as files + CLI without MCP.
+
+
+## Product UX boundary
+
+Internal architecture may be rich, but the ordinary user-facing workflow should remain intentionally small:
+
+```text
+assertiva audit
+assertiva improve
+```
+
+`audit` is read-only with respect to project files. It may inspect and run permitted verification, but it cannot mutate the audited project.
+
+`improve` performs the audit first, builds and verifies candidate changes outside the original project, presents evidence, and requests approval before applying anything. Temporary workspaces, Git worktrees, candidate IDs, patch staging and post-apply verification are internal mechanisms rather than extra everyday modes.
+
+This keeps the product aligned with "less is more": simple commands on top of strict runtime guarantees.
+
+## HTML Assurance Report
+
+The report is a first-class interface rather than a terminal afterthought.
+
+It should support:
+- baseline/current/candidate/applied states without conflating them;
+- test definitions, materializations, invocations and attempts where available;
+- pass/fail/error/blocked/skipped/xfail/xpass/not-run outcomes;
+- coverage and mutation evidence;
+- weak-oracle, smoke, negative-path, validation and fidelity findings;
+- Verification Surface and local/CI/build/deploy parity;
+- change-set summary;
+- Evidence Delta;
+- remaining gaps/unknowns;
+- a bounded "What does green prove?" statement;
+- artifact/provenance links.
+
+Charts must be accompanied by equivalent readable text/table data, use semantic HTML, support keyboard navigation and remain useful in light/dark themes.
+
+Do not invent a composite quality score merely to make the dashboard look complete.

@@ -104,6 +104,24 @@ Requirement
 
 Useful relations include `depends_on`, `validates`, `covers`, `kills_mutant`, `reproduces`, `isolates`, and `composes_into`.
 
+## User-facing workflow
+
+Assertiva keeps the interface intentionally small:
+
+```bash
+assertiva audit
+assertiva improve
+```
+
+- `audit` analyzes the project and **never changes project files**. It inventories tests/checks, measures available evidence, finds gaps and produces recommendations plus an HTML Assurance Report.
+- `improve` starts from the audit, builds candidate test/verification improvements in an isolated workspace, verifies them, compares baseline vs candidate, and asks for approval before any project change.
+
+Isolation, candidate workspaces, patch application and post-apply verification are implementation details rather than extra user-facing modes. The runtime enforces write boundaries; prompt instructions alone are not considered sufficient protection.
+
+The HTML report is a first-class product surface. It should be responsive, accessible and visually calm, with summary cards, charts, filters, expandable evidence, before/candidate/applied comparisons, Evidence Delta, Verification Surface, and a final **What does green prove?** claim boundary. Candidate metrics must never be presented as already applied.
+
+See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
+
 ## Current status
 
 Assertiva is currently **M0.2: executable assurance core (active)**.

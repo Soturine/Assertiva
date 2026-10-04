@@ -15,6 +15,7 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 - [Executable Assurance Core](EXECUTABLE_ASSURANCE_CORE.md) — implemented M0.2 TDD vertical slice and current claim boundaries.
 - [Pipeline & Delivery Assurance](PIPELINE_AND_DELIVERY_ASSURANCE.md) — local/CI/build/package/deploy evidence and false-green prevention.
 - [FTD/FTE Interoperability](FTD_FTE_INTEROPERABILITY.md) — optional Test Case authority and Azure handoffs.
+- [User Experience and Reporting](USER_EXPERIENCE_AND_REPORTING.md) — two-command UX, write boundaries, candidate approval flow and HTML Assurance Report.
 
 ## Test identity, selection and execution
 

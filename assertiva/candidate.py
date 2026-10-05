@@ -73,6 +73,7 @@ class CandidateTestChange:
     kind: CandidateChangeKind
     reason: str
     original_fingerprint: str | None = None
+    candidate_fingerprint: str | None = None
     original_preserved: bool = True
     human_approval_required: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)

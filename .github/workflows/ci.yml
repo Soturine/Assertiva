@@ -25,3 +25,11 @@ jobs:
           .wheel-smoke/bin/python -m pip install dist/*.whl
           cd /tmp
           "$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva" audit "$GITHUB_WORKSPACE" --output json > assertiva-static-audit.json
+      - name: Dogfood read-only audit with native execution
+        run: |
+          before="$(git status --porcelain)"
+          cd /tmp
+          "$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva" audit "$GITHUB_WORKSPACE" --execute --python "$(command -v python)" --output json > assertiva-self-audit.json
+          cd "$GITHUB_WORKSPACE"
+          test "$before" = "$(git status --porcelain)"
+          python -c "import json; r=json.load(open('/tmp/assertiva-self-audit.json')); runs=r['states']['current']['runs']; assert runs and all(x['status']=='PASS' for x in runs), runs; print(r['status'], [x['invocations'] for x in runs])"

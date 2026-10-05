@@ -1,0 +1,339 @@
+"""`assertiva improve` orchestration.
+
+AUDIT -> baseline snapshot -> isolated candidate -> candidate changes -> qualification
+-> baseline vs candidate -> explicit human approval -> approved apply -> post-apply
+verification. The original project is read-only (and verified as such) until apply.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from .adapters import runner_adapters
+from .candidate import (
+    CandidateChangeKind,
+    CandidateQualification,
+    CandidateTestChange,
+    DeltaState,
+    QualificationStage,
+    QualificationStageResult,
+    StageStatus,
+)
+from .evidence import (
+    ControlOutcome,
+    NegativeControl,
+    NegativeControlResult,
+    StateEvidence,
+    compare_states,
+    measure,
+    run_negative_control,
+    state_from_dict,
+    to_jsonable,
+)
+from .models import Outcome
+from .verification import VerificationOrigin, discover_surface
+from .workspace import (
+    Approval,
+    Baseline,
+    apply_changes,
+    capture_baseline,
+    change_set,
+    create_workspace,
+    file_digest,
+    read_only_guard,
+    remove_workspace,
+    snapshot,
+    state_dir,
+)
+
+_SESSION = "session.json"
+
+
+class SessionExistsError(RuntimeError):
+    pass
+
+
+@dataclass
+class ImproveSession:
+    root: Path
+    directory: Path
+    baseline: Baseline
+    workspace: Path
+    baseline_copy: Path
+    python: str | None
+    baseline_evidence: StateEvidence
+
+    def save(self) -> None:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        (self.directory / _SESSION).write_text(json.dumps(to_jsonable(self), indent=2), encoding="utf-8")
+
+
+@dataclass
+class QualificationResult:
+    qualification: CandidateQualification
+    baseline_evidence: StateEvidence
+    candidate_evidence: StateEvidence
+    baseline_controls: list[NegativeControlResult] = field(default_factory=list)
+
+
+@dataclass
+class AppliedResult:
+    applied: list[CandidateTestChange]
+    evidence: StateEvidence
+    files_match_candidate: bool
+
+
+def load_session(root: str | Path) -> ImproveSession | None:
+    path = state_dir(root, "sessions") / _SESSION
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return ImproveSession(
+        root=Path(data["root"]),
+        directory=Path(data["directory"]),
+        baseline=Baseline(**data["baseline"]),
+        workspace=Path(data["workspace"]),
+        baseline_copy=Path(data["baseline_copy"]),
+        python=data["python"],
+        baseline_evidence=state_from_dict(data["baseline_evidence"]),
+    )
+
+
+def start_improve(root: str | Path, python: str | None = None) -> ImproveSession:
+    root = Path(root).resolve()
+    if load_session(root) is not None:
+        raise SessionExistsError(f"an improve session is already active for {root}")
+    directory = state_dir(root, "sessions")
+    with read_only_guard(root):
+        baseline = capture_baseline(root)
+        workspace = create_workspace(baseline)
+        baseline_copy = snapshot(root, directory / "baseline")
+        baseline_evidence = measure(baseline_copy, "baseline", "isolated-baseline-copy", python)
+    session = ImproveSession(root, directory, baseline, workspace, baseline_copy, python, baseline_evidence)
+    session.save()
+    return session
+
+
+def discard_session(session: ImproveSession) -> None:
+    remove_workspace(session.baseline, session.workspace)
+    shutil.rmtree(session.directory, ignore_errors=True)
+
+
+def _stage(stage: QualificationStage, status: StageStatus, summary: str, *limitations: str) -> QualificationStageResult:
+    return QualificationStageResult(stage, status, summary, limitations=tuple(limitations))
+
+
+def _invocations(state: StateEvidence):
+    return [inv for run in state.runs for inv in run.invocations]
+
+
+def _discovery_stage(candidate: StateEvidence) -> QualificationStageResult:
+    stage = QualificationStage.STATIC_AND_DISCOVERY
+    if not candidate.runs:
+        return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could discover candidate tests", *candidate.limitations)
+    errors = [error for run in candidate.runs for error in run.collection_errors]
+    if errors:
+        return _stage(stage, StageStatus.FAIL, "collection errors: " + ", ".join(errors[:10]))
+    if any(run.status is StageStatus.BLOCKED for run in candidate.runs):
+        return _stage(stage, StageStatus.BLOCKED, "runner could not execute", *[l for r in candidate.runs for l in r.limitations])
+    count = len(_invocations(candidate))
+    if not count:
+        return _stage(stage, StageStatus.UNKNOWN, "no candidate invocations were collected")
+    return _stage(stage, StageStatus.PASS, f"{count} invocations collected natively without errors")
+
+
+def _candidate_tests_stage(changes: list[CandidateTestChange], candidate: StateEvidence) -> QualificationStageResult:
+    stage = QualificationStage.CANDIDATE_TESTS
+    if not candidate.runs:
+        return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could execute candidate tests", *candidate.limitations)
+    changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
+    touched = [inv for inv in _invocations(candidate) if changed & set(inv.source_paths)]
+    errors = [e for run in candidate.runs for e in run.collection_errors if e.split("::")[0] in changed]
+    if errors:
+        return _stage(stage, StageStatus.FAIL, "candidate test files failed to collect: " + ", ".join(errors))
+    if not touched:
+        return _stage(stage, StageStatus.NOT_RUN, "the candidate does not add or modify executable tests")
+    bad = sorted(inv.invocation_id for inv in touched if inv.outcome in (Outcome.FAILED, Outcome.ERROR))
+    if bad:
+        return _stage(stage, StageStatus.FAIL, "failing candidate invocations: " + ", ".join(bad[:10]))
+    if all(inv.outcome in (Outcome.SKIPPED, Outcome.NOT_RUN, None) for inv in touched):
+        return _stage(stage, StageStatus.UNKNOWN, "every candidate invocation was skipped or not run")
+    return _stage(stage, StageStatus.PASS, f"{len(touched)} added/modified invocations executed without failure")
+
+
+def _regression_stage(session: ImproveSession, changes: list[CandidateTestChange], candidate: StateEvidence) -> QualificationStageResult:
+    """Run the unchanged original tests against the candidate."""
+    stage = QualificationStage.ORIGINAL_REGRESSION
+    baseline = session.baseline_evidence
+    if not baseline.runs or not candidate.runs:
+        return _stage(stage, StageStatus.UNKNOWN, "no runner adapter produced baseline/candidate execution evidence")
+    protected = {inv.invocation_id for inv in _invocations(baseline) if inv.outcome is Outcome.PASSED}
+    if not protected:
+        return _stage(stage, StageStatus.UNKNOWN, "the baseline had no passing invocations to protect")
+    test_sources = {path for inv in _invocations(baseline) for path in inv.source_paths}
+    restore = [c.path for c in changes if c.kind is not CandidateChangeKind.ADD and c.path in test_sources]
+    if restore:
+        copy = snapshot(session.workspace)
+        try:
+            for path in restore:
+                (copy / path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(session.baseline_copy / path, copy / path)
+            runs = [adapter.run(copy) for adapter in runner_adapters(copy, session.python)]
+        finally:
+            shutil.rmtree(copy, ignore_errors=True)
+    else:
+        runs = candidate.runs
+    if any(run.status is StageStatus.BLOCKED for run in runs):
+        return _stage(stage, StageStatus.BLOCKED, "original regression run could not execute")
+    outcomes = {inv.invocation_id: inv.outcome for run in runs for inv in run.invocations}
+    broken = sorted(i for i in protected if outcomes.get(i) is not Outcome.PASSED)
+    restored = f" (original versions of {len(restore)} changed test files restored)" if restore else ""
+    if broken:
+        return _stage(stage, StageStatus.FAIL, "original tests no longer pass against the candidate: " + ", ".join(broken[:10]) + restored)
+    return _stage(stage, StageStatus.PASS, f"all {len(protected)} originally passing invocations still pass{restored}")
+
+
+def _delta_stage(stage: QualificationStage, deltas, names: tuple[str, ...], required: tuple[str, ...], missing_note: str) -> QualificationStageResult:
+    relevant = [d for d in deltas if d.name in names]
+    regressed = [d.name for d in relevant if d.state is DeltaState.REGRESSED]
+    if regressed:
+        return _stage(stage, StageStatus.FAIL, "regressed: " + ", ".join(regressed))
+    present = {d.name for d in relevant if d.state is not DeltaState.UNKNOWN}
+    if not set(required) <= present:
+        return _stage(stage, StageStatus.UNKNOWN, "partial evidence: " + (", ".join(sorted(present)) or "none"), missing_note)
+    return _stage(stage, StageStatus.PASS, "no regression in " + ", ".join(sorted(present)))
+
+
+def _controls_stage(candidate: StateEvidence) -> QualificationStageResult:
+    stage = QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS
+    results = candidate.negative_controls
+    if not results:
+        return _stage(
+            stage, StageStatus.NOT_RUN, "no negative controls or mutation evidence were provided",
+            "a green suite was not challenged with deliberately broken behavior",
+        )
+    survived = [r.control_id for r in results if r.outcome is ControlOutcome.SURVIVED]
+    invalid = [r.control_id for r in results if r.outcome is ControlOutcome.INVALID]
+    if survived:
+        return _stage(stage, StageStatus.FAIL, "NEGATIVE_CONTROL_SURVIVED: " + ", ".join(survived))
+    if invalid:
+        return _stage(stage, StageStatus.UNKNOWN, "invalid controls: " + ", ".join(invalid), *[r.detail for r in results if r.outcome is ControlOutcome.INVALID])
+    return _stage(stage, StageStatus.PASS, f"all {len(results)} negative controls were killed")
+
+
+def _pipeline_stage(session: ImproveSession) -> QualificationStageResult:
+    """Reproduce the candidate's own delivery checks where an adapter understands them."""
+    stage = QualificationStage.PIPELINE_EQUIVALENT
+    delivery = discover_surface(session.workspace).by_origin(VerificationOrigin.CI)
+    if not delivery:
+        return _stage(stage, StageStatus.NOT_RUN, "no delivery pipeline was discovered", "delivery-path verification is UNKNOWN")
+    adapters = runner_adapters(session.workspace, session.python)
+    statuses: list[StageStatus] = []
+    not_reproduced: list[str] = []
+    notes: list[str] = []
+    copy = snapshot(session.workspace)
+    try:
+        for check in delivery:
+            plan = next(((a, args) for a in adapters if (args := a.reproduction_args(check)) is not None), None)
+            label = check.command or check.tool or check.check_id
+            if plan is None:
+                not_reproduced.append(f"not reproduced: {label} [{check.kind.value}]")
+                continue
+            adapter, args = plan
+            run = adapter.run(copy, args=args)
+            statuses.append(run.status)
+            notes.append(f"{label}: {run.status.value}")
+            if check.metadata.get("matrix"):
+                notes.append(f"{label}: only the local environment was reproduced, not matrix {check.metadata['matrix']}")
+    finally:
+        shutil.rmtree(copy, ignore_errors=True)
+    summary = f"reproduced {len(statuses)}/{len(delivery)} delivery checks locally"
+    if StageStatus.FAIL in statuses:
+        return _stage(stage, StageStatus.FAIL, summary + "; a reproduced check failed", *notes, *not_reproduced)
+    if StageStatus.BLOCKED in statuses:
+        return _stage(stage, StageStatus.BLOCKED, summary + "; a reproduced check could not run", *notes, *not_reproduced)
+    if not_reproduced or not statuses or any(s is not StageStatus.PASS for s in statuses):
+        return _stage(stage, StageStatus.UNKNOWN, summary, *notes, *not_reproduced)
+    return _stage(stage, StageStatus.PASS, summary + "; all passed", *notes)
+
+
+def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas) -> list[QualificationStageResult]:
+    wall = [d for d in deltas if d.name == "wall_clock_s"]
+    return [
+        _discovery_stage(candidate),
+        _candidate_tests_stage(changes, candidate),
+        _regression_stage(session, changes, candidate),
+        _delta_stage(
+            QualificationStage.COVERAGE_AND_ORACLES, deltas,
+            ("line_coverage", "branch_coverage", "weak_oracle_tests"),
+            ("line_coverage", "branch_coverage", "weak_oracle_tests"),
+            "coverage was not measured for both states",
+        ),
+        _delta_stage(
+            QualificationStage.NEGATIVE_PATHS, deltas,
+            ("broad_error_expectations", "error_status_only_tests", "rejection_state_effects"),
+            ("rejection_state_effects",),
+            "only static expected-error signals; state after rejection, rollback and side effects are not evidenced",
+        ),
+        _controls_stage(candidate),
+        _pipeline_stage(session),
+        _stage(
+            QualificationStage.BUILD_AND_ARTIFACT, StageStatus.NOT_RUN,
+            "no build/package/startup adapter ran", "source-tree tests do not prove the built artifact",
+        ),
+        _stage(
+            QualificationStage.PREVIEW_DEPLOY, StageStatus.NOT_RUN,
+            "no authorized non-production preview adapter", "production is never used to qualify tests",
+        ),
+        _stage(
+            QualificationStage.STABILITY_AND_COST, StageStatus.UNKNOWN,
+            "single execution per state; wall clock " + (f"{wall[0].baseline}s -> {wall[0].candidate}s ({wall[0].state.value})" if wall else "unknown"),
+            "flakiness, retries and order dependence were not measured",
+        ),
+    ]
+
+
+def qualify_candidate(session: ImproveSession, negative_controls: list[NegativeControl] | None = None) -> QualificationResult:
+    controls = list(negative_controls or [])
+    changes = change_set(session.baseline, session.workspace)
+    with read_only_guard(session.root):
+        candidate = measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls)
+        adapters = runner_adapters(session.baseline_copy, session.python)
+        baseline_controls = [run_negative_control(session.baseline_copy, c, adapters) for c in controls]
+        baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls})
+        deltas = compare_states(baseline, candidate)
+        stages = _stages(session, changes, candidate, deltas)
+    result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls)
+    (session.directory / "qualification.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
+    return result
+
+
+def load_qualified_changes(session: ImproveSession) -> list[CandidateTestChange]:
+    path = session.directory / "qualification.json"
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return [
+        CandidateTestChange(**{**c, "kind": CandidateChangeKind(c["kind"])})
+        for c in data["qualification"]["changes"]
+    ]
+
+
+def apply_approved(
+    session: ImproveSession,
+    qualified: QualificationResult | list[CandidateTestChange],
+    approval: Approval | None,
+) -> AppliedResult:
+    changes = qualified.qualification.changes if isinstance(qualified, QualificationResult) else qualified
+    applied = apply_changes(session.root, session.baseline, session.workspace, changes, approval)
+    files_match = all(
+        (file_digest(session.root / c.path) if (session.root / c.path).is_file() else None) == c.candidate_fingerprint
+        for c in applied
+    )
+    evidence = measure(session.root, "applied", "applied-project-copy", session.python)
+    result = AppliedResult(applied, evidence, files_match)
+    (session.directory / "applied.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
+    return result

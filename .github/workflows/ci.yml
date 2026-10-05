@@ -24,4 +24,4 @@ jobs:
           python -m venv .wheel-smoke
           .wheel-smoke/bin/python -m pip install dist/*.whl
           cd /tmp
-          "$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva" audit-pytest "$GITHUB_WORKSPACE" --output json > assertiva-self-audit.json
+          "$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva" audit "$GITHUB_WORKSPACE" --output json > assertiva-static-audit.json

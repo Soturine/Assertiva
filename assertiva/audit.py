@@ -1,0 +1,81 @@
+"""`assertiva audit`: read-only assurance audit over the Verification Surface.
+
+Read-only is enforced, not promised: the whole audit runs inside ``read_only_guard``,
+which fails if any project file (including caches and ignored files) changed. Executing
+tests is opt-in and always happens in a disposable copy of the project.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from .adapters import runner_adapters
+from .evidence import StateEvidence, measure
+from .models import Finding, Outcome
+from .report import audit_model
+from .verification import discover_surface, surface_findings
+from .workspace import capture_baseline, read_only_guard
+
+
+def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]:
+    findings = []
+    invocations = [inv for run in current.runs for inv in run.invocations]
+    errors = [e for run in current.runs for e in run.collection_errors]
+    if errors:
+        findings.append(Finding("NATIVE_COLLECTION_ERRORS", "The native runner could not collect some tests.", {"errors": errors[:20]}))
+    failing = [inv.invocation_id for inv in invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
+    if failing:
+        findings.append(Finding("NATIVE_TESTS_FAILING", "Some tests fail or error in the current state.", {"count": len(failing), "tests": failing[:20]}))
+    if invocations and len(invocations) != static_total:
+        findings.append(
+            Finding(
+                "STATIC_INVENTORY_DIVERGES_FROM_NATIVE",
+                "Native collection differs from static inventory; native collection is authoritative for what runs.",
+                {
+                    "static_definitions_and_materializations": static_total,
+                    "native_invocations": len(invocations),
+                    "native_declarations": len({inv.declaration_id for inv in invocations}),
+                    "inherited_materializations": sum(inv.inherited for inv in invocations),
+                    "parameterized_invocations": sum(inv.parameters_id is not None for inv in invocations),
+                },
+            )
+        )
+    return findings
+
+
+def run_audit(root: str | Path, coverage_json: str | Path | None = None, execute: bool = False, python: str | None = None) -> dict:
+    root = Path(root).resolve()
+    findings: list[Finding] = []
+    limitations: list[str] = []
+    with read_only_guard(root):
+        baseline = capture_baseline(root)
+        surface = discover_surface(root)
+        adapters = runner_adapters(root, python)
+        if not adapters:
+            findings.append(
+                Finding(
+                    "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED",
+                    "No executable test adapter recognized this project. Assertiva does not infer that it has zero tests.",
+                )
+            )
+            limitations.append("test evidence is UNKNOWN for this toolchain until an adapter or portable report is available")
+        static_total = 0
+        for adapter in adapters:
+            static = adapter.static_audit(root, coverage_json)
+            findings.extend(static.findings)
+            static_total += len(static.tests) + len(static.materializations)
+            limitations.append(f"{adapter.adapter_id}: static inventory is bounded AST analysis, not native collection")
+        if execute and adapters:
+            current = measure(root, "current", "isolated-project-copy", python)
+            findings.extend(_native_findings(current, static_total))
+        else:
+            current = StateEvidence("current", "static-analysis")
+            for adapter in adapters:
+                current.static.update(adapter.static_signals(root))
+            if adapters:
+                limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
+        findings.extend(surface_findings(surface))
+    status = "UNKNOWN" if not adapters else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
+    for run in current.runs:
+        limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)
+    return audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)

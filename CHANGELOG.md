@@ -1,6 +1,22 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] — 2026-10-05
+
+### Added
+- Runtime-enforced read-only `assertiva audit`: tree fingerprint guard, `--execute` runs tests only in a disposable copy, reports outside the project.
+- `assertiva improve` as one command: isolated candidate (Git worktree or copy), qualification, explicit `--approve <change ids>`, stale-baseline refusal, post-apply verification, `--discard`.
+- Candidate qualification stages with original regression against the candidate, coverage/oracle deltas, deliberate negative controls, pipeline-equivalent reproduction; unavailable stages are NOT_RUN/UNKNOWN.
+- Native pytest adapter: invocation/parameter ids, markers, filters, skip/xfail/xpass, collection errors, custom items, inherited materialization, coverage.
+- Verification Surface discovery from GitHub Actions and pre-commit with local-vs-CI parity findings.
+- Assurance Report model and accessible self-contained HTML renderer.
+- CI dogfood: the installed wheel audits this repository with native execution and fails if the tree changed.
+
+### Changed
+- Milestones simplified to M0 (done), M1 Executable Assurance, M2 Cross-stack Intelligence, M3 Productization & Empirical Validation.
+- GitHub Actions parsing now uses PyYAML (new runtime dependency).
+- The hidden `audit-pytest` alias was removed; use `assertiva audit`.
+
+## Earlier
 
 ### Added
 - Candidate qualification / test-the-tests contract: immutable baseline, isolated candidate, original regression, mutation/negative controls, pipeline-equivalent verification, optional authorized preview deployment, and evidence-delta comparison.

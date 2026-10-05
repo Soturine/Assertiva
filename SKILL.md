@@ -80,6 +80,13 @@ Runtime enforcement is required:
 
 Reports/artifacts should default to Assertiva-owned storage outside the audited repository so read-only use does not dirty the working tree.
 
+### Driving `assertiva improve`
+
+1. `assertiva improve` measures the baseline and prints a candidate workspace. Write candidate changes **only there**.
+2. `assertiva improve` again qualifies the candidate. Optionally pass `--negative-controls <file.json>`: a list of `{"control_id", "path", "find", "replace", "claim", "tests"?}` deliberate behavior-breaking edits that the tests claiming `claim` must detect. They run only in disposable copies.
+3. Show the report to the human. Never pass `--approve` on your own initiative: approval names specific change ids and belongs to the human.
+4. `--discard` drops the candidate without touching the project.
+
 ## Reporting contract
 
 Produce one Assurance Report model for both workflows.
@@ -249,4 +256,4 @@ Core policy is framework/language/provider neutral. Adapters expose capabilities
 
 ## Current maturity
 
-The semantic contract is usable today and M0.2 has begun the executable core. A TDD-built bounded pytest/GitHub Actions audit, coverage.py JSON ingestion and a technical-preview `assertiva audit-pytest` CLI are implemented. Native runner collection/execution, universal adapters, impact graphs, mutation orchestration, historical intelligence, full CLI/MCP productization and multi-stack executable benchmarks remain roadmap work.
+M1 (Executable Assurance) is active. `assertiva audit` (runtime read-only, optional `--execute` in a disposable copy) and `assertiva improve` (isolated candidate, qualification stages, explicit approval, post-apply verification) are executable for the pytest / GitHub Actions / pre-commit reference adapters. Mutation-tool adapters, build/artifact and preview-deploy stages, other runners and CI providers, impact graphs, history and MCP remain roadmap work; see STATUS.md.

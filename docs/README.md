@@ -12,7 +12,7 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 - [Semantic UI and Browser Assurance](SEMANTIC_UI_AND_BROWSER_ASSURANCE.md) — semantic contracts, locators, accessibility tree, keyboard/focus, snapshots, structural mutation and browser flake evidence.
 - [Derivanta Integration](DERIVANTA_INTEGRATION.md) — cross-project ownership and evidence handoff.
 - [Verification Surface](VERIFICATION_SURFACE.md) — language/framework-neutral model for every check that contributes to or blocks delivery confidence.
-- [Executable Assurance Core](EXECUTABLE_ASSURANCE_CORE.md) — implemented M0.2 TDD vertical slice and current claim boundaries.
+- [Executable Assurance Core](EXECUTABLE_ASSURANCE_CORE.md) — executable modules, adapter protocol and claim boundaries.
 - [Pipeline & Delivery Assurance](PIPELINE_AND_DELIVERY_ASSURANCE.md) — local/CI/build/package/deploy evidence and false-green prevention.
 - [FTD/FTE Interoperability](FTD_FTE_INTEROPERABILITY.md) — optional Test Case authority and Azure handoffs.
 - [User Experience and Reporting](USER_EXPERIENCE_AND_REPORTING.md) — two-command UX, write boundaries, candidate approval flow and HTML Assurance Report.

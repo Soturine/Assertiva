@@ -23,23 +23,29 @@ repository tests
 → findings + limitations
 ```
 
-## M0.2 vertical slice
+## Modules
 
-Implemented now:
+The core is small and tool-neutral; tool knowledge lives in `assertiva/adapters/`.
 
-- bounded static pytest definition inventory using Python AST;
-- GitHub Actions pytest command/scope discovery;
-- repository-test-vs-observed-CI scope comparison;
-- coverage.py JSON ingestion for line/branch evidence;
-- smoke-dominant and weak-oracle signals;
-- high-line-coverage/weak-oracle and line-vs-branch contradiction findings;
-- `assertiva audit-pytest` technical-preview CLI.
+| Module | Owns |
+| --- | --- |
+| `workspace.py` | fingerprints, baseline, isolated candidate (worktree/copy), change set, approved apply, read-only guard, Assertiva-owned state location |
+| `evidence.py` | measuring one state in a disposable copy, negative controls, direction-aware metrics and state comparison |
+| `improve.py` | improve session and qualification stages |
+| `audit.py` | read-only audit over runner adapters and the Verification Surface |
+| `report.py` | the single Assurance Report model and its HTML rendering |
+| `verification.py` | VerificationCheck/Surface and generic local-vs-delivery parity findings |
+| `candidate.py`, `models.py` | stage/metric/change and runner-evidence records |
+| `adapters/pytest_native.py` | native pytest collection/execution, coverage, static signals, CI-check reproduction |
+| `adapters/github_actions.py`, `adapters/pre_commit.py`, `adapters/commands.py` | declared CI steps, hooks and command classification |
+
+Adapter protocol, by capability: runner adapters expose `supports`, `run`/`collect`, `static_signals`, `static_audit` and `reproduction_args(check)`; surface adapters expose `supports` and `discover`. The core never branches on a tool name.
 
 ## TDD rule
 
 Every new capability should begin with an executable fixture/reproduction of a false-green or evidence gap, then implementation.
 
-Current tests cover discovery, CI scope gaps, full-scope pytest, smoke-dominant suites, coverage/oracle mismatch, and missing CI evidence.
+Adversarial fixtures include a test that writes into its working directory (audit must stay read-only), a candidate that breaks production code and weakens the test to match (original regression must fail), a negative control the baseline suite cannot detect, stale baselines, hook checks absent from CI and CI-only validators.
 
 ## Claim boundary
 

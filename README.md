@@ -124,44 +124,34 @@ See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
 ## Current status
 
-Assertiva is currently **M0.2: executable assurance core (active)**.
-
-The first TDD vertical slice is executable. It inventories pytest-style definitions without importing the target project, compares them with observed GitHub Actions pytest scopes, ingests coverage.py JSON, and surfaces conservative false-green signals such as smoke-dominant suites, weak oracles, line-vs-branch divergence, and tests present in the repository but outside observed CI scope.
+Assertiva is in **M1 — Executable Assurance (active)**. `audit` and `improve` work end to end for the first reference adapters (pytest, GitHub Actions, pre-commit); other ecosystems report UNKNOWN rather than "0 tests".
 
 ```bash
 python -m pip install -e .
-assertiva audit . --output json
-assertiva audit . --coverage-json coverage.json
+
+# Read-only audit (static); add --execute to run tests natively in a disposable copy.
+assertiva audit .
+assertiva audit . --execute --coverage-json coverage.json --output json
+
+# Improve: one command, called again at each step.
+assertiva improve .                      # measure baseline, create the candidate workspace
+#   ...write candidate changes in the printed workspace...
+assertiva improve . --negative-controls controls.json   # qualify; project still untouched
+assertiva improve . --approve tests/test_new.py          # apply only the approved changes, then verify
+assertiva improve . --discard                            # or drop the candidate
 ```
 
-The top-level `audit` command is now the user-facing technical-preview entry point. It delegates only to executable adapters currently available and reports UNKNOWN instead of pretending an unsupported project has zero tests.
+Reports (JSON + self-contained HTML) are written under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project. `--python` selects the project's interpreter.
 
-See [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md), [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md), and [Pipeline & Delivery Assurance](docs/PIPELINE_AND_DELIVERY_ASSURANCE.md).
+What runs today:
+- runtime-enforced read-only audit (exit code 3 if any project file changed);
+- isolated candidate (Git worktree or copy) with ADD / MODIFY / RETIRE_CANDIDATE change sets, explicit approval by change id, stale-baseline refusal and post-apply verification;
+- qualification stages including original regression against the candidate, coverage/oracle deltas, deliberate negative controls and pipeline-equivalent reproduction; unavailable stages are NOT_RUN/UNKNOWN, never PASS;
+- native pytest evidence (invocations, parameters, markers, skip/xfail/xpass, collection errors, inherited materialization, coverage);
+- Verification Surface from GitHub Actions and pre-commit with local-vs-CI parity findings;
+- one Assurance Report model with baseline/candidate/applied states and "What does green prove?".
 
-Implemented/specification-level foundations include:
-- canonical `SKILL.md`;
-- deterministic evidence tiers;
-- architecture/evidence/refactor contracts;
-- definition-vs-invocation identity;
-- parameterized/property/fuzz/error-contract semantics;
-- test modality guidance;
-- eval catalog;
-- JSON schemas/examples;
-- JUnit XML compact summarizer;
-- repository validator and CI.
-
-Still planned:
-- native pytest collection/result evidence, parameterized invocations, skip/xfail/markers/filters;
-- package/container/startup/deployment parity checks;
-- Azure Pipelines/GitLab CI/Jenkins adapters;
-- universal discovery;
-- multi-language Test Impact Analysis engine;
-- automatic Test Evidence Graph construction;
-- first-party framework adapters;
-- mutation orchestration;
-- historical flake/runtime/failure intelligence;
-- CLI/MCP;
-- empirical multi-stack benchmark harness.
+See [STATUS.md](STATUS.md) for the IMPLEMENTED / SPECIFIED / PLANNED split, [ROADMAP.md](ROADMAP.md), [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md).
 
 Start with the [Documentation Portal](docs/README.md). Key owners include [Semantic UI and Browser Assurance](docs/SEMANTIC_UI_AND_BROWSER_ASSURANCE.md), [Determinism and Evidence Tiers](docs/DETERMINISM_AND_EVIDENCE_TIERS.md), [Refactor Safety](docs/REFACTOR_SAFETY.md), [Test Harness and Fidelity](docs/TEST_HARNESS_AND_FIDELITY.md), [Assertions/Oracles/Observation Surfaces](docs/ASSERTIONS_ORACLES_AND_OBSERVATION_SURFACES.md), and [Agent Skill/CLI/MCP Architecture](docs/AGENT_SKILL_MCP_ARCHITECTURE.md). See [STATUS.md](STATUS.md) and [ROADMAP.md](ROADMAP.md) for maturity.
 

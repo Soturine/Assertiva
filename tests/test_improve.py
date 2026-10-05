@@ -192,7 +192,7 @@ def _with_workflow(root, steps):
 
 
 def test_pipeline_equivalent_partial_reproduction_is_unknown_not_pass(calc_project):
-    _with_workflow(calc_project, ["pytest tests -q", "ruff check .", "./scripts/deploy-preview"])
+    _with_workflow(calc_project, ["pytest tests -q", "docker build .", "./scripts/deploy-preview"])
     session = start_improve(calc_project, python=PY)
     try:
         write(session.workspace / "tests" / "test_strong.py", STRONG_TEST)
@@ -201,7 +201,7 @@ def test_pipeline_equivalent_partial_reproduction_is_unknown_not_pass(calc_proje
         discard_session(session)
     assert result.status is StageStatus.UNKNOWN
     assert "reproduced 1/3" in result.summary
-    assert any("ruff check ." in item for item in result.limitations)
+    assert any("docker build ." in item and "not authorized" in item for item in result.limitations)
 
 
 def test_pipeline_equivalent_pass_requires_every_delivery_check(calc_project):

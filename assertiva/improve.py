@@ -8,11 +8,14 @@ verification. The original project is read-only (and verified as such) until app
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .adapters import runner_adapters
+from .adapters.commands import reproduction_plan
 from .adapters.mutation import load_mutation_report
 from .candidate import (
     CandidateChangeKind,
@@ -37,7 +40,8 @@ from .evidence import (
     to_jsonable,
 )
 from .models import MutantStatus, Outcome
-from .verification import VerificationOrigin, discover_surface
+from .process import run_command
+from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
     Approval,
     Baseline,
@@ -278,43 +282,66 @@ def _artifact_stage(candidate: StateEvidence) -> QualificationStageResult:
     return _stage(stage, StageStatus.PASS, "; ".join(parts), *limitations)
 
 
-def _pipeline_stage(session: ImproveSession) -> QualificationStageResult:
-    """Reproduce the candidate's own delivery checks where an adapter understands them."""
+def _run_declared(argv: tuple[str, ...], copy: Path, python: str | None) -> tuple[StageStatus, str]:
+    env = dict(os.environ)
+    env["PATH"] = str(Path(python or sys.executable).parent) + os.pathsep + env.get("PATH", "")
+    result = run_command(list(argv), copy, env=env)
+    if result.error or result.timed_out:
+        return StageStatus.BLOCKED, result.summary()
+    return (StageStatus.PASS if result.ok else StageStatus.FAIL), result.summary()
+
+
+def _pipeline_stage(session: ImproveSession, authorized: set[str]) -> QualificationStageResult:
+    """Reproduce the candidate's own delivery checks: DISCOVERED -> AUTHORIZED -> EXECUTED."""
     stage = QualificationStage.PIPELINE_EQUIVALENT
     delivery = discover_surface(session.workspace).by_origin(VerificationOrigin.CI)
     if not delivery:
         return _stage(stage, StageStatus.NOT_RUN, "no delivery pipeline was discovered", "delivery-path verification is UNKNOWN")
     adapters = runner_adapters(session.workspace, session.python)
-    statuses: list[StageStatus] = []
-    not_reproduced: list[str] = []
+    gating: list[StageStatus] = []
+    reproduced, partial = 0, False
     notes: list[str] = []
     copy = snapshot(session.workspace)
     try:
         for check in delivery:
-            plan = next(((a, args) for a in adapters if (args := a.reproduction_args(check)) is not None), None)
-            label = check.command or check.tool or check.check_id
-            if plan is None:
-                not_reproduced.append(f"not reproduced: {label} [{check.kind.value}]")
-                continue
-            adapter, args = plan
-            run = adapter.run(copy, args=args)
-            statuses.append(run.status)
-            notes.append(f"{label}: {run.status.value}")
+            label = f"{check.command or check.tool or check.check_id} [{check.kind.value}]"
+            runner = next(((a, args) for a in adapters if (args := a.reproduction_args(check)) is not None), None)
+            if runner:
+                run = runner[0].run(copy, args=runner[1])
+                status, detail = run.status, f"{len(run.invocations)} invocations"
+            else:
+                plan = reproduction_plan(check, session.python or sys.executable)
+                if plan.argv is None:
+                    notes.append(f"not reproduced: {label}: {plan.reason}")
+                    continue
+                if plan.needs_authorization and check.check_id not in authorized:
+                    notes.append(f"not reproduced: {label}: discovered, not authorized (assertiva improve --run-check {check.check_id})")
+                    continue
+                status, detail = _run_declared(plan.argv, copy, session.python)
+            reproduced += 1
+            if check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY) and status is not StageStatus.PASS:
+                notes.append(f"{label}: {status.value} but allowed to fail ({check.gate.value}): {detail}")
+            else:
+                gating.append(status)
+                notes.append(f"{label}: {status.value}: {detail}")
             if check.metadata.get("matrix"):
+                partial = True
                 notes.append(f"{label}: only the local environment was reproduced, not matrix {check.metadata['matrix']}")
+            if check.metadata.get("condition"):
+                notes.append(f"{label}: condition `{check.metadata['condition']}` was not evaluated")
     finally:
         shutil.rmtree(copy, ignore_errors=True)
-    summary = f"reproduced {len(statuses)}/{len(delivery)} delivery checks locally"
-    if StageStatus.FAIL in statuses:
-        return _stage(stage, StageStatus.FAIL, summary + "; a reproduced check failed", *notes, *not_reproduced)
-    if StageStatus.BLOCKED in statuses:
-        return _stage(stage, StageStatus.BLOCKED, summary + "; a reproduced check could not run", *notes, *not_reproduced)
-    if not_reproduced or not statuses or any(s is not StageStatus.PASS for s in statuses):
-        return _stage(stage, StageStatus.UNKNOWN, summary, *notes, *not_reproduced)
-    return _stage(stage, StageStatus.PASS, summary + "; all passed", *notes)
+    summary = f"reproduced {reproduced}/{len(delivery)} delivery checks locally"
+    if StageStatus.FAIL in gating:
+        return _stage(stage, StageStatus.FAIL, summary + "; a reproduced gating check failed", *notes)
+    if StageStatus.BLOCKED in gating:
+        return _stage(stage, StageStatus.BLOCKED, summary + "; a reproduced check could not run", *notes)
+    if reproduced < len(delivery) or partial or any(s is not StageStatus.PASS for s in gating):
+        return _stage(stage, StageStatus.UNKNOWN, summary, *notes)
+    return _stage(stage, StageStatus.PASS, summary + "; all gating checks passed", *notes)
 
 
-def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas) -> list[QualificationStageResult]:
+def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str]) -> list[QualificationStageResult]:
     wall = [d for d in deltas if d.name == "wall_clock_s"]
     return [
         _discovery_stage(candidate),
@@ -333,7 +360,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas) 
             "only static expected-error signals; state after rejection, rollback and side effects are not evidenced",
         ),
         _mutation_stage(candidate),
-        _pipeline_stage(session),
+        _pipeline_stage(session, authorized),
         _artifact_stage(candidate),
         _stage(
             QualificationStage.PREVIEW_DEPLOY, StageStatus.NOT_RUN,
@@ -351,6 +378,7 @@ def qualify_candidate(
     session: ImproveSession,
     negative_controls: list[NegativeControl] | None = None,
     mutation_reports: dict[str, str | Path] | None = None,
+    authorized_checks: set[str] | None = None,
 ) -> QualificationResult:
     """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state."""
     controls = list(negative_controls or [])
@@ -369,7 +397,7 @@ def qualify_candidate(
         if "candidate" in reports:
             attach_mutation(candidate, load_mutation_report(reports["candidate"]), session.workspace)
         deltas = compare_states(baseline, candidate)
-        stages = _stages(session, changes, candidate, deltas)
+        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()))
     result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls)
     (session.directory / "qualification.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result

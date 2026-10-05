@@ -36,7 +36,13 @@ _TOOLS: dict[tuple[str, str | None], K] = {
     ("coverage", None): K.COVERAGE, ("mutmut", None): K.MUTATION, ("cosmic-ray", None): K.MUTATION, ("stryker", None): K.MUTATION,
     ("docker", "build"): K.CONTAINER, ("alembic", "upgrade"): K.MIGRATION,
     ("npm", "test"): K.TEST, ("npm", "run"): K.UNKNOWN, ("pre-commit", "run"): K.CUSTOM,
+    ("compileall", None): K.STATIC_ANALYSIS,
+    ("twine", "upload"): K.DEPLOY, ("docker", "push"): K.DEPLOY, ("kubectl", "apply"): K.DEPLOY, ("helm", "upgrade"): K.DEPLOY,
+    ("helm", "install"): K.DEPLOY, ("gh", "release"): K.DEPLOY,
 }
+# Kinds whose recognized tools only read the (disposable) copy: reproducible without asking.
+SAFE_KINDS = frozenset({K.LINT, K.FORMAT, K.TYPECHECK, K.STATIC_ANALYSIS, K.PACKAGE, K.BUILD})
+_SHELL = re.compile(r"\$\{\{|&&|\|\||[;|<>`$*?]")
 _MANAGE_PY = {"test": K.TEST, "check": K.STATIC_ANALYSIS, "migrate": K.MIGRATION, "makemigrations": K.MIGRATION, "compilemessages": K.LOCALIZATION}
 _SETUP = {
     ("pip", "install"), ("pip", "download"), ("venv", None), ("cd", None), ("echo", None), ("mkdir", None), ("export", None),
@@ -97,6 +103,38 @@ def _classify_segment(segment: str) -> tuple[K | None, str, tuple[str, ...], dic
     if (head, None) in _TOOLS:
         return _TOOLS[(head, None)], head, tuple(tokens[1:]), {}
     return K.UNKNOWN, " ".join(tokens), (), {}
+
+
+@dataclass(frozen=True)
+class ReproductionPlan:
+    argv: tuple[str, ...] | None
+    needs_authorization: bool
+    reason: str
+
+
+def reproduction_plan(check, python: str) -> ReproductionPlan:
+    """How (and whether) a discovered check may be reproduced locally in a disposable copy.
+
+    DISCOVERED is not AUTHORIZED: only recognized, side-effect-free checks run without an
+    explicit authorization; deploys never run; compound shell steps are not reproduced.
+    """
+    kind = check.kind
+    if not check.command:
+        return ReproductionPlan(None, False, "no command to reproduce (action or reusable workflow)")
+    if kind is K.DEPLOY:
+        return ReproductionPlan(None, False, "deploy/publish checks are never executed by Assertiva")
+    lines = [line for line in check.command.splitlines() if line.strip()]
+    if len(lines) != 1 or _SHELL.search(lines[0]):
+        return ReproductionPlan(None, False, "compound shell step is not reproduced")
+    if check.metadata.get("working_directory"):
+        return ReproductionPlan(None, False, "working-directory is not reproduced")
+    try:
+        argv = shlex.split(lines[0], posix=True)
+    except ValueError:
+        return ReproductionPlan(None, False, "command could not be parsed")
+    if argv and PurePosixPath(argv[0].replace("\\", "/")).name in {"python", "python3", "py", "python.exe"}:
+        argv[0] = python
+    return ReproductionPlan(tuple(argv), kind not in SAFE_KINDS, f"{kind.value} check")
 
 
 def classify_command(command: str) -> CommandClass:

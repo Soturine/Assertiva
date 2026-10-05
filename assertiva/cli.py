@@ -124,7 +124,9 @@ def _improve(args: argparse.Namespace) -> int:
         ])
         return 0
 
-    result = qualify_candidate(session, _controls(args.negative_controls), _state_reports(args.mutation_report))
+    result = qualify_candidate(
+        session, _controls(args.negative_controls), _state_reports(args.mutation_report), set(args.run_check or ())
+    )
     report = improve_report(session, result)
     report["report_path"] = str(write_report(report, directory, "improve"))
     q = result.qualification
@@ -189,6 +191,7 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--approved-by", help="name recorded with the approval (default: current user)")
     improve.add_argument("--negative-controls", help="JSON list of deliberate behavior-breaking edits to challenge the tests")
     improve.add_argument("--mutation-report", action="append", metavar="STATE=PATH", help="mutation-tool report for baseline or candidate")
+    improve.add_argument("--run-check", action="append", metavar="CHECK_ID", help="authorize running a discovered delivery check in the candidate copy")
     improve.add_argument("--discard", action="store_true", help="drop the candidate session without touching the project")
     improve.set_defaults(handler=_improve)
     return parser

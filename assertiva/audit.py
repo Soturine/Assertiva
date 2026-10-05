@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .adapters import runner_adapters
+from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label
 from .candidate import StageStatus
@@ -28,17 +29,18 @@ def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]
     failing = [inv.invocation_id for inv in invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
     if failing:
         findings.append(Finding("NATIVE_TESTS_FAILING", "Some tests fail or error in the current state.", {"count": len(failing), "tests": failing[:20]}))
-    if invocations and len(invocations) != static_total:
+    executed = [inv for run in current.runs if run.mode == "execute" for inv in run.invocations]
+    if executed and static_total and len(executed) != static_total:
         findings.append(
             Finding(
                 "STATIC_INVENTORY_DIVERGES_FROM_NATIVE",
                 "Native collection differs from static inventory; native collection is authoritative for what runs.",
                 {
                     "static_definitions_and_materializations": static_total,
-                    "native_invocations": len(invocations),
-                    "native_declarations": len({inv.declaration_id for inv in invocations}),
-                    "inherited_materializations": sum(inv.inherited for inv in invocations),
-                    "parameterized_invocations": sum(inv.parameters_id is not None for inv in invocations),
+                    "native_invocations": len(executed),
+                    "native_declarations": len({inv.declaration_id for inv in executed}),
+                    "inherited_materializations": sum(inv.inherited for inv in executed),
+                    "parameterized_invocations": sum(inv.parameters_id is not None for inv in executed),
                 },
             )
         )
@@ -93,6 +95,7 @@ def run_audit(
     execute: bool = False,
     python: str | None = None,
     mutation_reports: list[str | Path] | tuple = (),
+    junit_reports: list[str | Path] | tuple = (),
 ) -> dict:
     root = Path(root).resolve()
     findings: list[Finding] = []
@@ -117,19 +120,21 @@ def run_audit(
             limitations.append(f"{adapter.adapter_id}: static inventory is bounded AST analysis, not native collection")
         if execute and adapters:
             current = measure(root, "current", "isolated-project-copy", python)
-            findings.extend(_native_findings(current, static_total))
         else:
             current = StateEvidence("current", "static-analysis")
             for adapter in adapters:
                 current.static.update(adapter.static_signals(root))
             if adapters:
                 limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
+        current.runs.extend(load_junit(report) for report in junit_reports)
+        if current.runs:
+            findings.extend(_native_findings(current, static_total))
         for report in mutation_reports:
             attach_mutation(current, load_mutation_report(report), root)
         findings.extend(_mutation_findings(current))
         findings.extend(_artifact_findings(current))
         findings.extend(surface_findings(surface))
-    status = "UNKNOWN" if not adapters else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
+    status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)
     return audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)

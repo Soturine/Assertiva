@@ -153,6 +153,7 @@ class RunEvidence:
     command: list[str] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
     coverage: "CoverageSummary | None" = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

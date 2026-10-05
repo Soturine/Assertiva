@@ -141,7 +141,13 @@ def audit_model(
     findings_data = [_finding(f) for f in findings]
     observed, not_evidenced = [], []
     for run in current.runs:
-        observed.append(f"native {run.adapter_id} run in an isolated copy: {run.status.value} ({len(run.invocations)} invocations)")
+        if run.mode == "report":
+            observed.append(
+                f"results ingested from {run.metadata.get('source')} via {run.adapter_id} (not executed by Assertiva): "
+                f"{run.status.value} ({len(run.invocations)} cases)"
+            )
+        else:
+            observed.append(f"native {run.adapter_id} run in an isolated copy: {run.status.value} ({len(run.invocations)} invocations)")
     if not current.runs:
         not_evidenced.append("no tests were executed; test outcomes are UNKNOWN")
     if current.static:

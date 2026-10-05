@@ -52,7 +52,7 @@ def _emit(payload: dict, output: str, lines: list[str]) -> None:
 def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     directory = _report_dir(root, args.report_dir)
-    report = run_audit(root, args.coverage_json, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [])
+    report = run_audit(root, args.coverage_json, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [], junit_reports=args.junit_xml or [])
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -197,6 +197,7 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--coverage-json", help="existing coverage.py JSON report to ingest")
     audit.add_argument("--execute", action="store_true", help="also run the tests natively, in an isolated copy")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
+    audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
     audit.set_defaults(handler=_audit)
 
     improve = sub.add_parser("improve", help="build and qualify candidate test improvements; apply only with approval")

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .adapters import runner_adapters
+from .adapters.mutation import load_mutation_report
 from .candidate import (
     CandidateChangeKind,
     CandidateQualification,
@@ -27,13 +28,15 @@ from .evidence import (
     NegativeControl,
     NegativeControlResult,
     StateEvidence,
+    attach_mutation,
+    mutant_label,
     compare_states,
     measure,
     run_negative_control,
     state_from_dict,
     to_jsonable,
 )
-from .models import Outcome
+from .models import MutantStatus, Outcome
 from .verification import VerificationOrigin, discover_surface
 from .workspace import (
     Approval,
@@ -207,21 +210,54 @@ def _delta_stage(stage: QualificationStage, deltas, names: tuple[str, ...], requ
     return _stage(stage, StageStatus.PASS, "no regression in " + ", ".join(sorted(present)))
 
 
-def _controls_stage(candidate: StateEvidence) -> QualificationStageResult:
+def _mutation_stage(candidate: StateEvidence) -> QualificationStageResult:
+    """Negative controls and mutation reports are separate evidence; both are reported."""
     stage = QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS
-    results = candidate.negative_controls
-    if not results:
+    controls, runs = candidate.negative_controls, candidate.mutation
+    if not controls and not runs:
         return _stage(
             stage, StageStatus.NOT_RUN, "no negative controls or mutation evidence were provided",
             "a green suite was not challenged with deliberately broken behavior",
         )
-    survived = [r.control_id for r in results if r.outcome is ControlOutcome.SURVIVED]
-    invalid = [r.control_id for r in results if r.outcome is ControlOutcome.INVALID]
+    failures, unknown, limitations, passed = [], [], [], []
+    survived = [r.control_id for r in controls if r.outcome is ControlOutcome.SURVIVED]
     if survived:
-        return _stage(stage, StageStatus.FAIL, "NEGATIVE_CONTROL_SURVIVED: " + ", ".join(survived))
+        failures.append("NEGATIVE_CONTROL_SURVIVED: " + ", ".join(survived))
+    invalid = [r for r in controls if r.outcome is ControlOutcome.INVALID]
     if invalid:
-        return _stage(stage, StageStatus.UNKNOWN, "invalid controls: " + ", ".join(invalid), *[r.detail for r in results if r.outcome is ControlOutcome.INVALID])
-    return _stage(stage, StageStatus.PASS, f"all {len(results)} negative controls were killed")
+        unknown.append("invalid controls: " + ", ".join(r.control_id for r in invalid))
+        limitations += [r.detail for r in invalid]
+    if controls and not survived and not invalid:
+        passed.append(f"{len(controls)} negative controls killed")
+    blocked = [run for run in runs if run.error]
+    for run in runs:
+        limitations += [f"{run.source}: {item}" for item in run.limitations]
+        if run.error:
+            limitations.append(f"{run.source}: unreadable mutation report ({run.error})")
+            continue
+        if run.matches_state is False:
+            unknown.append(f"mutation report {run.source} was produced for different source")
+            continue
+        tool = run.tool or "mutation report"
+        survivors = run.survivors()
+        if run.count(MutantStatus.SURVIVED):
+            shown = ", ".join(mutant_label(m) for m in survivors[:5]) if survivors else f"{run.count(MutantStatus.SURVIVED)} survived (no per-mutant identity)"
+            failures.append(f"MUTATION_SURVIVOR ({tool}): {shown}")
+        if run.count(MutantStatus.NO_COVERAGE):
+            failures.append(f"MUTATION_NO_COVERAGE ({tool}): {run.count(MutantStatus.NO_COVERAGE)} mutants not covered by any test")
+        if run.count(MutantStatus.UNKNOWN):
+            unknown.append(f"{tool}: {run.count(MutantStatus.UNKNOWN)} mutants with unknown/pending status")
+        if not run.evaluated:
+            unknown.append(f"{tool}: no evaluated mutants")
+        elif not run.count(MutantStatus.SURVIVED) and not run.count(MutantStatus.NO_COVERAGE):
+            passed.append(f"{tool}: all {run.evaluated} evaluated mutants detected")
+    if failures:
+        return _stage(stage, StageStatus.FAIL, "; ".join(failures), *limitations)
+    if blocked:
+        return _stage(stage, StageStatus.BLOCKED, "mutation evidence could not be read", *limitations)
+    if unknown:
+        return _stage(stage, StageStatus.UNKNOWN, "; ".join(unknown + passed), *limitations)
+    return _stage(stage, StageStatus.PASS, "; ".join(passed), *limitations)
 
 
 def _pipeline_stage(session: ImproveSession) -> QualificationStageResult:
@@ -278,7 +314,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas) 
             ("rejection_state_effects",),
             "only static expected-error signals; state after rejection, rollback and side effects are not evidenced",
         ),
-        _controls_stage(candidate),
+        _mutation_stage(candidate),
         _pipeline_stage(session),
         _stage(
             QualificationStage.BUILD_AND_ARTIFACT, StageStatus.NOT_RUN,
@@ -296,14 +332,27 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas) 
     ]
 
 
-def qualify_candidate(session: ImproveSession, negative_controls: list[NegativeControl] | None = None) -> QualificationResult:
+def qualify_candidate(
+    session: ImproveSession,
+    negative_controls: list[NegativeControl] | None = None,
+    mutation_reports: dict[str, str | Path] | None = None,
+) -> QualificationResult:
+    """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state."""
     controls = list(negative_controls or [])
+    reports = dict(mutation_reports or {})
+    unknown_states = set(reports) - {"baseline", "candidate"}
+    if unknown_states:
+        raise ValueError(f"mutation reports must target baseline or candidate, not {sorted(unknown_states)}")
     changes = change_set(session.baseline, session.workspace)
     with read_only_guard(session.root):
         candidate = measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls)
         adapters = runner_adapters(session.baseline_copy, session.python)
         baseline_controls = [run_negative_control(session.baseline_copy, c, adapters) for c in controls]
-        baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls})
+        baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls, "mutation": []})
+        if "baseline" in reports:
+            attach_mutation(baseline, load_mutation_report(reports["baseline"]), session.baseline_copy)
+        if "candidate" in reports:
+            attach_mutation(candidate, load_mutation_report(reports["candidate"]), session.workspace)
         deltas = compare_states(baseline, candidate)
         stages = _stages(session, changes, candidate, deltas)
     result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls)

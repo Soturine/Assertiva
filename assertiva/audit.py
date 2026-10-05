@@ -10,8 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from .adapters import runner_adapters
-from .evidence import StateEvidence, measure
-from .models import Finding, Outcome
+from .adapters.mutation import load_mutation_report
+from .evidence import StateEvidence, attach_mutation, measure, mutant_label
+from .models import Finding, MutantStatus, Outcome
 from .report import audit_model
 from .verification import discover_surface, surface_findings
 from .workspace import capture_baseline, read_only_guard
@@ -43,7 +44,35 @@ def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]
     return findings
 
 
-def run_audit(root: str | Path, coverage_json: str | Path | None = None, execute: bool = False, python: str | None = None) -> dict:
+def _mutation_findings(current: StateEvidence) -> list[Finding]:
+    findings = []
+    for run in current.mutation:
+        if run.error:
+            findings.append(Finding("MUTATION_REPORT_UNREADABLE", "A mutation report could not be read; it provides no evidence.", {"source": run.source, "error": run.error}))
+        elif run.matches_state is False:
+            findings.append(Finding("MUTATION_REPORT_SOURCE_MISMATCH", "A mutation report was produced for different source than the audited project.", {"source": run.source, "limitations": run.limitations}))
+        elif run.count(MutantStatus.SURVIVED) or run.count(MutantStatus.NO_COVERAGE):
+            findings.append(
+                Finding(
+                    "MUTATION_SURVIVORS",
+                    "Deliberate defects went undetected; a high mutation score does not cover these behaviors.",
+                    {
+                        "tool": run.tool, "source": run.source,
+                        "survived": run.count(MutantStatus.SURVIVED), "no_coverage": run.count(MutantStatus.NO_COVERAGE),
+                        "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:20]],
+                    },
+                )
+            )
+    return findings
+
+
+def run_audit(
+    root: str | Path,
+    coverage_json: str | Path | None = None,
+    execute: bool = False,
+    python: str | None = None,
+    mutation_reports: list[str | Path] | tuple = (),
+) -> dict:
     root = Path(root).resolve()
     findings: list[Finding] = []
     limitations: list[str] = []
@@ -74,6 +103,9 @@ def run_audit(root: str | Path, coverage_json: str | Path | None = None, execute
                 current.static.update(adapter.static_signals(root))
             if adapters:
                 limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
+        for report in mutation_reports:
+            attach_mutation(current, load_mutation_report(report), root)
+        findings.extend(_mutation_findings(current))
         findings.extend(surface_findings(surface))
     status = "UNKNOWN" if not adapters else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:

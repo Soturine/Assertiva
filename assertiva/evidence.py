@@ -14,7 +14,16 @@ from typing import Any
 
 from .adapters import runner_adapters
 from .candidate import MetricDelta, MetricDirection, MetricObservation, StageStatus, compare_metric_sets
-from .models import CoverageSummary, Outcome, RunEvidence, TestInvocation
+from .models import (
+    DETECTED,
+    CoverageSummary,
+    MutantRecord,
+    MutantStatus,
+    MutationRun,
+    Outcome,
+    RunEvidence,
+    TestInvocation,
+)
 from .workspace import snapshot
 
 
@@ -52,6 +61,7 @@ class StateEvidence:
     static: dict[str, int] = field(default_factory=dict)
     negative_controls: list[NegativeControlResult] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
+    mutation: list[MutationRun] = field(default_factory=list)
 
     def invocation_ids(self) -> set[str]:
         return {inv.invocation_id for run in self.runs for inv in run.invocations}
@@ -87,6 +97,29 @@ def run_negative_control(source: Path, control: NegativeControl, adapters: list)
     if all(run.status is StageStatus.PASS for run in runs):
         return result(ControlOutcome.SURVIVED, "tests stayed green with the behavior deliberately broken")
     return result(ControlOutcome.INVALID, "runner did not produce a usable result: " + ", ".join(r.status.value for r in runs))
+
+
+def mutant_label(m: MutantRecord) -> str:
+    where = f"{m.path}:{m.line}" if m.path else m.mutant_id
+    return f"{where} {m.operator or ''}{f' ({m.replacement})' if m.replacement else ''}".strip()
+
+
+def attach_mutation(state: StateEvidence, run: MutationRun, state_dir: str | Path) -> MutationRun:
+    """Attach a mutation report to a state, checking it against that state's sources when possible."""
+    if run.error is None and run.sources:
+        def norm(text: str) -> str:
+            return text.replace("\r\n", "\n")
+
+        mismatched = [
+            path for path, source in run.sources.items()
+            if not (Path(state_dir) / path).is_file()
+            or norm((Path(state_dir) / path).read_text(encoding="utf-8", errors="replace")) != norm(source)
+        ]
+        run.matches_state = not mismatched
+        if mismatched:
+            run.limitations.append(f"report source does not match the {state.label} state: " + ", ".join(sorted(mismatched)[:5]))
+    state.mutation.append(run)
+    return run
 
 
 def measure(
@@ -155,7 +188,17 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         add("negative_controls_killed", sum(r.outcome is ControlOutcome.KILLED for r in valid), MetricDirection.HIGHER_IS_BETTER)
         add("negative_controls_survived", sum(r.outcome is ControlOutcome.SURVIVED for r in valid), MetricDirection.LOWER_IS_BETTER)
         add("negative_controls_invalid", len(state.negative_controls) - len(valid), MetricDirection.LOWER_IS_BETTER)
+    usable = [run for run in state.mutation if run.error is None and run.matches_state is not False]
+    if usable:
+        tier = "E0"
+        add("mutation_evaluated", sum(r.evaluated for r in usable), MetricDirection.CONTEXTUAL, tier=tier)
+        add("mutation_killed", sum(sum(r.count(s) for s in DETECTED) for r in usable), MetricDirection.HIGHER_IS_BETTER, tier=tier)
+        add("mutation_survived", sum(r.count(MutantStatus.SURVIVED) for r in usable), MetricDirection.LOWER_IS_BETTER, tier=tier)
+        add("mutation_no_coverage", sum(r.count(MutantStatus.NO_COVERAGE) for r in usable), MetricDirection.LOWER_IS_BETTER, tier=tier)
     return metrics
+
+
+_MUTATION_COUNTS = ("mutation_killed", "mutation_survived", "mutation_no_coverage")
 
 
 def compare_states(before: StateEvidence, after: StateEvidence) -> list[MetricDelta]:
@@ -165,6 +208,13 @@ def compare_states(before: StateEvidence, after: StateEvidence) -> list[MetricDe
         for metrics in (baseline, candidate):
             old = metrics["wall_clock_s"]
             metrics["wall_clock_s"] = MetricObservation(old.name, old.value, MetricDirection.LOWER_IS_BETTER, old.unit, old.evidence_tier, old.provenance)
+    # Mutation counts are only better/worse over the same number of evaluated mutants.
+    evaluated = (baseline.get("mutation_evaluated"), candidate.get("mutation_evaluated"))
+    if all(evaluated) and evaluated[0].value != evaluated[1].value:
+        for metrics in (baseline, candidate):
+            for name in _MUTATION_COUNTS:
+                old = metrics[name]
+                metrics[name] = MetricObservation(old.name, old.value, MetricDirection.CONTEXTUAL, old.unit, old.evidence_tier, old.provenance)
     return compare_metric_sets(baseline, candidate)
 
 
@@ -209,4 +259,14 @@ def state_from_dict(data: dict) -> StateEvidence:
             NegativeControlResult(**{**r, "outcome": ControlOutcome(r["outcome"])}) for r in data["negative_controls"]
         ],
         limitations=list(data["limitations"]),
+        mutation=[
+            MutationRun(**{
+                **m,
+                "mutants": [
+                    MutantRecord(**{**r, "status": MutantStatus(r["status"]), "killed_by": tuple(r["killed_by"])})
+                    for r in m["mutants"]
+                ],
+            })
+            for m in data.get("mutation", [])
+        ],
     )

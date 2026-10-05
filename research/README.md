@@ -13,6 +13,10 @@ Research records are dated evidence and benchmarks, not permanent Assertiva poli
 
 - [Semantic UI and Browser Test Assurance](2026-10-02-semantic-ui-browser-assurance.md) — current Playwright, Testing Library, WAI-ARIA/WCAG and Android Compose evidence supporting provider-neutral semantic interface contracts, locator robustness, accessibility claim boundaries and cross-platform mapping.
 
+## 2026-10-05
+
+- [Mutation Report Formats](2026-10-05-mutation-report-formats.md) — mutation-testing-elements (Stryker family), PIT XML, mutmut stats and why Cosmic Ray `cr-xml` is not ingested.
+
 ## Rule
 
 When a mutable external tool changes, update or add a dated record instead of silently rewriting history. Promote only reusable, evidence-supported conclusions into canonical docs.

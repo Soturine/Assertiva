@@ -50,7 +50,7 @@ def _emit(payload: dict, output: str, lines: list[str]) -> None:
 def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     directory = _report_dir(root, args.report_dir)
-    report = run_audit(root, args.coverage_json, execute=args.execute, python=args.python)
+    report = run_audit(root, args.coverage_json, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [])
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
     lines += [f"[{f['severity'].upper()}] {f['code']}: {f['summary']}" for f in report["findings"]]
@@ -67,6 +67,16 @@ def _controls(path: str | None) -> list[NegativeControl]:
         NegativeControl(**{**item, "tests": tuple(item.get("tests", ()))})
         for item in json.loads(Path(path).read_text(encoding="utf-8"))
     ]
+
+
+def _state_reports(values: list[str] | None) -> dict[str, str]:
+    reports = {}
+    for value in values or []:
+        state, sep, path = value.partition("=")
+        if not sep or state not in {"baseline", "candidate"}:
+            raise UsageError("improve --mutation-report expects baseline=PATH or candidate=PATH")
+        reports[state] = path
+    return reports
 
 
 def _improve(args: argparse.Namespace) -> int:
@@ -114,7 +124,7 @@ def _improve(args: argparse.Namespace) -> int:
         ])
         return 0
 
-    result = qualify_candidate(session, _controls(args.negative_controls))
+    result = qualify_candidate(session, _controls(args.negative_controls), _state_reports(args.mutation_report))
     report = improve_report(session, result)
     report["report_path"] = str(write_report(report, directory, "improve"))
     q = result.qualification
@@ -170,6 +180,7 @@ def _parser() -> argparse.ArgumentParser:
     common(audit)
     audit.add_argument("--coverage-json", help="existing coverage.py JSON report to ingest")
     audit.add_argument("--execute", action="store_true", help="also run the tests natively, in an isolated copy")
+    audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
     audit.set_defaults(handler=_audit)
 
     improve = sub.add_parser("improve", help="build and qualify candidate test improvements; apply only with approval")
@@ -177,6 +188,7 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--approve", nargs="+", metavar="CHANGE_ID", help="explicitly approve qualified changes to apply")
     improve.add_argument("--approved-by", help="name recorded with the approval (default: current user)")
     improve.add_argument("--negative-controls", help="JSON list of deliberate behavior-breaking edits to challenge the tests")
+    improve.add_argument("--mutation-report", action="append", metavar="STATE=PATH", help="mutation-tool report for baseline or candidate")
     improve.add_argument("--discard", action="store_true", help="drop the candidate session without touching the project")
     improve.set_defaults(handler=_improve)
     return parser

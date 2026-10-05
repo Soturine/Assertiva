@@ -16,13 +16,14 @@ from typing import Any
 
 from . import __version__
 from .candidate import DeltaState, MetricDirection, StageStatus
-from .evidence import StateEvidence, compare_states, state_metrics, to_jsonable
+from .evidence import StateEvidence, compare_states, mutant_label, state_metrics, to_jsonable
 
 REPORT_VERSION = "1"
 
 _SEVERITY = {
     "CI_TEST_EXECUTION_GAP": "high", "LOCAL_CHECK_NOT_OBSERVED_IN_CI": "high", "HIGH_COVERAGE_WEAK_ORACLE": "high",
-    "SUITE_SMOKE_DOMINANT": "high", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
+    "SUITE_SMOKE_DOMINANT": "high", "MUTATION_SURVIVORS": "high", "MUTATION_REPORT_UNREADABLE": "medium",
+    "MUTATION_REPORT_SOURCE_MISMATCH": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
     "CI_PYTEST_NOT_OBSERVED": "medium", "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "info", "NO_DELIVERY_PIPELINE_OBSERVED": "info",
@@ -43,6 +44,8 @@ _RECOMMENDATION = {
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "Provide portable evidence (JUnit XML, coverage reports) or an adapter for this toolchain.",
     "NATIVE_COLLECTION_ERRORS": "Fix collection errors first: tests that cannot be collected provide no evidence.",
     "NATIVE_TESTS_FAILING": "Triage failing tests before trusting any other metric in this report.",
+    "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
+    "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
 }
 
 
@@ -67,7 +70,17 @@ def state_summary(state: StateEvidence | None) -> dict | None:
             for run in state.runs
         ],
         "negative_controls": to_jsonable(state.negative_controls),
+        "mutation": [_mutation_summary(run) for run in state.mutation],
         "limitations": list(state.limitations),
+    }
+
+
+def _mutation_summary(run) -> dict:
+    return {
+        "tool": run.tool, "tool_version": run.tool_version, "source": run.source, "error": run.error,
+        "per_mutant": run.per_mutant, "matches_state": run.matches_state, "counts": dict(run.counts),
+        "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:50]],
+        "limitations": list(run.limitations),
     }
 
 
@@ -129,7 +142,12 @@ def audit_model(
         not_evidenced.append("whether declared CI checks actually ran, on which revision, and whether they gate merges")
     if not any(run.coverage for run in current.runs):
         not_evidenced.append("coverage")
-    not_evidenced += ["mutation / negative-control strength", "build, package, startup and deployment behavior"]
+    usable_mutation = [run for run in current.mutation if run.error is None and run.matches_state is not False]
+    if usable_mutation:
+        observed.append("ingested mutation report(s): " + ", ".join(f"{r.tool or 'unknown tool'} ({r.evaluated} evaluated)" for r in usable_mutation))
+    else:
+        not_evidenced.append("mutation / negative-control strength")
+    not_evidenced.append("build, package, startup and deployment behavior")
     return {
         "report_version": REPORT_VERSION,
         "workflow": "audit",
@@ -284,6 +302,28 @@ def _chart(states: list, names: list[str]) -> str:
     )
 
 
+def _mutation_html(report: dict) -> str:
+    rows = []
+    for key, state in report["states"].items():
+        for run in (state or {}).get("mutation", []):
+            counts = ", ".join(f"{k.lower()}: {v}" for k, v in sorted(run["counts"].items())) or "—"
+            status = "unreadable: " + run["error"] if run["error"] else ("source mismatch" if run["matches_state"] is False else counts)
+            survivors = _list(run["survivors"], "none listed" if run["per_mutant"] else "no per-mutant identity in this format")
+            rows.append(
+                f'<tr><th scope="row">{_e(_STATE_LABELS[key])}</th><td>{_e(run["tool"] or "unknown")}</td>'
+                f'<td>{_e(status)}</td><td>{survivors}</td><td>{_e("; ".join(run["limitations"]))}</td></tr>'
+            )
+    if not rows:
+        return ""
+    return (
+        '<section id="mutation-evidence" aria-labelledby="h-mut"><h2 id="h-mut">Mutation evidence</h2>'
+        "<p>Ingested from existing tools. A high score never hides a surviving mutant.</p>"
+        '<div class="scroll"><table><caption>Mutation reports by state</caption><thead><tr><th scope="col">State</th>'
+        '<th scope="col">Tool</th><th scope="col">Result</th><th scope="col">Survivors</th><th scope="col">Limitations</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>'
+    )
+
+
 def _list(items: list[str], empty: str) -> str:
     return "<ul>" + "".join(f"<li>{_e(i)}</li>" for i in items) + "</ul>" if items else f"<p>{_e(empty)}</p>"
 
@@ -412,6 +452,8 @@ def render_html(report: dict) -> str:
     sections = [("summary", "Summary"), ("metrics", "States and metrics")]
     if report.get("candidate_qualification"):
         sections.append(("qualification", "Qualification"))
+    if any((s or {}).get("mutation") for s in report["states"].values()):
+        sections.append(("mutation-evidence", "Mutation"))
     if report.get("change_set"):
         sections.append(("changes", "Change set"))
     if report["findings"] or report["workflow"] == "audit":
@@ -438,7 +480,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_mutation_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

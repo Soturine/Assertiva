@@ -18,6 +18,65 @@ class Outcome(str, Enum):
     NOT_RUN = "NOT_RUN"
 
 
+class MutantStatus(str, Enum):
+    KILLED = "KILLED"
+    SURVIVED = "SURVIVED"
+    NO_COVERAGE = "NO_COVERAGE"
+    TIMEOUT = "TIMEOUT"
+    ERROR = "ERROR"  # invalid mutant: did not compile/load/run
+    IGNORED = "IGNORED"
+    EQUIVALENT = "EQUIVALENT"
+    UNKNOWN = "UNKNOWN"  # pending, not run, or a status this adapter does not know
+
+
+DETECTED = frozenset({MutantStatus.KILLED, MutantStatus.TIMEOUT})
+NOT_EVALUATED = frozenset({MutantStatus.ERROR, MutantStatus.IGNORED, MutantStatus.EQUIVALENT, MutantStatus.UNKNOWN})
+
+
+@dataclass(frozen=True)
+class MutantRecord:
+    mutant_id: str
+    status: MutantStatus
+    native_status: str
+    path: str | None = None
+    line: int | None = None
+    operator: str | None = None
+    replacement: str | None = None
+    description: str | None = None
+    killed_by: tuple[str, ...] = ()
+    duration_ms: float | None = None
+
+
+@dataclass
+class MutationRun:
+    """Normalized mutation-tool evidence. Fields a tool does not provide stay None/empty."""
+
+    source: str
+    tool: str | None = None
+    tool_version: str | None = None
+    per_mutant: bool = True
+    mutants: list[MutantRecord] = field(default_factory=list)
+    counts: dict[str, int] = field(default_factory=dict)  # MutantStatus value -> count
+    sources: dict[str, str] = field(default_factory=dict)  # mutated file -> source text the tool saw
+    limitations: list[str] = field(default_factory=list)
+    error: str | None = None
+    matches_state: bool | None = None  # None: the report cannot be tied to the measured state
+
+    def count(self, status: MutantStatus) -> int:
+        return self.counts.get(status.value, 0)
+
+    @property
+    def total(self) -> int:
+        return sum(self.counts.values())
+
+    @property
+    def evaluated(self) -> int:
+        return sum(n for s, n in self.counts.items() if MutantStatus(s) not in NOT_EVALUATED)
+
+    def survivors(self) -> list[MutantRecord]:
+        return [m for m in self.mutants if m.status is MutantStatus.SURVIVED]
+
+
 @dataclass(frozen=True)
 class TestInvocation:
     """One concrete runnable case as reported by a native runner.

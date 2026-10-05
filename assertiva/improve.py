@@ -214,6 +214,37 @@ def _delta_stage(stage: QualificationStage, deltas, names: tuple[str, ...], requ
     return _stage(stage, StageStatus.PASS, "no regression in " + ", ".join(sorted(present)))
 
 
+_WEAK_NEGATIVE = {"ERROR_TYPE", "PROTOCOL_STATUS"}
+
+
+def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> QualificationStageResult:
+    """Static failure-contract dimensions (E3) combined with runtime outcomes (E1)."""
+    stage = QualificationStage.NEGATIVE_PATHS
+    provenance = "dimensions are static AST signals (E3); outcomes come from the native run (E1); rollback and external side effects are not evidenced"
+    weakened = [
+        d.name for d in deltas
+        if d.name in {"broad_error_expectations", "error_status_only_tests", "negative_paths_without_contract_detail"}
+        and d.state is DeltaState.REGRESSED
+    ]
+    if weakened:
+        return _stage(stage, StageStatus.FAIL, "negative-path evidence weakened: " + ", ".join(weakened), provenance)
+    changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
+    touched = {tid: dims for tid, dims in candidate.negative_paths.items() if tid.split("::")[0] in changed}
+    if not touched:
+        return _stage(stage, StageStatus.UNKNOWN, "the candidate does not add or modify negative-path tests", provenance)
+    outcomes: dict[str, set] = {}
+    for inv in _invocations(candidate):
+        outcomes.setdefault(inv.materialization_id, set()).add(inv.outcome)
+    shallow = [tid for tid, dims in touched.items() if set(dims) <= _WEAK_NEGATIVE]
+    not_passing = [tid for tid in touched if outcomes.get(tid) != {Outcome.PASSED}]
+    summary = "; ".join(f"{tid}: {', '.join(dims) or 'any error'}" for tid, dims in sorted(touched.items()))
+    if not_passing:
+        return _stage(stage, StageStatus.UNKNOWN, summary + " | not passing at runtime: " + ", ".join(not_passing), provenance)
+    if shallow:
+        return _stage(stage, StageStatus.UNKNOWN, summary + " | only type/status observed: " + ", ".join(shallow), provenance)
+    return _stage(stage, StageStatus.PASS, summary, provenance)
+
+
 def _mutation_stage(candidate: StateEvidence) -> QualificationStageResult:
     """Negative controls and mutation reports are separate evidence; both are reported."""
     stage = QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS
@@ -353,12 +384,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, 
             ("line_coverage", "branch_coverage", "weak_oracle_tests"),
             "coverage was not measured for both states",
         ),
-        _delta_stage(
-            QualificationStage.NEGATIVE_PATHS, deltas,
-            ("broad_error_expectations", "error_status_only_tests", "rejection_state_effects"),
-            ("rejection_state_effects",),
-            "only static expected-error signals; state after rejection, rollback and side effects are not evidenced",
-        ),
+        _negative_path_stage(changes, candidate, deltas),
         _mutation_stage(candidate),
         _pipeline_stage(session, authorized),
         _artifact_stage(candidate),

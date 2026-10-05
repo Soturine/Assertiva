@@ -68,6 +68,108 @@ def _assertion_kind(node: ast.Assert) -> str:
     return "BEHAVIORAL_ASSERTION"
 
 
+# --- negative-path dimensions (E3: deterministic AST signals, not runtime proof) ---------
+
+NEGATIVE_DIMENSIONS = (
+    "ERROR_TYPE", "MESSAGE", "MACHINE_CODE", "FIELD_OR_PATH", "STRUCTURED_CONTEXT",
+    "PROTOCOL_STATUS", "STATE_AFTER_REJECTION", "ASYNC_OBSERVED",
+)
+_CODE = {"code", "error_code", "err_code", "errcode", "errno", "error_type", "reason_code"}
+_FIELD = {"field", "fields", "path", "loc", "location", "pointer", "param", "parameter", "field_name", "attribute"}
+_CONTEXT = {"errors", "details", "detail", "context", "extra", "violations"}
+_MESSAGE = {"message", "msg", "args"}
+_RAISES = {"raises", "assertRaises", "assertRaisesRegex"}
+
+
+def _names(node: ast.AST) -> set[str]:
+    names: set[str] = set()
+    for item in ast.walk(node):
+        if isinstance(item, ast.Attribute):
+            names.add(item.attr)
+        elif isinstance(item, ast.Subscript) and isinstance(item.slice, ast.Constant) and isinstance(item.slice.value, str):
+            names.add(item.slice.value)
+    return names
+
+
+def _refers_to(node: ast.AST, var: str | None) -> bool:
+    return var is not None and any(isinstance(n, ast.Name) and n.id == var for n in ast.walk(node))
+
+
+def _detail_dims(assert_node: ast.Assert, var: str | None = None) -> set[str]:
+    names, found = _names(assert_node), set()
+    if names & _CODE:
+        found.add("MACHINE_CODE")
+    if names & _FIELD:
+        found.add("FIELD_OR_PATH")
+    if names & _CONTEXT:
+        found.add("STRUCTURED_CONTEXT")
+    stringified = any(
+        isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "str" and any(_refers_to(a, var) for a in n.args)
+        for n in ast.walk(assert_node)
+    )
+    if names & _MESSAGE or stringified:
+        found.add("MESSAGE")
+    return found
+
+
+def _raises_call(expr: ast.AST) -> ast.Call | None:
+    if isinstance(expr, ast.Call) and (_expr_name(expr.func) or "").split(".")[-1] in _RAISES:
+        return expr
+    return None
+
+
+def negative_path_evidence(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[tuple[str, ...], tuple[str, ...], bool]:
+    """(dimensions, specific expected error types, async failure created but never observed)."""
+    dims: set[str] = set()
+    error_types: list[str] = []
+    is_async = isinstance(node, ast.AsyncFunctionDef)
+    blocks = []  # (with node, excinfo var)
+    for item in ast.walk(node):
+        if isinstance(item, (ast.With, ast.AsyncWith)):
+            for with_item in item.items:
+                call = _raises_call(with_item.context_expr)
+                if call is None:
+                    continue
+                var = with_item.optional_vars.id if isinstance(with_item.optional_vars, ast.Name) else None
+                blocks.append((item, var))
+                if is_async and any(isinstance(n, ast.Await) for stmt in item.body for n in ast.walk(stmt)):
+                    dims.add("ASYNC_OBSERVED")
+        if isinstance(item, ast.Call) and _raises_call(item):
+            if item.args and not _is_broad_exception(item.args[0]):
+                dims.add("ERROR_TYPE")
+                error_types.append((_expr_name(item.args[0]) or "?").split(".")[-1])
+            if any(k.arg == "match" for k in item.keywords) or (_expr_name(item.func) or "").endswith("Regex"):
+                dims.add("MESSAGE")
+
+    asserts = [n for n in ast.walk(node) if isinstance(n, ast.Assert)]
+    status_negative = any(_assertion_kind(a) == "ERROR_STATUS_ONLY" for a in asserts)
+    if status_negative:
+        dims.add("PROTOCOL_STATUS")
+        for a in asserts:
+            dims |= _detail_dims(a)
+    for with_node, var in blocks:
+        end = getattr(with_node, "end_lineno", with_node.lineno)
+        for a in asserts:
+            if _refers_to(a, var):
+                dims |= _detail_dims(a, var)
+            elif a.lineno > end:
+                dims.add("STATE_AFTER_REJECTION")
+
+    unobserved = False
+    if is_async:
+        awaited = {n.id for aw in ast.walk(node) if isinstance(aw, ast.Await) for n in ast.walk(aw) if isinstance(n, ast.Name)}
+        for item in ast.walk(node):
+            value = item.value if isinstance(item, (ast.Assign, ast.Expr)) else None
+            if isinstance(value, ast.Call) and (_expr_name(value.func) or "").split(".")[-1] in {"create_task", "ensure_future"}:
+                targets = [t.id for t in getattr(item, "targets", []) if isinstance(t, ast.Name)]
+                if not targets or not set(targets) & awaited:
+                    unobserved = True
+    if not blocks and not status_negative and not any(_raises_call(n) for n in ast.walk(node)):
+        dims = set()  # not a negative-path test: detail names alone prove nothing about failures
+    ordered = tuple(d for d in NEGATIVE_DIMENSIONS if d in dims)
+    return ordered, tuple(dict.fromkeys(error_types)), unobserved
+
+
 def _function_assertions(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, ...]:
     kinds = [_assertion_kind(item) for item in ast.walk(node) if isinstance(item, ast.Assert)]
     for item in ast.walk(node):
@@ -179,6 +281,12 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
     return relations
 
 
+def _definition(node_id: str, rel: str, node: ast.FunctionDef | ast.AsyncFunctionDef) -> TestDefinition:
+    kinds = _function_assertions(node)
+    dims, error_types, unobserved = negative_path_evidence(node)
+    return TestDefinition(node_id, rel, node.name, kinds, all(kind in _WEAK for kind in kinds), dims, error_types, unobserved)
+
+
 def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
     root = Path(root)
     out: list[TestDefinition] = []
@@ -190,30 +298,57 @@ def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
         rel = str(path.relative_to(root)).replace("\\", "/")
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
-                kinds = _function_assertions(node)
-                out.append(
-                    TestDefinition(
-                        f"{rel}::{node.name}",
-                        rel,
-                        node.name,
-                        kinds,
-                        all(kind in _WEAK for kind in kinds),
-                    )
-                )
+                out.append(_definition(f"{rel}::{node.name}", rel, node))
             elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
                 for child in node.body:
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test_"):
-                        kinds = _function_assertions(child)
-                        out.append(
-                            TestDefinition(
-                                f"{rel}::{node.name}::{child.name}",
-                                rel,
-                                child.name,
-                                kinds,
-                                all(kind in _WEAK for kind in kinds),
-                            )
-                        )
+                        out.append(_definition(f"{rel}::{node.name}::{child.name}", rel, child))
     return out
+
+
+WEAK_NEGATIVE = frozenset({"ERROR_TYPE", "PROTOCOL_STATUS"})
+DETAIL = frozenset({"MACHINE_CODE", "FIELD_OR_PATH", "STRUCTURED_CONTEXT"})
+
+
+def is_negative_path(test: TestDefinition) -> bool:
+    return bool(test.negative_dims) or "BROAD_ERROR_EXPECTATION" in test.assertion_kinds
+
+
+def lacks_contract_detail(test: TestDefinition) -> bool:
+    """Negative-path test that only shows *that* something failed (type/status) or accepts any error."""
+    return is_negative_path(test) and set(test.negative_dims) <= WEAK_NEGATIVE
+
+
+def _negative_path_findings(tests: list[TestDefinition]) -> list[Finding]:
+    findings = []
+    detailed_types = {t for test in tests if DETAIL & set(test.negative_dims) for t in test.error_types}
+    type_only = [
+        test for test in tests
+        if test.error_types and not DETAIL & set(test.negative_dims) and set(test.error_types) & detailed_types
+    ]
+    if type_only:
+        findings.append(Finding(
+            "ERROR_CONTRACT_FIELD_NOT_OBSERVED",
+            "Other tests show these errors carry a machine code/field/context, but these tests only check the type.",
+            {"tests": [t.node_id for t in type_only][:20], "error_types": sorted({e for t in type_only for e in t.error_types} & detailed_types)},
+        ))
+    raising = [t for t in tests if "ERROR_TYPE" in t.negative_dims]
+    if any("STATE_AFTER_REJECTION" in t.negative_dims for t in raising):
+        missing = [t.node_id for t in raising if "STATE_AFTER_REJECTION" not in t.negative_dims]
+        if missing:
+            findings.append(Finding(
+                "STATE_AFTER_REJECTION_NOT_EVIDENCED",
+                "Some tests check state after a rejection; these do not, so partial writes would go unnoticed (static E3 signal).",
+                {"tests": missing[:20]},
+            ))
+    unobserved = [t.node_id for t in tests if t.async_unobserved]
+    if unobserved:
+        findings.append(Finding(
+            "ASYNC_FAILURE_NOT_OBSERVED",
+            "An async task is created but never awaited, so its failure cannot fail the test.",
+            {"tests": unobserved[:20]},
+        ))
+    return findings
 
 
 def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = None) -> PytestAssuranceReport:
@@ -275,7 +410,7 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
             )
         )
 
-    error_status_only = [test.node_id for test in tests if "ERROR_STATUS_ONLY" in test.assertion_kinds]
+    error_status_only = [test.node_id for test in tests if test.negative_dims == ("PROTOCOL_STATUS",)]
     if error_status_only:
         findings.append(
             Finding(
@@ -284,6 +419,8 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
                 {"count": len(error_status_only), "tests": error_status_only[:20]},
             )
         )
+
+    findings.extend(_negative_path_findings(tests))
 
     if coverage and coverage.line_percent is not None and coverage.branch_percent is not None:
         if coverage.line_percent >= 90 and coverage.line_percent - coverage.branch_percent >= 20:

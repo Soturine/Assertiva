@@ -65,6 +65,7 @@ class StateEvidence:
     limitations: list[str] = field(default_factory=list)
     mutation: list[MutationRun] = field(default_factory=list)
     artifacts: list[ArtifactEvidence] = field(default_factory=list)
+    negative_paths: dict[str, list[str]] = field(default_factory=dict)  # test id -> dimensions (E3)
 
     def invocation_ids(self) -> set[str]:
         return {inv.invocation_id for run in self.runs for inv in run.invocations}
@@ -144,6 +145,7 @@ def measure(
             state.runs.append(adapter.run(copy, coverage=True))
             for name, value in adapter.static_signals(copy).items():
                 state.static[name] = state.static.get(name, 0) + value
+            state.negative_paths.update(adapter.static_negative_paths(copy))
     finally:
         shutil.rmtree(copy, ignore_errors=True)
     state.negative_controls = [run_negative_control(source, control, adapters) for control in negative_controls]
@@ -186,6 +188,9 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         "broad_error_expectations": MetricDirection.LOWER_IS_BETTER,
         "error_status_only_tests": MetricDirection.LOWER_IS_BETTER,
         "expected_error_contracts": MetricDirection.CONTEXTUAL,
+        "negative_path_tests": MetricDirection.CONTEXTUAL,
+        "negative_paths_without_contract_detail": MetricDirection.LOWER_IS_BETTER,
+        "negative_paths_with_state_after_rejection": MetricDirection.HIGHER_IS_BETTER,
     }
     for name, value in state.static.items():
         add(name, value, static_directions.get(name, MetricDirection.INFORMATIONAL), tier="E3")
@@ -269,6 +274,7 @@ def state_from_dict(data: dict) -> StateEvidence:
             NegativeControlResult(**{**r, "outcome": ControlOutcome(r["outcome"])}) for r in data["negative_controls"]
         ],
         limitations=list(data["limitations"]),
+        negative_paths={k: list(v) for k, v in data.get("negative_paths", {}).items()},
         mutation=[
             MutationRun(**{
                 **m,

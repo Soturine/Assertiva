@@ -101,13 +101,24 @@ class PytestNativeAdapter:
         """Static (E3) oracle / negative-path signals from the bounded AST analysis."""
         from assertiva.pytest_audit import audit_pytest_project
 
+        from assertiva.pytest_audit import is_negative_path, lacks_contract_detail
+
         tests = audit_pytest_project(root).tests
         return {
             "weak_oracle_tests": sum(test.smoke_like for test in tests),
             "broad_error_expectations": sum("BROAD_ERROR_EXPECTATION" in t.assertion_kinds for t in tests),
-            "error_status_only_tests": sum("ERROR_STATUS_ONLY" in t.assertion_kinds for t in tests),
+            "error_status_only_tests": sum(t.negative_dims == ("PROTOCOL_STATUS",) for t in tests),
             "expected_error_contracts": sum("EXPECTED_ERROR_CONTRACT" in t.assertion_kinds for t in tests),
+            "negative_path_tests": sum(is_negative_path(t) for t in tests),
+            "negative_paths_without_contract_detail": sum(lacks_contract_detail(t) for t in tests),
+            "negative_paths_with_state_after_rejection": sum("STATE_AFTER_REJECTION" in t.negative_dims for t in tests),
         }
+
+    def static_negative_paths(self, root: str | Path) -> dict[str, list[str]]:
+        """Negative-path test id -> observable failure-contract dimensions (static, E3)."""
+        from assertiva.pytest_audit import audit_pytest_project, is_negative_path
+
+        return {t.node_id: list(t.negative_dims) for t in audit_pytest_project(root).tests if is_negative_path(t)}
 
     def reproduction_args(self, check) -> list[str] | None:
         """pytest arguments that reproduce a delivery check, or None if this adapter cannot."""

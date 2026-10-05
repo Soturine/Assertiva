@@ -24,7 +24,8 @@ _SEVERITY = {
     "CI_TEST_EXECUTION_GAP": "high", "LOCAL_CHECK_NOT_OBSERVED_IN_CI": "high", "HIGH_COVERAGE_WEAK_ORACLE": "high",
     "SUITE_SMOKE_DOMINANT": "high", "MUTATION_SURVIVORS": "high", "MUTATION_REPORT_UNREADABLE": "medium",
     "MUTATION_REPORT_SOURCE_MISMATCH": "medium",
-    "ARTIFACT_QUALIFICATION_FAILED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
+    "ARTIFACT_QUALIFICATION_FAILED": "high", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
+    "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
     "CI_PYTEST_NOT_OBSERVED": "medium", "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "info", "NO_DELIVERY_PIPELINE_OBSERVED": "info",
@@ -48,6 +49,9 @@ _RECOMMENDATION = {
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
     "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
     "ARTIFACT_QUALIFICATION_FAILED": "Fix packaging (included packages, package data, metadata) so the installed artifact passes the same tests as the source tree.",
+    "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "Assert the machine code/field the error contract carries, as the other tests for the same error do.",
+    "STATE_AFTER_REJECTION_NOT_EVIDENCED": "After the expected rejection, assert that no partial write or forbidden side effect happened.",
+    "ASYNC_FAILURE_NOT_OBSERVED": "Await (or gather) the created task so its failure can fail the test.",
     "ARTIFACT_OMITS_SOURCE_FILES": "Confirm the listed files are intentionally excluded from the artifact, or add them as package data.",
 }
 
@@ -75,6 +79,7 @@ def state_summary(state: StateEvidence | None) -> dict | None:
         "negative_controls": to_jsonable(state.negative_controls),
         "mutation": [_mutation_summary(run) for run in state.mutation],
         "artifacts": to_jsonable(state.artifacts),
+        "negative_paths": {k: list(v) for k, v in state.negative_paths.items()},
         "limitations": list(state.limitations),
     }
 
@@ -335,6 +340,26 @@ def _mutation_html(report: dict) -> str:
     )
 
 
+def _negative_html(report: dict) -> str:
+    states = [(k, s) for k, s in report["states"].items() if s and s.get("negative_paths")]
+    if not states:
+        return ""
+    tests = sorted({t for _, s in states for t in s["negative_paths"]})
+    head = "".join(f'<th scope="col">{_STATE_LABELS[k]}</th>' for k, _ in states)
+    rows = "".join(
+        f'<tr><th scope="row"><code>{_e(t)}</code></th>'
+        + "".join(f"<td>{_e(', '.join(s['negative_paths'][t]) or 'any error accepted') if t in s['negative_paths'] else '—'}</td>" for _, s in states)
+        + "</tr>"
+        for t in tests
+    )
+    return (
+        '<section id="negative-paths" aria-labelledby="h-neg"><h2 id="h-neg">Negative-path evidence</h2>'
+        "<p>What each failure-path test observes (static E3 signals). A post-rejection assertion is a state signal, not rollback proof.</p>"
+        f'<div class="scroll"><table><caption>Observed failure-contract dimensions per test</caption><thead><tr><th scope="col">Test</th>{head}</tr></thead>'
+        f"<tbody>{rows}</tbody></table></div></section>"
+    )
+
+
 def _artifact_html(report: dict) -> str:
     rows = []
     for key, state in report["states"].items():
@@ -488,6 +513,8 @@ def render_html(report: dict) -> str:
     sections = [("summary", "Summary"), ("metrics", "States and metrics")]
     if report.get("candidate_qualification"):
         sections.append(("qualification", "Qualification"))
+    if any((s or {}).get("negative_paths") for s in report["states"].values()):
+        sections.append(("negative-paths", "Negative paths"))
     if any((s or {}).get("mutation") for s in report["states"].values()):
         sections.append(("mutation-evidence", "Mutation"))
     if any((s or {}).get("artifacts") for s in report["states"].values()):
@@ -518,7 +545,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

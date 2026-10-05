@@ -146,6 +146,9 @@ class TestDefinition:
     name: str
     assertion_kinds: tuple[str, ...] = ()
     smoke_like: bool = False
+    negative_dims: tuple[str, ...] = ()
+    error_types: tuple[str, ...] = ()
+    async_unobserved: bool = False
 
 
 @dataclass(frozen=True)

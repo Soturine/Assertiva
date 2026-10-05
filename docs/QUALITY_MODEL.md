@@ -70,3 +70,14 @@ Statement/line, branch/decision, condition, function/method, instruction and tes
 ## Refactor safety
 
 A suite should be judged partly by whether it can detect unintended behavioral drift during refactoring. High coverage with weak oracles is not a safety net. For consequential refactors, map important behaviors/contracts to credible detectors and challenge the suite with negative controls or mutation where proportionate.
+
+
+## Candidate-suite qualification
+
+A generated or modified test is not trusted because it passes once. Compare baseline and candidate evidence and challenge the candidate safety net when proportionate.
+
+Useful comparisons include coverage metric deltas, mutation/negative-control sensitivity, negative-path depth, parameterized boundary representation, integration/E2E fidelity, flaky behavior, runtime cost and delivery-pipeline parity.
+
+Test count is contextual. More tests can mean duplicated noise; fewer tests can be an improvement if equivalent or stronger evidence is preserved at lower cost.
+
+A proposed retirement remains a review candidate until a human explicitly approves removal or consolidation.

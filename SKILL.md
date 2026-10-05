@@ -98,6 +98,29 @@ The HTML surface should include accessible charts and textual/table equivalents,
 
 Candidate metrics are candidate evidence, not current-project evidence.
 
+## Candidate qualification / test-the-tests
+
+Inside IMPROVE, do not trust generated or modified tests merely because they pass. Qualify the candidate safety net using the strongest available evidence:
+- candidate tests and the unchanged original regression suite;
+- line/branch/condition/function coverage as available;
+- assertion/oracle strength;
+- negative-path/error/rollback/state-effect evidence;
+- parameterized/boundary-case materialization;
+- integration/E2E fidelity and matrix coverage;
+- mutation testing or deliberate negative controls where proportionate;
+- flake/retry/order-dependence signals;
+- runtime/resource cost;
+- pipeline-equivalent checks and build/package/startup evidence;
+- optional non-production preview deployment only when supported, safe and explicitly authorized.
+
+Never deploy to production merely to qualify candidate tests.
+
+Original tests are immutable baseline evidence during IMPROVE. ADD/MODIFY/RETIRE proposals happen only in isolated candidate state until approval. A retirement candidate must keep the project original active until explicit human approval. Do not comment out originals in active files as a default preservation mechanism; preserve revision/fingerprint and show side-by-side diffs instead.
+
+A higher test count is not automatically an improvement. Compare evidence deltas with explicit metric direction and report mixed/regressed/unknown dimensions without collapsing them into a single quality score.
+
+Read docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md when proposing or evaluating test changes.
+
 ## Optional integrations
 
 Functional Test Designer is an optional source of authority-rich Test Cases. Preserve its oracle/provenance when present, but Assertiva must work normally on projects that only have pytest/Jest/Playwright/JUnit/etc. Functional Test Executor is also optional and applies when Azure Test Plans fetch/publication is part of the workflow. See docs/FTD_FTE_INTEROPERABILITY.md.

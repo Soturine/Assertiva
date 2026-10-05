@@ -39,6 +39,10 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [x] two-command product UX contract: audit / improve
 - [x] read-only audit and isolated candidate write policy
 - [x] HTML Assurance Report information architecture and evidence-delta model
+- [x] generic CandidateQualification / CandidateTestChange model
+- [x] metric-direction-aware baseline vs candidate comparison without a magic score
+- [x] original-test preservation / approval-gated retirement policy
+- [x] top-level technical-preview `assertiva audit` command with conservative UNKNOWN fallback
 - [ ] native pytest collection/result adapter
 - [ ] inherited/composed test materialization from native runner evidence
 - [ ] collection errors, skip, xfail, markers, assumptions and filters
@@ -112,6 +116,12 @@ TDD first: reproduce the false-green/evidence gap, then implement the smallest d
 - [ ] stable `assertiva improve` command
 - [ ] runtime-enforced read-only audit policy
 - [ ] isolated candidate workspace + stale-source protection
+- [ ] candidate qualification orchestrator (test-the-tests)
+- [ ] run unchanged original regression against candidate
+- [ ] mutation/negative-control qualification adapters
+- [ ] pipeline-equivalent candidate verification
+- [ ] optional authorized remote CI execution
+- [ ] optional ephemeral/preview deployment qualification
 - [ ] approval-gated patch application
 - [ ] responsive accessible HTML Assurance Report
 - [ ] baseline/candidate/applied report comparison

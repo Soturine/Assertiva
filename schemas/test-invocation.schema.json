@@ -2,39 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Assertiva Test Invocation",
   "type": "object",
-  "required": [
-    "definition_id",
-    "invocation_id"
-  ],
+  "required": ["definition_id", "invocation_id"],
   "properties": {
-    "definition_id": {
-      "type": "string"
-    },
-    "invocation_id": {
-      "type": "string"
-    },
-    "parameter_case_id": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "display_name": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "attempt": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "matrix": {
-      "type": "object"
-    },
-    "redacted_parameters": {
-      "type": "boolean"
-    }
+    "definition_id": {"type": "string"},
+    "materialization_id": {"type": ["string", "null"]},
+    "invocation_id": {"type": "string"},
+    "parameter_case_id": {"type": ["string", "null"]},
+    "display_name": {"type": ["string", "null"]},
+    "attempt": {"type": "integer", "minimum": 1},
+    "matrix": {"type": "object"},
+    "redacted_parameters": {"type": "boolean"}
   },
   "additionalProperties": true
 }

@@ -52,6 +52,9 @@ Heuristic or LLM output must not silently become deterministic fact. Derived gra
 - VerificationCheck — one discovered validation/gate/check with kind, command/tool, origin, scope, blocking semantics, evidence class and limitations.
 - VerificationSurface — the revision-scoped inventory of checks observed across local workflows, hooks, CI/CD, packaging and deployment.
 - TestInventoryEntry — definition identity, runner/framework, source, level/fidelity, dynamic/parameterized characteristics and tags.
+- TestCompositionRelation — declaration/materialization inheritance/composition/override provenance.
+- CandidateTestChange — isolated ADD/MODIFY/RETIRE_CANDIDATE proposal with original fingerprint and mandatory human approval.
+- CandidateQualification — candidate qualification stages plus baseline-vs-candidate evidence deltas.
 - TestInvocation — concrete parameter/data/dynamic invocation identity plus attempt/retry.
 - TestRun — revision/environment/configuration, selection basis, status, timing.
 - FailureEvidence — assertion/exception/location/cluster/diagnostic level/artifact refs.
@@ -94,3 +97,12 @@ The core must never contain policy such as "if pytest then confidence is X" or "
 When no dedicated adapter exists, Assertiva should preserve project-declared or observed commands as CUSTOM/UNKNOWN verification checks with provenance. Unknown support must widen uncertainty, not produce a fake pass.
 
 This allows projects in different languages and stacks to participate without forcing them into one framework vocabulary.
+
+
+## Candidate qualification boundary
+
+`improve` uses an isolated candidate workspace and an immutable baseline. Candidate tests are themselves tested using available mutation/negative-control, original-regression, coverage/oracle, pipeline-equivalent, artifact and stability evidence.
+
+Remote CI or preview deployment is an execution target, not a new user mode. It requires an adapter/capability plus authorization. Production deployment is never the default qualification path.
+
+Original tests are not automatically deleted or commented out. Retirement can be simulated in the isolated candidate to measure evidence loss, but applying retirement requires explicit human approval.

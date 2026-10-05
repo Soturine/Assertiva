@@ -31,6 +31,8 @@ Recommendations are proposals, not changes already present in the project.
 
 `improve` performs the audit first, creates candidate changes in an isolated workspace, verifies the candidate, compares it with the baseline, and presents the result before touching the original project.
 
+The user sees one simple flow. Candidate qualification includes **test-the-tests**: the candidate suite is challenged with available mutation/negative-control evidence, original regression evidence, coverage/oracle analysis, pipeline-equivalent checks and, when explicitly authorized and safe, an ephemeral non-production preview deployment.
+
 The user sees one simple flow:
 
 ```text
@@ -51,7 +53,9 @@ verify applied result
 
 The isolation mechanism is intentionally hidden from ordinary UX. It may use a temporary workspace or Git worktree internally, but users should not need to learn a separate "sandbox mode".
 
-Candidate removals are conservative. Assertiva may recommend removal or consolidation, but deletion requires explicit approval.
+Candidate removals are conservative. Assertiva may recommend retirement or consolidation and may evaluate that change only inside the isolated candidate, but the original project test remains active until explicit human approval. Original tests are not commented out in active source files by default; baseline revision/fingerprint plus side-by-side diff preserves them more safely.
+
+Candidate qualification is defined in [Candidate Qualification and Test-the-Tests](CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md).
 
 Before applying, Assertiva must detect stale source changes and refuse unsafe blind overwrite. Application should be patch/change-set based rather than replacing newer user work.
 

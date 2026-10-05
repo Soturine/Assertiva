@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- Candidate qualification / test-the-tests contract: immutable baseline, isolated candidate, original regression, mutation/negative controls, pipeline-equivalent verification, optional authorized preview deployment, and evidence-delta comparison.
+- Generic candidate models and tests for approval-gated ADD/MODIFY/RETIRE_CANDIDATE changes and metric-direction-aware comparisons.
+- Top-level `assertiva audit` technical-preview command with UNKNOWN fallback instead of reporting unsupported ecosystems as zero-test projects.
+- Static expected-error recognition and same-file inherited/composed pytest materialization evidence.
 - Two-command UX contract: `assertiva audit` for read-only assurance and `assertiva improve` for isolated candidate improvements with approval before project writes.
 - Runtime write-boundary policy, stale-source protection, and candidate-vs-applied evidence semantics.
 - HTML Assurance Report design contract with responsive accessible charts, baseline/candidate/applied comparisons, Evidence Delta, Verification Surface, findings and bounded green-claim reporting.

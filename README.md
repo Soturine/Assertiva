@@ -114,11 +114,11 @@ assertiva improve
 ```
 
 - `audit` analyzes the project and **never changes project files**. It inventories tests/checks, measures available evidence, finds gaps and produces recommendations plus an HTML Assurance Report.
-- `improve` starts from the audit, builds candidate test/verification improvements in an isolated workspace, verifies them, compares baseline vs candidate, and asks for approval before any project change.
+- `improve` starts from the audit, builds candidate test/verification improvements in an isolated workspace, **tests the tests**, compares baseline vs candidate, and asks for approval before any project change. Candidate qualification can include mutation/negative controls, original regression, coverage/oracle analysis, pipeline-equivalent checks, build/artifact verification and an explicitly authorized non-production preview deploy when supported.
 
 Isolation, candidate workspaces, patch application and post-apply verification are implementation details rather than extra user-facing modes. The runtime enforces write boundaries; prompt instructions alone are not considered sufficient protection.
 
-The HTML report is a first-class product surface. It should be responsive, accessible and visually calm, with summary cards, charts, filters, expandable evidence, before/candidate/applied comparisons, Evidence Delta, Verification Surface, and a final **What does green prove?** claim boundary. Candidate metrics must never be presented as already applied.
+The HTML report is a first-class product surface. It should be responsive, accessible and visually calm, with summary cards, charts, filters, expandable evidence, before/candidate/applied comparisons, Evidence Delta, Verification Surface, and a final **What does green prove?** claim boundary. Candidate metrics must never be presented as already applied. Original tests stay untouched in the project until human approval; retirement candidates are never auto-deleted or silently commented out.
 
 See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
@@ -130,11 +130,13 @@ The first TDD vertical slice is executable. It inventories pytest-style definiti
 
 ```bash
 python -m pip install -e .
-assertiva audit-pytest . --output json
-assertiva audit-pytest . --coverage-json coverage.json
+assertiva audit . --output json
+assertiva audit . --coverage-json coverage.json
 ```
 
-See [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Pipeline & Delivery Assurance](docs/PIPELINE_AND_DELIVERY_ASSURANCE.md).
+The top-level `audit` command is now the user-facing technical-preview entry point. It delegates only to executable adapters currently available and reports UNKNOWN instead of pretending an unsupported project has zero tests.
+
+See [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md), [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md), and [Pipeline & Delivery Assurance](docs/PIPELINE_AND_DELIVERY_ASSURANCE.md).
 
 Implemented/specification-level foundations include:
 - canonical `SKILL.md`;

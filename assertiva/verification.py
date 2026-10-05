@@ -99,3 +99,76 @@ def verification_gap(
     expected = {check.check_id for check in declared_or_local}
     observed = {check.check_id for check in delivery}
     return expected - observed
+
+
+def discover_surface(root) -> VerificationSurface:
+    """Run every surface adapter that supports the project."""
+    from pathlib import Path
+
+    from .adapters import surface_adapters
+
+    surface = VerificationSurface()
+    for adapter in surface_adapters():
+        if adapter.supports(Path(root)) is SupportLevel.SUPPORTED:
+            for check in adapter.discover(Path(root)):
+                surface.add(check)
+    return surface
+
+
+def _covers(delivery: VerificationCheck, local: VerificationCheck) -> bool:
+    if local.tool and delivery.tool == local.tool:
+        return True
+    runs = delivery.metadata.get("runs_hooks") or []
+    return "*" in runs or local.metadata.get("hook_id") in runs
+
+
+def surface_findings(surface: VerificationSurface) -> list:
+    """Generic parity findings: local/declared checks versus delivery (CI) checks."""
+    from .models import Finding
+
+    findings: list = []
+    delivery = surface.by_origin(VerificationOrigin.CI)
+    local = surface.by_origin(VerificationOrigin.HOOK) + surface.by_origin(VerificationOrigin.LOCAL)
+    if not delivery:
+        findings.append(
+            Finding(
+                "NO_DELIVERY_PIPELINE_OBSERVED",
+                "No CI/CD configuration was recognized. Delivery-path verification is UNKNOWN, not absent.",
+                {"recognized_local_checks": len(local)},
+            )
+        )
+        return findings
+    missing = [check.check_id for check in local if not any(_covers(ci, check) for ci in delivery)]
+    if missing:
+        findings.append(
+            Finding(
+                "LOCAL_CHECK_NOT_OBSERVED_IN_CI",
+                "Local/hook checks were not observed in CI; a green pipeline does not cover them.",
+                {"checks": missing, "matching": "by tool identity or CI hook runner; renamed tools may be missed"},
+            )
+        )
+    if local:
+        ci_only = [
+            check.command or check.tool or check.check_id
+            for check in delivery
+            if check.kind is not VerificationKind.UNKNOWN or check.command
+            if not any(check.tool == item.tool for item in local) and not check.metadata.get("runs_hooks")
+        ]
+        if ci_only:
+            findings.append(
+                Finding(
+                    "CI_ONLY_CHECK",
+                    "CI runs checks no discovered local hook declares; local green is weaker than pipeline green.",
+                    {"checks": ci_only},
+                )
+            )
+    unknown = [check.check_id for check in surface.checks if check.kind is VerificationKind.UNKNOWN]
+    if unknown:
+        findings.append(
+            Finding(
+                "UNCLASSIFIED_VERIFICATION",
+                "Some checks could not be classified; they are preserved as UNKNOWN rather than guessed.",
+                {"checks": unknown},
+            )
+        )
+    return findings

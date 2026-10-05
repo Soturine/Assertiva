@@ -159,14 +159,17 @@ def test_audit_execute_reports_source_green_artifact_red(tmp_path, capsys):
 def test_target_interpreter_with_inherited_site_dirs_keeps_its_dependencies(tmp_path):
     """Found by dogfooding: deps visible to the target only via an extra site dir were lost."""
     import subprocess
-    import sysconfig
+
+    import pytest
+    import setuptools
 
     venv = tmp_path / "target-env"
     subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(venv)], check=True)
     target = venv / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
     site = subprocess.run([str(target), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"], capture_output=True, text=True).stdout.strip()
-    # pytest/setuptools reach this interpreter only through an extra site directory.
-    (tmp_path / "pth.txt").write_text(sysconfig.get_paths()["purelib"] + "\n")
-    (Path(site) / "inherited.pth").write_text(sysconfig.get_paths()["purelib"] + "\n")
+    # pytest/setuptools reach this interpreter only through extra site directories
+    # (wherever they are installed for the interpreter running this test).
+    inherited = dict.fromkeys(str(Path(m.__file__).resolve().parents[1]) for m in (pytest, setuptools))
+    (Path(site) / "inherited.pth").write_text("\n".join(inherited) + "\n")
     evidence = PythonPackageAdapter(python=str(target)).qualify(make_package(tmp_path / "pkg"))
     assert check(evidence, "tests").status is StageStatus.PASS, evidence

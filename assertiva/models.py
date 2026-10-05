@@ -1,8 +1,59 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
+
+from .candidate import StageStatus
+
+
+class Outcome(str, Enum):
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    ERROR = "ERROR"
+    SKIPPED = "SKIPPED"
+    XFAILED = "XFAILED"
+    XPASSED = "XPASSED"
+    NOT_RUN = "NOT_RUN"
+
+
+@dataclass(frozen=True)
+class TestInvocation:
+    """One concrete runnable case as reported by a native runner.
+
+    declaration -> materialization -> invocation is preserved: an inherited or shared
+    declaration can materialize in many suites, each with many parameter invocations.
+    """
+
+    invocation_id: str
+    declaration_id: str
+    materialization_id: str
+    parameters_id: str | None = None
+    markers: tuple[str, ...] = ()
+    outcome: Outcome | None = None
+    duration_s: float | None = None
+    inherited: bool = False
+    custom: bool = False
+    message: str | None = None
+    source_paths: tuple[str, ...] = ()  # project files that define this invocation
+
+
+@dataclass
+class RunEvidence:
+    """Normalized native runner evidence (collection or execution)."""
+
+    adapter_id: str
+    mode: str
+    status: StageStatus
+    invocations: list[TestInvocation] = field(default_factory=list)
+    collection_errors: list[str] = field(default_factory=list)
+    deselected: list[str] = field(default_factory=list)
+    exit_code: int | None = None
+    wall_clock_s: float | None = None
+    command: list[str] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+    coverage: "CoverageSummary | None" = None
 
 
 @dataclass(frozen=True)

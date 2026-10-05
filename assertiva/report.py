@@ -184,6 +184,7 @@ def audit_model(
         "change_set": None,
         "candidate_qualification": None,
         "claim_boundary": {"observed": observed, "not_evidenced": not_evidenced, "limitations": limitations},
+        "remaining_unknowns": list(not_evidenced),
         "provenance": {"assertiva_version": __version__, "adapters": adapters, "read_only_verified": True},
     }
 
@@ -233,6 +234,10 @@ def improve_report(session, result, applied=None) -> dict:
             "timings": list(result.timings),
         },
         "claim_boundary": {"observed": observed, "not_evidenced": not_evidenced, "limitations": limitations},
+        "remaining_unknowns": [
+            f"{s.stage.value} ({s.status.value}): {s.summary}" for s in q.stages
+            if s.status in (StageStatus.UNKNOWN, StageStatus.NOT_RUN, StageStatus.BLOCKED)
+        ] + [f"metric {d.name}: not measured in both states" for d in q.metric_deltas if d.state is DeltaState.UNKNOWN],
         "provenance": {"assertiva_version": __version__, "python": session.python, "read_only_until_approval": True},
     }
 
@@ -393,6 +398,25 @@ def _artifact_html(report: dict) -> str:
     )
 
 
+def _runs_html(report: dict) -> str:
+    rows = []
+    for key, state in report["states"].items():
+        for run in (state or {}).get("runs", []):
+            how = "ingested report (not executed by Assertiva)" if run["mode"] == "report" else f"executed in {state['observed_in']}"
+            rows.append(
+                f'<tr><th scope="row">{_e(_STATE_LABELS[key])}</th><td>{_e(run["adapter"])}</td><td>{_e(how)}</td>'
+                f'<td><span class="chip {run["status"].lower()}">{_e(run["status"])}</span></td><td>{_e(run["invocations"])}</td>'
+                f'<td><code>{_e(" ".join(run["command"])[:160])}</code></td></tr>'
+            )
+    body = (
+        '<div class="scroll"><table><caption>Where each state\'s test results came from</caption><thead><tr><th scope="col">State</th>'
+        '<th scope="col">Adapter</th><th scope="col">Provenance</th><th scope="col">Status</th><th scope="col">Invocations</th>'
+        f'<th scope="col">Command</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+        if rows else "<p>No test results were produced or ingested.</p>"
+    )
+    return f'<section id="runs" aria-labelledby="h-runs"><h2 id="h-runs">Test runs and provenance</h2>{body}</section>'
+
+
 def _list(items: list[str], empty: str) -> str:
     return "<ul>" + "".join(f"<li>{_e(i)}</li>" for i in items) + "</ul>" if items else f"<p>{_e(empty)}</p>"
 
@@ -508,8 +532,10 @@ nav ul{display:flex;flex-wrap:wrap;gap:4px 14px;padding:0;list-style:none}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;background:var(--card)}
 caption{text-align:left;color:var(--muted);padding:6px 0}th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 .chip{display:inline-block;border:1px solid currentColor;border-radius:999px;padding:0 8px;font-size:.8em;font-weight:600}
-.pass,.improved,.killed{color:var(--pass)}.fail,.regressed,.high,.survived{color:var(--fail)}.blocked,.medium,.retire_candidate{color:var(--warn)}
-.unknown,.not_run,.info,.changed,.unchanged{color:var(--unk)}
+.pass{color:var(--pass)}.fail{color:var(--fail);font-weight:700}.blocked{color:var(--warn);border-style:double}
+.unknown{color:var(--unk);border-style:dotted}.not_run{color:var(--unk);border-style:dashed;opacity:.8}
+.improved,.killed,.stable,.applied{color:var(--pass)}.regressed,.high,.survived,.flaky_signal,.consistent_failure{color:var(--fail)}
+.medium,.retire_candidate{color:var(--warn)}.info,.changed,.unchanged,.insufficient_evidence{color:var(--unk)}
 details{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin:6px 0}summary{cursor:pointer}
 pre{overflow-x:auto;font-size:.85em}.filters{margin:8px 0}figure{margin:12px 0}
 svg .lbl,svg .val{fill:var(--fg);font-size:11px}.bar.baseline{fill:var(--c-baseline)}.bar.candidate{fill:var(--c-candidate)}
@@ -549,7 +575,10 @@ def render_html(report: dict) -> str:
         sections.append(("changes", "Change set"))
     if report["findings"] or report["workflow"] == "audit":
         sections.append(("findings", "Findings"))
-    sections += [("surface-section", "Verification surface"), ("green", "What does green prove?"), ("provenance", "Provenance")]
+    sections += [
+        ("runs", "Runs"), ("surface-section", "Verification surface"), ("green", "What does green prove?"),
+        ("unknowns", "Remaining unknowns"), ("provenance", "Provenance"),
+    ]
     nav = "".join(f'<li><a href="#{i}">{_e(t)}</a></li>' for i, t in sections)
     delta = report.get("evidence_delta")
     delta_html = (
@@ -571,11 +600,12 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_findings_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>
 <div><h3>Limitations</h3>{_list(boundary.get('limitations') or [], 'None recorded.')}</div></div></section>
+<section id="unknowns" aria-labelledby="h-unknowns"><h2 id="h-unknowns">Remaining unknowns</h2>{_list(report.get('remaining_unknowns') or [], 'None recorded.')}</section>
 <section id="provenance" aria-labelledby="h-prov"><h2 id="h-prov">Provenance</h2><pre>{_e(json.dumps(report['provenance'], indent=2))}</pre></section>
 </main>
 <footer><p class="meta">Assertiva Assurance Report v{REPORT_VERSION}. Offline, self-contained. Evidence over green status.</p></footer>

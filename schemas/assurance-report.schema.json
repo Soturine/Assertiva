@@ -99,6 +99,13 @@
           "items": {
             "type": "object"
           }
+        },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "Contextual metrics that changed without a defensible better/worse direction."
         }
       },
       "additionalProperties": true
@@ -145,6 +152,13 @@
         "object",
         "null"
       ]
+    },
+    "remaining_unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Evidence that was not produced: UNKNOWN/NOT_RUN/BLOCKED stages and unmeasured metrics."
     }
   },
   "additionalProperties": true

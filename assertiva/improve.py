@@ -260,6 +260,24 @@ def _mutation_stage(candidate: StateEvidence) -> QualificationStageResult:
     return _stage(stage, StageStatus.PASS, "; ".join(passed), *limitations)
 
 
+def _artifact_stage(candidate: StateEvidence) -> QualificationStageResult:
+    stage = QualificationStage.BUILD_AND_ARTIFACT
+    if not candidate.artifacts:
+        return _stage(stage, StageStatus.NOT_RUN, "no build/package adapter supports this project", "source-tree tests do not prove a built artifact")
+    parts, limitations = [], []
+    for a in candidate.artifacts:
+        checks = ", ".join(f"{c.name} {c.status.value}" for c in a.checks)
+        parts.append(f"{a.kind} {a.artifact or '(not built)'}" + (f" sha256 {a.sha256[:12]}" if a.sha256 else "") + f": {checks}")
+        limitations += a.limitations + [f"{c.name}: {c.detail}" for c in a.checks if c.status is not StageStatus.PASS]
+        if a.omitted_files:
+            limitations.append("files in packaged directories missing from the artifact: " + ", ".join(a.omitted_files[:10]))
+    statuses = [a.status for a in candidate.artifacts]
+    for status in (StageStatus.FAIL, StageStatus.BLOCKED, StageStatus.UNKNOWN, StageStatus.NOT_RUN):
+        if status in statuses:
+            return _stage(stage, status, "; ".join(parts), *limitations)
+    return _stage(stage, StageStatus.PASS, "; ".join(parts), *limitations)
+
+
 def _pipeline_stage(session: ImproveSession) -> QualificationStageResult:
     """Reproduce the candidate's own delivery checks where an adapter understands them."""
     stage = QualificationStage.PIPELINE_EQUIVALENT
@@ -316,10 +334,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas) 
         ),
         _mutation_stage(candidate),
         _pipeline_stage(session),
-        _stage(
-            QualificationStage.BUILD_AND_ARTIFACT, StageStatus.NOT_RUN,
-            "no build/package/startup adapter ran", "source-tree tests do not prove the built artifact",
-        ),
+        _artifact_stage(candidate),
         _stage(
             QualificationStage.PREVIEW_DEPLOY, StageStatus.NOT_RUN,
             "no authorized non-production preview adapter", "production is never used to qualify tests",

@@ -78,6 +78,30 @@ class MutationRun:
 
 
 @dataclass(frozen=True)
+class ArtifactCheck:
+    name: str  # build / install / import / tests ...
+    status: StageStatus
+    command: str | None = None
+    duration_s: float | None = None
+    detail: str = ""
+
+
+@dataclass
+class ArtifactEvidence:
+    """Evidence that a built deliverable (not the source tree) works."""
+
+    adapter_id: str
+    kind: str
+    status: StageStatus
+    artifact: str | None = None
+    sha256: str | None = None
+    checks: list[ArtifactCheck] = field(default_factory=list)
+    environment: dict[str, Any] = field(default_factory=dict)
+    omitted_files: list[str] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class TestInvocation:
     """One concrete runnable case as reported by a native runner.
 

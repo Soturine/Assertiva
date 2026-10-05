@@ -23,7 +23,8 @@ REPORT_VERSION = "1"
 _SEVERITY = {
     "CI_TEST_EXECUTION_GAP": "high", "LOCAL_CHECK_NOT_OBSERVED_IN_CI": "high", "HIGH_COVERAGE_WEAK_ORACLE": "high",
     "SUITE_SMOKE_DOMINANT": "high", "MUTATION_SURVIVORS": "high", "MUTATION_REPORT_UNREADABLE": "medium",
-    "MUTATION_REPORT_SOURCE_MISMATCH": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
+    "MUTATION_REPORT_SOURCE_MISMATCH": "medium",
+    "ARTIFACT_QUALIFICATION_FAILED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
     "CI_PYTEST_NOT_OBSERVED": "medium", "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "info", "NO_DELIVERY_PIPELINE_OBSERVED": "info",
@@ -46,6 +47,8 @@ _RECOMMENDATION = {
     "NATIVE_TESTS_FAILING": "Triage failing tests before trusting any other metric in this report.",
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
     "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
+    "ARTIFACT_QUALIFICATION_FAILED": "Fix packaging (included packages, package data, metadata) so the installed artifact passes the same tests as the source tree.",
+    "ARTIFACT_OMITS_SOURCE_FILES": "Confirm the listed files are intentionally excluded from the artifact, or add them as package data.",
 }
 
 
@@ -71,6 +74,7 @@ def state_summary(state: StateEvidence | None) -> dict | None:
         ],
         "negative_controls": to_jsonable(state.negative_controls),
         "mutation": [_mutation_summary(run) for run in state.mutation],
+        "artifacts": to_jsonable(state.artifacts),
         "limitations": list(state.limitations),
     }
 
@@ -147,7 +151,14 @@ def audit_model(
         observed.append("ingested mutation report(s): " + ", ".join(f"{r.tool or 'unknown tool'} ({r.evaluated} evaluated)" for r in usable_mutation))
     else:
         not_evidenced.append("mutation / negative-control strength")
-    not_evidenced.append("build, package, startup and deployment behavior")
+    for a in current.artifacts:
+        verified = ", ".join(f"{c.name} {c.status.value}" for c in a.checks)
+        (observed if a.status is StageStatus.PASS else not_evidenced).append(
+            f"{a.kind} {a.artifact or '(not built)'}: {verified}"
+        )
+    if not current.artifacts:
+        not_evidenced.append("build, package and installed-artifact behavior")
+    not_evidenced.append("startup, health and deployment behavior")
     return {
         "report_version": REPORT_VERSION,
         "workflow": "audit",
@@ -324,6 +335,31 @@ def _mutation_html(report: dict) -> str:
     )
 
 
+def _artifact_html(report: dict) -> str:
+    rows = []
+    for key, state in report["states"].items():
+        for a in (state or {}).get("artifacts", []):
+            checks = "".join(
+                f'<li><span class="chip {c["status"].lower()}">{_e(c["status"])}</span> {_e(c["name"])}: {_e(c["detail"])}</li>'
+                for c in a["checks"]
+            )
+            rows.append(
+                f'<tr><th scope="row">{_e(_STATE_LABELS[key])}</th><td>{_e(a["kind"])} <code>{_e(a["artifact"] or "not built")}</code><br>'
+                f'<span class="note">sha256 {_e((a["sha256"] or "—")[:16])}</span></td>'
+                f'<td><span class="chip {a["status"].lower()}">{_e(a["status"])}</span></td><td><ul>{checks}</ul></td>'
+                f'<td>{_list(a["limitations"] + (["missing from artifact: " + ", ".join(a["omitted_files"][:10])] if a["omitted_files"] else []), "None.")}</td></tr>'
+            )
+    if not rows:
+        return ""
+    return (
+        '<section id="artifact-evidence" aria-labelledby="h-art"><h2 id="h-art">Built artifact</h2>'
+        "<p>Verified from the installed artifact in an isolated environment, outside the source tree.</p>"
+        '<div class="scroll"><table><caption>Artifact qualification by state</caption><thead><tr><th scope="col">State</th>'
+        '<th scope="col">Artifact</th><th scope="col">Status</th><th scope="col">Checks</th><th scope="col">Limitations</th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table></div></section>'
+    )
+
+
 def _list(items: list[str], empty: str) -> str:
     return "<ul>" + "".join(f"<li>{_e(i)}</li>" for i in items) + "</ul>" if items else f"<p>{_e(empty)}</p>"
 
@@ -454,6 +490,8 @@ def render_html(report: dict) -> str:
         sections.append(("qualification", "Qualification"))
     if any((s or {}).get("mutation") for s in report["states"].values()):
         sections.append(("mutation-evidence", "Mutation"))
+    if any((s or {}).get("artifacts") for s in report["states"].values()):
+        sections.append(("artifact-evidence", "Artifact"))
     if report.get("change_set"):
         sections.append(("changes", "Change set"))
     if report["findings"] or report["workflow"] == "audit":
@@ -480,7 +518,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_mutation_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_findings_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

@@ -12,10 +12,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from .adapters import runner_adapters
+from .adapters import artifact_adapters, runner_adapters
 from .candidate import MetricDelta, MetricDirection, MetricObservation, StageStatus, compare_metric_sets
 from .models import (
     DETECTED,
+    ArtifactCheck,
+    ArtifactEvidence,
     CoverageSummary,
     MutantRecord,
     MutantStatus,
@@ -62,6 +64,7 @@ class StateEvidence:
     negative_controls: list[NegativeControlResult] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
     mutation: list[MutationRun] = field(default_factory=list)
+    artifacts: list[ArtifactEvidence] = field(default_factory=list)
 
     def invocation_ids(self) -> set[str]:
         return {inv.invocation_id for run in self.runs for inv in run.invocations}
@@ -128,6 +131,7 @@ def measure(
     observed_in: str,
     python: str | None = None,
     negative_controls: list[NegativeControl] | tuple = (),
+    artifacts: bool = True,
 ) -> StateEvidence:
     source = Path(source)
     adapters = runner_adapters(source, python)
@@ -143,6 +147,8 @@ def measure(
     finally:
         shutil.rmtree(copy, ignore_errors=True)
     state.negative_controls = [run_negative_control(source, control, adapters) for control in negative_controls]
+    if artifacts:
+        state.artifacts = [adapter.qualify(source) for adapter in artifact_adapters(source, python)]
     return state
 
 
@@ -195,6 +201,10 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         add("mutation_killed", sum(sum(r.count(s) for s in DETECTED) for r in usable), MetricDirection.HIGHER_IS_BETTER, tier=tier)
         add("mutation_survived", sum(r.count(MutantStatus.SURVIVED) for r in usable), MetricDirection.LOWER_IS_BETTER, tier=tier)
         add("mutation_no_coverage", sum(r.count(MutantStatus.NO_COVERAGE) for r in usable), MetricDirection.LOWER_IS_BETTER, tier=tier)
+    if state.artifacts:
+        statuses = {a.status for a in state.artifacts}
+        value = 0 if StageStatus.FAIL in statuses else (1 if statuses == {StageStatus.PASS} else None)
+        add("artifact_qualified", value, MetricDirection.HIGHER_IS_BETTER, tier="E0")
     return metrics
 
 
@@ -268,5 +278,13 @@ def state_from_dict(data: dict) -> StateEvidence:
                 ],
             })
             for m in data.get("mutation", [])
+        ],
+        artifacts=[
+            ArtifactEvidence(**{
+                **a,
+                "status": StageStatus(a["status"]),
+                "checks": [ArtifactCheck(**{**c, "status": StageStatus(c["status"])}) for c in a["checks"]],
+            })
+            for a in data.get("artifacts", [])
         ],
     )

@@ -18,6 +18,14 @@ def surface_adapters() -> list:
     return [GitHubActionsAdapter(), PreCommitAdapter()]
 
 
+def artifact_adapters(root: str | Path, python: str | None = None) -> list:
+    """Adapters that build and verify a deliverable artifact for the project at ``root``."""
+    from .python_package import PythonPackageAdapter
+
+    candidates = [PythonPackageAdapter(python=python)]
+    return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
+
+
 def runner_adapters(root: str | Path, python: str | None = None) -> list:
     """Executable test-runner adapters that support the project at ``root``."""
     from .pytest_native import PytestNativeAdapter

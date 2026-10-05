@@ -119,7 +119,9 @@ def test_aggregate_only_report_has_counts_but_no_mutant_identity(tmp_path):
 
 
 def test_core_modules_do_not_branch_on_mutation_tools():
-    core = Path(__file__).parents[1] / "assertiva"
+    import assertiva
+
+    core = Path(assertiva.__file__).parent  # the code under test, installed or source
     for name in ("candidate.py", "evidence.py", "improve.py", "verification.py", "workspace.py", "report.py", "models.py"):
         text = (core / name).read_text(encoding="utf-8").lower()
         assert not re.search(r"stryker|pitest|\bpit\b|mutmut|cosmic", text), name

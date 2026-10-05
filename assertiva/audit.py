@@ -12,6 +12,7 @@ from pathlib import Path
 from .adapters import runner_adapters
 from .adapters.mutation import load_mutation_report
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label
+from .candidate import StageStatus
 from .models import Finding, MutantStatus, Outcome
 from .report import audit_model
 from .verification import discover_surface, surface_findings
@@ -41,6 +42,26 @@ def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]
                 },
             )
         )
+    return findings
+
+
+def _artifact_findings(current: StateEvidence) -> list[Finding]:
+    findings = []
+    for a in current.artifacts:
+        if a.status is not StageStatus.PASS:
+            failed = [c for c in a.checks if c.status is not StageStatus.PASS]
+            findings.append(
+                Finding(
+                    "ARTIFACT_QUALIFICATION_FAILED" if a.status is StageStatus.FAIL else "ARTIFACT_QUALIFICATION_INCOMPLETE",
+                    "The built artifact was not verified as working; source-tree results do not cover it.",
+                    {"artifact": a.artifact, "status": a.status.value, "checks": [f"{c.name}: {c.status.value}: {c.detail}" for c in failed]},
+                )
+            )
+        if a.omitted_files:
+            findings.append(
+                Finding("ARTIFACT_OMITS_SOURCE_FILES", "Files inside packaged directories are not in the artifact (they may be intentionally excluded).",
+                        {"artifact": a.artifact, "files": a.omitted_files[:30]})
+            )
     return findings
 
 
@@ -106,6 +127,7 @@ def run_audit(
         for report in mutation_reports:
             attach_mutation(current, load_mutation_report(report), root)
         findings.extend(_mutation_findings(current))
+        findings.extend(_artifact_findings(current))
         findings.extend(surface_findings(surface))
     status = "UNKNOWN" if not adapters else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:

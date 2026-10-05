@@ -12,15 +12,14 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 from assertiva.candidate import StageStatus
 from assertiva.coverage import load_coverage_json
 from assertiva.models import CoverageSummary, Outcome, RunEvidence, TestInvocation
+from assertiva.process import run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
@@ -146,10 +145,7 @@ class PytestNativeAdapter:
         return self._invoke(Path(root), list(args or []), mode="execute", coverage=coverage)
 
     def _has_module(self, module: str, env: dict) -> bool:
-        try:
-            return subprocess.run([self.python, "-c", f"import {module}"], env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=60).returncode == 0
-        except (OSError, subprocess.TimeoutExpired):
-            return False
+        return run_command([self.python, "-c", f"import {module}"], Path.cwd(), env=env, timeout_s=60).ok
 
     def _invoke(self, root: Path, args: list[str], mode: str, coverage: bool = False) -> RunEvidence:
         with tempfile.TemporaryDirectory(prefix="assertiva-pytest-") as tmp:
@@ -175,17 +171,13 @@ class PytestNativeAdapter:
             evidence = RunEvidence(adapter_id=self.adapter_id, mode=mode, status=StageStatus.UNKNOWN, command=command)
             if coverage and not measure_coverage:
                 evidence.limitations.append("coverage.py is not available in the target interpreter; coverage was not measured")
-            started = time.monotonic()
-            try:
-                completed = subprocess.run(
-                    command, cwd=root, env=env, capture_output=True, text=True, stdin=subprocess.DEVNULL,
-                    encoding="utf-8", errors="replace", timeout=self.timeout_s,
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
+            completed = run_command(command, root, env=env, timeout_s=self.timeout_s)
+            if completed.error or completed.timed_out:
                 evidence.status = StageStatus.BLOCKED
-                evidence.limitations.append(f"pytest could not be executed: {exc}")
+                evidence.wall_clock_s = completed.duration_s
+                evidence.limitations.append(f"pytest could not be executed: {completed.summary()}")
                 return evidence
-            evidence.wall_clock_s = round(time.monotonic() - started, 3)
+            evidence.wall_clock_s = completed.duration_s
             evidence.exit_code = completed.returncode
             records = [json.loads(line) for line in evidence_file.read_text(encoding="utf-8").splitlines()] if evidence_file.exists() else []
             if measure_coverage and records:
@@ -202,13 +194,7 @@ class PytestNativeAdapter:
 
     def _coverage_json(self, root: Path, env: dict, out_dir: Path) -> CoverageSummary | None:
         report = out_dir / "coverage.json"
-        try:
-            subprocess.run(
-                [self.python, "-m", "coverage", "json", "-q", "-o", str(report)],
-                cwd=root, env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=self.timeout_s,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return None
+        run_command([self.python, "-m", "coverage", "json", "-q", "-o", str(report)], root, env=env, timeout_s=self.timeout_s)
         if not report.exists():
             return None
         summary = load_coverage_json(report)

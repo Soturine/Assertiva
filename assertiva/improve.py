@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -39,8 +40,8 @@ from .evidence import (
     state_from_dict,
     to_jsonable,
 )
-from .models import MutantStatus, Outcome
-from .process import run_command
+from .models import MutantStatus, Outcome, StabilityEvidence, StabilityRecord
+from .process import run_command, traced_stage
 from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
     Approval,
@@ -84,6 +85,8 @@ class QualificationResult:
     baseline_evidence: StateEvidence
     candidate_evidence: StateEvidence
     baseline_controls: list[NegativeControlResult] = field(default_factory=list)
+    stability: StabilityEvidence = field(default_factory=StabilityEvidence)
+    timings: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -372,32 +375,100 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str]) -> Qualificat
     return _stage(stage, StageStatus.PASS, summary + "; all gating checks passed", *notes)
 
 
-def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str]) -> list[QualificationStageResult]:
-    wall = [d for d in deltas if d.name == "wall_clock_s"]
-    return [
-        _discovery_stage(candidate),
-        _candidate_tests_stage(changes, candidate),
-        _regression_stage(session, changes, candidate),
-        _delta_stage(
+MAX_STABILITY_INVOCATIONS = 50
+MAX_STABILITY_RERUNS = 2
+
+
+def _verdict(outcomes: tuple) -> str:
+    if len(outcomes) < 2 or None in outcomes:
+        return "INSUFFICIENT_EVIDENCE"
+    failing = {Outcome.FAILED, Outcome.ERROR}
+    if all(o in failing for o in outcomes):
+        return "CONSISTENT_FAILURE"
+    return "STABLE" if len(set(outcomes)) == 1 else "FLAKY_SIGNAL"
+
+
+def _stability(session: ImproveSession, changes, candidate: StateEvidence, reruns: int) -> StabilityEvidence:
+    """Bounded reruns of relevant invocations. The first outcome is kept; later ones are added, never substituted."""
+    evidence = StabilityEvidence()
+    reruns = min(max(reruns, 0), MAX_STABILITY_RERUNS)
+    adapters = runner_adapters(session.workspace, session.python)
+    if not reruns or not candidate.runs or not adapters:
+        return evidence
+    changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
+    first = {inv.invocation_id: inv for inv in _invocations(candidate)}
+    relevant = [
+        iid for iid, inv in first.items()
+        if changed & set(inv.source_paths) or inv.outcome in (Outcome.FAILED, Outcome.ERROR)
+    ]
+    if len(relevant) > MAX_STABILITY_INVOCATIONS:
+        evidence.limitations.append(f"only the first {MAX_STABILITY_INVOCATIONS} of {len(relevant)} relevant invocations were rerun")
+    selected = relevant[:MAX_STABILITY_INVOCATIONS]
+    if not selected:
+        return evidence
+    later: dict[str, list] = {iid: [] for iid in selected}
+    for _ in range(reruns):
+        copy = snapshot(session.workspace)
+        try:
+            for adapter in adapters:
+                run = adapter.run(copy, args=selected)
+                evidence.commands.append(" ".join(run.command))
+                for inv in run.invocations:
+                    if inv.invocation_id in later:
+                        later[inv.invocation_id].append(inv)
+        finally:
+            shutil.rmtree(copy, ignore_errors=True)
+    evidence.attempts = 1 + reruns
+    for iid in selected:
+        attempts = [first[iid], *later[iid]]
+        outcomes = tuple(inv.outcome for inv in attempts)
+        evidence.records.append(StabilityRecord(iid, outcomes, tuple(inv.duration_s for inv in attempts), _verdict(outcomes)))
+    return evidence
+
+
+def _stability_stage(stability: StabilityEvidence, deltas) -> QualificationStageResult:
+    stage = QualificationStage.STABILITY_AND_COST
+    wall = next((d for d in deltas if d.name == "wall_clock_s"), None)
+    cost = f"wall clock {wall.baseline}s -> {wall.candidate}s ({wall.state.value})" if wall else "wall clock unknown"
+    bounds = ("absence of observed instability is not proof of stability", "order dependence was not measured", *stability.limitations)
+    if not stability.records:
+        return _stage(stage, StageStatus.NOT_RUN, f"no relevant invocation was rerun; {cost}", *bounds)
+    by = {v: [r for r in stability.records if r.verdict == v] for v in ("FLAKY_SIGNAL", "INSUFFICIENT_EVIDENCE", "CONSISTENT_FAILURE")}
+    if by["FLAKY_SIGNAL"]:
+        shown = ", ".join(f"{r.invocation_id} ({'/'.join(o.value if o else '?' for o in r.outcomes)})" for r in by["FLAKY_SIGNAL"][:5])
+        return _stage(stage, StageStatus.FAIL, f"FLAKY_SIGNAL: {shown}; {cost}", *bounds)
+    if by["INSUFFICIENT_EVIDENCE"] or by["CONSISTENT_FAILURE"]:
+        notes = [f"{len(by['CONSISTENT_FAILURE'])} consistently failing (see CANDIDATE_TESTS)"] if by["CONSISTENT_FAILURE"] else []
+        notes += [f"{len(by['INSUFFICIENT_EVIDENCE'])} with insufficient reruns"] if by["INSUFFICIENT_EVIDENCE"] else []
+        return _stage(stage, StageStatus.UNKNOWN, "; ".join(notes) + f"; {cost}", *bounds)
+    return _stage(
+        stage, StageStatus.PASS,
+        f"no instability observed in {stability.attempts} executions of {len(stability.records)} invocations; {cost}", *bounds,
+    )
+
+
+def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed) -> list[QualificationStageResult]:
+    plan = [
+        (QualificationStage.STATIC_AND_DISCOVERY, lambda: _discovery_stage(candidate)),
+        (QualificationStage.CANDIDATE_TESTS, lambda: _candidate_tests_stage(changes, candidate)),
+        (QualificationStage.ORIGINAL_REGRESSION, lambda: _regression_stage(session, changes, candidate)),
+        (QualificationStage.COVERAGE_AND_ORACLES, lambda: _delta_stage(
             QualificationStage.COVERAGE_AND_ORACLES, deltas,
             ("line_coverage", "branch_coverage", "weak_oracle_tests"),
             ("line_coverage", "branch_coverage", "weak_oracle_tests"),
             "coverage was not measured for both states",
-        ),
-        _negative_path_stage(changes, candidate, deltas),
-        _mutation_stage(candidate),
-        _pipeline_stage(session, authorized),
-        _artifact_stage(candidate),
-        _stage(
+        )),
+        (QualificationStage.NEGATIVE_PATHS, lambda: _negative_path_stage(changes, candidate, deltas)),
+        (QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS, lambda: _mutation_stage(candidate)),
+        (QualificationStage.PIPELINE_EQUIVALENT, lambda: _pipeline_stage(session, authorized)),
+        (QualificationStage.BUILD_AND_ARTIFACT, lambda: _artifact_stage(candidate)),
+        (QualificationStage.PREVIEW_DEPLOY, lambda: _stage(
             QualificationStage.PREVIEW_DEPLOY, StageStatus.NOT_RUN,
             "no authorized non-production preview adapter", "production is never used to qualify tests",
-        ),
-        _stage(
-            QualificationStage.STABILITY_AND_COST, StageStatus.UNKNOWN,
-            "single execution per state; wall clock " + (f"{wall[0].baseline}s -> {wall[0].candidate}s ({wall[0].state.value})" if wall else "unknown"),
-            "flakiness, retries and order dependence were not measured",
-        ),
+        )),
+        (QualificationStage.STABILITY_AND_COST, lambda: _stability_stage(stability, deltas)),
     ]
+    return [timed(stage.value, build) for stage, build in plan]
 
 
 def qualify_candidate(
@@ -405,6 +476,7 @@ def qualify_candidate(
     negative_controls: list[NegativeControl] | None = None,
     mutation_reports: dict[str, str | Path] | None = None,
     authorized_checks: set[str] | None = None,
+    stability_reruns: int = MAX_STABILITY_RERUNS,
 ) -> QualificationResult:
     """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state."""
     controls = list(negative_controls or [])
@@ -412,19 +484,29 @@ def qualify_candidate(
     unknown_states = set(reports) - {"baseline", "candidate"}
     if unknown_states:
         raise ValueError(f"mutation reports must target baseline or candidate, not {sorted(unknown_states)}")
+    timings: list[dict] = []
+
+    def timed(name, build):
+        started = time.monotonic()
+        with traced_stage(name):
+            value = build()
+        timings.append({"stage": name, "duration_s": round(time.monotonic() - started, 3)})
+        return value
+
     changes = change_set(session.baseline, session.workspace)
     with read_only_guard(session.root):
-        candidate = measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls)
+        candidate = timed("candidate-measure", lambda: measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls))
         adapters = runner_adapters(session.baseline_copy, session.python)
-        baseline_controls = [run_negative_control(session.baseline_copy, c, adapters) for c in controls]
+        baseline_controls = timed("baseline-controls", lambda: [run_negative_control(session.baseline_copy, c, adapters) for c in controls])
         baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls, "mutation": []})
         if "baseline" in reports:
             attach_mutation(baseline, load_mutation_report(reports["baseline"]), session.baseline_copy)
         if "candidate" in reports:
             attach_mutation(candidate, load_mutation_report(reports["candidate"]), session.workspace)
         deltas = compare_states(baseline, candidate)
-        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()))
-    result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls)
+        stability = timed("stability-reruns", lambda: _stability(session, changes, candidate, stability_reruns))
+        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()), stability, timed)
+    result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls, stability, timings)
     (session.directory / "qualification.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result
 

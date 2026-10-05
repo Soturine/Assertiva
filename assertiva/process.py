@@ -2,13 +2,44 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 OUTPUT_LIMIT = 4000
+# When set, every stage and command appends start/end events here *as they happen*, so an
+# interrupted or hung run still shows the stage, command, start time and timeout in flight.
+TRACE_PATH: Path | None = None
+_stage: str | None = None
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def trace(event: str, **data) -> None:
+    if TRACE_PATH is None:
+        return
+    TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(TRACE_PATH, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"event": event, "at": _now(), "stage": _stage, **data}) + "\n")
+
+
+@contextmanager
+def traced_stage(name: str):
+    global _stage
+    previous, _stage = _stage, name
+    started = time.monotonic()
+    trace("stage_start")
+    try:
+        yield
+    finally:
+        trace("stage_end", duration_s=round(time.monotonic() - started, 3))
+        _stage = previous
 
 
 def _tail(text: str | bytes | None) -> str:
@@ -48,9 +79,9 @@ class CommandResult:
 def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0) -> CommandResult:
     started = time.monotonic()
     result = CommandResult(
-        command=[str(c) for c in command], cwd=str(cwd),
-        started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"), duration_s=0.0, timeout_s=timeout_s,
+        command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
     )
+    trace("command_start", command=result.command, cwd=result.cwd, timeout_s=timeout_s)
     try:
         completed = subprocess.run(
             result.command, cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -62,4 +93,8 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
     except OSError as exc:
         result.error = str(exc)
     result.duration_s = round(time.monotonic() - started, 3)
+    trace(
+        "command_end", command=result.command[:3], returncode=result.returncode, timed_out=result.timed_out,
+        error=result.error, duration_s=result.duration_s,
+    )
     return result

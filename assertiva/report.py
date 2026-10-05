@@ -223,6 +223,8 @@ def improve_report(session, result, applied=None) -> dict:
             "ready_for_review": q.ready_for_review,
             "stages": to_jsonable(q.stages),
             "baseline_negative_controls": to_jsonable(result.baseline_controls),
+            "stability": to_jsonable(result.stability),
+            "timings": list(result.timings),
         },
         "claim_boundary": {"observed": observed, "not_evidenced": not_evidenced, "limitations": limitations},
         "provenance": {"assertiva_version": __version__, "python": session.python, "read_only_until_approval": True},
@@ -402,7 +404,25 @@ def _stages_html(report: dict) -> str:
         '<section id="qualification" aria-labelledby="h-qual"><h2 id="h-qual">Candidate qualification (test-the-tests)</h2>'
         f'<p>Ready for review: <strong>{"yes" if q["ready_for_review"] else "no"}</strong>. Unavailable stages are never shown as PASS.</p>'
         '<div class="scroll"><table><caption>Qualification stages</caption><thead><tr><th scope="col">Stage</th>'
-        f'<th scope="col">Status</th><th scope="col">Evidence and limitations</th></tr></thead><tbody>{rows}</tbody></table></div></section>'
+        f'<th scope="col">Status</th><th scope="col">Evidence and limitations</th></tr></thead><tbody>{rows}</tbody></table></div>'
+        f"{_stability_html(q)}</section>"
+    )
+
+
+def _stability_html(q: dict) -> str:
+    records = (q.get("stability") or {}).get("records") or []
+    if not records:
+        return ""
+    rows = "".join(
+        f'<tr><th scope="row"><code>{_e(r["invocation_id"])}</code></th><td>{_e(" / ".join(o or "?" for o in r["outcomes"]))}</td>'
+        f'<td>{_e(" / ".join(f"{d:.3f}s" if d is not None else "?" for d in r["durations_s"]))}</td>'
+        f'<td><span class="chip {r["verdict"].lower()}">{_e(r["verdict"])}</span></td></tr>'
+        for r in records
+    )
+    return (
+        '<div class="scroll"><table><caption>Bounded reruns (first outcome first; later passes never replace it)</caption>'
+        '<thead><tr><th scope="col">Invocation</th><th scope="col">Outcomes</th><th scope="col">Durations</th>'
+        f'<th scope="col">Verdict</th></tr></thead><tbody>{rows}</tbody></table></div>'
     )
 
 

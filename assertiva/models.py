@@ -102,6 +102,22 @@ class ArtifactEvidence:
 
 
 @dataclass(frozen=True)
+class StabilityRecord:
+    invocation_id: str
+    outcomes: tuple["Outcome | None", ...]  # first execution first; never replaced by later ones
+    durations_s: tuple[float | None, ...]
+    verdict: str  # STABLE / FLAKY_SIGNAL / CONSISTENT_FAILURE / INSUFFICIENT_EVIDENCE
+
+
+@dataclass
+class StabilityEvidence:
+    attempts: int = 0
+    records: list[StabilityRecord] = field(default_factory=list)
+    commands: list[str] = field(default_factory=list)
+    limitations: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class TestInvocation:
     """One concrete runnable case as reported by a native runner.
 

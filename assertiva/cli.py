@@ -10,8 +10,10 @@ import argparse
 import getpass
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
+from . import process
 from .audit import run_audit
 from .evidence import NegativeControl
 from .improve import (
@@ -51,6 +53,7 @@ def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     directory = _report_dir(root, args.report_dir)
     report = run_audit(root, args.coverage_json, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [])
+    report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
     lines += [f"[{f['severity'].upper()}] {f['code']}: {f['summary']}" for f in report["findings"]]
@@ -115,6 +118,7 @@ def _improve(args: argparse.Namespace) -> int:
         applied = apply_approved(session, changes, approval)
         result = _result_from(qualified)
         report = improve_report(session, result, applied)
+        report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
         report["report_path"] = str(write_report(report, directory, "improve"))
         discard_session(session)
         _emit(report, args.output, [
@@ -128,6 +132,7 @@ def _improve(args: argparse.Namespace) -> int:
         session, _controls(args.negative_controls), _state_reports(args.mutation_report), set(args.run_check or ())
     )
     report = improve_report(session, result)
+    report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "improve"))
     q = result.qualification
     lines = [f"Candidate qualification: {report['status']} (not applied)"]
@@ -148,6 +153,7 @@ def _result_from(data: dict):
     )
     from .evidence import ControlOutcome, NegativeControlResult, state_from_dict
     from .improve import QualificationResult
+    from .models import Outcome, StabilityEvidence, StabilityRecord
 
     q = data["qualification"]
     return QualificationResult(
@@ -165,6 +171,14 @@ def _result_from(data: dict):
         baseline_evidence=state_from_dict(data["baseline_evidence"]),
         candidate_evidence=state_from_dict(data["candidate_evidence"]),
         baseline_controls=[NegativeControlResult(**{**r, "outcome": ControlOutcome(r["outcome"])}) for r in data["baseline_controls"]],
+        stability=StabilityEvidence(**{
+            **data["stability"],
+            "records": [
+                StabilityRecord(r["invocation_id"], tuple(Outcome(o) if o else None for o in r["outcomes"]), tuple(r["durations_s"]), r["verdict"])
+                for r in data["stability"]["records"]
+            ],
+        }),
+        timings=list(data["timings"]),
     )
 
 
@@ -200,6 +214,8 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        process.TRACE_PATH = state_dir(Path(args.root), "traces") / f"{args.command}-{stamp}.jsonl"
         return args.handler(args)
     except (UsageError, ValueError, ApprovalRequiredError, SessionExistsError) as exc:
         print(f"assertiva: {exc}", file=sys.stderr)
@@ -210,6 +226,8 @@ def main(argv: list[str] | None = None) -> int:
     except ProjectModifiedError as exc:
         print(f"assertiva: READ-ONLY VIOLATION: {exc}", file=sys.stderr)
         return 3
+    finally:
+        process.TRACE_PATH = None
 
 
 if __name__ == "__main__":

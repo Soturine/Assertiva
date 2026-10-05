@@ -33,12 +33,12 @@ def trace(event: str, **data) -> None:
 def traced_stage(name: str):
     global _stage
     previous, _stage = _stage, name
-    started = time.monotonic()
+    started = time.perf_counter()
     trace("stage_start")
     try:
         yield
     finally:
-        trace("stage_end", duration_s=round(time.monotonic() - started, 3))
+        trace("stage_end", duration_s=round(time.perf_counter() - started, 3))
         _stage = previous
 
 
@@ -77,7 +77,7 @@ class CommandResult:
 
 
 def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0) -> CommandResult:
-    started = time.monotonic()
+    started = time.perf_counter()
     result = CommandResult(
         command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
     )
@@ -92,7 +92,7 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
         result.timed_out, result.stdout, result.stderr = True, _tail(exc.stdout), _tail(exc.stderr)
     except OSError as exc:
         result.error = str(exc)
-    result.duration_s = round(time.monotonic() - started, 3)
+    result.duration_s = round(time.perf_counter() - started, 3)
     trace(
         "command_end", command=result.command[:3], returncode=result.returncode, timed_out=result.timed_out,
         error=result.error, duration_s=result.duration_s,

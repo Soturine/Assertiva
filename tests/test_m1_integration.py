@@ -134,7 +134,9 @@ def test_real_improvement_is_shown_dimension_by_dimension(improved):
         "branch_coverage", "mutation_survived", "mutation_killed", "artifact_qualified",
         "negative_paths_without_contract_detail", "weak_oracle_tests",
     } <= names(report, "improved")
-    assert "wall_clock_s" in names(report, "changed")  # different invocations: runtime is not comparable
+    # Different invocations ran, so runtime is contextual: never reported as better or worse
+    # (equal or different readings are both legitimate for the non-directional buckets).
+    assert "wall_clock_s" not in names(report, "improved") | names(report, "regressed")
     assert "test_invocations" not in names(report, "improved")
     by = stages(result.qualification)
     for stage in (

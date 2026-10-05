@@ -487,10 +487,10 @@ def qualify_candidate(
     timings: list[dict] = []
 
     def timed(name, build):
-        started = time.monotonic()
+        started = time.perf_counter()
         with traced_stage(name):
             value = build()
-        timings.append({"stage": name, "duration_s": round(time.monotonic() - started, 3)})
+        timings.append({"stage": name, "duration_s": round(time.perf_counter() - started, 3)})
         return value
 
     changes = change_set(session.baseline, session.workspace)

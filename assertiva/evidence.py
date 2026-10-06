@@ -233,6 +233,9 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
     if state.runs:
         invocations = [inv for run in state.runs for inv in run.invocations]
         add("test_invocations", len(invocations), MetricDirection.CONTEXTUAL)
+        deselected = sum(len(run.deselected) for run in state.runs)
+        if deselected:
+            add("deselected", deselected, MetricDirection.CONTEXTUAL)
         add("test_declarations", len({inv.declaration_id for inv in invocations}), MetricDirection.CONTEXTUAL)
         add("inherited_materializations", sum(inv.inherited for inv in invocations), MetricDirection.CONTEXTUAL)
         add("passed", sum(inv.outcome is Outcome.PASSED for inv in invocations), MetricDirection.CONTEXTUAL)

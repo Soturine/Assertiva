@@ -12,7 +12,7 @@ Before adding a rule or integration:
 
 ## Validation levels
 
-Validate in proportion to the change: targeted tests for the code touched and the fast suite (`pytest -m "not integration and not artifact"`) while developing; the full suite (`pytest -n auto`) at block gates; the full self-dogfood (CI `workflow_dispatch` or a `v*` tag) when closing a milestone or changing how qualification itself works.
+Validate in proportion to the change: targeted tests for the code touched and the fast suite (`pytest -m "not integration and not artifact"`) while developing; the full suite (`pytest -n auto`) at block gates; the runtime self-qualification (CI `workflow_dispatch` or a `v*` tag: the installed wheel audits this repository and qualifies its own wheel on the fast/core suite) when closing a milestone or changing how qualification itself works. Semantic Skill evaluation is separate (`evals/README.md`).
 
 CI tool versions are pinned in `constraints.txt`; bump them deliberately in their own commit.
 

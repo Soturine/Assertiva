@@ -194,6 +194,8 @@ def run_audit(
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)
+        if run.deselected:
+            limitations.append(f"{run.adapter_id}: {len(run.deselected)} tests were deselected by the run's own filters; they are not evidenced")
     report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
     report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
     report["test_selection"] = selection_summary(selection)

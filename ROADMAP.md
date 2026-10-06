@@ -37,7 +37,7 @@ Audit and improve as a working, dogfooded vertical slice.
 - [x] JUnit XML portable result fallback (audit)
 - [x] Assurance Report model + accessible self-contained HTML
 - [x] execution trace with stage/command timing and timeout provenance
-- [x] CI dogfood: installed wheel audits this repository, runs it natively and qualifies its own wheel (on demand / release tags)
+- [x] runtime self-qualification: installed wheel audits this repository, runs it natively and qualifies its own wheel (on demand / release tags)
 - [x] fast feedback separated from full qualification: test markers, slow-test reporting in the fast suite, parallel per-commit CI, fixture-based installed-CLI invariant
 
 Deferred out of M1 (tracked in STATUS as SPECIFIED): final visual design of the HTML report (waiting for the visual reference), sdist verification, Cosmic Ray, JUnit/mutation evidence as improve candidate state for non-native runners, order dependence.

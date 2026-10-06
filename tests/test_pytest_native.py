@@ -168,3 +168,15 @@ def test_stale_bytecode_in_a_copied_tree_does_not_corrupt_provenance(tmp_path):
     [invocation] = ADAPTER.collect(copy).invocations
     assert invocation.declaration_id == "tests/test_a.py::test_a"
     assert not invocation.inherited
+
+
+@pytest.mark.integration
+def test_tests_deselected_by_the_runs_own_filters_are_declared_not_evidenced(tmp_path, monkeypatch):
+    from assertiva.audit import run_audit
+
+    write(tmp_path / "tests" / "test_a.py", "import pytest\n\n\ndef test_fast():\n    assert True\n\n\n@pytest.mark.slow\ndef test_slow():\n    assert True\n")
+    write(tmp_path / "pytest.ini", "[pytest]\nmarkers =\n    slow: slow tests\n")
+    monkeypatch.setenv("PYTEST_ADDOPTS", "-m 'not slow'")
+    report = run_audit(tmp_path, execute=True, python=sys.executable)
+    assert report["states"]["current"]["metrics"]["deselected"]["value"] == 1
+    assert any("1 tests were deselected" in item for item in report["claim_boundary"]["limitations"])

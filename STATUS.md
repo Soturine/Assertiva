@@ -104,17 +104,19 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Credential-looking values in recorded commands (`token=`, `password=`, `user:pass@` URLs) are redacted in traces.
 - Every subprocess runs non-interactively with a timeout and bounded output; each stage and command writes start/end events (stage such as `current:pytest-native`, command, start, timeout, return code, duration, timeout classification) to a trace under `ASSERTIVA_HOME` as it happens; the report links the trace.
 
-### Fast feedback ≠ full qualification
-- Tests are marked by what they run: unmarked = fast/core, `integration` = real tooling in subprocesses, `artifact` = wheel builds. The three groups add up to the whole suite (88 + 68 + 18 = 174); a conftest guard fails any unmarked test that becomes slow (>2 s including setup).
-- Per-commit CI (~2 min): validator, fast suite, integration + artifact suites in parallel, wheel build, installed-CLI smoke, and the read-only invariant through the installed CLI (`audit --execute` and an `improve` qualification) on a small generated package.
-- Full self-dogfood (on demand / `v*` tags): the installed wheel audits this repository with `--execute`, runs the suite natively and again against Assertiva's own installed wheel, and must leave the tree unchanged. Last run (2026-10-06, `9169cf7`): 174 invocations PASS, wheel build/install/import/tests PASS, 4m25s.
+### Three kinds of evidence (never interchangeable)
+- **Ordinary CI** (every commit): validator, fast/core suite, integration and artifact suites, wheel build, installed-CLI smoke and the read-only invariant through the installed CLI on a generated package; dedicated `browser` and `java` jobs for real Playwright and Maven runs.
+- **Runtime self-qualification** (`runtime-self-qualification`, on demand / `v*` tags): deep deterministic qualification of the runtime. The installed wheel audits this repository with `--execute` and qualifies its own wheel; it runs the fast/core suite natively and against the installed wheel, because the source suites already ran in ordinary CI (new execution must buy new evidence). Tests deselected this way are declared in the report. The full-suite design last ran on 2026-10-06 (`e462547`): 419 invocations PASS, wheel PASS, declared dependency closure PASS, 24m45s; the current design on the same tree: 310 invocations PASS, identical artifact fidelity, 102 s.
+- **Semantic Skill evaluation** (`evals/`): an agent using `SKILL.md` is graded by a separate judge against a private rubric. It evaluates reasoning and evidence discipline, not the runtime.
 
-| | Before (2026-10-05) | After (2026-10-06) |
+| | M1 close | M2 close |
 | --- | --- | --- |
-| Full suite, local | 170 tests, 418.5 s sequential | 174 tests, 141 s parallel |
-| Fast/core suite | — | 88 tests, ~5 s local, 1.8 s CI |
-| Artifact tests, sequential | 195.8 s | 139.1 s (2 more tests) |
-| Per-commit CI | 8–16 min (full self-dogfood every commit) | 1m51s |
+| Tests | 174 | 420 |
+| Fast/core suite, official sequential command | ~5 s | 310 tests, 22–38 s |
+| Full suite, local parallel, all ecosystems real | 141 s | 304 s |
+| Per-commit CI (validate job) | 1m51s | ~2m14s, browser and java jobs in parallel |
+
+Tests are marked by what they run (unmarked = fast/core, `integration`, `artifact`, `browser`, `jvm`); the fast suite reports unmarked tests slower than 2 s instead of failing them.
 
 ## SPECIFIED (documented, not executable)
 - Running mutation tools (Assertiva only ingests their reports); Cosmic Ray ingestion (its `cr-xml` cannot distinguish pending from killed).

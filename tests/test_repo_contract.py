@@ -38,14 +38,16 @@ def test_per_commit_ci_proves_the_essentials_without_recursive_self_qualificatio
     assert 'audit "$GITHUB_WORKSPACE" --execute' not in script
 
 
-def test_full_self_dogfood_is_a_separate_on_demand_job():
+def test_runtime_self_qualification_is_on_demand_and_buys_only_new_evidence():
     workflow, jobs = _ci()
     on = workflow.get("on") or workflow.get(True)  # YAML 1.1 reads the `on` key as True
     assert "workflow_dispatch" in on
-    dogfood = [job for job in jobs.values() if 'audit "$GITHUB_WORKSPACE" --execute' in _script(job)]
-    assert len(dogfood) == 1
-    condition = dogfood[0]["if"]
-    assert "workflow_dispatch" in condition and "refs/tags/v" in condition
+    deep = {name: job for name, job in jobs.items() if 'audit "$GITHUB_WORKSPACE" --execute' in _script(job)}
+    assert list(deep) == ["runtime-self-qualification"]
+    job = deep["runtime-self-qualification"]
+    assert "workflow_dispatch" in job["if"] and "refs/tags/v" in job["if"]
+    # the source suites already ran in `validate`; the deep job does not run them twice again
+    assert job["env"]["PYTEST_ADDOPTS"] == '-m "not integration and not artifact"'
 
 
 def test_ci_installs_are_constrained_for_reproducibility():

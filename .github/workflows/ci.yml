@@ -145,12 +145,19 @@ jobs:
           cd /tmp
           /tmp/py311/bin/assertiva audit "$GITHUB_WORKSPACE" --output json > /dev/null
 
-  dogfood:
-    # Full self-qualification (the suite natively and again against Assertiva's own installed
-    # wheel). Heavy by design: run on demand and for release tags, not on every commit.
+  runtime-self-qualification:
+    # Deep deterministic self-qualification of the Assertiva runtime (not a semantic Skill
+    # evaluation; see evals/README.md). The installed wheel audits this repository with --execute
+    # and qualifies its own wheel. New execution must buy new evidence: the source suites already
+    # ran in `validate`, so the runner executes the fast/core suite natively and against the
+    # installed wheel (source isolation, environment compatibility, declared dependency closure).
+    # On demand and for release tags only.
+    name: Runtime self-qualification
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: validate
     runs-on: ubuntu-latest
+    env:
+      PYTEST_ADDOPTS: -m "not integration and not artifact"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -164,7 +171,7 @@ jobs:
           python -m build --wheel
           python -m venv .wheel-smoke
           .wheel-smoke/bin/python -m pip install dist/*.whl -c "$GITHUB_WORKSPACE/constraints.txt"
-      - name: Dogfood read-only audit with native execution and artifact qualification
+      - name: Read-only self-audit with native execution and artifact qualification
         run: |
           before="$(git status --porcelain)"
           cd /tmp

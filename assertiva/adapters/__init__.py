@@ -37,8 +37,14 @@ def _jest(python=None):
     return JestAdapter(python=python)
 
 
+def _playwright(python=None):
+    from .playwright import PlaywrightAdapter
+
+    return PlaywrightAdapter(python=python)
+
+
 # Plain lists of factories (called with the target interpreter); no plugin machinery.
-RUNNER_FACTORIES = [_pytest, _jest]
+RUNNER_FACTORIES = [_pytest, _jest, _playwright]
 ARTIFACT_FACTORIES = [_python_package]
 
 

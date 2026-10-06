@@ -11,3 +11,7 @@ dist/
 
 # JS fixture dependencies are installed by npm ci, never committed
 node_modules/
+
+# Playwright run outputs (fixture runs outside Assertiva)
+test-results/
+playwright-report/

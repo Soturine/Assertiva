@@ -1,0 +1,93 @@
+{
+ "config": {
+  "argv": [
+   "<TMP>\\node-v24.21.0-win-x64\\node.exe",
+   "<ROOT>\\node_modules\\playwright\\cli.js",
+   "test",
+   "--project=chromium",
+   "--retries=0",
+   "--reporter=json"
+  ],
+  "configFile": "<ROOT>\\playwright.config.js",
+  "rootDir": "<ROOT>/tests",
+  "failOnFlakyTests": false,
+  "forbidOnly": false,
+  "fullyParallel": false,
+  "globalSetup": null,
+  "globalTeardown": null,
+  "globalTimeout": 0,
+  "grep": {},
+  "grepInvert": null,
+  "maxFailures": 0,
+  "metadata": {},
+  "preserveOutput": "always",
+  "projects": [
+   {
+    "outputDir": "<ROOT>/test-results",
+    "repeatEach": 1,
+    "retries": 0,
+    "metadata": {},
+    "id": "chromium",
+    "name": "chromium",
+    "testDir": "<ROOT>/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 30000
+   },
+   {
+    "outputDir": "<ROOT>/test-results",
+    "repeatEach": 1,
+    "retries": 0,
+    "metadata": {},
+    "id": "firefox",
+    "name": "firefox",
+    "testDir": "<ROOT>/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 30000
+   }
+  ],
+  "quiet": false,
+  "reporter": [
+   [
+    "json"
+   ]
+  ],
+  "reportSlowTests": {
+   "max": 5,
+   "threshold": 300000
+  },
+  "shard": null,
+  "tags": [],
+  "updateSnapshots": "missing",
+  "updateSourceMethod": "patch",
+  "version": "1.63.0",
+  "workers": 6,
+  "webServer": null
+ },
+ "suites": [],
+ "errors": [
+  {
+   "message": "Error: cannot load this file",
+   "stack": "Error: cannot load this file\n    at Object.<anonymous> (<ROOT>\\tests\\broken.spec.js:2:7)",
+   "location": {
+    "file": "<ROOT>\\tests\\broken.spec.js",
+    "column": 7,
+    "line": 2
+   },
+   "snippet": "   at broken.spec.js:2\n\n  1 | const { test } = require(\"@playwright/test\");\n> 2 | throw new Error(\"cannot load this file\");\n    |       ^\n  3 |"
+  }
+ ],
+ "stats": {
+  "startTime": "2026-10-06T16:54:04.512Z",
+  "duration": 36.18099999999998,
+  "expected": 0,
+  "skipped": 0,
+  "unexpected": 0,
+  "flaky": 0
+ }
+}

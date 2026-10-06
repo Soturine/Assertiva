@@ -1,0 +1,378 @@
+{
+ "config": {
+  "argv": [
+   "<TMP>\\node-v24.21.0-win-x64\\node.exe",
+   "<ROOT>\\node_modules\\playwright\\cli.js",
+   "test",
+   "--project=chromium",
+   "--retries=0",
+   "--reporter=json"
+  ],
+  "configFile": "<ROOT>\\playwright.config.js",
+  "rootDir": "<ROOT>/tests",
+  "failOnFlakyTests": false,
+  "forbidOnly": false,
+  "fullyParallel": false,
+  "globalSetup": null,
+  "globalTeardown": null,
+  "globalTimeout": 0,
+  "grep": {},
+  "grepInvert": null,
+  "maxFailures": 0,
+  "metadata": {
+   "actualWorkers": 1
+  },
+  "preserveOutput": "always",
+  "projects": [
+   {
+    "outputDir": "<ROOT>/test-results",
+    "repeatEach": 1,
+    "retries": 0,
+    "metadata": {
+     "actualWorkers": 1
+    },
+    "id": "chromium",
+    "name": "chromium",
+    "testDir": "<ROOT>/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 30000
+   },
+   {
+    "outputDir": "<ROOT>/test-results",
+    "repeatEach": 1,
+    "retries": 0,
+    "metadata": {
+     "actualWorkers": 1
+    },
+    "id": "firefox",
+    "name": "firefox",
+    "testDir": "<ROOT>/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 30000
+   }
+  ],
+  "quiet": false,
+  "reporter": [
+   [
+    "json"
+   ]
+  ],
+  "reportSlowTests": {
+   "max": 5,
+   "threshold": 300000
+  },
+  "shard": null,
+  "tags": [],
+  "updateSnapshots": "missing",
+  "updateSourceMethod": "patch",
+  "version": "1.63.0",
+  "workers": 6,
+  "webServer": null
+ },
+ "suites": [
+  {
+   "title": "variants.spec.js",
+   "file": "variants.spec.js",
+   "column": 0,
+   "line": 0,
+   "specs": [
+    {
+     "title": "fails",
+     "ok": false,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 30000,
+       "annotations": [],
+       "expectedStatus": "passed",
+       "projectId": "chromium",
+       "projectName": "chromium",
+       "results": [
+        {
+         "workerIndex": 0,
+         "parallelIndex": 0,
+         "status": "failed",
+         "duration": 836,
+         "error": {
+          "message": "Error: expect(locator).toHaveText(expected) failed\n\nLocator:  getByRole('heading')\nExpected: \"Total: 11\"\nReceived: \"Total: 10\"\nTimeout:  500ms\n\nCall log:\n  - Expect \"toHaveText\" getByRole('heading') with timeout 500ms\n  - waiting for getByRole('heading')\n    6 × locator resolved to <h1>Total: 10</h1>\n      - unexpected value \"Total: 10\"\n",
+          "stack": "Error: expect(locator).toHaveText(expected) failed\n\nLocator:  getByRole('heading')\nExpected: \"Total: 11\"\nReceived: \"Total: 10\"\nTimeout:  500ms\n\nCall log:\n  - Expect \"toHaveText\" getByRole('heading') with timeout 500ms\n  - waiting for getByRole('heading')\n    6 × locator resolved to <h1>Total: 10</h1>\n      - unexpected value \"Total: 10\"\n\n    at <ROOT>\\tests\\variants.spec.js:5:43",
+          "location": {
+           "file": "<ROOT>\\tests\\variants.spec.js",
+           "column": 43,
+           "line": 5
+          },
+          "snippet": "  3 | test(\"fails\", async ({ page }) => {\n  4 |   await page.setContent(\"<h1>Total: 10</h1>\");\n> 5 |   await expect(page.getByRole(\"heading\")).toHaveText(\"Total: 11\", { timeout: 500 });\n    |                                           ^\n  6 | });\n  7 |\n  8 | test(\"known bug\", async () => {"
+         },
+         "errors": [
+          {
+           "location": {
+            "file": "<ROOT>\\tests\\variants.spec.js",
+            "column": 43,
+            "line": 5
+           },
+           "message": "Error: expect(locator).toHaveText(expected) failed\n\nLocator:  getByRole('heading')\nExpected: \"Total: 11\"\nReceived: \"Total: 10\"\nTimeout:  500ms\n\nCall log:\n  - Expect \"toHaveText\" getByRole('heading') with timeout 500ms\n  - waiting for getByRole('heading')\n    6 × locator resolved to <h1>Total: 10</h1>\n      - unexpected value \"Total: 10\"\n\n\n  3 | test(\"fails\", async ({ page }) => {\n  4 |   await page.setContent(\"<h1>Total: 10</h1>\");\n> 5 |   await expect(page.getByRole(\"heading\")).toHaveText(\"Total: 11\", { timeout: 500 });\n    |                                           ^\n  6 | });\n  7 |\n  8 | test(\"known bug\", async () => {\n    at <ROOT>\\tests\\variants.spec.js:5:43"
+          }
+         ],
+         "stdout": [],
+         "stderr": [],
+         "retry": 0,
+         "startTime": "2026-10-06T16:54:14.584Z",
+         "annotations": [],
+         "attachments": [
+          {
+           "name": "screenshot",
+           "contentType": "image/png",
+           "path": "<ROOT>\\test-results\\variants-fails-chromium\\test-failed-1.png"
+          },
+          {
+           "name": "error-context",
+           "contentType": "text/markdown",
+           "path": "<ROOT>\\test-results\\variants-fails-chromium\\error-context.md"
+          }
+         ],
+         "errorLocation": {
+          "file": "<ROOT>\\tests\\variants.spec.js",
+          "column": 43,
+          "line": 5
+         }
+        }
+       ],
+       "status": "unexpected"
+      }
+     ],
+     "id": "b48b4687cb4fa019cb6c-520cff43ae0165476ca9",
+     "file": "variants.spec.js",
+     "line": 3,
+     "column": 1
+    },
+    {
+     "title": "known bug",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 30000,
+       "annotations": [
+        {
+         "type": "fail",
+         "location": {
+          "file": "<ROOT>\\tests\\variants.spec.js",
+          "line": 9,
+          "column": 8
+         }
+        }
+       ],
+       "expectedStatus": "failed",
+       "projectId": "chromium",
+       "projectName": "chromium",
+       "results": [
+        {
+         "workerIndex": 1,
+         "parallelIndex": 0,
+         "status": "failed",
+         "duration": 7,
+         "error": {
+          "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1",
+          "stack": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1\n    at <ROOT>\\tests\\variants.spec.js:10:13",
+          "location": {
+           "file": "<ROOT>\\tests\\variants.spec.js",
+           "column": 13,
+           "line": 10
+          },
+          "snippet": "   8 | test(\"known bug\", async () => {\n   9 |   test.fail();\n> 10 |   expect(1).toBe(2);\n     |             ^\n  11 | });\n  12 |\n  13 | test.describe(\"matrix\", () => {"
+         },
+         "errors": [
+          {
+           "location": {
+            "file": "<ROOT>\\tests\\variants.spec.js",
+            "column": 13,
+            "line": 10
+           },
+           "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 2\nReceived: 1\n\n   8 | test(\"known bug\", async () => {\n   9 |   test.fail();\n> 10 |   expect(1).toBe(2);\n     |             ^\n  11 | });\n  12 |\n  13 | test.describe(\"matrix\", () => {\n    at <ROOT>\\tests\\variants.spec.js:10:13"
+          }
+         ],
+         "stdout": [],
+         "stderr": [],
+         "retry": 0,
+         "startTime": "2026-10-06T16:54:16.282Z",
+         "annotations": [
+          {
+           "type": "fail",
+           "location": {
+            "file": "<ROOT>\\tests\\variants.spec.js",
+            "line": 9,
+            "column": 8
+           }
+          }
+         ],
+         "attachments": [
+          {
+           "name": "error-context",
+           "contentType": "text/markdown",
+           "path": "<ROOT>\\test-results\\variants-known-bug-chromium\\error-context.md"
+          }
+         ],
+         "errorLocation": {
+          "file": "<ROOT>\\tests\\variants.spec.js",
+          "column": 13,
+          "line": 10
+         }
+        }
+       ],
+       "status": "expected"
+      }
+     ],
+     "id": "b48b4687cb4fa019cb6c-342f63e7eafb5b9246e7",
+     "file": "variants.spec.js",
+     "line": 8,
+     "column": 1
+    },
+    {
+     "title": "broken upstream",
+     "ok": true,
+     "tags": [],
+     "tests": [
+      {
+       "timeout": 30000,
+       "annotations": [
+        {
+         "type": "fixme",
+         "location": {
+          "file": "<ROOT>\\tests\\variants.spec.js",
+          "line": 22,
+          "column": 6
+         }
+        }
+       ],
+       "expectedStatus": "skipped",
+       "projectId": "chromium",
+       "projectName": "chromium",
+       "results": [
+        {
+         "workerIndex": 1,
+         "parallelIndex": 0,
+         "status": "skipped",
+         "duration": 0,
+         "errors": [],
+         "stdout": [],
+         "stderr": [],
+         "retry": 0,
+         "startTime": "2026-10-06T16:54:17.146Z",
+         "annotations": [
+          {
+           "type": "fixme",
+           "location": {
+            "file": "<ROOT>\\tests\\variants.spec.js",
+            "line": 22,
+            "column": 6
+           }
+          }
+         ],
+         "attachments": []
+        }
+       ],
+       "status": "skipped"
+      }
+     ],
+     "id": "b48b4687cb4fa019cb6c-17d77a06f6b4bb99a3d5",
+     "file": "variants.spec.js",
+     "line": 22,
+     "column": 6
+    }
+   ],
+   "suites": [
+    {
+     "title": "matrix",
+     "file": "variants.spec.js",
+     "line": 13,
+     "column": 6,
+     "specs": [
+      {
+       "title": "renders small",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "chromium",
+         "projectName": "chromium",
+         "results": [
+          {
+           "workerIndex": 1,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 365,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-10-06T16:54:16.323Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "expected"
+        }
+       ],
+       "id": "b48b4687cb4fa019cb6c-70ad22d03c3843f13a74",
+       "file": "variants.spec.js",
+       "line": 15,
+       "column": 5
+      },
+      {
+       "title": "renders large",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "chromium",
+         "projectName": "chromium",
+         "results": [
+          {
+           "workerIndex": 1,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 196,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-10-06T16:54:16.937Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "expected"
+        }
+       ],
+       "id": "b48b4687cb4fa019cb6c-723770cf0e7f3b4920b7",
+       "file": "variants.spec.js",
+       "line": 15,
+       "column": 5
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "errors": [],
+ "stats": {
+  "startTime": "2026-10-06T16:54:14.145Z",
+  "duration": 3201.208,
+  "expected": 3,
+  "skipped": 1,
+  "unexpected": 1,
+  "flaky": 0
+ }
+}

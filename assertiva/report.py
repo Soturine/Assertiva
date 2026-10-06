@@ -75,6 +75,9 @@ def state_summary(state: StateEvidence | None) -> dict | None:
                 "adapter": run.adapter_id, "mode": run.mode, "status": run.status.value, "command": run.command,
                 "exit_code": run.exit_code, "invocations": len(run.invocations), "collection_errors": run.collection_errors,
                 "limitations": run.limitations,
+                # Adapter-defined execution dimensions (e.g. projects or targets) and attachment references.
+                "matrix": dict(run.metadata.get("matrix") or {}),
+                "attachments": sum(len(v) for v in (run.metadata.get("attachments") or {}).values()),
             }
             for run in state.runs
         ],
@@ -160,6 +163,10 @@ def audit_model(
         not_evidenced.append("whether declared CI checks actually ran, on which revision, and whether they gate merges")
     if not any(run.coverage for run in current.runs) and not any(c.error is None for c in current.coverage):
         not_evidenced.append("coverage")
+    for run in current.runs:
+        for name, value in (run.metadata.get("matrix") or {}).items():
+            if value != "EXECUTED":
+                not_evidenced.append(f"{run.adapter_id} {name}: {value.lower().replace('_', ' ')}, not executed")
     usable_mutation = [run for run in current.mutation if run.error is None and run.matches_state is not False]
     if usable_mutation:
         observed.append("ingested mutation report(s): " + ", ".join(f"{r.tool or 'unknown tool'} ({r.evaluated} evaluated)" for r in usable_mutation))
@@ -454,6 +461,11 @@ def _runs_html(report: dict) -> str:
                 f'<td><span class="chip {run["status"].lower()}">{_e(run["status"])}</span></td><td>{_e(run["invocations"])}</td>'
                 f'<td><code>{_e(" ".join(run["command"])[:160])}</code></td></tr>'
             )
+            if run.get("matrix") or run.get("attachments"):
+                cells = " · ".join(f"{name}: {value}" for name, value in run["matrix"].items()) or "none"
+                attached = run.get("attachments") or 0
+                extra = f" · {attached} attachment reference(s)" if attached else ""
+                rows.append(f'<tr><td></td><td colspan="5">Execution matrix: {_e(cells)}{_e(extra)}</td></tr>')
     body = (
         '<div class="scroll"><table><caption>Where each state\'s test results came from</caption><thead><tr><th scope="col">State</th>'
         '<th scope="col">Adapter</th><th scope="col">Provenance</th><th scope="col">Status</th><th scope="col">Invocations</th>'

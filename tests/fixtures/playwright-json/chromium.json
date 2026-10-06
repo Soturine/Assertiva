@@ -1,0 +1,313 @@
+{
+ "config": {
+  "argv": [
+   "<TMP>\\node-v24.21.0-win-x64\\node.exe",
+   "<ROOT>\\node_modules\\playwright\\cli.js",
+   "test",
+   "--project=chromium",
+   "--reporter=json"
+  ],
+  "configFile": "<ROOT>\\playwright.config.js",
+  "rootDir": "<ROOT>/tests",
+  "failOnFlakyTests": false,
+  "forbidOnly": false,
+  "fullyParallel": false,
+  "globalSetup": null,
+  "globalTeardown": null,
+  "globalTimeout": 0,
+  "grep": {},
+  "grepInvert": null,
+  "maxFailures": 0,
+  "metadata": {
+   "actualWorkers": 1
+  },
+  "preserveOutput": "always",
+  "projects": [
+   {
+    "outputDir": "<ROOT>/test-results",
+    "repeatEach": 1,
+    "retries": 1,
+    "metadata": {
+     "actualWorkers": 1
+    },
+    "id": "chromium",
+    "name": "chromium",
+    "testDir": "<ROOT>/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 30000
+   },
+   {
+    "outputDir": "<ROOT>/test-results",
+    "repeatEach": 1,
+    "retries": 1,
+    "metadata": {
+     "actualWorkers": 1
+    },
+    "id": "firefox",
+    "name": "firefox",
+    "testDir": "<ROOT>/tests",
+    "testIgnore": [],
+    "testMatch": [
+     "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+    ],
+    "timeout": 30000
+   }
+  ],
+  "quiet": false,
+  "reporter": [
+   [
+    "json"
+   ]
+  ],
+  "reportSlowTests": {
+   "max": 5,
+   "threshold": 300000
+  },
+  "shard": null,
+  "tags": [],
+  "updateSnapshots": "missing",
+  "updateSourceMethod": "patch",
+  "version": "1.63.0",
+  "workers": 6,
+  "webServer": null
+ },
+ "suites": [
+  {
+   "title": "form.spec.js",
+   "file": "form.spec.js",
+   "column": 0,
+   "line": 0,
+   "specs": [],
+   "suites": [
+    {
+     "title": "signup form",
+     "file": "form.spec.js",
+     "line": 10,
+     "column": 6,
+     "specs": [
+      {
+       "title": "semantic locators",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "chromium",
+         "projectName": "chromium",
+         "results": [
+          {
+           "workerIndex": 0,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 480,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-10-06T16:52:51.168Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "expected"
+        }
+       ],
+       "id": "2f379e0ccf955432678f-b81474dc729675001b9d",
+       "file": "form.spec.js",
+       "line": 15,
+       "column": 3
+      },
+      {
+       "title": "structural locators",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "chromium",
+         "projectName": "chromium",
+         "results": [
+          {
+           "workerIndex": 0,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 224,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-10-06T16:52:51.957Z",
+           "annotations": [],
+           "attachments": []
+          }
+         ],
+         "status": "expected"
+        }
+       ],
+       "id": "2f379e0ccf955432678f-c86dd0401db626f0d4ea",
+       "file": "form.spec.js",
+       "line": 22,
+       "column": 3
+      },
+      {
+       "title": "passes only on retry",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [],
+         "expectedStatus": "passed",
+         "projectId": "chromium",
+         "projectName": "chromium",
+         "results": [
+          {
+           "workerIndex": 0,
+           "parallelIndex": 0,
+           "status": "failed",
+           "duration": 198,
+           "error": {
+            "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 1\nReceived: 0",
+            "stack": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 1\nReceived: 0\n    at <ROOT>\\tests\\form.spec.js:30:28",
+            "location": {
+             "file": "<ROOT>\\tests\\form.spec.js",
+             "column": 28,
+             "line": 30
+            },
+            "snippet": "  28 |   test(\"passes only on retry\", async ({ page }, testInfo) => {\n  29 |     // Deterministically flaky: the first attempt fails (screenshot), the retry passes (trace).\n> 30 |     expect(testInfo.retry).toBe(1);\n     |                            ^\n  31 |   });\n  32 |\n  33 |   test.skip(\"not ready yet\", async () => {});"
+           },
+           "errors": [
+            {
+             "location": {
+              "file": "<ROOT>\\tests\\form.spec.js",
+              "column": 28,
+              "line": 30
+             },
+             "message": "Error: expect(received).toBe(expected) // Object.is equality\n\nExpected: 1\nReceived: 0\n\n  28 |   test(\"passes only on retry\", async ({ page }, testInfo) => {\n  29 |     // Deterministically flaky: the first attempt fails (screenshot), the retry passes (trace).\n> 30 |     expect(testInfo.retry).toBe(1);\n     |                            ^\n  31 |   });\n  32 |\n  33 |   test.skip(\"not ready yet\", async () => {});\n    at <ROOT>\\tests\\form.spec.js:30:28"
+            }
+           ],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-10-06T16:52:52.195Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "screenshot",
+             "contentType": "image/png",
+             "path": "<ROOT>\\test-results\\form-signup-form-passes-only-on-retry-chromium\\test-failed-1.png"
+            },
+            {
+             "name": "error-context",
+             "contentType": "text/markdown",
+             "path": "<ROOT>\\test-results\\form-signup-form-passes-only-on-retry-chromium\\error-context.md"
+            }
+           ],
+           "errorLocation": {
+            "file": "<ROOT>\\tests\\form.spec.js",
+            "column": 28,
+            "line": 30
+           }
+          },
+          {
+           "workerIndex": 1,
+           "parallelIndex": 0,
+           "status": "passed",
+           "duration": 479,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 1,
+           "startTime": "2026-10-06T16:52:53.052Z",
+           "annotations": [],
+           "attachments": [
+            {
+             "name": "trace",
+             "contentType": "application/zip",
+             "path": "<ROOT>\\test-results\\form-signup-form-passes-only-on-retry-chromium-retry1\\trace.zip"
+            }
+           ]
+          }
+         ],
+         "status": "flaky"
+        }
+       ],
+       "id": "2f379e0ccf955432678f-b13b91f1a3d6948f9b9b",
+       "file": "form.spec.js",
+       "line": 28,
+       "column": 3
+      },
+      {
+       "title": "not ready yet",
+       "ok": true,
+       "tags": [],
+       "tests": [
+        {
+         "timeout": 30000,
+         "annotations": [
+          {
+           "type": "skip",
+           "location": {
+            "file": "<ROOT>\\tests\\form.spec.js",
+            "line": 33,
+            "column": 8
+           }
+          }
+         ],
+         "expectedStatus": "skipped",
+         "projectId": "chromium",
+         "projectName": "chromium",
+         "results": [
+          {
+           "workerIndex": 1,
+           "parallelIndex": 0,
+           "status": "skipped",
+           "duration": 0,
+           "errors": [],
+           "stdout": [],
+           "stderr": [],
+           "retry": 0,
+           "startTime": "2026-10-06T16:52:53.815Z",
+           "annotations": [
+            {
+             "type": "skip",
+             "location": {
+              "file": "<ROOT>\\tests\\form.spec.js",
+              "line": 33,
+              "column": 8
+             }
+            }
+           ],
+           "attachments": []
+          }
+         ],
+         "status": "skipped"
+        }
+       ],
+       "id": "2f379e0ccf955432678f-92a5e5c0148ac4d03088",
+       "file": "form.spec.js",
+       "line": 33,
+       "column": 8
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "errors": [],
+ "stats": {
+  "startTime": "2026-10-06T16:52:50.772Z",
+  "duration": 3205.616,
+  "expected": 2,
+  "skipped": 1,
+  "unexpected": 0,
+  "flaky": 1
+ }
+}

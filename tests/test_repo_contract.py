@@ -28,7 +28,7 @@ def test_per_commit_ci_proves_the_essentials_without_recursive_self_qualificatio
     for required in (
         "scripts/validate_repo.py",
         '-m "not integration and not artifact"',  # fast/core suite
-        '-m "integration or artifact"',  # integration and artifact suites still run on every commit
+        '-m "(integration or artifact) and not browser"',  # integration and artifact suites still run on every commit
         "python -m build --wheel",
         "/bin/assertiva\" audit",  # installed CLI smoke
         "--execute",  # read-only invariant with execution...
@@ -80,6 +80,18 @@ def test_ci_runs_the_js_adapter_against_a_real_runner_without_package_hooks():
     _, jobs = _ci()
     steps = [step for job in jobs.values() if "if" not in job for step in job["steps"]]
     installs = [str(step.get("run", "")) for step in steps if "npm ci" in str(step.get("run", ""))]
-    assert installs and all("--ignore-scripts" in run and "tests/fixtures/js-jest" in run for run in installs)
+    assert installs and all("--ignore-scripts" in run and "tests/fixtures/js-" in run for run in installs)
     required = [step for step in steps if (step.get("env") or {}).get("ASSERTIVA_REQUIRE_JS") == "1"]
     assert any("integration" in str(step.get("run", "")) for step in required)  # JS tests may not silently skip in CI
+
+
+def test_only_the_browser_job_downloads_a_browser_and_only_chromium():
+    _, jobs = _ci()
+    downloading = {name: job for name, job in jobs.items() if "cli.js install" in _script(job)}
+    assert list(downloading) == ["browser"], list(downloading)
+    script = _script(downloading["browser"])
+    assert "--only-shell chromium" in script and "firefox" not in script and "webkit" not in script
+    steps = downloading["browser"]["steps"]
+    required = [step for step in steps if (step.get("env") or {}).get("ASSERTIVA_REQUIRE_PLAYWRIGHT") == "1"]
+    assert any('-m browser' in str(step.get("run", "")) for step in required)  # may not silently skip
+    assert "and not browser" in _script(jobs["validate"])  # the per-commit integration step never needs a browser

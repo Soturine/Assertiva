@@ -21,4 +21,5 @@ pythonpath = ["."]
 markers = [
     "integration: runs real project tooling in subprocesses (native runner, improve sessions)",
     "artifact: builds and installs wheels",
+    "browser: drives a real browser (needs an installed browser build; runs in its own CI job)",
 ]

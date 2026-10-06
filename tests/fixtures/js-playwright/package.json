@@ -1,0 +1,12 @@
+{
+  "name": "assertiva-js-playwright-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Playwright project used by Assertiva's own adapter tests (no server, no network).",
+  "scripts": {
+    "test": "playwright test --project=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

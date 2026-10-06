@@ -91,6 +91,8 @@ When the target exposes a stable user-observable identity, a useful preference o
 
 This order is guidance, not a ban.
 
+Implemented (Playwright, M2): locator calls are counted by kind (ROLE, LABEL, PLACEHOLDER, TEXT, TEST_ID, CSS, XPATH, OTHER, UNKNOWN) as static E3 evidence with an informational direction. The counts describe coupling and semantics; they are never ranked or scored.
+
 ### Legitimate exceptions
 
 A structural locator/assertion can be correct when:

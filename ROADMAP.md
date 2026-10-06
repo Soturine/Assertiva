@@ -57,7 +57,7 @@ Cross-stack
 - [x] cross-stack core contract tests (fake runner/coverage/artifact adapters)
 - [x] first JavaScript/TypeScript test adapter (Jest; Vitest not yet)
 - [x] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
-- [ ] Playwright semantic browser evidence (declared / selected / executed projects)
+- [x] Playwright semantic browser evidence (declared / selected / executed projects)
 - [ ] Java test evidence (JUnit Platform, Surefire/Failsafe, Gradle, JaCoCo)
 - [ ] .NET / Go / Rust, only if the core is still simple after the above
 

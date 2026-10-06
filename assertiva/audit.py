@@ -17,7 +17,8 @@ from .evidence import StateEvidence, attach_mutation, measure, mutant_label
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
 from .process import scoped
-from .report import audit_model, execution_budget
+from .report import audit_model, execution_budget, selection_summary
+from .selection import select_changes
 from .verification import discover_surface, surface_findings
 from .workspace import boundary_report, capture_baseline, read_only_guard
 
@@ -119,14 +120,18 @@ def run_audit(
     mutation_reports: list[str | Path] | tuple = (),
     junit_reports: list[str | Path] | tuple = (),
     coverage_reports: list[str | Path] | tuple = (),
+    changed_since: str | None = None,
 ) -> dict:
     root = Path(root).resolve()
+    selection = None
     findings: list[Finding] = []
     limitations: list[str] = []
     with read_only_guard(root):
         baseline = capture_baseline(root)
         surface = discover_surface(root)
         adapters = runner_adapters(root, python)
+        if changed_since:
+            selection = select_changes(root, changed_since)
         if not adapters:
             findings.append(
                 Finding(
@@ -145,7 +150,9 @@ def run_audit(
             static_total += len(static.tests) + len(static.materializations)
             limitations.append(f"{adapter.adapter_id}: static inventory is bounded source analysis, not native collection")
         if execute and adapters:
-            current = measure(root, "current", "isolated-project-copy", python, reason="requested: audit --execute")
+            subset = sorted(selection.selected) if selection is not None and not selection.full else None
+            current = measure(root, "current", "isolated-project-copy", python,
+                              reason="requested: audit --execute" + (" (selected set)" if subset else ""), selected=subset)
         else:
             current = StateEvidence("current", "static-analysis")
             not_requested = "not requested: fast static feedback; audit --execute runs tests and artifact checks"
@@ -174,4 +181,12 @@ def run_audit(
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)
     report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
     report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
+    report["test_selection"] = selection_summary(selection)
+    if selection is not None:
+        boundary = report["claim_boundary"]
+        counts = report["test_selection"]["counts"]
+        if execute and not selection.full:
+            boundary["observed"].append(f"selected-set run: {counts['selected']} of {counts['mapped']} mapped test files ({selection.confidence.value})")
+            boundary["not_evidenced"].append(f"full-suite outcome: {counts['not_selected']} mapped test files were not run")
+        boundary["limitations"] += [lim for lim in selection.limitations if lim not in boundary["limitations"]]
     return report

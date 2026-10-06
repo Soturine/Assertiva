@@ -433,6 +433,41 @@ def _artifact_html(report: dict) -> str:
     )
 
 
+def selection_summary(selection) -> dict | None:
+    if selection is None:
+        return None
+    data = to_jsonable(selection)
+    data["full"] = selection.full
+    data["counts"] = {"selected": len(selection.selected), "not_selected": len(selection.not_selected),
+                      "mapped": len(selection.selected) + len(selection.not_selected)}
+    return data
+
+
+def _selection_html(report: dict) -> str:
+    selection = report.get("test_selection")
+    if not selection:
+        return ""
+    counts = selection["counts"]
+    rows = "".join(
+        f'<tr><th scope="row"><code>{_e(test)}</code></th><td>{_e(reasons[0]["reason"])}</td>'
+        f'<td>{_e(reasons[0]["tier"] or reasons[0]["trigger"] or "")}</td><td>{_e(" → ".join(reasons[0]["path"]))}</td></tr>'
+        for test, reasons in sorted(selection["selected"].items())[:200]
+    )
+    widening = _list([f'{w["trigger"]}{" (full suite)" if w["full"] else ""}: {w["path"] or ""} {w["reason"]}'.strip()
+                      for w in selection["widening"]], "No widening was needed.")
+    unknowns = _list([f'{u["node"]}: {u["reason"]}' for u in selection["unknown_dependencies"]], "No unknown relation is reachable from a test.")
+    return (
+        '<section id="selection" aria-labelledby="h-selection"><h2 id="h-selection">Impact-based test selection</h2>'
+        f'<p>Base <code>{_e(selection["base"] or "none")}</code> · {len(selection["changes"])} changed file(s) · '
+        f'confidence <span class="chip">{_e(selection["confidence"])}</span> · selected {counts["selected"]} of {counts["mapped"]} mapped test files'
+        f'{" · " + _e(selection["fallback"]) if selection["fallback"] else ""}</p>'
+        f'<h3>Widening</h3>{widening}<h3>Unknown dependencies</h3>{unknowns}'
+        '<div class="scroll"><table><caption>Selected tests and why</caption><thead><tr><th scope="col">Test</th><th scope="col">Reason</th>'
+        f'<th scope="col">Tier / trigger</th><th scope="col">Proof path</th></tr></thead><tbody>{rows}</tbody></table></div>'
+        f'<p class="note">{_e(selection["limitations"][0] if selection["limitations"] else "")}</p></section>'
+    )
+
+
 def _budget_html(report: dict) -> str:
     budget = report.get("execution_budget")
     if not budget:
@@ -621,6 +656,8 @@ def render_html(report: dict) -> str:
     table, chart = _metrics_table(report)
     boundary = report["claim_boundary"]
     sections = [("summary", "Summary"), ("metrics", "States and metrics")]
+    if report.get("test_selection"):
+        sections.append(("selection", "Test selection"))
     if report.get("candidate_qualification"):
         sections.append(("qualification", "Qualification"))
     if any((s or {}).get("negative_paths") for s in report["states"].values()):
@@ -658,7 +695,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_selection_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

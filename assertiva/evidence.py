@@ -151,8 +151,13 @@ def measure(
     artifacts: bool = True,
     reason: str = "state measurement",
     origin: str | Path | None = None,
+    selected: list[str] | None = None,
 ) -> StateEvidence:
-    """Measure a state in a disposable copy; ``origin`` is the project whose installed dependencies runners use."""
+    """Measure a state in a disposable copy; ``origin`` is the project whose installed dependencies runners use.
+
+    ``selected`` limits each runner to those tests when it can select them; a runner that cannot
+    runs its full suite, and says so.
+    """
     source = Path(source)
     origin = Path(origin or source)
     adapters = runner_adapters(source, python)
@@ -179,8 +184,16 @@ def measure(
     copy = runnable_copy(source, adapters, origin)
     try:
         for adapter in adapters:
+            args = None
+            if selected is not None:
+                args = adapter.selection_args(selected) if hasattr(adapter, "selection_args") else None
+                if args is None:
+                    state.limitations.append(f"{adapter.adapter_id} cannot run a selected subset; it ran its full suite")
+                elif not args:
+                    state.limitations.append(f"{adapter.adapter_id}: none of the selected tests belong to it; it was not run")
+                    continue
             with traced_stage(f"{label}:{adapter.adapter_id}"):
-                state.runs.append(adapter.run(copy, coverage=True))
+                state.runs.append(adapter.run(copy, args=args, coverage=True))
             for name, value in adapter.static_signals(copy).items():
                 state.static[name] = state.static.get(name, 0) + value
             state.negative_paths.update(adapter.static_negative_paths(copy))

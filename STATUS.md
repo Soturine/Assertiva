@@ -68,6 +68,7 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 
 ### Impact graph (M2)
 - Revision-scoped impact graph (content digest) with tiered, provenanced edges; Python slice: imports, fixtures/conftest scope, configuration, declarations, base tests, helpers, coverage.py dynamic contexts (E0) and naming (E4, never a fact). Computed dynamic imports and unparseable files are unknowns. See `docs/IMPACT_AND_SELECTION.md`.
+- Conservative test selection: `audit --changed-since REV` selects tests with a proven path to each change and widens for shared fixtures (scope), configuration, unmapped changes, no proven path, stale graphs, unreadable changes or no changes (full suite); tests reaching an unknown relation are always added and confidence is then never complete. With `--execute` only the selected set runs, reported as a selected-set claim. Runner subset execution: pytest.
 
 ### Java: Maven, Surefire/Failsafe, JaCoCo (M2)
 - Runs the project's Maven offline (`-o`, failures recorded) in a disposable copy and reads only the reports that run wrote. Each Surefire/Failsafe report goes through the generic JUnit XML parser; the adapter adds the build phase (Surefire `test`, Failsafe `integration-test`: the build's classification, not proof of scope), reruns and flaky passes, parameterized invocations of one method, the test's source file and the project's own JaCoCo report (counts per kind). JVM system properties in the reports are never copied.

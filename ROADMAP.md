@@ -63,7 +63,7 @@ Cross-stack
 
 Impact and selection
 - [x] revision-scoped test impact graph with evidence tiers
-- [ ] test selection with conservative widening (never "no impact found = nothing to run")
+- [x] test selection with conservative widening (never "no impact found = nothing to run")
 - [ ] monorepo affected sets
 
 History

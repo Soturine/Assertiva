@@ -153,6 +153,7 @@ class PythonImpactAdapter:
         package = PurePosixPath(rel).parent
         imported: dict[str, list[str]] = {}  # local name -> files that define it
         targets: dict[str, list[str]] = {}  # target file -> reasons
+        plugins: dict[str, None] = {}
 
         def unresolved(dotted: str, base_roots: list[str]) -> None:
             out.unresolved.setdefault(rel, set()).update(c for r in base_roots for c in project.candidates(r, dotted))
@@ -201,6 +202,21 @@ class PythonImpactAdapter:
                         rel, f"dynamic import with a computed name or path (line {node.lineno}); what it loads is unknown",
                         revision, "python ast"))
 
+        for node in tree.body:  # pytest_plugins: modules pytest imports by name (framework-declared)
+            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "pytest_plugins" for t in node.targets):
+                values = node.value.elts if isinstance(node.value, (ast.List, ast.Tuple)) else [node.value]
+                for value in values:
+                    if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                        for target in project.resolve(value.value, roots) or []:
+                            plugins.setdefault(target, None)
+                        if not project.resolve(value.value, roots):
+                            unresolved(value.value, roots)
+                    else:
+                        out.unknowns.append(UnknownRelation(rel, f"pytest_plugins entry is not a literal (line {node.lineno}); the plugin is unknown",
+                                                            revision, "python ast"))
+        for target in plugins:
+            if target != rel:
+                edge(rel, target, Relation.IMPORTS, "E1", "pytest_plugins declaration (pytest imports these modules)")
         bases = {
             base.id if isinstance(base, ast.Name) else base.value.id
             for node in ast.walk(tree) if isinstance(node, ast.ClassDef) and node.name.startswith("Test")

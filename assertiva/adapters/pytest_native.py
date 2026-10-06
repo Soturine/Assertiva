@@ -147,6 +147,10 @@ class PytestNativeAdapter:
     def run(self, root: str | Path, args: list[str] | None = None, coverage: bool = False) -> RunEvidence:
         return self._invoke(Path(root), list(args or []), mode="execute", coverage=coverage)
 
+    def selection_args(self, tests: list[str]) -> list[str]:
+        """pytest arguments running exactly the selected test files."""
+        return sorted(t for t in tests if t.endswith(".py"))
+
     def equivalent_to_default(self, args: list[str]) -> bool:
         """Whether a run with ``args`` selects and runs exactly what a default run does."""
         return all(arg in _COSMETIC or arg.startswith(_COSMETIC_PREFIXES) for arg in args)

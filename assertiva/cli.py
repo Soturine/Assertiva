@@ -53,7 +53,7 @@ def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     directory = _report_dir(root, args.report_dir)
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
-                       junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [])
+                       junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -200,6 +200,8 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--coverage-report", "--coverage-json", dest="coverage_report", action="append",
                        help="existing coverage report to ingest: coverage.py JSON, istanbul summary, LCOV, Cobertura or JaCoCo XML")
     audit.add_argument("--execute", action="store_true", help="also run the tests natively, in an isolated copy")
+    audit.add_argument("--changed-since", metavar="REV", help="select tests impacted by changes since REV (widened when impact is not proven); "
+                                                              "with --execute, only the selected set runs")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
     audit.set_defaults(handler=_audit)

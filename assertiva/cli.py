@@ -218,7 +218,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         process.TRACE_PATH = state_dir(Path(args.root), "traces") / f"{args.command}-{stamp}.jsonl"
-        return args.handler(args)
+        with process.run_scope():
+            return args.handler(args)
     except (UsageError, ValueError, ApprovalRequiredError, SessionExistsError) as exc:
         print(f"assertiva: {exc}", file=sys.stderr)
         return 2

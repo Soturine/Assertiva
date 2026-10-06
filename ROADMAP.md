@@ -50,7 +50,7 @@ Scale and hardening
 - [x] filesystem/path boundaries (symlinks, junctions, escapes, nested repos, case collisions)
 - [x] transactional approved apply with rollback
 - [x] artifact fidelity vs dependency closure (offline declared-dependency closure; clean index install and sdist still NOT_RUN)
-- [ ] run-scoped runtime capability evidence
+- [x] run-scoped runtime capability evidence and credential redaction in traces
 - [ ] CI reproducibility and Python 3.11 compatibility
 
 Cross-stack

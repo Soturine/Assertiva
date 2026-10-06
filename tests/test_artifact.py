@@ -206,9 +206,14 @@ def test_artifact_environment_is_created_without_bootstrapping_pip(tmp_path):
 def test_interpreter_capability_probes_are_cached(tmp_path):
     from assertiva import process
 
-    process._MODULES.clear()  # start cold so the probes really happen in this test
     root = make_package(tmp_path / "twice")
-    commands = _traced_commands(tmp_path, lambda: (ADAPTER.qualify(root), ADAPTER.qualify(root)))
+
+    def one_run_qualifying_twice():
+        with process.run_scope():  # a fresh run: probes really happen here, once each
+            ADAPTER.qualify(root)
+            ADAPTER.qualify(root)
+
+    commands = _traced_commands(tmp_path, one_run_qualifying_twice)
     probes = [c for c in commands if c[1] == "-c" and c[2].startswith("import ") and "\n" not in c[2]]
     assert probes  # capabilities were probed...
     assert len(probes) == len({(c[0], c[2]) for c in probes})  # ...once per interpreter

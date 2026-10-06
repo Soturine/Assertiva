@@ -41,7 +41,7 @@ from .evidence import (
     to_jsonable,
 )
 from .models import BudgetDecision, MutantStatus, Outcome, StabilityEvidence, StabilityRecord
-from .process import run_command, traced_stage
+from .process import run_command, scoped, traced_stage
 from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
     Approval,
@@ -114,6 +114,7 @@ def load_session(root: str | Path) -> ImproveSession | None:
     )
 
 
+@scoped
 def start_improve(root: str | Path, python: str | None = None) -> ImproveSession:
     root = Path(root).resolve()
     if load_session(root) is not None:
@@ -478,6 +479,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, 
     return [timed(stage.value, build) for stage, build in plan]
 
 
+@scoped
 def qualify_candidate(
     session: ImproveSession,
     negative_controls: list[NegativeControl] | None = None,
@@ -536,6 +538,7 @@ def load_qualified_changes(session: ImproveSession) -> list[CandidateTestChange]
     ]
 
 
+@scoped
 def apply_approved(
     session: ImproveSession,
     qualified: QualificationResult | list[CandidateTestChange],

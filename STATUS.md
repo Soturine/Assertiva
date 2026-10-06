@@ -61,6 +61,8 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Clean install from a package index and the sdist are NOT_RUN and reported as such.
 
 ### Execution provenance
+- Interpreter capability probes are evidence about one run: reused within a run (CLI command, audit, improve step), re-probed by the next, keyed by interpreter identity, never cached outside a run.
+- Credential-looking values in recorded commands (`token=`, `password=`, `user:pass@` URLs) are redacted in traces.
 - Every subprocess runs non-interactively with a timeout and bounded output; each stage and command writes start/end events (stage such as `current:pytest-native`, command, start, timeout, return code, duration, timeout classification) to a trace under `ASSERTIVA_HOME` as it happens; the report links the trace.
 
 ### Fast feedback ≠ full qualification

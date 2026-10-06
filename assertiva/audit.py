@@ -15,6 +15,7 @@ from .adapters.mutation import load_mutation_report
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
+from .process import scoped
 from .report import audit_model, execution_budget
 from .verification import discover_surface, surface_findings
 from .workspace import boundary_report, capture_baseline, read_only_guard
@@ -108,6 +109,7 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
     return findings
 
 
+@scoped
 def run_audit(
     root: str | Path,
     coverage_json: str | Path | None = None,

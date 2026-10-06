@@ -26,7 +26,7 @@ from .models import (
     RunEvidence,
     TestInvocation,
 )
-from .process import execution_refusal, traced_stage
+from .process import execution_refusal, scoped, traced_stage
 from .workspace import boundary_report, remove_tree, snapshot
 
 
@@ -128,6 +128,7 @@ def attach_mutation(state: StateEvidence, run: MutationRun, state_dir: str | Pat
     return run
 
 
+@scoped
 def measure(
     source: str | Path,
     label: str,

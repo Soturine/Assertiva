@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import os
+import re
 import subprocess
 import time
 from contextlib import contextmanager
@@ -123,16 +125,62 @@ def active_target(kind: str, identity: str):
             os.environ[TARGETS_ENV] = previous
 
 
-_MODULES: dict[tuple[str, str], bool] = {}
+# --- run-scoped capability evidence ----------------------------------------------------
+# Capability probes are evidence about an environment at a moment: reused within one run,
+# re-probed by the next run (a long-lived process must not remember a removed module).
+_SCOPES: list[dict] = []
+
+
+@contextmanager
+def run_scope():
+    """One run's capability evidence. Re-entrant: nested scopes share the outer run."""
+    if _SCOPES:
+        yield
+        return
+    _SCOPES.append({})
+    try:
+        yield
+    finally:
+        _SCOPES.pop()
+
+
+def scoped(function):
+    """Run ``function`` inside a run scope (sharing the caller's run when there is one)."""
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        with run_scope():
+            return function(*args, **kwargs)
+    return wrapper
+
+
+def _interpreter_identity(python: str) -> tuple:
+    try:
+        st = os.stat(python)
+        return (st.st_size, st.st_mtime_ns)
+    except OSError:
+        return ()
 
 
 def module_available(python: str, module: str) -> bool:
-    """Whether ``module`` imports in interpreter ``python``; probed once per interpreter."""
-    key = (str(python), module)
-    if key not in _MODULES:
-        env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME"}}
-        _MODULES[key] = run_command([str(python), "-c", f"import {module}"], Path.cwd(), env=env, timeout_s=60).ok
-    return _MODULES[key]
+    """Whether ``module`` imports in interpreter ``python`` (cached only within a run)."""
+    key = (str(python), _interpreter_identity(str(python)), module)
+    cache = _SCOPES[-1] if _SCOPES else None
+    if cache is not None and key in cache:
+        return cache[key]
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME"}}
+    available = run_command([str(python), "-c", f"import {module}"], Path.cwd(), env=env, timeout_s=60).ok
+    if cache is not None:
+        cache[key] = available
+    return available
+
+
+_SECRET_ARG = re.compile(r"(?i)((?:token|password|passwd|secret|api[-_]?key|auth)[^=:\s]*[=:])([^\s]+)")
+_URL_CREDENTIALS = re.compile(r"(://[^/\s:@]+:)([^@\s]+)(@)")
+
+
+def redact(text: str) -> str:
+    """Hide credential-looking values (key=value, url user:password@) in recorded commands."""
+    return _URL_CREDENTIALS.sub(r"\1***\3", _SECRET_ARG.sub(r"\1***", text))
 
 
 def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0) -> CommandResult:
@@ -140,7 +188,7 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
     result = CommandResult(
         command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
     )
-    trace("command_start", command=result.command, cwd=result.cwd, timeout_s=timeout_s)
+    trace("command_start", command=[redact(c) for c in result.command], cwd=result.cwd, timeout_s=timeout_s)
     env = dict(os.environ if env is None else env)
     env[DEPTH_ENV] = str(current_depth() + 1)
     if os.environ.get(TARGETS_ENV):
@@ -157,7 +205,7 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
         result.error = str(exc)
     result.duration_s = round(time.perf_counter() - started, 3)
     trace(
-        "command_end", command=result.command[:3], returncode=result.returncode, timed_out=result.timed_out,
+        "command_end", command=[redact(c) for c in result.command[:3]], returncode=result.returncode, timed_out=result.timed_out,
         error=result.error, duration_s=result.duration_s,
     )
     return result

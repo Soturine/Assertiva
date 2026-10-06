@@ -20,7 +20,7 @@ from pathlib import Path
 
 from assertiva.candidate import StageStatus
 from assertiva.models import ArtifactCheck, ArtifactEvidence
-from assertiva.process import CommandResult, active_target, execution_refusal, is_active, module_available, run_command
+from assertiva.process import CommandResult, active_target, execution_refusal, is_active, module_available, run_command, scoped
 from assertiva.verification import SupportLevel
 from assertiva.workspace import project_files, snapshot
 
@@ -188,6 +188,7 @@ class PythonPackageAdapter:
         project = _pyproject(Path(root)).get("project") or {}
         return f"{project.get('name') or Path(root).resolve().name}=={project.get('version') or '?'}"
 
+    @scoped
     def qualify(self, root: str | Path) -> ArtifactEvidence:
         root = Path(root)
         identity = self.identity(root)

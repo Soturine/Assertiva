@@ -119,6 +119,22 @@ def test_same_population_keeps_percentage_direction():
     assert deltas["branch_coverage"].state is DeltaState.IMPROVED and deltas["branch_total"].state is DeltaState.UNCHANGED
 
 
+@pytest.mark.parametrize(("candidate", "population_unknown", "fails"), [
+    ((90, 120), True, False),  # covered up, missed up (20 -> 30): no single judgment
+    ((90, 105), False, False),  # covered up, missed down (20 -> 15): better under every reading
+    ((70, 120), False, True),  # fewer covered over a population that did not shrink
+])
+def test_coverage_stage_judges_population_changes_by_counts(candidate, population_unknown, fails):
+    from assertiva.evidence import compare_states
+    from assertiva.improve import _coverage_stage
+
+    stage = _coverage_stage(compare_states(_state(80, 100), _state(*candidate)))
+    assert ("population changed" in stage.summary) is population_unknown
+    assert (stage.status is StageStatus.FAIL) is fails
+    if population_unknown:
+        assert stage.status is StageStatus.UNKNOWN and any("80/100 -> 90/120" in lim for lim in stage.limitations)
+
+
 @pytest.mark.integration
 @pytest.mark.parametrize(("candidate", "expected"), [((90, 120), StageStatus.UNKNOWN), ((70, 120), StageStatus.FAIL)])
 def test_coverage_stage_does_not_pass_when_the_population_changed(calc_project, candidate, expected):

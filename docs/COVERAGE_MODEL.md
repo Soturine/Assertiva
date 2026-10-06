@@ -23,7 +23,7 @@ Implemented: coverage.py JSON, istanbul json-summary, LCOV, Cobertura XML and Ja
 
 ## Interpretation
 
-Compare counts, not only percentages. Covered is higher-is-better; total is contextual. When the total changes, the two percentages measure different populations: the percentage delta is contextual, carries the denominator note, and qualification is UNKNOWN for it (80/100 = 80% vs 90/120 = 75%: covered rose, total changed, percent fell). Fewer covered units over a population that did not shrink is a regression.
+Compare counts, not only percentages. Covered is higher-is-better; total is contextual. When the total changes, the two percentages measure different populations: the percentage delta is contextual and carries the denominator note. More covered and fewer missed units is better under every reading; otherwise qualification is UNKNOWN for it (80/100 = 80% vs 90/120 = 75%: covered rose, total changed, missed rose, percent fell). Fewer covered units over a population that did not shrink is a regression.
 
 100% line coverage can still miss alternate branches and cannot prove that assertions/oracles are meaningful. Branch coverage can still miss condition combinations, integration fidelity and domain invariants.
 

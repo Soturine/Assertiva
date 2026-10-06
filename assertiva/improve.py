@@ -235,7 +235,14 @@ def _coverage_stage(deltas) -> QualificationStageResult:
             regressed.append(f"{kind}_covered")  # fewer covered over a population that did not shrink
     if regressed:
         return _stage(stage, StageStatus.FAIL, "regressed: " + ", ".join(sorted(set(regressed))))
-    notes = [f"{d.name}: {d.note}" for d in deltas if d.note and d.name.endswith("_coverage")]
+    def ambiguous(kind: str) -> bool:  # covered up and missed down is better under every reading
+        covered, total = by.get(f"{kind}_covered"), by.get(f"{kind}_total")
+        if not covered or not total or None in (covered.baseline, covered.candidate, total.baseline, total.candidate):
+            return True
+        return not (covered.candidate >= covered.baseline
+                    and total.candidate - covered.candidate <= total.baseline - covered.baseline)
+
+    notes = [f"{d.name}: {d.note}" for d in deltas if d.note and d.name.endswith("_coverage") and ambiguous(d.name[: -len("_coverage")])]
     if notes:
         return _stage(stage, StageStatus.UNKNOWN, "coverage population changed; percentages are not comparable", *notes)
     present = {d.name for d in deltas if d.name in ("line_coverage", "branch_coverage", "weak_oracle_tests") and d.state is not DeltaState.UNKNOWN}

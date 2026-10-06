@@ -55,3 +55,10 @@ Each run preserves revision, agent, judge, tool permissions and results; infrast
 - [Keyboard and pointer behavior divergence](cases/KEYBOARD_POINTER_BEHAVIOR_DIVERGENCE.md)
 - [Selector survives non-behavioral refactor](cases/SELECTOR_SURVIVES_NONBEHAVIORAL_REFACTOR.md)
 - [Retry and timeout false repair](cases/RETRY_TIMEOUT_FALSE_REPAIR.md)
+
+## Skill ↔ engine and claim-category cases
+
+- [Engine unavailable: semantic-only audit](cases/ENGINE_UNAVAILABLE_SEMANTIC_ONLY.md)
+- [CI green for a different revision](cases/CI_GREEN_REVISION_PROVENANCE.md)
+- [Static counts are not execution](cases/STATIC_COUNT_NOT_EXECUTION.md)
+- [Dependency reproducibility for a library](cases/LIBRARY_LOCKFILE_RECOMMENDATION.md)

@@ -24,6 +24,29 @@ Prefer deterministic, machine-verifiable evidence whenever possible.
 
 E3/E4 may rank, flag, cluster and propose. They must not silently suppress material tests or close consequential gates. When evidence is insufficient, widen execution or report UNKNOWN.
 
+Label every claim with its category and never move it to another one silently:
+
+- **DETERMINISTIC FACT** (E0/E1) — "run 123 succeeded for SHA abc", "coverage line 83/100 from coverage.xml".
+- **DECLARED FACT** (E2) — "the GitHub Actions workflow declares Python 3.12": configuration, not execution.
+- **HEURISTIC SIGNAL** (E3) — "605 functions start with `test_`", "~1446 `assert*` call occurrences": static counts, never executed tests, meaningful assertions or oracle strength without native discovery/runtime evidence.
+- **SEMANTIC INFERENCE** (E4) — "this oracle appears weak", "the uncovered branch looks safety-critical": your reasoning, never presented as engine output.
+- **UNKNOWN** — what no available evidence settles.
+
+Revision provenance: a green CI run proves a revision only when its identity is confirmed (for example the run's head SHA equals `git rev-parse HEAD`, or an equally explicit link). Otherwise report "CI green observed; correspondence to HEAD UNKNOWN" and never raise it to E0 or proof for the current revision. A dirty working tree is never proven by any run.
+
+## Execution mode and the engine
+
+Before auditing a project, check whether the deterministic engine is available (`assertiva --version`).
+
+- **engine-backed** — start with the cheapest call, `assertiva audit <project> --output json`, which is static and read-only. Use `--execute`, `--changed-since`, coverage, mutation, JUnit or other runs only when the new evidence would change a decision or close a material UNKNOWN: new execution must buy new evidence. Capture `report_path` (the HTML Assurance Report the engine wrote) from the output.
+- **semantic-only** — the engine is missing or fails to start. Continue the audit with the Skill; do not abort, imply runtime evidence or promise an HTML report.
+
+Open the answer with one line, no banner: `Assertiva mode: engine-backed` or `Assertiva mode: semantic-only — local engine unavailable; runtime evidence and Assurance HTML were not produced.` Then report deterministic evidence (engine or native artifacts), semantic findings, unknowns and recommendations as distinguishable parts. When the engine produced a report, end with `Assurance Report:` and the `report_path`. The Skill never renders HTML itself.
+
+Normal use is an audit, not a grade: never present PASS/FAIL/REVIEW as the Skill's verdict. Those belong to the Skill evaluation in `evals/semantic.py`.
+
+Recommendations must follow from the project's delivery/consumption model, not from a generic checklist. Example: for a library, tool or package, prefer declared compatible dependency ranges plus constrained, reproducible CI and minimum- and latest-supported dependency runs; a lockfile fits an application or development environment and is not an automatic recommendation.
+
 ## AUDIT
 
 Determine whether existing tests actually provide meaningful evidence.
@@ -259,4 +282,4 @@ Core policy is framework/language/provider neutral. Adapters expose capabilities
 
 ## Current maturity
 
-`assertiva audit` and `assertiva improve` are the executable surface. They read pytest, Jest, Playwright and Maven runs, portable JUnit XML, mutation and coverage reports, and CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins; `audit --changed-since` selects tests from a revision-scoped impact graph (Python) and widens whenever impact is not proven; a local history adds stability and failure-fingerprint evidence. MCP is not implemented. Use the CLI for deterministic evidence and this Skill for reasoning about it; STATUS.md holds the exact claim boundaries.
+`assertiva audit` and `assertiva improve` are the executable surface. They read pytest, Jest, Playwright and Maven runs, portable JUnit XML, mutation and coverage reports, and CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins; `audit --changed-since` selects tests from a revision-scoped impact graph (Python) and widens whenever impact is not proven; a local history adds stability and failure-fingerprint evidence. MCP is not implemented. Use the CLI for deterministic evidence and this Skill for reasoning about it (see Execution mode and the engine); STATUS.md holds the exact claim boundaries.

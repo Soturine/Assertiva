@@ -122,6 +122,17 @@ The HTML report is a first-class product surface. It should be responsive, acces
 
 See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
+### Skill, engine and evaluation
+
+| Surface | What you get |
+|---|---|
+| `/assertiva` (Skill, engine not installed) | semantic reasoning over what the agent can read; mode `semantic-only`, no runtime evidence, no HTML report |
+| `/assertiva` with the engine installed | the same reasoning grounded in deterministic engine evidence, plus the engine's HTML Assurance Report; mode `engine-backed` |
+| `assertiva audit` / `assertiva improve` | the deterministic engine directly |
+| [`evals/semantic.py`](evals/semantic.py) | evaluation/benchmark of the Skill itself; its PASS/FAIL/REVIEW verdicts are never part of a normal audit |
+
+The mode rules, the cheapest-first engine use and the claim categories live in [SKILL.md](SKILL.md).
+
 ## Current status
 
 `audit` and `improve` work end to end. Runners: pytest, Jest, Playwright and Maven (Surefire/Failsafe), with JUnit XML, mutation reports and coverage reports (coverage.py, istanbul, LCOV, Cobertura, JaCoCo) as portable evidence; unrecognized ecosystems report UNKNOWN rather than "0 tests". Milestone status and exact claim boundaries live in [STATUS.md](STATUS.md).

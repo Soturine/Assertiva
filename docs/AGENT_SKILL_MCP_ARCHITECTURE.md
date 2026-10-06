@@ -165,6 +165,6 @@ deterministic evidence core (CLI/engine/adapters)
 bounded claims (what green proves, what stays UNKNOWN)
 ```
 
-The Skill may reason freely, but facts come from evidence: "this oracle looks weak" is an inference to present as such; "419 tests executed" is deterministic evidence. A language model never replaces the deterministic core.
+The Skill may reason freely, but facts come from evidence: "this oracle looks weak" is an inference to present as such; "419 tests executed" is deterministic evidence. A language model never replaces the deterministic core. Without an installed engine the Skill runs semantic-only; with it, engine-backed (rules in [SKILL.md](../SKILL.md#execution-mode-and-the-engine)). The HTML report is always rendered by the engine.
 
 Each layer is evaluated by its own means: the runtime by deterministic tests, CI and the on-demand runtime self-qualification; the Skill by semantic evaluation with a hidden rubric and a separate judge ([`evals/README.md`](../evals/README.md)). Neither substitutes for the other.

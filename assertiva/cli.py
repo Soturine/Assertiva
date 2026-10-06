@@ -13,7 +13,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import process
+from . import __version__, process
 from .audit import run_audit
 from .evidence import NegativeControl
 from .improve import (
@@ -191,6 +191,7 @@ def _result_from(data: dict):
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="assertiva", description="Adaptive Test Intelligence & Assurance")
+    parser.add_argument("--version", action="version", version=f"assertiva {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     def common(p: argparse.ArgumentParser) -> None:

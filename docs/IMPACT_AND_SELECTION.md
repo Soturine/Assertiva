@@ -36,6 +36,16 @@ Combining independent sources can improve recall.
 - Every selected test carries its reason, weakest evidence tier and proof path; every unselected test says why; widening triggers, unknown dependencies and the fallback are recorded.
 - Runners select through an optional adapter capability; a runner that cannot select runs its full suite and the report says so.
 
+## Monorepo affected set (implemented, M2)
+
+`assertiva/components.py` models components (workspace/package/module), declared `depends_on` and `affected_by_change`. Only explicit layouts are read: npm `package.json` workspaces and `pyproject.toml` projects in subdirectories (PEP 503-normalized dependency names). Maven/Gradle modules, pnpm and other layouts are not read yet.
+
+- A change inside a component affects it and its declared dependents, transitively; their tests are selected (E1).
+- Workspace configuration (root manifests, lockfiles) widens to every component; files outside every component widen to the full suite.
+- Dependencies that look local but cannot be resolved (`workspace:` to an unknown name, `file:`/`link:` paths, direct file references) are unknowns: their components are always affected and the selection is never claimed complete.
+- A change with no proven path inside a component widens to that component and its dependents instead of the full suite.
+- Python import resolution also searches each subproject's root and `src`, so undeclared cross-package imports are still proven (E3).
+
 ## Selector output
 Include selected tests, reasons, source/method, known blind spots, confidence category, and expansion triggers. Do not use fake precision unless confidence is calibrated.
 

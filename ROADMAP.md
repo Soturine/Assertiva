@@ -64,7 +64,7 @@ Cross-stack
 Impact and selection
 - [x] revision-scoped test impact graph with evidence tiers
 - [x] test selection with conservative widening (never "no impact found = nothing to run")
-- [ ] monorepo affected sets
+- [x] monorepo affected sets (npm workspaces, Python subprojects)
 
 History
 - [ ] minimal revision-aware history store

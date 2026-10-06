@@ -41,6 +41,9 @@ class _Project:
         self.py = {f for f in files if f.endswith(".py")}
         self.tests = {f for f in self.py if _is_test(f)}
         self.test_dirs = {str(PurePosixPath(t).parent) for t in self.tests} - {"."}
+        # projects in subdirectories (monorepos): their root and src layout are import roots too
+        self.project_dirs = sorted({str(PurePosixPath(f).parent) for f in files
+                                    if PurePosixPath(f).name in ("pyproject.toml", "setup.py") and "/" in f})
 
     def has(self, rel: str) -> bool:
         return rel in self.py
@@ -53,7 +56,7 @@ class _Project:
         return "" if str(directory) == "." else str(directory)
 
     def roots(self, rel: str) -> list[str]:
-        roots = ["", "src", self.base_dir(rel)]
+        roots = ["", "src", *(r for d in self.project_dirs for r in (d, f"{d}/src")), self.base_dir(rel)]
         return list(dict.fromkeys(r for r in roots if r == "" or any(f.startswith(r + "/") for f in self.py)))
 
     @staticmethod

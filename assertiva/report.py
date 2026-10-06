@@ -456,12 +456,15 @@ def _selection_html(report: dict) -> str:
     widening = _list([f'{w["trigger"]}{" (full suite)" if w["full"] else ""}: {w["path"] or ""} {w["reason"]}'.strip()
                       for w in selection["widening"]], "No widening was needed.")
     unknowns = _list([f'{u["node"]}: {u["reason"]}' for u in selection["unknown_dependencies"]], "No unknown relation is reachable from a test.")
+    affected = sorted((selection.get("affected_components") or {}).items())
+    components = f"<h3>Affected components</h3>{_list([f'{name}: {why}' for name, why in affected], '')}" if affected else ""
     return (
         '<section id="selection" aria-labelledby="h-selection"><h2 id="h-selection">Impact-based test selection</h2>'
         f'<p>Base <code>{_e(selection["base"] or "none")}</code> · {len(selection["changes"])} changed file(s) · '
         f'confidence <span class="chip">{_e(selection["confidence"])}</span> · selected {counts["selected"]} of {counts["mapped"]} mapped test files'
         f'{" · " + _e(selection["fallback"]) if selection["fallback"] else ""}</p>'
-        f'<h3>Widening</h3>{widening}<h3>Unknown dependencies</h3>{unknowns}'
+        + components
+        + f'<h3>Widening</h3>{widening}<h3>Unknown dependencies</h3>{unknowns}'
         '<div class="scroll"><table><caption>Selected tests and why</caption><thead><tr><th scope="col">Test</th><th scope="col">Reason</th>'
         f'<th scope="col">Tier / trigger</th><th scope="col">Proof path</th></tr></thead><tbody>{rows}</tbody></table></div>'
         f'<p class="note">{_e(selection["limitations"][0] if selection["limitations"] else "")}</p></section>'

@@ -74,6 +74,7 @@ class TestSelection:
     not_selected: dict[str, str] = field(default_factory=dict)
     unknown_dependencies: list[UnknownRelation] = field(default_factory=list)
     widening: list[Widening] = field(default_factory=list)
+    affected_components: dict[str, str] = field(default_factory=dict)
     fallback: str | None = None
     confidence: Confidence = Confidence.FULL_SUITE
     limitations: list[str] = field(default_factory=list)
@@ -97,7 +98,9 @@ def select_tests(
     revision: str,
     base: str | None = None,
     must_run: set[str] | frozenset = frozenset(),
+    components=None,
 ) -> TestSelection:
+    """Select tests for ``changes``; ``components`` (a component graph) adds declared cross-component impact."""
     selection = TestSelection(revision=revision, base=base, graph_revision=graph.revision, git_revision=graph.git_revision,
                               changes=list(changes), limitations=[CLAIM, *graph.limitations])
 
@@ -114,6 +117,14 @@ def select_tests(
     except StaleGraphError as exc:
         widen(Trigger.STALE_GRAPH, None, str(exc))
         return _finish(selection, graph)
+    if components is not None and components.revision != revision:
+        widen(Trigger.STALE_GRAPH, None, "the component graph was built for another revision")
+        return _finish(selection, graph)
+
+    def tests_in(component) -> list[str]:
+        prefix = component.path.rstrip("/") + "/"
+        return sorted(t for t in graph.tests if t.startswith(prefix))
+
     if not graph.tests:
         widen(Trigger.NO_TEST_NODES, None, "no adapter mapped any test at this revision")
     if not changes:
@@ -135,6 +146,15 @@ def select_tests(
                     widen(Trigger.NO_PROVEN_PATH, old, "nothing at this revision still refers to the deleted file; its impact is not proven")
                 continue
         path = change.path
+        if components is not None and path in components.workspace_files:
+            widen(Trigger.CONFIGURATION, path, "workspace configuration affects every component")
+            continue
+        owner = components.owner(path) if components is not None else None
+        if owner is not None:
+            for dependent in components.dependents(owner.name):
+                for test in tests_in(components.components[dependent]):
+                    add(test, SelectionReason(f"component {dependent} depends on {owner.name} ({components.components[dependent].manifest})",
+                                              "E1", (), Trigger.COMPONENT_DEPENDENCY))
         if path not in graph.nodes:
             widen(Trigger.UNMAPPED_CHANGE, path, "no adapter relates this file to any test")
             continue
@@ -152,7 +172,15 @@ def select_tests(
             if test not in proven:
                 add(test, SelectionReason(f"heuristic relation to {path} (not proof)", "E4", _path(edges)))
         if not proven and not traced:
-            widen(Trigger.NO_PROVEN_PATH, path, "no proven path from this change to any test; no edge found is not evidence that no test is needed")
+            scope = [owner.name, *components.dependents(owner.name)] if owner is not None else []
+            scoped = [t for name in scope for t in tests_in(components.components[name])]
+            if scoped:
+                for test in scoped:
+                    add(test, SelectionReason(f"no proven path from {path}; widened to its component {owner.name} and dependents",
+                                              None, (), Trigger.COMPONENT_DEPENDENCY))
+                widen(Trigger.COMPONENT_DEPENDENCY, path, f"no proven path; widened to component {owner.name} and its declared dependents", full=False)
+            else:
+                widen(Trigger.NO_PROVEN_PATH, path, "no proven path from this change to any test; no edge found is not evidence that no test is needed")
 
     if changes:
         for test in sorted(graph.tests):
@@ -167,6 +195,16 @@ def select_tests(
             widen(Trigger.UNKNOWN_RELATION, None,
                   f"{len(selection.unknown_dependencies)} unknown relation(s) reachable from tests; every test reaching one is selected",
                   full=False)
+    if components is not None and changes:
+        selection.affected_components = components.affected(changes).components
+        for component in components.components.values():
+            if component.unknown_dependencies:
+                unknown = UnknownRelation(component.path, "declares dependencies that could not be resolved: "
+                                          + ", ".join(component.unknown_dependencies), revision, component.manifest)
+                if unknown not in selection.unknown_dependencies:
+                    selection.unknown_dependencies.append(unknown)
+                for test in tests_in(component):
+                    add(test, SelectionReason(unknown.reason, None, (), Trigger.UNKNOWN_RELATION))
     for test in sorted(must_run):
         add(test, SelectionReason("known failing test or reproducer", None))
     return _finish(selection, graph)
@@ -186,7 +224,8 @@ def _finish(selection: TestSelection, graph: ImpactGraph) -> TestSelection:
     else:
         selection.not_selected = {test: "no proven path from any changed file (E0–E3 edges at this revision)"
                                   for test in sorted(graph.tests - set(selection.selected))}
-        selection.confidence = Confidence.BOUNDED_BY_UNKNOWNS if selection.unknown_dependencies else Confidence.PROVEN_PATHS
+        bounded = selection.unknown_dependencies or any(w.trigger is Trigger.COMPONENT_DEPENDENCY and w.path for w in selection.widening)
+        selection.confidence = Confidence.BOUNDED_BY_UNKNOWNS if bounded else Confidence.PROVEN_PATHS
     if graph.unknowns and selection.confidence is Confidence.PROVEN_PATHS:
         selection.limitations.append("unknown relations exist but no test reaches them statically")
     return selection
@@ -194,9 +233,11 @@ def _finish(selection: TestSelection, graph: ImpactGraph) -> TestSelection:
 
 def select_changes(root: str | Path, base: str, must_run: set[str] | frozenset = frozenset()) -> TestSelection:
     """Impact graph of the working tree plus the selection for its changes relative to ``base``."""
+    from .components import build_component_graph
     from .impact import build_impact_graph
 
     graph = build_impact_graph(root)
+    components = build_component_graph(root, revision=graph.revision)
     try:
         changes = changed_files(root, base)
     except ValueError as exc:
@@ -204,7 +245,8 @@ def select_changes(root: str | Path, base: str, must_run: set[str] | frozenset =
                                   git_revision=graph.git_revision, limitations=[CLAIM])
         selection.widening.append(Widening(Trigger.CHANGES_UNKNOWN, None, True, str(exc)))
         return _finish(selection, graph)
-    return select_tests(graph, changes, revision=graph.revision, base=base, must_run=must_run)
+    return select_tests(graph, changes, revision=graph.revision, base=base, must_run=must_run,
+                        components=components if components.components else None)
 
 
 def changed_files(root: str | Path, base: str) -> list[FileChange]:

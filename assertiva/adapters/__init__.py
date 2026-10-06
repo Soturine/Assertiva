@@ -62,6 +62,13 @@ def impact_adapters(root: str | Path) -> list:
     return [PythonImpactAdapter()]
 
 
+def component_adapters(root: str | Path) -> list:
+    """Adapters that read explicit workspace layouts (components and declared dependencies)."""
+    from .workspaces import NpmWorkspacesAdapter, PythonProjectsAdapter
+
+    return [NpmWorkspacesAdapter(), PythonProjectsAdapter()]
+
+
 def artifact_adapters(root: str | Path, python: str | None = None) -> list:
     """Adapters that build and verify a deliverable artifact for the project at ``root``."""
     candidates = [factory(python=python) for factory in ARTIFACT_FACTORIES]

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.1] — 2026-10-06 — Skill polish and Skill ↔ engine integration
+
+Patch release; M2 stays closed, M3 has not started. Gaps from the first real use of the Skill on another project.
+
+### Added
+- Explicit execution mode in the Skill: `engine-backed` (static `assertiva audit --output json` first, execution only when it buys new evidence, `report_path` shown as the Assurance Report) or `semantic-only` (audit continues, no runtime evidence or HTML promised).
+- `assertiva --version`, the cheap probe the Skill uses to detect the engine.
+- Four semantic eval cases: engine unavailable, CI green for a different revision, static counts are not execution, dependency reproducibility for a library.
+
+### Changed
+- SKILL.md labels every claim as deterministic fact, declared fact, heuristic signal, semantic inference or UNKNOWN (mapped to E0–E4); a CI run proves a revision only with confirmed identity (head SHA = HEAD); static counts never become executed tests; recommendations follow the project's delivery model (no automatic lockfile for libraries); PASS/FAIL/REVIEW belongs only to the Skill evaluation.
+
 ## [0.5.0] — 2026-10-06 — M2 Scale & Cross-Stack Intelligence closed
 
 ### Added

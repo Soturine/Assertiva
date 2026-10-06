@@ -27,7 +27,7 @@ from .models import (
     TestInvocation,
 )
 from .process import execution_refusal, scoped, traced_stage
-from .workspace import boundary_report, remove_tree, snapshot
+from .workspace import boundary_report, link_installed, remove_tree, snapshot
 
 
 @dataclass(frozen=True)
@@ -74,13 +74,25 @@ class StateEvidence:
         return {inv.invocation_id for run in self.runs for inv in run.invocations}
 
 
-def run_negative_control(source: Path, control: NegativeControl, adapters: list) -> NegativeControlResult:
+def installed_dependencies(adapters) -> list[str]:
+    """Ignored directories the runners need installed (declared by adapters, e.g. a package manager's)."""
+    return sorted({name for a in adapters for name in (a.installed_dependencies() if hasattr(a, "installed_dependencies") else ())})
+
+
+def runnable_copy(source: str | Path, adapters, origin: str | Path | None = None) -> Path:
+    """A disposable copy of the project plus links to the installed dependencies its runners need."""
+    copy = snapshot(source)
+    link_installed(copy, Path(origin or source), installed_dependencies(adapters))
+    return copy
+
+
+def run_negative_control(source: Path, control: NegativeControl, adapters: list, origin: Path | None = None) -> NegativeControlResult:
     def result(outcome: ControlOutcome, detail: str) -> NegativeControlResult:
         return NegativeControlResult(control.control_id, control.claim, outcome, detail)
 
     if not adapters:
         return result(ControlOutcome.INVALID, "no runner adapter can execute this project")
-    copy = snapshot(source)
+    copy = runnable_copy(source, adapters, origin)
     try:
         target = copy / control.path
         text = target.read_text(encoding="utf-8") if target.is_file() else ""
@@ -138,8 +150,11 @@ def measure(
     negative_controls: list[NegativeControl] | tuple = (),
     artifacts: bool = True,
     reason: str = "state measurement",
+    origin: str | Path | None = None,
 ) -> StateEvidence:
+    """Measure a state in a disposable copy; ``origin`` is the project whose installed dependencies runners use."""
     source = Path(source)
+    origin = Path(origin or source)
     adapters = runner_adapters(source, python)
     state = StateEvidence(label=label, observed_in=observed_in)
     escaping = boundary_report(source)["external_links"]
@@ -155,7 +170,13 @@ def measure(
         "BLOCKED" if refusal and adapters else ("EXECUTED" if adapters else "NOT_RUN"),
         refusal if refusal and adapters else (reason if adapters else "no runner adapter supports this project"),
     ))
-    copy = snapshot(source)
+    linked = [name for name in installed_dependencies(adapters) if (origin / name).is_dir()]
+    if linked:
+        state.limitations.append(
+            "installed dependencies are linked from the project, not isolated (" + ", ".join(linked)
+            + "); runs can read and write them, and dependency changes made by a candidate are not installed"
+        )
+    copy = runnable_copy(source, adapters, origin)
     try:
         for adapter in adapters:
             with traced_stage(f"{label}:{adapter.adapter_id}"):
@@ -166,7 +187,7 @@ def measure(
     finally:
         remove_tree(copy)
     with traced_stage(f"{label}:negative-controls"):
-        state.negative_controls = [run_negative_control(source, control, adapters) for control in negative_controls]
+        state.negative_controls = [run_negative_control(source, control, adapters, origin) for control in negative_controls]
     if artifacts:
         for adapter in artifact_adapters(source, python):
             with traced_stage(f"{label}:{adapter.adapter_id}"):

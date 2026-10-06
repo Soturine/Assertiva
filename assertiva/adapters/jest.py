@@ -178,6 +178,9 @@ class JestAdapter:
                     run.limitations.append("coverage was requested but Jest produced no json-summary")
         return run
 
+    def installed_dependencies(self) -> tuple[str, ...]:
+        return ("node_modules",)  # ignored by projects, so linked into copies rather than copied
+
     def static_signals(self, root) -> dict[str, int]:
         return {}
 

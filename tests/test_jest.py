@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -106,6 +107,32 @@ def test_package_scripts_join_the_verification_surface(tmp_path):
     assert checks["package-script:deploy"].kind is VerificationKind.UNKNOWN
 
 
+def _commit_all(root):
+    git = ["git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"]
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "fixture"]):
+        subprocess.run([*git, *args], cwd=root, check=True, capture_output=True)
+
+
+def test_installed_dependencies_are_linked_into_copies_never_copied(tmp_path):
+    from assertiva.evidence import runnable_copy
+    from assertiva.workspace import PathBoundaryError, is_link, link_installed, remove_tree
+
+    origin = tmp_path / "project"
+    write(origin / "package.json", '{"devDependencies": {"jest": "30.5.2"}}')
+    write(origin / "node_modules" / "jest" / "bin" / "jest.js", "")
+    write(origin / ".gitignore", "node_modules/\n")
+    _commit_all(origin)  # installed dependencies are ignored, so the copy never contains them
+    copy = runnable_copy(origin, [JestAdapter()], origin)
+    try:
+        assert is_link(copy / "node_modules") and (copy / "node_modules" / "jest" / "bin" / "jest.js").is_file()
+    finally:
+        remove_tree(copy)
+    assert (origin / "node_modules" / "jest" / "bin" / "jest.js").is_file()  # removing the copy never follows the link
+    for name in ("../outside", "/abs", ""):
+        with pytest.raises(PathBoundaryError):
+            link_installed(tmp_path / "copy", origin, [name])
+
+
 # --- real Jest runs (Node + the fixture's node_modules installed once) ----------------
 
 @pytest.fixture
@@ -128,6 +155,9 @@ def jest_project(tmp_path):
         import _winapi
 
         _winapi.CreateJunction(str(modules), str(root / "node_modules"))
+    # The realistic shape: installed dependencies are ignored by Git, so they are never copied.
+    write(root / ".gitignore", "node_modules/\n")
+    _commit_all(root)
     return root
 
 

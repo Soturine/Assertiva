@@ -57,7 +57,7 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 
 ### JavaScript: Jest (M2)
 - Runs the project's own installed Jest with `--json` in a disposable copy and normalizes its official results: outcomes (pending/todo/disabled are skips, never passes), test files that fail to run as collection errors, `test.each` cases grouped into one declaration by Jest-reported location, retried tests flagged with their invocation count, istanbul json-summary coverage.
-- Never installs dependencies or uses `npx`: missing Node or Jest is BLOCKED. No static oracle or negative-path analysis exists for JavaScript yet (UNKNOWN).
+- Never installs dependencies or uses `npx`: missing Node or Jest is BLOCKED. The project's installed `node_modules` (ignored, so never copied) is linked into each disposable copy, never copied or followed on cleanup; reports state that it is not isolated and that dependency changes made by a candidate are not installed. No static oracle or negative-path analysis exists for JavaScript yet (UNKNOWN).
 - `package.json` scripts join the Verification Surface as local checks. Proven against a real Jest 30.5.2 fixture locally and in CI (installed once with `npm ci --ignore-scripts`; CI fails instead of skipping when the fixture is missing). Vitest is not supported yet.
 
 ### Artifact fidelity (M2)

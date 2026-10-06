@@ -38,6 +38,7 @@ from .evidence import (
     compare_states,
     measure,
     run_negative_control,
+    runnable_copy,
     state_from_dict,
     to_jsonable,
 )
@@ -125,7 +126,7 @@ def start_improve(root: str | Path, python: str | None = None) -> ImproveSession
         baseline = capture_baseline(root)
         workspace = create_workspace(baseline)
         baseline_copy = snapshot(root, directory / "baseline")
-        baseline_evidence = measure(baseline_copy, "baseline", "isolated-baseline-copy", python, reason="baseline for improve")
+        baseline_evidence = measure(baseline_copy, "baseline", "isolated-baseline-copy", python, reason="baseline for improve", origin=root)
     session = ImproveSession(root, directory, baseline, workspace, baseline_copy, python, baseline_evidence)
     session.save()
     return session
@@ -190,12 +191,13 @@ def _regression_stage(session: ImproveSession, changes: list[CandidateTestChange
     test_sources = {path for inv in _invocations(baseline) for path in inv.source_paths}
     restore = [c.path for c in changes if c.kind is not CandidateChangeKind.ADD and c.path in test_sources]
     if restore:
-        copy = snapshot(session.workspace)
+        adapters = runner_adapters(session.workspace, session.python)
+        copy = runnable_copy(session.workspace, adapters, session.root)
         try:
             for path in restore:
                 (copy / path).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(session.baseline_copy / path, copy / path, follow_symlinks=False)
-            runs = [adapter.run(copy) for adapter in runner_adapters(copy, session.python)]
+            runs = [adapter.run(copy) for adapter in adapters]
         finally:
             remove_tree(copy)
     else:
@@ -368,7 +370,7 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
     gating: list[StageStatus] = []
     reproduced, partial = 0, False
     notes: list[str] = []
-    copy = snapshot(session.workspace)
+    copy = runnable_copy(session.workspace, adapters, session.root)
     try:
         for check in delivery:
             label = f"{check.command or check.tool or check.check_id} [{check.kind.value}]"
@@ -446,7 +448,7 @@ def _stability(session: ImproveSession, changes, candidate: StateEvidence, rerun
         return evidence
     later: dict[str, list] = {iid: [] for iid in selected}
     for _ in range(reruns):
-        copy = snapshot(session.workspace)
+        copy = runnable_copy(session.workspace, adapters, session.root)
         try:
             for adapter in adapters:
                 run = adapter.run(copy, args=selected)
@@ -530,9 +532,10 @@ def qualify_candidate(
 
     changes = change_set(session.baseline, session.workspace)
     with read_only_guard(session.root):
-        candidate = timed("candidate-measure", lambda: measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls, reason="candidate qualification"))
+        candidate = timed("candidate-measure", lambda: measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls,
+                                                         reason="candidate qualification", origin=session.root))
         adapters = runner_adapters(session.baseline_copy, session.python)
-        baseline_controls = timed("baseline-controls", lambda: [run_negative_control(session.baseline_copy, c, adapters) for c in controls])
+        baseline_controls = timed("baseline-controls", lambda: [run_negative_control(session.baseline_copy, c, adapters, session.root) for c in controls])
         baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls, "mutation": [],
                                     "coverage": list(session.baseline_evidence.coverage)})
         if "baseline" in reports:

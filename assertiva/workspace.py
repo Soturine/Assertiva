@@ -20,7 +20,7 @@ import subprocess
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Iterator
 
 from .candidate import CandidateChangeKind, CandidateTestChange
@@ -337,6 +337,27 @@ def snapshot(source: str | Path, target: str | Path | None = None) -> Path:
     target.mkdir(parents=True, exist_ok=True)
     _copy_files(source, target, project_files(source))
     return target.resolve()
+
+
+def link_installed(copy: str | Path, origin: str | Path, names) -> list[str]:
+    """Link installed dependency directories from the origin into a copy.
+
+    Installed dependencies are usually ignored, so copies never contain them; runners that need
+    them get a link (never a copy, never followed on removal). Names must stay inside both roots.
+    """
+    copy, origin = Path(copy), Path(origin)
+    linked = []
+    for name in names:
+        rel = PurePosixPath(str(name).replace("\\", "/"))
+        if not str(name) or rel.is_absolute() or ".." in rel.parts or PureWindowsPath(str(name)).drive:
+            raise PathBoundaryError(f"installed dependency path escapes the project: {name!r}")
+        source, target = origin / rel, copy / rel
+        if not source.is_dir() or os.path.lexists(target):
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if _make_link(target, source.resolve(), directory=True):
+            linked.append(rel.as_posix())
+    return linked
 
 
 def remove_workspace(baseline: Baseline | None, workspace: str | Path) -> None:

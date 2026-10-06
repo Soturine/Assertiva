@@ -14,10 +14,11 @@ import json
 import os
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 from assertiva.candidate import StageStatus
-from assertiva.coverage import load_coverage_json
+from .coverage_reports import load_coverage_report
 from assertiva.models import CoverageSummary, Outcome, RunEvidence, TestInvocation
 from assertiva.process import execution_refusal, module_available, run_command
 from assertiva.verification import SupportLevel
@@ -203,8 +204,8 @@ class PytestNativeAdapter:
         run_command([self.python, "-m", "coverage", "json", "-q", "-o", str(report)], root, env=env, timeout_s=self.timeout_s)
         if not report.exists():
             return None
-        summary = load_coverage_json(report)
-        return CoverageSummary(summary.line_percent, summary.branch_percent, "coverage.py json (project coverage configuration)")
+        summary = load_coverage_report(report)
+        return replace(summary, scope="project coverage configuration") if summary.error is None else None
 
     def _normalize(self, evidence: RunEvidence, records: list[dict]) -> None:
         reports: dict[str, dict[str, dict]] = {}

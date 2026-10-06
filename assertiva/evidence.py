@@ -6,7 +6,7 @@ measured directory. Metrics carry an explicit direction; there is no aggregate s
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -68,6 +68,7 @@ class StateEvidence:
     artifacts: list[ArtifactEvidence] = field(default_factory=list)
     budget: list[BudgetDecision] = field(default_factory=list)
     negative_paths: dict[str, list[str]] = field(default_factory=dict)  # test id -> dimensions (E3)
+    coverage: list[CoverageSummary] = field(default_factory=list)  # ingested reports (take precedence)
 
     def invocation_ids(self) -> set[str]:
         return {inv.invocation_id for run in self.runs for inv in run.invocations}
@@ -180,8 +181,13 @@ def measure(
 
 
 def _coverage(state: StateEvidence) -> CoverageSummary | None:
-    summaries = [run.coverage for run in state.runs if run.coverage]
+    """One coverage source per state: an ingested report wins over coverage measured during runs."""
+    ingested = [c for c in state.coverage if c.error is None]
+    summaries = ingested or [run.coverage for run in state.runs if run.coverage and run.coverage.error is None]
     return summaries[0] if len(summaries) == 1 else None
+
+
+_COVERAGE_NAMES = {"line": "line_coverage", "branch": "branch_coverage"}
 
 
 def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
@@ -206,8 +212,14 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         add("wall_clock_s", round(sum(wall), 3) if None not in wall else None, MetricDirection.CONTEXTUAL, "s")
     coverage = _coverage(state)
     if coverage:
-        add("line_coverage", coverage.line_percent, MetricDirection.HIGHER_IS_BETTER, "%")
-        add("branch_coverage", coverage.branch_percent, MetricDirection.HIGHER_IS_BETTER, "%")
+        for kind in sorted({"line", "branch", *coverage.counts}):
+            percent = coverage.percent(kind)
+            if percent is None and kind not in coverage.counts:
+                continue
+            add(_COVERAGE_NAMES.get(kind, f"{kind}_coverage"), percent, MetricDirection.HIGHER_IS_BETTER, "%")
+            if kind in coverage.counts:
+                add(f"{kind}_covered", coverage.counts[kind]["covered"], MetricDirection.HIGHER_IS_BETTER)
+                add(f"{kind}_total", coverage.counts[kind]["total"], MetricDirection.CONTEXTUAL)
     static_directions = {
         "weak_oracle_tests": MetricDirection.LOWER_IS_BETTER,
         "broad_error_expectations": MetricDirection.LOWER_IS_BETTER,
@@ -248,6 +260,20 @@ def compare_states(before: StateEvidence, after: StateEvidence) -> list[MetricDe
         for metrics in (baseline, candidate):
             old = metrics["wall_clock_s"]
             metrics["wall_clock_s"] = MetricObservation(old.name, old.value, MetricDirection.LOWER_IS_BETTER, old.unit, old.evidence_tier, old.provenance)
+    # A coverage percentage is only better/worse over the same population (denominator).
+    notes = {}
+    for name in [n for n in baseline if n.endswith("_total") and n in candidate]:
+        kind = name[: -len("_total")]
+        before_total, after_total = baseline[name].value, candidate[name].value
+        percent = _COVERAGE_NAMES.get(kind, f"{kind}_coverage")
+        if before_total != after_total and percent in baseline and percent in candidate:
+            for metrics in (baseline, candidate):
+                old = metrics[percent]
+                metrics[percent] = MetricObservation(old.name, old.value, MetricDirection.CONTEXTUAL, old.unit, old.evidence_tier, old.provenance)
+            notes[percent] = (
+                f"denominator changed: {baseline[kind + '_covered'].value}/{before_total} -> "
+                f"{candidate[kind + '_covered'].value}/{after_total}; the percentages measure different populations"
+            )
     # Mutation counts are only better/worse over the same number of evaluated mutants.
     evaluated = (baseline.get("mutation_evaluated"), candidate.get("mutation_evaluated"))
     if all(evaluated) and evaluated[0].value != evaluated[1].value:
@@ -255,7 +281,7 @@ def compare_states(before: StateEvidence, after: StateEvidence) -> list[MetricDe
             for name in _MUTATION_COUNTS:
                 old = metrics[name]
                 metrics[name] = MetricObservation(old.name, old.value, MetricDirection.CONTEXTUAL, old.unit, old.evidence_tier, old.provenance)
-    return compare_metric_sets(baseline, candidate)
+    return [replace(d, note=notes[d.name]) if d.name in notes else d for d in compare_metric_sets(baseline, candidate)]
 
 
 # --- JSON persistence -----------------------------------------------------------------
@@ -276,7 +302,7 @@ def to_jsonable(value: Any) -> Any:
 
 def _run_from(data: dict) -> RunEvidence:
     run = RunEvidence(**{**data, "status": StageStatus(data["status"]), "invocations": [], "coverage": None})
-    run.coverage = CoverageSummary(**data["coverage"]) if data.get("coverage") else None
+    run.coverage = _coverage_from(data["coverage"]) if data.get("coverage") else None
     run.invocations = [
         TestInvocation(**{
             **inv,
@@ -287,6 +313,10 @@ def _run_from(data: dict) -> RunEvidence:
         for inv in data["invocations"]
     ]
     return run
+
+
+def _coverage_from(data: dict) -> CoverageSummary:
+    return CoverageSummary(**{**data, "limitations": tuple(data.get("limitations") or ())})
 
 
 def state_from_dict(data: dict) -> StateEvidence:
@@ -301,6 +331,7 @@ def state_from_dict(data: dict) -> StateEvidence:
         limitations=list(data["limitations"]),
         negative_paths={k: list(v) for k, v in data.get("negative_paths", {}).items()},
         budget=[BudgetDecision(**d) for d in data.get("budget", [])],
+        coverage=[_coverage_from(c) for c in data.get("coverage", [])],
         mutation=[
             MutationRun(**{
                 **m,

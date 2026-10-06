@@ -19,7 +19,11 @@ Normalize without conflating:
 
 Preserve tool/version, metric kind, covered/missed/total units, scope, aggregate-vs-test-specific context, revision, exclusions, generated/synthetic-code treatment and raw artifact reference.
 
+Implemented: coverage.py JSON, istanbul json-summary, LCOV, Cobertura XML and JaCoCo XML (report-level counters) normalize to covered/total per kind with tool, scope, source and limitations. A Cobertura report with rates only records that its denominators are unknown. An unreadable report carries an error and no numbers.
+
 ## Interpretation
+
+Compare counts, not only percentages. Covered is higher-is-better; total is contextual. When the total changes, the two percentages measure different populations: the percentage delta is contextual, carries the denominator note, and qualification is UNKNOWN for it (80/100 = 80% vs 90/120 = 75%: covered rose, total changed, percent fell). Fewer covered units over a population that did not shrink is a regression.
 
 100% line coverage can still miss alternate branches and cannot prove that assertions/oracles are meaningful. Branch coverage can still miss condition combinations, integration fidelity and domain invariants.
 

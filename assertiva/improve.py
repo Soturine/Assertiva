@@ -17,6 +17,7 @@ from pathlib import Path
 
 from .adapters import runner_adapters
 from .adapters.commands import reproduction_plan
+from .adapters.coverage_reports import load_coverage_report
 from .adapters.mutation import load_mutation_report
 from .candidate import (
     CandidateChangeKind,
@@ -221,6 +222,27 @@ def _delta_stage(stage: QualificationStage, deltas, names: tuple[str, ...], requ
 
 
 _WEAK_NEGATIVE = {"ERROR_TYPE", "PROTOCOL_STATUS"}
+
+
+def _coverage_stage(deltas) -> QualificationStageResult:
+    """Coverage counts and percentages, never a blind percentage comparison across populations."""
+    stage = QualificationStage.COVERAGE_AND_ORACLES
+    by = {d.name: d for d in deltas}
+    regressed = [d.name for d in deltas if d.name in ("line_coverage", "branch_coverage", "weak_oracle_tests") and d.state is DeltaState.REGRESSED]
+    for kind in ("line", "branch"):
+        covered, total = by.get(f"{kind}_covered"), by.get(f"{kind}_total")
+        if covered and total and covered.state is DeltaState.REGRESSED and None not in (total.baseline, total.candidate) and total.candidate >= total.baseline:
+            regressed.append(f"{kind}_covered")  # fewer covered over a population that did not shrink
+    if regressed:
+        return _stage(stage, StageStatus.FAIL, "regressed: " + ", ".join(sorted(set(regressed))))
+    notes = [f"{d.name}: {d.note}" for d in deltas if d.note and d.name.endswith("_coverage")]
+    if notes:
+        return _stage(stage, StageStatus.UNKNOWN, "coverage population changed; percentages are not comparable", *notes)
+    present = {d.name for d in deltas if d.name in ("line_coverage", "branch_coverage", "weak_oracle_tests") and d.state is not DeltaState.UNKNOWN}
+    if present != {"line_coverage", "branch_coverage", "weak_oracle_tests"}:
+        return _stage(stage, StageStatus.UNKNOWN, "partial evidence: " + (", ".join(sorted(present)) or "none"),
+                      "coverage or oracle signals were not measured for both states")
+    return _stage(stage, StageStatus.PASS, "no regression in " + ", ".join(sorted(present)))
 
 
 def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> QualificationStageResult:
@@ -461,12 +483,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, 
         (QualificationStage.STATIC_AND_DISCOVERY, lambda: _discovery_stage(candidate)),
         (QualificationStage.CANDIDATE_TESTS, lambda: _candidate_tests_stage(changes, candidate)),
         (QualificationStage.ORIGINAL_REGRESSION, lambda: _regression_stage(session, changes, candidate)),
-        (QualificationStage.COVERAGE_AND_ORACLES, lambda: _delta_stage(
-            QualificationStage.COVERAGE_AND_ORACLES, deltas,
-            ("line_coverage", "branch_coverage", "weak_oracle_tests"),
-            ("line_coverage", "branch_coverage", "weak_oracle_tests"),
-            "coverage was not measured for both states",
-        )),
+        (QualificationStage.COVERAGE_AND_ORACLES, lambda: _coverage_stage(deltas)),
         (QualificationStage.NEGATIVE_PATHS, lambda: _negative_path_stage(changes, candidate, deltas)),
         (QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS, lambda: _mutation_stage(candidate)),
         (QualificationStage.PIPELINE_EQUIVALENT, lambda: _pipeline_stage(session, authorized, candidate, budget)),
@@ -487,6 +504,7 @@ def qualify_candidate(
     mutation_reports: dict[str, str | Path] | None = None,
     authorized_checks: set[str] | None = None,
     stability_reruns: int = MAX_STABILITY_RERUNS,
+    coverage_reports: dict[str, str | Path] | None = None,
 ) -> QualificationResult:
     """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state."""
     controls = list(negative_controls or [])
@@ -508,11 +526,14 @@ def qualify_candidate(
         candidate = timed("candidate-measure", lambda: measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls, reason="candidate qualification"))
         adapters = runner_adapters(session.baseline_copy, session.python)
         baseline_controls = timed("baseline-controls", lambda: [run_negative_control(session.baseline_copy, c, adapters) for c in controls])
-        baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls, "mutation": []})
+        baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls, "mutation": [],
+                                    "coverage": list(session.baseline_evidence.coverage)})
         if "baseline" in reports:
             attach_mutation(baseline, load_mutation_report(reports["baseline"]), session.baseline_copy)
         if "candidate" in reports:
             attach_mutation(candidate, load_mutation_report(reports["candidate"]), session.workspace)
+        for state_name, report in (coverage_reports or {}).items():
+            {"baseline": baseline, "candidate": candidate}[state_name].coverage.append(load_coverage_report(report))
         deltas = compare_states(baseline, candidate)
         budget: list[BudgetDecision] = []
         stability = timed("stability-reruns", lambda: _stability(session, changes, candidate, stability_reruns))

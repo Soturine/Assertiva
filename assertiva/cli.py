@@ -52,7 +52,8 @@ def _emit(payload: dict, output: str, lines: list[str]) -> None:
 def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     directory = _report_dir(root, args.report_dir)
-    report = run_audit(root, args.coverage_json, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [], junit_reports=args.junit_xml or [])
+    report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
+                       junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [])
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -77,7 +78,7 @@ def _state_reports(values: list[str] | None) -> dict[str, str]:
     for value in values or []:
         state, sep, path = value.partition("=")
         if not sep or state not in {"baseline", "candidate"}:
-            raise UsageError("improve --mutation-report expects baseline=PATH or candidate=PATH")
+            raise UsageError("improve reports expect baseline=PATH or candidate=PATH")
         reports[state] = path
     return reports
 
@@ -129,7 +130,8 @@ def _improve(args: argparse.Namespace) -> int:
         return 0
 
     result = qualify_candidate(
-        session, _controls(args.negative_controls), _state_reports(args.mutation_report), set(args.run_check or ())
+        session, _controls(args.negative_controls), _state_reports(args.mutation_report), set(args.run_check or ()),
+        coverage_reports=_state_reports(args.coverage_report),
     )
     report = improve_report(session, result)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
@@ -195,7 +197,8 @@ def _parser() -> argparse.ArgumentParser:
 
     audit = sub.add_parser("audit", help="read-only assurance audit; never changes project files")
     common(audit)
-    audit.add_argument("--coverage-json", help="existing coverage.py JSON report to ingest")
+    audit.add_argument("--coverage-report", "--coverage-json", dest="coverage_report", action="append",
+                       help="existing coverage report to ingest: coverage.py JSON, istanbul summary, LCOV, Cobertura or JaCoCo XML")
     audit.add_argument("--execute", action="store_true", help="also run the tests natively, in an isolated copy")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
@@ -207,6 +210,7 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--approved-by", help="name recorded with the approval (default: current user)")
     improve.add_argument("--negative-controls", help="JSON list of deliberate behavior-breaking edits to challenge the tests")
     improve.add_argument("--mutation-report", action="append", metavar="STATE=PATH", help="mutation-tool report for baseline or candidate")
+    improve.add_argument("--coverage-report", action="append", metavar="STATE=PATH", help="coverage report for baseline or candidate")
     improve.add_argument("--run-check", action="append", metavar="CHECK_ID", help="authorize running a discovered delivery check in the candidate copy")
     improve.add_argument("--discard", action="store_true", help="drop the candidate session without touching the project")
     improve.set_defaults(handler=_improve)

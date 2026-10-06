@@ -64,6 +64,7 @@ class MetricDelta:
     candidate: float | int | None
     state: DeltaState
     unit: str | None = None
+    note: str | None = None  # why a delta is not directional (e.g. a changed denominator)
 
 
 @dataclass(frozen=True)

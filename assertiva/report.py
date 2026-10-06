@@ -82,6 +82,7 @@ def state_summary(state: StateEvidence | None) -> dict | None:
         "mutation": [_mutation_summary(run) for run in state.mutation],
         "artifacts": to_jsonable(state.artifacts),
         "negative_paths": {k: list(v) for k, v in state.negative_paths.items()},
+        "coverage": [to_jsonable(c) for c in (state.coverage or [run.coverage for run in state.runs if run.coverage])],
         "limitations": list(state.limitations),
     }
 
@@ -157,7 +158,7 @@ def audit_model(
     if surface and surface.checks:
         observed.append(f"{len(surface.checks)} declared verification checks (configuration, not run evidence)")
         not_evidenced.append("whether declared CI checks actually ran, on which revision, and whether they gate merges")
-    if not any(run.coverage for run in current.runs):
+    if not any(run.coverage for run in current.runs) and not any(c.error is None for c in current.coverage):
         not_evidenced.append("coverage")
     usable_mutation = [run for run in current.mutation if run.error is None and run.matches_state is not False]
     if usable_mutation:
@@ -296,6 +297,7 @@ def _metrics_table(report: dict) -> tuple[str, str]:
     if not names:
         return "<p>No metric was measured. Nothing is charted.</p>", ""
     delta = {d["name"]: bucket for bucket, items in (report.get("evidence_delta") or {}).items() for d in items}
+    notes = {d["name"]: d.get("note") for items in (report.get("evidence_delta") or {}).values() for d in items}
     head = "".join(f'<th scope="col">{_STATE_LABELS[k]}<br><span class="note">{_STATE_NOTES[k]}</span></th>' for k, _ in states)
     rows = []
     for name in names:
@@ -303,12 +305,21 @@ def _metrics_table(report: dict) -> tuple[str, str]:
         cells = "".join(f"<td>{_e(_fmt(s['metrics'].get(name)))}</td>" for _, s in states)
         state = delta.get(name, "")
         badge = f'<span class="chip {state}">{_e(state.upper())}</span>' if state else ""
+        if notes.get(name):
+            badge += f'<br><span class="note">{_e(notes[name])}</span>'
         rows.append(f'<tr><th scope="row">{_e(name)}</th>{cells}<td>{_e(direction)}</td><td>{badge}</td></tr>')
     table = (
         '<div class="scroll"><table id="metrics-table"><caption>Metrics by state (direction-aware; no aggregate score)</caption>'
         f'<thead><tr><th scope="col">Metric</th>{head}<th scope="col">Direction</th><th scope="col">Delta</th></tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>"
     )
+    sources = [
+        f"{_STATE_LABELS[k]}: {c.get('tool') or 'unknown tool'}" + (f" ({c['scope']})" if c.get("scope") else "")
+        + (f" — {c['error']}" if c.get("error") else "") + "".join(f"; {lim}" for lim in c.get("limitations") or ())
+        for k, s in states for c in s.get("coverage") or []
+    ]
+    if sources:
+        table += "<p>Coverage sources: " + _e(" · ".join(sources)) + "</p>"
     return table, _chart(states, names)
 
 

@@ -10,9 +10,9 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 
 ### Audit — `assertiva audit`
 - Runtime read-only guard: every project file (including caches and ignored files) is fingerprinted before and after; any change exits with code 3.
-- Static (AST) pytest inventory and oracle/negative-path signals; coverage.py JSON; tests execute only with `--execute`, always in a disposable copy.
+- Static (AST) pytest inventory and oracle/negative-path signals; tests execute only with `--execute`, always in a disposable copy.
 - With `--execute`: native pytest evidence plus built/installed artifact qualification.
-- `--mutation-report PATH` and `--junit-xml PATH` ingest existing tool output as portable evidence.
+- `--mutation-report PATH`, `--junit-xml PATH` and `--coverage-report PATH` (coverage.py JSON, istanbul json-summary, LCOV, Cobertura XML, JaCoCo XML; `--coverage-json` is an alias) ingest existing tool output as portable evidence.
 - Verification Surface from GitHub Actions and pre-commit with local-vs-CI parity findings; unknown commands/actions stay UNKNOWN.
 - Reports, state and traces live in `ASSERTIVA_HOME` (default `~/.assertiva`), which must be outside the project.
 
@@ -23,7 +23,7 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Qualification stages (PASS / FAIL / BLOCKED / NOT_RUN / UNKNOWN; unavailable is never PASS):
   - STATIC_AND_DISCOVERY, CANDIDATE_TESTS from native collection/execution;
   - ORIGINAL_REGRESSION: unchanged original tests rerun against the candidate;
-  - COVERAGE_AND_ORACLES: line/branch coverage (when coverage.py is in the target interpreter) and weak-oracle deltas;
+  - COVERAGE_AND_ORACLES: line/branch coverage (measured, or ingested with `--coverage-report baseline=…|candidate=…`) and weak-oracle deltas; covered and total are compared as counts, and a percentage over a changed denominator is UNKNOWN with the note shown in the report (80/100 → 90/120: covered up, total changed, percent down), never a pass or a fail by percentage alone;
   - NEGATIVE_PATHS: static failure-contract dimensions (E3) combined with runtime outcomes; fails when the candidate weakens negative-path evidence;
   - MUTATION_OR_NEGATIVE_CONTROLS: deliberate negative controls (run on baseline and candidate) and ingested mutation reports (`--mutation-report baseline=…|candidate=…`), side by side; any surviving or uncovered mutant fails the stage whatever the score; reports produced for other source are not used;
   - PIPELINE_EQUIVALENT: DISCOVERED → AUTHORIZED → EXECUTED. Native runner checks and recognized side-effect-free checks (lint, format, typecheck, static analysis, package/build) run in the disposable copy; migration/container/startup/health/unknown commands only with `--run-check CHECK_ID`; deploy/publish never; compound shell steps are not reproduced; allowed-failure keeps its meaning; a matrix reproduced in one environment is partial;

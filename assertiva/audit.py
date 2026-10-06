@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .adapters import runner_adapters
+from .adapters.coverage_reports import load_coverage_report
 from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label
@@ -117,6 +118,7 @@ def run_audit(
     python: str | None = None,
     mutation_reports: list[str | Path] | tuple = (),
     junit_reports: list[str | Path] | tuple = (),
+    coverage_reports: list[str | Path] | tuple = (),
 ) -> dict:
     root = Path(root).resolve()
     findings: list[Finding] = []
@@ -138,7 +140,7 @@ def run_audit(
             static_audit = getattr(adapter, "static_audit", None)
             if static_audit is None:
                 continue
-            static = static_audit(root, coverage_json)
+            static = static_audit(root, coverage_json or next(iter(coverage_reports), None))
             findings.extend(static.findings)
             static_total += len(static.tests) + len(static.materializations)
             limitations.append(f"{adapter.adapter_id}: static inventory is bounded source analysis, not native collection")
@@ -155,6 +157,12 @@ def run_audit(
         current.runs.extend(load_junit(report) for report in junit_reports)
         if current.runs:
             findings.extend(_native_findings(current, static_total))
+        for report in [*coverage_reports, *([coverage_json] if coverage_json else [])]:
+            summary = load_coverage_report(report)
+            current.coverage.append(summary)
+            if summary.error:
+                findings.append(Finding("COVERAGE_REPORT_UNREADABLE", "A coverage report could not be read; it provides no evidence.",
+                                        {"source": summary.source, "error": summary.error}))
         for report in mutation_reports:
             attach_mutation(current, load_mutation_report(report), root)
         findings.extend(_mutation_findings(current))

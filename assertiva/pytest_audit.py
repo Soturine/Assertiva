@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .ci import CiPytestInvocation, discover_github_actions_pytest, path_selected_by_ci
-from .coverage import load_coverage_json
+from .adapters.coverage_reports import load_coverage_report
 from .models import CoverageSummary, Finding, TestCompositionRelation, TestDefinition
 
 
@@ -383,7 +383,9 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
     tests = discover_pytest_definitions(root)
     materializations = discover_pytest_composition(root)
     ci = discover_github_actions_pytest(root)
-    coverage = load_coverage_json(coverage_json) if coverage_json else None
+    coverage = load_coverage_report(coverage_json) if coverage_json else None
+    if coverage is not None and coverage.error:
+        coverage = None
     findings: list[Finding] = []
 
     if not tests and not materializations:
@@ -451,21 +453,21 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
 
     findings.extend(_negative_path_findings(tests))
 
-    if coverage and coverage.line_percent is not None and coverage.branch_percent is not None:
-        if coverage.line_percent >= 90 and coverage.line_percent - coverage.branch_percent >= 20:
+    if coverage and coverage.percent('line') is not None and coverage.percent('branch') is not None:
+        if coverage.percent('line') >= 90 and coverage.percent('line') - coverage.percent('branch') >= 20:
             findings.append(
                 Finding(
                     "LINE_BRANCH_COVERAGE_DIVERGENCE",
                     "High line coverage materially exceeds branch coverage.",
-                    {"line_percent": coverage.line_percent, "branch_percent": coverage.branch_percent},
+                    {"line_percent": coverage.percent('line'), "branch_percent": coverage.percent('branch')},
                 )
             )
-    if coverage and coverage.line_percent is not None and coverage.line_percent >= 90 and weak:
+    if coverage and coverage.percent('line') is not None and coverage.percent('line') >= 90 and weak:
         findings.append(
             Finding(
                 "HIGH_COVERAGE_WEAK_ORACLE",
                 "High line coverage coexists with weak oracle signals; coverage alone is insufficient evidence.",
-                {"line_percent": coverage.line_percent, "weak_oracle_tests": len(weak)},
+                {"line_percent": coverage.percent('line'), "weak_oracle_tests": len(weak)},
             )
         )
 

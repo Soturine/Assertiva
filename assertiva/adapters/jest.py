@@ -20,6 +20,7 @@ from assertiva.process import execution_refusal, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
+from .coverage_reports import load_coverage_report
 
 _OUTCOMES = {
     "passed": Outcome.PASSED, "failed": Outcome.FAILED, "pending": Outcome.SKIPPED, "skipped": Outcome.SKIPPED,
@@ -115,11 +116,8 @@ def parse_jest_results(data: dict | str, root: str | Path) -> RunEvidence:
 
 
 def _coverage(summary_file: Path) -> CoverageSummary | None:
-    try:
-        total = json.loads(summary_file.read_text(encoding="utf-8"))["total"]
-    except (OSError, ValueError, KeyError):
-        return None
-    return CoverageSummary(total["lines"]["pct"], total["branches"]["pct"], "Jest json-summary (istanbul)")
+    summary = load_coverage_report(summary_file)
+    return summary if summary.error is None else None
 
 
 class JestAdapter:

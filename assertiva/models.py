@@ -193,9 +193,22 @@ class TestCompositionRelation:
 
 @dataclass(frozen=True)
 class CoverageSummary:
+    """Coverage totals. ``counts`` keeps covered/total per kind (line, branch, method...) when known."""
+
     line_percent: float | None = None
     branch_percent: float | None = None
     source: str | None = None
+    counts: dict[str, dict[str, int]] = field(default_factory=dict)
+    tool: str | None = None
+    scope: str | None = None
+    limitations: tuple[str, ...] = ()
+    error: str | None = None
+
+    def percent(self, kind: str) -> float | None:
+        count = self.counts.get(kind)
+        if count and count["total"]:
+            return round(count["covered"] * 100.0 / count["total"], 4)
+        return {"line": self.line_percent, "branch": self.branch_percent}.get(kind)
 
 
 @dataclass(frozen=True)

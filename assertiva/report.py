@@ -54,6 +54,12 @@ _RECOMMENDATION = {
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "After the expected rejection, assert that no partial write or forbidden side effect happened.",
     "ASYNC_FAILURE_NOT_OBSERVED": "Await (or gather) the created task so its failure can fail the test.",
     "PROJECT_LINK_ESCAPES_ROOT": "Replace links that leave the project with project files or declared external dependencies.",
+    "MATRIX_GAP": "Add the declared runtime/target to a CI job, or narrow what the project declares it supports.",
+    "MATRIX_UNVERIFIED": "State the runtime/target explicitly in CI (matrix or setup version) so coverage of it can be checked.",
+    "CI_SINGLE_OS": "If other operating systems are supported, run at least one CI job on each.",
+    "PUBLISHED_ARTIFACT_NOT_QUALIFIED": "Test the built artifact (install it and run tests) in the job that publishes it, before publishing.",
+    "ARTIFACT_LINEAGE_UNKNOWN": "Record the tested artifact's hash and publish exactly those bytes, or verify the hash before deploying.",
+    "TESTED_ARTIFACT_DIFFERS_FROM_DELIVERED": "Rebuild and requalify, or publish the artifact that was actually tested.",
     "ARTIFACT_OMITS_SOURCE_FILES": "Confirm the listed files are intentionally excluded from the artifact, or add them as package data.",
 }
 
@@ -467,6 +473,27 @@ def _history_html(report: dict) -> str:
             f'{_list(history["limitations"], "")}</section>')
 
 
+def _delivery_html(report: dict) -> str:
+    delivery = report.get("delivery")
+    review = report.get("review_candidates") or []
+    if not delivery and not review:
+        return ""
+    matrix = (delivery or {}).get("matrix") or {}
+    declared = [f'{dim}: {", ".join(info["values"])} ({info["source"]})' for dim, info in sorted((matrix.get("declared") or {}).items())]
+    ci = [f'{dim}: {", ".join(values)}' for dim, values in sorted((matrix.get("ci") or {}).items())]
+    lineage = [f'{item["artifact"]} sha256 {(item["sha256"] or "?")[:12]} · tested {item["tested"]} · published {item["published"] if isinstance(item["published"], str) else len(item["published"])} '
+               f'· deployed {item["deployed"] if isinstance(item["deployed"], str) else len(item["deployed"])}' for item in (delivery or {}).get("artifact_lineage") or []]
+    candidates = [f'{c["kind"]}: {c["subject"]} — {c["tests"]} test(s), e.g. {", ".join(c["examples"][:3])}' for c in review]
+    return (
+        '<section id="delivery" aria-labelledby="h-delivery"><h2 id="h-delivery">Delivery and review candidates</h2>'
+        f'<h3>Declared by the project</h3>{_list(declared, "No runtime or target declaration was recognized.")}'
+        f'<h3>Selected by CI configuration</h3>{_list(ci, "CI configuration states no runtime, target or operating system.")}'
+        f'<h3>Artifact lineage</h3>{_list(lineage, "No artifact was built and tested in this run.")}'
+        '<h3>Review candidates</h3><p class="note">Concentrations worth a human look: not duplicates, not findings, never a gate; nothing is removed.</p>'
+        f'{_list(candidates, "None.")}</section>'
+    )
+
+
 def _selection_html(report: dict) -> str:
     selection = report.get("test_selection")
     if not selection:
@@ -691,6 +718,8 @@ def render_html(report: dict) -> str:
         sections.append(("selection", "Test selection"))
     if report.get("history"):
         sections.append(("history", "History"))
+    if report.get("delivery") or report.get("review_candidates"):
+        sections.append(("delivery", "Delivery"))
     if report.get("candidate_qualification"):
         sections.append(("qualification", "Qualification"))
     if any((s or {}).get("negative_paths") for s in report["states"].values()):
@@ -728,7 +757,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_selection_html(report)}{_history_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_selection_html(report)}{_history_html(report)}{_delivery_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

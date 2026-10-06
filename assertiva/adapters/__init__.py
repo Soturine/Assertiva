@@ -12,12 +12,16 @@ from assertiva.verification import SupportLevel
 
 def surface_adapters() -> list:
     """Adapters that discover declared/observed verification checks."""
+    from .azure_pipelines import AzurePipelinesAdapter
     from .github_actions import GitHubActionsAdapter
+    from .gitlab_ci import GitLabCiAdapter
+    from .jenkins import JenkinsAdapter
     from .maven import MavenBuildSurfaceAdapter
     from .package_scripts import PackageScriptsAdapter
     from .pre_commit import PreCommitAdapter
 
-    return [GitHubActionsAdapter(), PreCommitAdapter(), PackageScriptsAdapter(), MavenBuildSurfaceAdapter()]
+    return [GitHubActionsAdapter(), AzurePipelinesAdapter(), GitLabCiAdapter(), JenkinsAdapter(),
+            PreCommitAdapter(), PackageScriptsAdapter(), MavenBuildSurfaceAdapter()]
 
 
 def _python_package(python=None):

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .adapters import runner_adapters
+from .adapters import artifact_adapters, runner_adapters
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
@@ -20,7 +20,7 @@ from .process import scoped
 from .history import record_state
 from .report import audit_model, execution_budget, selection_summary
 from .selection import select_changes
-from .verification import discover_surface, surface_findings
+from .verification import artifact_lineage, delivery_matrix, discover_surface, matrix_findings, surface_findings
 from .workspace import boundary_report, capture_baseline, read_only_guard
 
 
@@ -176,6 +176,20 @@ def run_audit(
         findings.extend(_mutation_findings(current))
         findings.extend(_artifact_findings(current))
         findings.extend(surface_findings(surface))
+        declared: dict[str, dict] = {}
+        for adapter in adapters:
+            if hasattr(adapter, "declared_matrix"):
+                declared.update(adapter.declared_matrix(root))
+        covered = delivery_matrix(surface, adapters)
+        findings.extend(matrix_findings(surface, declared, covered))
+        delivered = {}
+        for adapter in artifact_adapters(root, python):
+            for evidence in current.artifacts:
+                if hasattr(adapter, "delivered_candidates") and evidence.adapter_id == adapter.adapter_id:
+                    delivered.setdefault(evidence.artifact or "", []).extend(adapter.delivered_candidates(root, evidence))
+        lineage, lineage_findings = artifact_lineage(surface, current.artifacts, delivered, baseline.revision)
+        findings.extend(lineage_findings)
+        review = [c for adapter in adapters if hasattr(adapter, "review_candidates") for c in adapter.review_candidates(root)]
         findings.extend(_boundary_findings(boundary_report(root)))
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
@@ -183,6 +197,8 @@ def run_audit(
     report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
     report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
     report["test_selection"] = selection_summary(selection)
+    report["delivery"] = {"matrix": {"declared": declared, "ci": covered}, "artifact_lineage": lineage}
+    report["review_candidates"] = review
     report["history"] = None
     if execute and current.runs:
         reasons = {test: why[0].reason for test, why in (selection.selected.items() if selection else ())}

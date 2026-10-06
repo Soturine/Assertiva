@@ -219,6 +219,17 @@ class MavenAdapter:
             run.limitations.append("coverage requires the project's own JaCoCo report goal; none was produced")
         return run
 
+    def declared_matrix(self, root) -> dict[str, dict]:
+        """Java release the build compiles for (``maven.compiler.release`` or ``maven.compiler.source``)."""
+        import re
+
+        try:
+            text = (Path(root) / "pom.xml").read_text(encoding="utf-8")
+        except OSError:
+            return {}
+        match = re.search(r"<maven\.compiler\.(release|source)>\s*(\d+)", text)
+        return {"java": {"values": [match.group(2)], "source": f"pom.xml maven.compiler.{match.group(1)}"}} if match else {}
+
     def static_signals(self, root) -> dict[str, int]:
         return {}
 

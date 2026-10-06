@@ -189,6 +189,13 @@ class PythonPackageAdapter:
         return f"{project.get('name') or Path(root).resolve().name}=={project.get('version') or '?'}"
 
     @scoped
+    def delivered_candidates(self, root: str | Path, evidence: ArtifactEvidence) -> list[tuple[str, str]]:
+        """A wheel with the qualified wheel's file name already in the project's ``dist/`` (what an upload would ship)."""
+        if not evidence.artifact:
+            return []
+        path = Path(root) / "dist" / evidence.artifact
+        return [(f"dist/{evidence.artifact}", hashlib.sha256(path.read_bytes()).hexdigest())] if path.is_file() else []
+
     def qualify(self, root: str | Path) -> ArtifactEvidence:
         root = Path(root)
         identity = self.identity(root)

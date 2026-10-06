@@ -33,6 +33,8 @@ Artifact evidence must name what it proved. Tests passing against an installed w
 
 Assertiva should report exactly what is evidenced and what remains unknown, rather than saying "all tests passed; deployment is safe."
 
+Implemented (M2): GitHub Actions, Azure Pipelines, GitLab CI and Jenkins share one normalization (`adapters/ci_common.py`); each provider adapter only reads its own format. Every check carries a lifecycle — DECLARED, SELECTED (unconditional/conditional), EXECUTED (UNKNOWN without run evidence), DEPLOYS — plus matrix, operating system, runtime and environment. Declared runtimes and targets are compared with what CI selects (MATRIX_GAP / MATRIX_UNVERIFIED / CI_SINGLE_OS), and artifact lineage is reported only as far as evidence goes (PUBLISHED_ARTIFACT_NOT_QUALIFIED, ARTIFACT_LINEAGE_UNKNOWN, TESTED_ARTIFACT_DIFFERS_FROM_DELIVERED). See STATUS for the exact boundary.
+
 
 ## Candidate pipeline and preview qualification
 

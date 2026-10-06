@@ -72,9 +72,9 @@ History
 - [x] deterministic failure fingerprinting and conservative grouping
 
 Delivery
-- [ ] Azure Pipelines, GitLab CI, Jenkins verification discovery with matrix gaps (declared / selected / executed / deployed)
-- [ ] tested vs published vs deployed artifact lineage
-- [ ] shared-oracle concentration, redundancy and mock-away review candidates
+- [x] Azure Pipelines, GitLab CI, Jenkins verification discovery with matrix gaps (declared / selected / executed / deployed; execution stays UNKNOWN without run evidence)
+- [x] tested vs published vs deployed artifact lineage (as far as evidence goes)
+- [x] shared-oracle concentration, redundancy and mock-away review candidates (review only, never gates)
 
 Dogfood
 - [x] matched full-suite vs selected+widening experiments with known injected defects (miss rate first): `tests/test_selection_experiment.py`, 0 misses in 12 controlled defects

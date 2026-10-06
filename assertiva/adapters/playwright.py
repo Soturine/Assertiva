@@ -295,6 +295,28 @@ class PlaywrightAdapter:
             run.limitations.append("browser tests are not coverage-instrumented by Assertiva")
         return run
 
+    def declared_matrix(self, root) -> dict[str, dict]:
+        """Project names declared in the Playwright config (static; computed names are not seen)."""
+        for name in _CONFIGS:
+            try:
+                text = (Path(root) / name).read_text(encoding="utf-8")
+            except OSError:
+                continue
+            block = text[text.find("projects"):] if "projects" in text else ""
+            names = list(dict.fromkeys(re.findall(r"""\bname\s*:\s*["'`]([^"'`]+)["'`]""", block)))
+            if names:
+                return {"browser project": {"values": names, "source": f"{name} projects"}}
+        return {}
+
+    def ci_matrix_values(self, check) -> dict[str, list[str]]:
+        """Projects a CI step selects: ``--project`` filters, or every project ("*")."""
+        if check.tool != "playwright test":
+            return {}
+        args = list(check.metadata.get("runner_args") or [])
+        selected = [a.split("=", 1)[1] for a in args if a.startswith("--project=")]
+        selected += [args[i + 1] for i, a in enumerate(args[:-1]) if a == "--project"]
+        return {"browser project": selected or ["*"]}
+
     def static_signals(self, root) -> dict[str, int]:
         """Locator kinds used by Playwright test files (static, E3; informational, never a score)."""
         root = Path(root)

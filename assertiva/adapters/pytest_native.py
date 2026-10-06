@@ -99,6 +99,23 @@ class PytestNativeAdapter:
 
         return audit_pytest_project(root, coverage_json)
 
+    def declared_matrix(self, root: str | Path) -> dict[str, dict]:
+        """Lowest Python version the project declares it supports (``requires-python``)."""
+        import re
+        import tomllib
+
+        try:
+            spec = tomllib.loads((Path(root) / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("requires-python")
+        except (OSError, ValueError):
+            return {}
+        match = re.search(r">=\s*(\d+\.\d+)", spec or "")
+        return {"python": {"values": [match.group(1)], "source": f"pyproject.toml requires-python {spec}"}} if match else {}
+
+    def review_candidates(self, root: str | Path) -> list[dict]:
+        from assertiva.pytest_audit import review_candidates
+
+        return review_candidates(root)
+
     def static_signals(self, root: str | Path) -> dict[str, int]:
         """Static (E3) oracle / negative-path signals from the bounded AST analysis."""
         from assertiva.pytest_audit import audit_pytest_project

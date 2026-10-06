@@ -479,3 +479,103 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
         coverage=coverage,
         materializations=materializations,
     )
+
+
+_DOUBLE_CALLS = {"patch", "setattr", "setitem", "object"}
+_SNAPSHOT_ASSERTIONS = {"assert_match_snapshot", "assert_snapshot", "match_snapshot", "tomatchsnapshot"}
+
+
+def _test_functions(tree: ast.Module):
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+            yield node.name, node, []
+        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name.startswith("test"):
+                    yield f"{node.name}::{item.name}", item, node.decorator_list
+
+
+def _double_target(call: ast.Call) -> str | None:
+    name = _expr_name(call.func) or ""
+    leaf = name.split(".")[-1]
+    if leaf not in _DOUBLE_CALLS or not call.args:
+        return None
+    first = call.args[0]
+    if isinstance(first, ast.Constant) and isinstance(first.value, str):
+        return first.value
+    if leaf in ("object", "setattr") and len(call.args) > 1 and isinstance(call.args[1], ast.Constant) and isinstance(call.args[1].value, str):
+        return f"{_expr_name(first) or '?'}.{call.args[1].value}"
+    return None
+
+
+def review_candidates(root: str | Path) -> list[dict]:
+    """Concentrations worth a human review (static, E3). Never findings, never duplicates, never removals.
+
+    Shared assertion helpers, central test doubles, integration tests that replace a dependency,
+    snapshot concentration and declarations materialized in several classes, ranked by the number
+    of tests involved; anything used by a single test is not a concentration.
+    """
+    root = Path(root)
+    files = _test_files(root)
+    support = [p for p in root.rglob("*.py") if p.name == "conftest.py" or (p.parent.name in ("tests", "test", "testing") and p not in files)]
+    helpers: set[str] = set()
+    for path in support + files:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        helpers |= {n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and not n.name.startswith("test") and any(isinstance(x, ast.Assert) for x in ast.walk(n))}
+    oracles: dict[str, set[str]] = {}
+    doubles: dict[str, set[str]] = {}
+    snapshots: dict[str, set[str]] = {}
+    integration_doubles: dict[str, set[str]] = {}
+    for path in files:
+        rel = path.relative_to(root).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            continue
+        module_marks = {
+            _expr_name(n) for stmt in tree.body
+            if isinstance(stmt, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "pytestmark" for t in stmt.targets)
+            for n in ast.walk(stmt.value) if isinstance(n, ast.Attribute)
+        }
+        for name, node, class_decorators in _test_functions(tree):
+            test_id = f"{rel}::{name}"
+            marks = {_expr_name(d.func if isinstance(d, ast.Call) else d) for d in [*node.decorator_list, *class_decorators]}
+            integration = "integration" in rel or any(m and m.endswith(".integration") for m in marks | module_marks)
+            calls = [c for c in ast.walk(node) if isinstance(c, ast.Call)]
+            for call in calls:
+                leaf = (_expr_name(call.func) or "").split(".")[-1]
+                if leaf in helpers:
+                    oracles.setdefault(leaf, set()).add(test_id)
+                called = _expr_name(call.func) or ""
+                if leaf.lower() in _SNAPSHOT_ASSERTIONS or (leaf == "assert_match" and called.lower().startswith("snapshot.")):
+                    snapshots.setdefault(rel, set()).add(test_id)  # snapshot assertions, not any function named snapshot
+                target = _double_target(call)
+                if target:
+                    doubles.setdefault(target, set()).add(test_id)
+                    if integration:
+                        integration_doubles.setdefault(target, set()).add(test_id)
+            for decorator in node.decorator_list:
+                if isinstance(decorator, ast.Call) and _double_target(decorator):
+                    doubles.setdefault(_double_target(decorator), set()).add(test_id)
+            if any(a.arg == "snapshot" for a in node.args.args):
+                snapshots.setdefault(rel, set()).add(test_id)
+    materialized: dict[str, set[str]] = {}
+    for relation in discover_pytest_composition(root):
+        materialized.setdefault(relation.declaration_id, set()).add(relation.materialization_id)
+
+    def ranked(kind: str, groups: dict[str, set[str]], minimum: int = 2) -> list[dict]:
+        return [{"kind": kind, "subject": subject, "tests": len(tests), "examples": sorted(tests)[:5],
+                 "note": "review candidate: shared is not duplicate; nothing is removed"}
+                for subject, tests in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0])) if len(tests) >= minimum]
+
+    return [
+        *ranked("SHARED_ORACLE_HELPER", oracles),
+        *ranked("CENTRAL_TEST_DOUBLE", doubles),
+        *ranked("INTEGRATION_TEST_REPLACES_DEPENDENCY", integration_doubles, minimum=1),
+        *ranked("SNAPSHOT_CONCENTRATION", snapshots),
+        *ranked("MULTIPLE_MATERIALIZATIONS", materialized),
+    ][:30]

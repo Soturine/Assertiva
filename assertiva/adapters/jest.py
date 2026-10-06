@@ -181,6 +181,14 @@ class JestAdapter:
     def installed_dependencies(self) -> tuple[str, ...]:
         return ("node_modules",)  # ignored by projects, so linked into copies rather than copied
 
+    def declared_matrix(self, root) -> dict[str, dict]:
+        """Lowest Node.js major the project declares (``engines.node``)."""
+        import re
+
+        spec = (_package(Path(root)).get("engines") or {}).get("node")
+        match = re.search(r"(?:>=|\^|~)?\s*(\d+)", str(spec or ""))
+        return {"node": {"values": [match.group(1)], "source": f"package.json engines.node {spec}"}} if spec and match else {}
+
     def static_signals(self, root) -> dict[str, int]:
         return {}
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -99,6 +100,8 @@ def workspace_copy(target: Path) -> Path:
             continue
         source, destination = ROOT / rel, target / rel
         if source.is_file():
+            if os.name == "nt":  # deep fixture paths exceed MAX_PATH under long temp directories
+                destination = Path("\\\\?\\" + str(destination.resolve()))
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
     return target

@@ -259,4 +259,4 @@ Core policy is framework/language/provider neutral. Adapters expose capabilities
 
 ## Current maturity
 
-M1 (Executable Assurance) is complete. `assertiva audit` and `assertiva improve` are executable end to end for the pytest / Python packaging / GitHub Actions / pre-commit reference adapters, with JUnit XML and mutation-report ingestion as portable evidence. Other runners and CI providers, impact graphs, history and MCP are M2/M3 work; see STATUS.md for exact claim boundaries.
+`assertiva audit` and `assertiva improve` are the executable surface. They read pytest, Jest, Playwright and Maven runs, portable JUnit XML, mutation and coverage reports, and CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins; `audit --changed-since` selects tests from a revision-scoped impact graph (Python) and widens whenever impact is not proven; a local history adds stability and failure-fingerprint evidence. MCP is not implemented. Use the CLI for deterministic evidence and this Skill for reasoning about it; STATUS.md holds the exact claim boundaries.

@@ -1,10 +1,22 @@
 # Assertiva Evals
 
-These cases specify behavioral expectations for future executable evaluation. They are not yet an automated benchmark harness.
+Two kinds of evaluation, never interchangeable:
 
-Cases marked **grader-ready** use [CASE_SPEC.md](CASE_SPEC.md) with explicit evidence, scoring, alternatives and pass conditions. Legacy compact cases remain specified until promoted.
+- **Semantic Skill evaluation** (this folder): an agent using [`SKILL.md`](../SKILL.md) handles a case; a separate judge grades its reasoning and evidence discipline against a private rubric. It evaluates the Skill, not the runtime.
+- **Deterministic runtime tests** (`tests/`, CI, and the on-demand runtime self-qualification): they prove the CLI, engine and adapters. A semantic verdict is never evidence that the runtime works, and a green suite is never evidence that an agent reasons well.
 
 Grade behavior, evidence honesty and cost-aware reasoning, not whether an agent repeats Assertiva terminology.
+
+## Hidden-rubric protocol ([`semantic.py`](semantic.py))
+
+1. `python evals/semantic.py prepare --out DIR CASE ...` writes each case's agent context: `SKILL.md`, the case title, context and task, and the allowed tools. Expected/prohibited behavior, evidence requirements, scoring dimensions, acceptable alternatives and the pass condition are private. With `--workspace`, the agent works on a copy of the repository without `evals/`.
+2. The evaluated agent answers from that context only (`response.md`; tool use listed in an evidence log).
+3. `python evals/semantic.py judge --out DIR CASE ...` writes the judge context: the full case and the response. The judge, in a separate context, returns PASS, FAIL or REVIEW with a justification per dimension: correctness, evidence grounding, overclaim avoidance, treatment of UNKNOWN, cost-aware evidence choice, safety, claim boundary, material alternatives. No score; no keyword, regex, exact-answer or topic-order grading; equivalent answers in other words pass.
+4. `python evals/semantic.py record --out DIR --results evals/results/NAME --agent ... --judge ...` validates every verdict and keeps verdicts, justifications, responses and provenance (revision, agent, judge). A missing or malformed verdict is recorded as not judged, never as a pass.
+
+Semantic reasoning may infer freely, but facts must come from evidence: "this oracle looks weak" is inference; "419 tests executed" is deterministic evidence. Runs: [`results/`](results/).
+
+Cases marked **grader-ready** use [CASE_SPEC.md](CASE_SPEC.md) with explicit evidence, scoring, alternatives and pass conditions; compact cases are judged with the same protocol.
 
 ## Cases
 - [High coverage, weak oracle](cases/HIGH_COVERAGE_WEAK_ORACLE.md)
@@ -22,8 +34,9 @@ Grade behavior, evidence honesty and cost-aware reasoning, not whether an agent 
 - [Structured validation error drift](cases/STRUCTURED_VALIDATION_ERROR_DRIFT.md)
 - [Heuristic selector overreach](cases/HEURISTIC_SELECTOR_OVERREACH.md)
 - [Whole-project refactor safety gap](cases/WHOLE_PROJECT_REFACTOR_SAFETY_GAP.md)
+- [Self-audit of the Assertiva repository](cases/SELF_AUDIT_ASSERTIVA.md)
 
-Future executable evaluation should preserve fixture, model/agent/provider, tool permissions, revision, budgets, result provenance and infrastructure-failure states.
+Each run preserves revision, agent, judge, tool permissions and results; infrastructure failures stay visible.
 
 ## Harness, doubles, web/UI, and agent-runtime cases
 

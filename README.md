@@ -124,14 +124,15 @@ See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
 ## Current status
 
-**M1 — Executable Assurance is complete.** `audit` and `improve` work end to end for the reference adapters (pytest, Python packaging, GitHub Actions, pre-commit) with portable fallbacks (JUnit XML, mutation reports). Other ecosystems report UNKNOWN rather than "0 tests". Next: M2 — Cross-stack Intelligence.
+`audit` and `improve` work end to end. Runners: pytest, Jest, Playwright and Maven (Surefire/Failsafe), with JUnit XML, mutation reports and coverage reports (coverage.py, istanbul, LCOV, Cobertura, JaCoCo) as portable evidence; unrecognized ecosystems report UNKNOWN rather than "0 tests". Milestone status and exact claim boundaries live in [STATUS.md](STATUS.md).
 
 ```bash
 python -m pip install -e .
 
 # Read-only audit (static); --execute also runs tests and qualifies the built artifact, in disposable copies.
 assertiva audit .
-assertiva audit . --execute --coverage-json coverage.json --mutation-report mutation.json --junit-xml results.xml
+assertiva audit . --execute --coverage-report coverage.xml --mutation-report mutation.json --junit-xml results.xml
+assertiva audit . --changed-since main --execute   # impact-based selection, widened when impact is not proven
 
 # Improve: one command, called again at each step.
 assertiva improve .                      # measure baseline, create the candidate workspace
@@ -143,7 +144,7 @@ assertiva improve . --approve tests/test_new.py          # apply only the approv
 assertiva improve . --discard                            # or drop the candidate
 ```
 
-Developing Assertiva itself: `pytest -m "not integration and not artifact"` gives fast feedback (~5 s); `pytest -n auto` runs everything (all tests still run in CI on every commit).
+Developing Assertiva itself: `pytest -m "not integration and not artifact"` gives fast feedback (~25 s); `pytest -n auto` runs everything (every suite runs in CI on every commit; real browser and JVM runs in their own jobs).
 
 Reports (JSON + self-contained HTML) and execution traces are written under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project. `--python` selects the project's interpreter.
 
@@ -151,6 +152,9 @@ What runs today:
 - runtime-enforced read-only audit (exit code 3 if any project file changed);
 - isolated candidate (Git worktree or copy), ADD / MODIFY / RETIRE_CANDIDATE change sets, explicit approval by change id, stale-baseline refusal, post-apply verification;
 - five qualification pillars — execution (native discovery, candidate tests), behavioral assurance (original regression against the candidate, coverage/oracle deltas, negative-path depth), fault sensitivity (negative controls, ingested mutation reports), delivery fidelity (pipeline-equivalent reproduction: discovered → authorized → executed; built/installed artifact qualification) and stability and cost; preview deployment is reported as not evidenced, never run against production;
+- impact-based test selection (`--changed-since`): a revision-scoped impact graph (Python), conservative widening, fixture-level `conftest.py` granularity and monorepo components; a green selected set is reported as a selected-set claim;
+- a local, optional history (stability across runs, duration percentiles with enough samples, deterministic failure fingerprints);
+- delivery intelligence from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins configuration: declared vs selected runtimes and browser projects, artifact lineage, review candidates;
 - one Assurance Report with baseline/candidate/applied states, Evidence Delta, remaining unknowns and "What does green prove?" — no aggregate score.
 
 See [STATUS.md](STATUS.md) for the IMPLEMENTED / SPECIFIED / PLANNED split, [ROADMAP.md](ROADMAP.md), [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md).

@@ -1,0 +1,73 @@
+"""The semantic eval harness keeps the rubric away from the evaluated agent and never grades by string.
+
+These tests check how contexts are assembled and how verdicts are validated; they do not grade answers."""
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "evals"))
+
+import semantic  # noqa: E402
+
+PRIVATE = ("Expected", "Expected behavior", "Prohibited", "Prohibited behavior", "Evidence requirements",
+           "Scoring dimensions", "Acceptable alternatives", "Pass", "Pass condition", "Identity")
+CASES = sorted(p.stem for p in semantic.CASES.glob("*.md"))
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_agent_context_never_contains_the_private_rubric(case):
+    _, sections = semantic.case_sections(case)
+    context = semantic.agent_context(case)
+    for name in PRIVATE:
+        body = sections.get(name)
+        if body:
+            assert body not in context, (case, name)
+    assert "<skill>" in context and semantic.DEFAULT_TASK in context or "Prompt / task" in sections
+
+
+def test_judge_context_holds_the_full_rubric_and_the_response():
+    _, sections = semantic.case_sections("SELF_AUDIT_ASSERTIVA")
+    context = semantic.judge_context("SELF_AUDIT_ASSERTIVA", "my answer")
+    assert sections["Pass condition"] in context and sections["Prohibited behavior"] in context and "my answer" in context
+
+
+@pytest.mark.parametrize("text", [
+    '{"verdict": "PASS", "justification": "grounded", "dimensions": {"safety": "fine"}}',
+    'Verdict follows:\n{"verdict": "REVIEW", "justification": "borderline"}',
+])
+def test_verdicts_are_categories_with_justification(text):
+    assert semantic.parse_verdict(text)["verdict"] in {"PASS", "REVIEW"}
+
+
+@pytest.mark.parametrize("text", [
+    '{"verdict": "PASS"}',  # no justification
+    '{"verdict": "GOOD", "justification": "x"}',
+    '{"verdict": "PASS", "justification": "x", "score": 8}',
+    '{"verdict": "PASS", "justification": "x", "quality": 0.9}',
+    "PASS",
+])
+def test_scores_and_malformed_verdicts_are_rejected(text):
+    with pytest.raises((ValueError, json.JSONDecodeError)):
+        semantic.parse_verdict(text)
+
+
+def test_agent_workspace_has_no_rubric(tmp_path):
+    workspace = semantic.workspace_copy(tmp_path / "ws")
+    assert (workspace / "SKILL.md").is_file() and (workspace / "assertiva").is_dir()
+    assert not (workspace / "evals").exists()
+    assert "Do not read anything outside" in semantic.agent_context("SELF_AUDIT_ASSERTIVA", workspace)
+
+
+def test_missing_verdict_is_recorded_as_not_judged_never_as_pass(tmp_path):
+    out = tmp_path / "run"
+    (out / "CASE_A").mkdir(parents=True)
+    (out / "CASE_A" / "response.md").write_text("answer", encoding="utf-8")
+    (out / "CASE_A" / "verdict.json").write_text('{"verdict": "PASS", "justification": "ok"}', encoding="utf-8")
+    (out / "CASE_B").mkdir()
+    (out / "CASE_B" / "response.md").write_text("answer", encoding="utf-8")
+    semantic.main(["record", "--out", str(out), "--results", str(tmp_path / "results"), "--agent", "a", "--judge", "j"])
+    page = (tmp_path / "results" / "README.md").read_text(encoding="utf-8")
+    assert "CASE_A: PASS" in page and "Not judged" in page and "CASE_B: no valid verdict" in page

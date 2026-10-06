@@ -154,3 +154,17 @@ It should support:
 Charts must be accompanied by equivalent readable text/table data, use semantic HTML, support keyboard navigation and remain useful in light/dark themes.
 
 Do not invent a composite quality score merely to make the dashboard look complete.
+
+## Reasoning layer, evidence core, bounded claims
+
+```text
+Skill (semantic reasoning, may infer)
+        ↓ asks for
+deterministic evidence core (CLI/engine/adapters)
+        ↓ produces
+bounded claims (what green proves, what stays UNKNOWN)
+```
+
+The Skill may reason freely, but facts come from evidence: "this oracle looks weak" is an inference to present as such; "419 tests executed" is deterministic evidence. A language model never replaces the deterministic core.
+
+Each layer is evaluated by its own means: the runtime by deterministic tests, CI and the on-demand runtime self-qualification; the Skill by semantic evaluation with a hidden rubric and a separate judge ([`evals/README.md`](../evals/README.md)). Neither substitutes for the other.

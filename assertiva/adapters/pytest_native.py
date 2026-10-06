@@ -148,8 +148,13 @@ class PytestNativeAdapter:
         return self._invoke(Path(root), list(args or []), mode="execute", coverage=coverage)
 
     def selection_args(self, tests: list[str]) -> list[str]:
-        """pytest arguments running exactly the selected test files."""
-        return sorted(t for t in tests if t.endswith(".py"))
+        """pytest arguments running exactly the selected test files, configured like a full run.
+
+        Without an ini file, explicit paths move pytest's rootdir to their common ancestor and
+        conftest.py files above it stop loading; the rootdir is pinned to the project root.
+        """
+        files = sorted(t for t in tests if t.endswith(".py"))
+        return ["--rootdir=.", *files] if files else []
 
     def equivalent_to_default(self, args: list[str]) -> bool:
         """Whether a run with ``args`` selects and runs exactly what a default run does."""

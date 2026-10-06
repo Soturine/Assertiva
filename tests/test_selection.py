@@ -234,3 +234,12 @@ def test_audit_executes_only_the_selected_set_and_says_so(tmp_path):
     assert run["invocations"] == 1 and run["status"] == "FAIL"
     assert any("selected-set run: 1 of 3" in item for item in report["claim_boundary"]["observed"])
     assert any("2 mapped test files were not run" in item for item in report["claim_boundary"]["not_evidenced"])
+
+
+def test_pytest_subset_keeps_the_full_runs_rootdir():
+    from assertiva.adapters.pytest_native import PytestNativeAdapter
+
+    # explicit paths would otherwise move rootdir (and conftest discovery) to their common ancestor
+    assert PytestNativeAdapter().selection_args(["pkg/b/test_b.py", "pkg/a/test_a.py", "web/x.test.js"]) == [
+        "--rootdir=.", "pkg/a/test_a.py", "pkg/b/test_b.py"]
+    assert PytestNativeAdapter().selection_args(["web/x.test.js"]) == []

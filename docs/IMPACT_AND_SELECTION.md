@@ -15,6 +15,16 @@ Select the smallest reasonable evidence set for the current claim, not the small
 
 Combining independent sources can improve recall.
 
+## Impact graph (implemented, M2)
+
+`assertiva/impact.py` holds a tool-neutral graph. An edge reads "`source` may be affected when `target` changes" and carries source, target, relation, revision, evidence tier, provenance, limitations and (only when a tool reports one) confidence.
+
+- Tiers: E0 runtime coverage mapping; E1/E2 relationships declared by a framework or the project; E3 static imports/dependencies; E4 heuristic inference, which may add work but is never a fact.
+- Relations: IMPORTS, COVERS, DECLARES, MATERIALIZES, DEPENDS_ON_FIXTURE, USES_HELPER, USES_CONFIG, USES_ARTIFACT, TESTS.
+- Revision-scoped: the revision is the content digest of the analyzed tree (the Git commit is kept as provenance). A graph refuses questions about another revision, and edges observed at another revision are kept aside, never used.
+- Unprovable relations are unknowns, not edges: computed dynamic imports, unparseable files. Unresolved references are kept so a deleted or renamed file can still be traced to the files that referred to it.
+- First slice, Python: imports resolved to project files (root, `src` layout, pytest's rootdir-less base directory, relative imports, parent packages, literal dynamic imports), `conftest.py` scope and pytest configuration files (E1), static declarations, base-test materialization and test helpers (E3), coverage.py dynamic contexts (E0), `test_<module>.py` naming (E4).
+
 ## Selector output
 Include selected tests, reasons, source/method, known blind spots, confidence category, and expansion triggers. Do not use fake precision unless confidence is calibrated.
 

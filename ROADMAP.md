@@ -62,7 +62,7 @@ Cross-stack
 - [ ] .NET / Go / Rust, only if the core is still simple after the above
 
 Impact and selection
-- [ ] revision-scoped test impact graph with evidence tiers
+- [x] revision-scoped test impact graph with evidence tiers
 - [ ] test selection with conservative widening (never "no impact found = nothing to run")
 - [ ] monorepo affected sets
 

@@ -66,6 +66,9 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Locator evidence: static (E3) counts of ROLE, LABEL, PLACEHOLDER, TEXT, TEST_ID, CSS, XPATH, OTHER, UNKNOWN locators; informational, never a score.
 - Never installs browsers or dependencies; a literal non-local `baseURL` blocks execution. No coverage, no visual comparison. Proven against a real Playwright 1.63.0 fixture: locally with an installed Chromium-based browser (`channel`), and in CI in a dedicated job that installs only Chromium's headless shell.
 
+### Impact graph (M2)
+- Revision-scoped impact graph (content digest) with tiered, provenanced edges; Python slice: imports, fixtures/conftest scope, configuration, declarations, base tests, helpers, coverage.py dynamic contexts (E0) and naming (E4, never a fact). Computed dynamic imports and unparseable files are unknowns. See `docs/IMPACT_AND_SELECTION.md`.
+
 ### Java: Maven, Surefire/Failsafe, JaCoCo (M2)
 - Runs the project's Maven offline (`-o`, failures recorded) in a disposable copy and reads only the reports that run wrote. Each Surefire/Failsafe report goes through the generic JUnit XML parser; the adapter adds the build phase (Surefire `test`, Failsafe `integration-test`: the build's classification, not proof of scope), reruns and flaky passes, parameterized invocations of one method, the test's source file and the project's own JaCoCo report (counts per kind). JVM system properties in the reports are never copied.
 - Selection by invocation id runs each test in its own phase (Failsafe's default include patterns); selection is per method, so every parameterized case of a selected method runs.

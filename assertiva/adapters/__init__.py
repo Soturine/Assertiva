@@ -55,6 +55,13 @@ RUNNER_FACTORIES = [_pytest, _jest, _playwright, _maven]
 ARTIFACT_FACTORIES = [_python_package]
 
 
+def impact_adapters(root: str | Path) -> list:
+    """Adapters that relate a project's files to its tests (impact edges)."""
+    from .python_impact import PythonImpactAdapter
+
+    return [PythonImpactAdapter()]
+
+
 def artifact_adapters(root: str | Path, python: str | None = None) -> list:
     """Adapters that build and verify a deliverable artifact for the project at ``root``."""
     candidates = [factory(python=python) for factory in ARTIFACT_FACTORIES]

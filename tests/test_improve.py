@@ -17,6 +17,8 @@ from assertiva.workspace import Approval, StaleBaselineError, file_digest, tree_
 
 from conftest import write
 
+pytestmark = pytest.mark.integration
+
 PY = sys.executable
 STRONG_TEST = "from calc import add\n\ndef test_add_distinguishes_operands():\n    assert add(2, 3) == 5\n"
 MULTIPLY_CONTROL = NegativeControl(

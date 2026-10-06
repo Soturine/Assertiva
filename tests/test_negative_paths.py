@@ -146,6 +146,7 @@ def stage(q):
     return next(s for s in q.stages if s.stage is QualificationStage.NEGATIVE_PATHS)
 
 
+@pytest.mark.integration
 def test_strengthened_negative_path_passes_stage(neg_session):
     (neg_session.workspace / "tests" / "test_signup.py").write_text(STRONG_TEST, encoding="utf-8")
     q = qualify_candidate(neg_session).qualification
@@ -156,16 +157,19 @@ def test_strengthened_negative_path_passes_stage(neg_session):
     assert next(d for d in q.metric_deltas if d.name == "negative_paths_without_contract_detail").state is DeltaState.IMPROVED
 
 
+@pytest.mark.integration
 def test_broadened_expectation_fails_stage(neg_session):
     (neg_session.workspace / "tests" / "test_signup.py").write_text(WEAK_TEST.replace("pytest.raises(SignupError)", "pytest.raises(Exception)"), encoding="utf-8")
     assert stage(qualify_candidate(neg_session).qualification).status is StageStatus.FAIL
 
 
+@pytest.mark.integration
 def test_untouched_negative_paths_stay_unknown(neg_session):
     write(neg_session.workspace / "tests" / "test_other.py", "def test_other():\n    assert 1 + 1 == 2\n")
     assert stage(qualify_candidate(neg_session).qualification).status is StageStatus.UNKNOWN
 
 
+@pytest.mark.integration
 def test_report_shows_negative_path_dimensions_per_state(neg_session):
     from assertiva.report import improve_report, render_html
 

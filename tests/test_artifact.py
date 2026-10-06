@@ -4,11 +4,15 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 from assertiva.adapters.python_package import PythonPackageAdapter
 from assertiva.candidate import DeltaState, QualificationStage, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 
 from conftest import write
+
+pytestmark = pytest.mark.artifact
 
 ADAPTER = PythonPackageAdapter(python=sys.executable)
 PYPROJECT = """[build-system]
@@ -173,3 +177,38 @@ def test_target_interpreter_with_inherited_site_dirs_keeps_its_dependencies(tmp_
     (Path(site) / "inherited.pth").write_text("\n".join(inherited) + "\n")
     evidence = PythonPackageAdapter(python=str(target)).qualify(make_package(tmp_path / "pkg"))
     assert check(evidence, "tests").status is StageStatus.PASS, evidence
+
+
+def _traced_commands(tmp_path, action):
+    import json
+
+    from assertiva import process
+
+    process.TRACE_PATH = tmp_path / "trace.jsonl"
+    try:
+        action()
+    finally:
+        process.TRACE_PATH = None
+    return [
+        json.loads(line)["command"] for line in (tmp_path / "trace.jsonl").read_text(encoding="utf-8").splitlines()
+        if json.loads(line)["event"] == "command_start"
+    ]
+
+
+def test_artifact_environment_is_created_without_bootstrapping_pip(tmp_path):
+    """Cost guard: the install still happens (other tests prove it); pip is not re-bootstrapped per venv."""
+    commands = _traced_commands(tmp_path, lambda: ADAPTER.qualify(make_package(tmp_path / "fast")))
+    venvs = [c for c in commands if c[1:3] == ["-m", "venv"]]
+    assert venvs and all("--without-pip" in c for c in venvs)
+    assert any(c[1:3] == ["-m", "pip"] and "--python" in c and "install" in c for c in commands)
+
+
+def test_interpreter_capability_probes_are_cached(tmp_path):
+    from assertiva import process
+
+    process._MODULES.clear()  # start cold so the probes really happen in this test
+    root = make_package(tmp_path / "twice")
+    commands = _traced_commands(tmp_path, lambda: (ADAPTER.qualify(root), ADAPTER.qualify(root)))
+    probes = [c for c in commands if c[1] == "-c" and c[2].startswith("import ") and "\n" not in c[2]]
+    assert probes  # capabilities were probed...
+    assert len(probes) == len({(c[0], c[2]) for c in probes})  # ...once per interpreter

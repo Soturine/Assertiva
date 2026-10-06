@@ -20,7 +20,7 @@ from pathlib import Path
 
 from assertiva.candidate import StageStatus
 from assertiva.models import ArtifactCheck, ArtifactEvidence
-from assertiva.process import CommandResult, run_command
+from assertiva.process import CommandResult, module_available, run_command
 from assertiva.verification import SupportLevel
 from assertiva.workspace import project_files, snapshot
 
@@ -101,8 +101,7 @@ class PythonPackageAdapter:
 
     def _backend_is_local(self, root: Path, work: Path) -> bool:
         backend = (_pyproject(root).get("build-system") or {}).get("build-backend", "setuptools.build_meta:__legacy__")
-        module = backend.split(":")[0].split(".")[0]
-        return self._run([self.python, "-c", f"import {module}"], work).ok
+        return module_available(self.python, backend.split(":")[0].split(".")[0])
 
     def qualify(self, root: str | Path) -> ArtifactEvidence:
         root = Path(root)
@@ -114,7 +113,7 @@ class PythonPackageAdapter:
             outside.mkdir()
 
             local_backend = self._backend_is_local(root, work)
-            has_build = self._run([self.python, "-c", "import build"], work).ok
+            has_build = module_available(self.python, "build")
             if has_build:
                 command = [self.python, "-m", "build", "--wheel", "--outdir", dist] + (["--no-isolation"] if local_backend else [])
             else:
@@ -165,7 +164,9 @@ class PythonPackageAdapter:
         return evidence
 
     def _install(self, venv: Path, wheel: Path, cwd: Path) -> CommandResult:
-        created = self._run([self.python, "-m", "venv", venv], cwd)
+        # A pip-less venv plus `pip --python` performs the same isolated install without
+        # bootstrapping pip into every environment (seconds per venv).
+        created = self._run([self.python, "-m", "venv", "--without-pip", venv], cwd)
         if not created.ok:
             return created
         # Make the target environment's dependencies visible *after* the venv's own site-packages.
@@ -175,9 +176,12 @@ class PythonPackageAdapter:
             Path(venv_site.stdout.strip()).joinpath("assertiva-target-env.pth").write_text(
                 "\n".join(json.loads(sites.stdout)) + "\n", encoding="utf-8"
             )
-        return self._run(
-            [_venv_python(venv), "-m", "pip", "install", "--no-deps", "--no-index", "--disable-pip-version-check", wheel], cwd
-        )
+        install = ["install", "--no-deps", "--no-index", "--disable-pip-version-check", wheel]
+        result = self._run([self.python, "-m", "pip", "--python", _venv_python(venv), *install], cwd)
+        if result.returncode and "no such option: --python" in result.stderr:  # pip < 22.3
+            self._run([_venv_python(venv), "-m", "ensurepip", "--default-pip"], cwd)
+            result = self._run([_venv_python(venv), "-m", "pip", *install], cwd)
+        return result
 
     def _omitted(self, work: Path, tops: list[str], names: set[str]) -> list[str]:
         """Non-code files inside packaged directories that the wheel does not contain (E3 signal)."""

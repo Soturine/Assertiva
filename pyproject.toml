@@ -18,3 +18,7 @@ include = ["assertiva*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "integration: runs real project tooling in subprocesses (native runner, improve sessions)",
+    "artifact: builds and installs wheels",
+]

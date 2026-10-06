@@ -49,3 +49,30 @@ def git_calc_project(calc_project):
     git(calc_project, "add", "-A")
     git(calc_project, "commit", "-q", "-m", "baseline")
     return calc_project
+
+
+FAST_LIMIT_S = 2.0
+SLOW_MARKERS = {"integration", "artifact"}
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Keep the fast suite fast: an unmarked test that runs long must declare what it is.
+
+    Applies to fast-suite runs (``-m "not integration and not artifact"``), sequentially, so
+    parallel full runs are never failed by CPU contention. Setup time counts: heavy work in a
+    fixture is still heavy.
+    """
+    outcome = yield
+    report = outcome.get_result()
+    if "not integration" not in (item.config.option.markexpr or ""):
+        return
+    elapsed = getattr(item, "_assertiva_elapsed", 0.0) + call.duration
+    item._assertiva_elapsed = elapsed
+    if report.when == "call" and report.passed and elapsed > FAST_LIMIT_S:
+        if not SLOW_MARKERS & {mark.name for mark in item.iter_markers()}:
+            report.outcome = "failed"
+            report.longrepr = (
+                f"{item.nodeid} took {elapsed:.1f}s (setup + call) without an 'integration' or 'artifact' marker; "
+                "mark it (it still runs in the full suite) or make it fast"
+            )

@@ -57,6 +57,7 @@ def assert_schema_shape(report):
         assert isinstance(report["claim_boundary"][key], list)
 
 
+@pytest.mark.integration
 def test_improve_report_shows_baseline_vs_candidate_never_applied(improve_states):
     session, result = improve_states
     report = improve_report(session, result)
@@ -69,6 +70,7 @@ def test_improve_report_shows_baseline_vs_candidate_never_applied(improve_states
     assert not re.search(r'<th scope="col">Applied\b', html)
 
 
+@pytest.mark.integration
 def test_applied_column_appears_only_after_approved_application(improve_states):
     session, result = improve_states
     applied = apply_approved(session, result, Approval(frozenset({"tests/test_strong.py"}), "reviewer"))
@@ -77,6 +79,7 @@ def test_applied_column_appears_only_after_approved_application(improve_states):
     assert re.search(r'<th scope="col">Applied\b', render_html(report))
 
 
+@pytest.mark.integration
 def test_report_bounds_what_green_proves(improve_states):
     session, result = improve_states
     boundary = improve_report(session, result)["claim_boundary"]
@@ -85,6 +88,7 @@ def test_report_bounds_what_green_proves(improve_states):
     assert any("not applied" in item.lower() for item in boundary["limitations"])
 
 
+@pytest.mark.integration
 def test_evidence_delta_buckets_use_metric_semantics(improve_states):
     session, result = improve_states
     delta = improve_report(session, result)["evidence_delta"]
@@ -93,6 +97,7 @@ def test_evidence_delta_buckets_use_metric_semantics(improve_states):
     assert not any(d["name"] == "test_invocations" for d in delta["improved"])
 
 
+@pytest.mark.integration
 def test_change_set_carries_reviewable_diff(improve_states):
     session, result = improve_states
     [change] = improve_report(session, result)["change_set"]["changes"]
@@ -100,6 +105,7 @@ def test_change_set_carries_reviewable_diff(improve_states):
     assert "+    assert add(2, 3) == 5" in change["diff"]
 
 
+@pytest.mark.integration
 def test_html_is_self_contained_semantic_and_accessible(improve_states):
     session, result = improve_states
     html = render_html(improve_report(session, result))
@@ -130,6 +136,7 @@ def test_charts_have_table_equivalents_and_no_invented_data(tmp_path):
     assert report["status"] == "UNKNOWN"
 
 
+@pytest.mark.integration
 def test_audit_report_has_current_findings_recommendations_unknowns(calc_project):
     report = audit_report(calc_project, execute=True, python=sys.executable)
     assert_schema_shape(report)

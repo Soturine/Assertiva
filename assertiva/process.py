@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from contextlib import contextmanager
@@ -74,6 +75,18 @@ class CommandResult:
             return f"timed out after {self.timeout_s}s"
         tail = (self.stderr or self.stdout).strip().splitlines()[-3:]
         return f"exit {self.returncode} in {self.duration_s}s" + (": " + " | ".join(tail) if tail and self.returncode else "")
+
+
+_MODULES: dict[tuple[str, str], bool] = {}
+
+
+def module_available(python: str, module: str) -> bool:
+    """Whether ``module`` imports in interpreter ``python``; probed once per interpreter."""
+    key = (str(python), module)
+    if key not in _MODULES:
+        env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME"}}
+        _MODULES[key] = run_command([str(python), "-c", f"import {module}"], Path.cwd(), env=env, timeout_s=60).ok
+    return _MODULES[key]
 
 
 def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0) -> CommandResult:

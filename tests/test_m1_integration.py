@@ -13,6 +13,8 @@ from assertiva.report import improve_report, render_html
 
 from conftest import write
 
+pytestmark = pytest.mark.artifact
+
 PYPROJECT = """[build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"

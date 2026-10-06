@@ -11,6 +11,8 @@ from assertiva.verification import discover_surface
 
 from conftest import write
 
+pytestmark = pytest.mark.integration
+
 
 def workflow(root, steps):
     body = ""

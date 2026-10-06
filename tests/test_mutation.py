@@ -144,6 +144,7 @@ def session(calc_project):
     discard_session(session)
 
 
+@pytest.mark.integration
 def test_survivor_appears_in_qualification_even_with_high_score(session, tmp_path):
     killed = [mutant(i, "Killed") for i in range(19)]
     baseline = mte(tmp_path / "b.json", [mutant(i, "Killed") for i in range(18)] + [mutant(90, "Survived"), mutant(91, "Survived")])
@@ -156,6 +157,7 @@ def test_survivor_appears_in_qualification_even_with_high_score(session, tmp_pat
     assert delta(q, "mutation_killed").state is DeltaState.IMPROVED
 
 
+@pytest.mark.integration
 def test_all_mutants_killed_passes_stage(session, tmp_path):
     report = mte(tmp_path / "c.json", [mutant(1, "Killed"), mutant(2, "Timeout")])
     q = qualify_candidate(session, mutation_reports={"candidate": report}).qualification
@@ -163,6 +165,7 @@ def test_all_mutants_killed_passes_stage(session, tmp_path):
     assert delta(q, "mutation_killed").state is DeltaState.UNKNOWN  # no baseline report: not invented
 
 
+@pytest.mark.integration
 def test_report_for_other_source_is_stale_not_pass(session, tmp_path):
     report = mte(tmp_path / "c.json", [mutant(1, "Killed")], source="def add(a, b):\n    return b + a\n")
     q = qualify_candidate(session, mutation_reports={"candidate": report}).qualification
@@ -170,6 +173,7 @@ def test_report_for_other_source_is_stale_not_pass(session, tmp_path):
     assert any("does not match" in item for item in stage(q).limitations)
 
 
+@pytest.mark.integration
 def test_unreadable_report_blocks_instead_of_passing(session, tmp_path):
     broken = tmp_path / "c.json"
     broken.write_text("{", encoding="utf-8")
@@ -177,6 +181,7 @@ def test_unreadable_report_blocks_instead_of_passing(session, tmp_path):
     assert stage(q).status is StageStatus.BLOCKED
 
 
+@pytest.mark.integration
 def test_mutation_report_and_negative_controls_coexist(session, tmp_path):
     from assertiva.evidence import NegativeControl
 
@@ -188,6 +193,7 @@ def test_mutation_report_and_negative_controls_coexist(session, tmp_path):
     assert "NEGATIVE_CONTROL_SURVIVED" in result.summary
 
 
+@pytest.mark.integration
 def test_different_mutant_sets_make_counts_contextual(session, tmp_path):
     baseline = mte(tmp_path / "b.json", [mutant(1, "Killed")])
     candidate = mte(tmp_path / "c.json", [mutant(1, "Killed"), mutant(2, "Killed")])
@@ -221,6 +227,7 @@ def test_audit_reports_unreadable_mutation_report(calc_project, tmp_path, capsys
     assert "mutation_killed" not in payload["states"]["current"]["metrics"]
 
 
+@pytest.mark.integration
 def test_improve_cli_accepts_state_targeted_mutation_reports(calc_project, tmp_path, capsys):
     from assertiva import cli
 

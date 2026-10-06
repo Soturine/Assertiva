@@ -36,6 +36,7 @@ def session(calc_project):
     discard_session(session)
 
 
+@pytest.mark.integration
 def test_alternating_outcome_is_a_flaky_signal_and_first_failure_is_kept(session, tmp_path):
     write(session.workspace / "tests" / "test_flaky.py", counter_test(tmp_path / "count", "n % 2 == 1"))
     result = qualify_candidate(session)
@@ -47,6 +48,7 @@ def test_alternating_outcome_is_a_flaky_signal_and_first_failure_is_kept(session
     assert stage(q, QualificationStage.CANDIDATE_TESTS).status is StageStatus.FAIL  # a later pass does not erase it
 
 
+@pytest.mark.integration
 def test_consistent_pass_is_stable_within_the_observed_runs_only(session):
     write(session.workspace / "tests" / "test_new.py", "def test_new():\n    assert 2 * 3 == 6\n")
     result = qualify_candidate(session)
@@ -56,6 +58,7 @@ def test_consistent_pass_is_stable_within_the_observed_runs_only(session):
     assert "no instability observed in 3 executions" in stage(result.qualification).summary
 
 
+@pytest.mark.integration
 def test_consistent_failure_is_not_instability_but_not_pass(session):
     write(session.workspace / "tests" / "test_new.py", "def test_new():\n    assert 2 * 3 == 7\n")
     result = qualify_candidate(session)
@@ -64,6 +67,7 @@ def test_consistent_failure_is_not_instability_but_not_pass(session):
     assert stage(result.qualification).status is not StageStatus.PASS
 
 
+@pytest.mark.integration
 def test_only_relevant_invocations_are_rerun(session):
     write(session.workspace / "tests" / "test_new.py", "def test_new():\n    assert 1 == 1\n")
     write(session.workspace / "tests" / "test_calc.py",
@@ -72,6 +76,7 @@ def test_only_relevant_invocations_are_rerun(session):
     assert {r.invocation_id for r in result.stability.records} == {"tests/test_new.py::test_new"}
 
 
+@pytest.mark.integration
 def test_disabled_stability_is_not_run(session):
     write(session.workspace / "tests" / "test_new.py", "def test_new():\n    assert True\n")
     result = qualify_candidate(session, stability_reruns=0)
@@ -100,6 +105,7 @@ def test_timeout_is_classified_not_hung(tmp_path):
     assert "timed out after 1" in result.summary()
 
 
+@pytest.mark.integration
 def test_qualification_records_stage_durations(session):
     write(session.workspace / "tests" / "test_new.py", "def test_new():\n    assert True\n")
     result = qualify_candidate(session)
@@ -107,6 +113,7 @@ def test_qualification_records_stage_durations(session):
     assert all(t["duration_s"] >= 0 for t in result.timings)
 
 
+@pytest.mark.integration
 def test_cli_runs_leave_a_trace_outside_the_project(calc_project, capsys, assertiva_home):
     from pathlib import Path
 

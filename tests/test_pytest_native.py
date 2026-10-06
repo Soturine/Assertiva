@@ -1,5 +1,6 @@
 """Native pytest evidence: the runner, not the AST, is authoritative for what runs."""
 
+import pytest
 import os
 import sys
 
@@ -9,6 +10,8 @@ from assertiva.models import Outcome
 from assertiva.workspace import tree_fingerprint
 
 from conftest import write
+
+pytestmark = pytest.mark.integration
 
 ADAPTER = PytestNativeAdapter(python=sys.executable)
 

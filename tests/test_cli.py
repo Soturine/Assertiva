@@ -1,3 +1,4 @@
+import pytest
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ def test_audit_unknown_project_reports_unknown_not_zero_tests(tmp_path, capsys):
     assert payload["findings"][0]["code"] == "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED"
 
 
+@pytest.mark.integration
 def test_audit_does_not_modify_project_tree(calc_project, capsys, assertiva_home):
     # Adversarial fixture: executing this suite writes into the working directory,
     # and pytest normally creates caches. None of it may reach the audited project.
@@ -60,6 +62,7 @@ def test_report_directory_inside_project_is_refused(calc_project, capsys):
     assert tree_fingerprint(calc_project) == before
 
 
+@pytest.mark.integration
 def test_improve_flow_is_one_command_with_explicit_approval(calc_project, capsys):
     original = tree_fingerprint(calc_project)
 
@@ -82,6 +85,7 @@ def test_improve_flow_is_one_command_with_explicit_approval(calc_project, capsys
     assert not workspace.exists()  # internal workspace is cleaned up after application
 
 
+@pytest.mark.integration
 def test_approve_before_qualification_is_refused(calc_project, capsys):
     run(capsys, "improve", str(calc_project))
     code = cli.main(["improve", str(calc_project), "--approve", "tests/x.py", "--python", sys.executable])
@@ -90,6 +94,7 @@ def test_approve_before_qualification_is_refused(calc_project, capsys):
     cli.main(["improve", str(calc_project), "--discard"])
 
 
+@pytest.mark.integration
 def test_negative_controls_file_feeds_qualification(calc_project, tmp_path, capsys):
     controls = tmp_path / "controls.json"
     controls.write_text(json.dumps([{"control_id": "c1", "path": "calc.py", "find": "return a + b", "replace": "return a * b", "claim": "sum"}]))

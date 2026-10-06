@@ -2,6 +2,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,18 +15,70 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install -e . pytest coverage build setuptools
+      - run: python -m pip install -e . pytest pytest-xdist coverage build setuptools
       - run: python scripts/validate_repo.py
-      - run: pytest -q
+      - name: Fast/core suite
+        run: pytest -q -m "not integration and not artifact"
+      - name: Integration and artifact suites
+        run: pytest -q -n auto -m "integration or artifact"
       - name: Build wheel
         run: python -m build --wheel
       - name: Smoke installed artifact
         run: |
           python -m venv .wheel-smoke
           .wheel-smoke/bin/python -m pip install dist/*.whl
+          before="$(git status --porcelain)"
           cd /tmp
           "$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva" audit "$GITHUB_WORKSPACE" --output json > assertiva-static-audit.json
-      - name: Dogfood read-only audit with native execution
+          cd "$GITHUB_WORKSPACE"
+          test "$before" = "$(git status --porcelain)"
+      - name: Read-only invariant and qualification from the installed CLI
+        run: |
+          A="$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva"
+          PY="$(command -v python)"
+          F=/tmp/qualify-fixture
+          python -c "import sys; sys.path[:0] = ['tests']; from pathlib import Path; import test_m1_integration as m; m.project(Path('$F'), package_data=True)"
+          fingerprint() { python -c "import json, sys; from assertiva.workspace import tree_fingerprint; print(json.dumps(tree_fingerprint(sys.argv[1]), sort_keys=True))" "$F"; }
+          before="$(fingerprint)"
+          cd /tmp
+          "$A" audit "$F" --execute --python "$PY" --output json > fixture-audit.json
+          ws="$("$A" improve "$F" --python "$PY" --output json | python -c "import json, sys; print(json.load(sys.stdin)['candidate_workspace'])")"
+          printf 'from shop import discount\n\n\ndef test_boundary():\n    assert discount(100, "VIP") == 90\n' > "$ws/tests/test_boundary.py"
+          "$A" improve "$F" --python "$PY" --output json > fixture-improve.json
+          "$A" improve "$F" --discard
+          cd "$GITHUB_WORKSPACE"
+          test "$before" = "$(fingerprint)"
+          python - <<'EOF'
+          import json
+          audit = json.load(open("/tmp/fixture-audit.json"))["states"]["current"]
+          assert [r["status"] for r in audit["runs"]] == ["PASS"], audit["runs"]
+          assert [a["status"] for a in audit["artifacts"]] == ["PASS"], audit["artifacts"]
+          improve = json.load(open("/tmp/fixture-improve.json"))
+          assert improve["states"]["applied"] is None
+          assert [c["change_id"] for c in improve["change_set"]["changes"]] == ["tests/test_boundary.py"]
+          stages = {s["stage"]: s["status"] for s in improve["candidate_qualification"]["stages"]}
+          assert stages["ORIGINAL_REGRESSION"] == "PASS" and stages["BUILD_AND_ARTIFACT"] == "PASS", stages
+          print("fixture audit + improve qualified; project unchanged")
+          EOF
+
+  dogfood:
+    # Full self-qualification (the suite natively and again against Assertiva's own installed
+    # wheel). Heavy by design: run on demand and for release tags, not on every commit.
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e . pytest pytest-xdist coverage build setuptools
+      - name: Build and install wheel
+        run: |
+          python -m build --wheel
+          python -m venv .wheel-smoke
+          .wheel-smoke/bin/python -m pip install dist/*.whl
+      - name: Dogfood read-only audit with native execution and artifact qualification
         run: |
           before="$(git status --porcelain)"
           cd /tmp

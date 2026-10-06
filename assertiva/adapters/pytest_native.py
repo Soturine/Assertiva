@@ -19,7 +19,7 @@ from pathlib import Path
 from assertiva.candidate import StageStatus
 from assertiva.coverage import load_coverage_json
 from assertiva.models import CoverageSummary, Outcome, RunEvidence, TestInvocation
-from assertiva.process import run_command
+from assertiva.process import module_available, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
@@ -144,9 +144,6 @@ class PytestNativeAdapter:
     def run(self, root: str | Path, args: list[str] | None = None, coverage: bool = False) -> RunEvidence:
         return self._invoke(Path(root), list(args or []), mode="execute", coverage=coverage)
 
-    def _has_module(self, module: str, env: dict) -> bool:
-        return run_command([self.python, "-c", f"import {module}"], Path.cwd(), env=env, timeout_s=60).ok
-
     def _invoke(self, root: Path, args: list[str], mode: str, coverage: bool = False) -> RunEvidence:
         with tempfile.TemporaryDirectory(prefix="assertiva-pytest-") as tmp:
             plugin_dir = Path(tmp)
@@ -163,7 +160,7 @@ class PytestNativeAdapter:
             env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(plugin_dir), env.get("PYTHONPATH")]))
             env["COVERAGE_FILE"] = str(plugin_dir / ".coverage")
             pytest_args = ["-p", _PLUGIN_MODULE, "-p", "no:cacheprovider", "-q", *args]
-            measure_coverage = coverage and self._has_module("coverage", env)
+            measure_coverage = coverage and module_available(self.python, "coverage")
             if measure_coverage:
                 command = [self.python, "-m", "coverage", "run", "--branch", "-m", "pytest", *pytest_args]
             else:

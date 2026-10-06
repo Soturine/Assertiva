@@ -34,11 +34,13 @@ Label every claim with its category and never move it to another one silently:
 
 Revision provenance: a green CI run proves a revision only when its identity is confirmed (for example the run's head SHA equals `git rev-parse HEAD`, or an equally explicit link). Otherwise report "CI green observed; correspondence to HEAD UNKNOWN" and never raise it to E0 or proof for the current revision. A dirty working tree is never proven by any run.
 
+Order evidence by cost: cheap provenance check → existing fresh evidence → targeted/local execution → broader/full execution only while it still buys something. When provider evidence is reachable (for example `gh run list --json headSha,conclusion`), check for a run whose head SHA equals HEAD before rerunning a full suite merely to learn whether HEAD is green. A full suite stays allowed when it adds relevant evidence; say what that evidence is.
+
 ## Execution mode and the engine
 
 Before auditing a project, check whether the deterministic engine is available (`assertiva --version`).
 
-- **engine-backed** — start with the cheapest call, `assertiva audit <project> --output json`, which is static and read-only. Use `--execute`, `--changed-since`, coverage, mutation, JUnit or other runs only when the new evidence would change a decision or close a material UNKNOWN: new execution must buy new evidence. Capture `report_path` (the HTML Assurance Report the engine wrote) from the output.
+- **engine-backed** — start with the cheapest call, `assertiva audit <project> --output json`, which is static and read-only. Use `--execute`, `--changed-since`, coverage, mutation, JUnit or other runs only when the new evidence would change a decision or close a material UNKNOWN: new execution must buy new evidence. Read `report_path` (the HTML Assurance Report the engine wrote) by parsing the whole JSON, never by sampling or truncating its text: `python -c "import json,sys; print(json.load(sys.stdin)['report_path'])"` or `jq -r .report_path`, then confirm the file exists. The output need not enter the context in full. If the command succeeded but `report_path` is missing or points to no file, report that as an engine defect, never as "no HTML".
 - **semantic-only** — the engine is missing or fails to start. Continue the audit with the Skill; do not abort, imply runtime evidence or promise an HTML report.
 
 Open the answer with one line, no banner: `Assertiva mode: engine-backed` or `Assertiva mode: semantic-only — local engine unavailable; runtime evidence and Assurance HTML were not produced.` Then report deterministic evidence (engine or native artifacts), semantic findings, unknowns and recommendations as distinguishable parts. When the engine produced a report, end with `Assurance Report:` and the `report_path`. The Skill never renders HTML itself.

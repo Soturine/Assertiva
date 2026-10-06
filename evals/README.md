@@ -62,3 +62,5 @@ Each run preserves revision, agent, judge, tool permissions and results; infrast
 - [CI green for a different revision](cases/CI_GREEN_REVISION_PROVENANCE.md)
 - [Static counts are not execution](cases/STATIC_COUNT_NOT_EXECUTION.md)
 - [Dependency reproducibility for a library](cases/LIBRARY_LOCKFILE_RECOMMENDATION.md)
+- [Engine-backed report handoff](cases/ENGINE_BACKED_REPORT_HANDOFF.md)
+- [Cost-aware evidence ordering for HEAD](cases/COST_AWARE_HEAD_EVIDENCE_ORDERING.md)

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="dev.assertiva.fixture.VariantsTest" time="0.015" tests="3" errors="1" skipped="0" failures="1" flakes="1">
+  <testcase name="passesOnRerun" classname="dev.assertiva.fixture.VariantsTest" time="0.002">
+    <flakyFailure message="first attempt fails ==&gt; expected: &lt;true&gt; but was: &lt;false&gt;" type="org.opentest4j.AssertionFailedError">
+      <stackTrace><![CDATA[org.opentest4j.AssertionFailedError: first attempt fails ==> expected: <true> but was: <false>
+	at org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:232)
+	at dev.assertiva.fixture.VariantsTest.passesOnRerun(VariantsTest.java:24)
+]]></stackTrace>
+    </flakyFailure>
+  </testcase>
+  <testcase name="wrongExpectation" classname="dev.assertiva.fixture.VariantsTest" time="0.003">
+    <failure message="expected: &lt;91&gt; but was: &lt;90&gt;" type="org.opentest4j.AssertionFailedError"><![CDATA[org.opentest4j.AssertionFailedError: expected: <91> but was: <90>
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:569)
+	at dev.assertiva.fixture.VariantsTest.wrongExpectation(VariantsTest.java:13)
+]]></failure>
+    <rerunFailure message="expected: &lt;91&gt; but was: &lt;90&gt;" type="org.opentest4j.AssertionFailedError">
+      <stackTrace><![CDATA[org.opentest4j.AssertionFailedError: expected: <91> but was: <90>
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:569)
+	at dev.assertiva.fixture.VariantsTest.wrongExpectation(VariantsTest.java:13)
+]]></stackTrace>
+    </rerunFailure>
+  </testcase>
+  <testcase name="unexpectedException" classname="dev.assertiva.fixture.VariantsTest" time="0.003">
+    <error message="database is not reachable" type="java.lang.IllegalStateException"><![CDATA[java.lang.IllegalStateException: database is not reachable
+	at dev.assertiva.fixture.VariantsTest.unexpectedException(VariantsTest.java:18)
+]]></error>
+    <rerunError message="database is not reachable" type="java.lang.IllegalStateException">
+      <stackTrace><![CDATA[java.lang.IllegalStateException: database is not reachable
+	at dev.assertiva.fixture.VariantsTest.unexpectedException(VariantsTest.java:18)
+]]></stackTrace>
+    </rerunError>
+  </testcase>
+</testsuite>

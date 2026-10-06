@@ -15,3 +15,7 @@ node_modules/
 # Playwright run outputs (fixture runs outside Assertiva)
 test-results/
 playwright-report/
+
+# Maven build output
+target/
+!tests/fixtures/maven-reports/*/target/

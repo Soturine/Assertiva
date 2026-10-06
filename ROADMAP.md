@@ -58,7 +58,7 @@ Cross-stack
 - [x] first JavaScript/TypeScript test adapter (Jest; Vitest not yet)
 - [x] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
 - [x] Playwright semantic browser evidence (declared / selected / executed projects)
-- [ ] Java test evidence (JUnit Platform, Surefire/Failsafe, Gradle, JaCoCo)
+- [x] Java test evidence (JUnit Platform via Maven Surefire/Failsafe, JaCoCo; Gradle not yet)
 - [ ] .NET / Go / Rust, only if the core is still simple after the above
 
 Impact and selection

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-failsafe-plugin/xsd/failsafe-test-report.xsd" version="3.0.2" name="dev.assertiva.fixture.PriceIT" time="0.014" tests="1" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="vipCheckoutEndToEnd" classname="dev.assertiva.fixture.PriceIT" time="0.01"/>
+</testsuite>

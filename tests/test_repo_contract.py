@@ -28,7 +28,7 @@ def test_per_commit_ci_proves_the_essentials_without_recursive_self_qualificatio
     for required in (
         "scripts/validate_repo.py",
         '-m "not integration and not artifact"',  # fast/core suite
-        '-m "(integration or artifact) and not browser"',  # integration and artifact suites still run on every commit
+        '-m "(integration or artifact) and not browser and not jvm"',  # integration and artifact suites still run on every commit
         "python -m build --wheel",
         "/bin/assertiva\" audit",  # installed CLI smoke
         "--execute",  # read-only invariant with execution...
@@ -95,3 +95,13 @@ def test_only_the_browser_job_downloads_a_browser_and_only_chromium():
     required = [step for step in steps if (step.get("env") or {}).get("ASSERTIVA_REQUIRE_PLAYWRIGHT") == "1"]
     assert any('-m browser' in str(step.get("run", "")) for step in required)  # may not silently skip
     assert "and not browser" in _script(jobs["validate"])  # the per-commit integration step never needs a browser
+
+
+def test_only_the_java_job_needs_a_jdk_and_its_tests_cannot_skip():
+    _, jobs = _ci()
+    with_java = [name for name, job in jobs.items() if any(str(s.get("uses", "")).startswith("actions/setup-java") for s in job["steps"])]
+    assert with_java == ["java"], with_java
+    steps = jobs["java"]["steps"]
+    required = [step for step in steps if (step.get("env") or {}).get("ASSERTIVA_REQUIRE_JAVA") == "1"]
+    assert any("-m jvm" in str(step.get("run", "")) for step in required)
+    assert "and not jvm" in _script(jobs["validate"])

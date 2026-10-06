@@ -30,7 +30,7 @@ jobs:
       - name: Integration and artifact suites
         env:
           ASSERTIVA_REQUIRE_JS: "1"
-        run: pytest -q -n auto -m "(integration or artifact) and not browser"
+        run: pytest -q -n auto -m "(integration or artifact) and not browser and not jvm"
       - name: Build wheel
         run: python -m build --wheel
       - name: Smoke installed artifact
@@ -95,6 +95,32 @@ jobs:
         env:
           ASSERTIVA_REQUIRE_PLAYWRIGHT: "1"
         run: pytest -q -m browser
+
+  java:
+    # Real JVM evidence in its own slice: the only job that needs a JDK and Maven's local repository.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e . pytest -c constraints.txt
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: tests/fixtures/java-maven/pom.xml
+      - name: Resolve the Maven fixture's plugins and dependencies once (the adapter itself runs offline)
+        run: |
+          mvn -B -ntp -q -f tests/fixtures/java-maven/pom.xml verify
+          rm -rf tests/fixtures/java-maven/target
+      - name: JVM evidence
+        env:
+          ASSERTIVA_REQUIRE_JAVA: "1"
+        run: pytest -q -m jvm
 
   compatibility:
     # requires-python >=3.11: the minimum version gets fast feedback and an installed-wheel smoke,

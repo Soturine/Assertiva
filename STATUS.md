@@ -55,6 +55,11 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Approved apply is transactional: writes are staged next to their targets and installed with atomic replaces, originals are backed up outside the project, every applied entry is verified against the candidate fingerprint, and any failure restores all touched entries, removes created directories and staging files (`ApplyFailedError`, "rolled back").
 - Nested repositories are included from the working tree and reported; links leaving the project are reported (`PROJECT_LINK_ESCAPES_ROOT`). The executable bit is part of a file's digest on POSIX.
 
+### JavaScript: Jest (M2)
+- Runs the project's own installed Jest with `--json` in a disposable copy and normalizes its official results: outcomes (pending/todo/disabled are skips, never passes), test files that fail to run as collection errors, `test.each` cases grouped into one declaration by Jest-reported location, retried tests flagged with their invocation count, istanbul json-summary coverage.
+- Never installs dependencies or uses `npx`: missing Node or Jest is BLOCKED. No static oracle or negative-path analysis exists for JavaScript yet (UNKNOWN).
+- `package.json` scripts join the Verification Surface as local checks. Proven against a real Jest 30.5.2 fixture locally and in CI (installed once with `npm ci --ignore-scripts`; CI fails instead of skipping when the fixture is missing). Vitest is not supported yet.
+
 ### Artifact fidelity (M2)
 - Artifact evidence states what it proves per dimension: source isolation (imports resolve to the installed wheel), target-environment compatibility (tests pass against the wheel with the target environment visible), declared-dependency closure, clean install and sdist.
 - Declared-dependency closure is checked offline: a clean environment sees only the wheel and the distributions it declares (resolved transitively with markers from the target environment) and every module of the package is imported. An undeclared import fails; a declared dependency that is not installed locally makes closure UNKNOWN, never PASS.

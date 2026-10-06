@@ -17,6 +17,10 @@ Research records are dated evidence and benchmarks, not permanent Assertiva poli
 
 - [Mutation Report Formats](2026-10-05-mutation-report-formats.md) — mutation-testing-elements (Stryker family), PIT XML, mutmut stats and why Cosmic Ray `cr-xml` is not ingested.
 
+## 2026-10-06
+
+- [JavaScript Test Result Formats](2026-10-06-js-test-result-formats.md) — Jest `--json` shape from its sources and a real run; Vitest's Jest-compatible claim (not verified).
+
 ## Rule
 
 When a mutable external tool changes, update or add a dated record instead of silently rewriting history. Promote only reusable, evidence-supported conclusions into canonical docs.

@@ -55,7 +55,7 @@ Scale and hardening
 
 Cross-stack
 - [x] cross-stack core contract tests (fake runner/coverage/artifact adapters)
-- [ ] first JavaScript/TypeScript test adapter
+- [x] first JavaScript/TypeScript test adapter (Jest; Vitest not yet)
 - [ ] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
 - [ ] Playwright semantic browser evidence (declared / selected / executed projects)
 - [ ] Java test evidence (JUnit Platform, Surefire/Failsafe, Gradle, JaCoCo)

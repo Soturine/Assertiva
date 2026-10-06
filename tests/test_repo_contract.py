@@ -74,3 +74,12 @@ def test_ci_checkouts_do_not_persist_credentials():
     _, jobs = _ci()
     checkouts = [step for job in jobs.values() for step in job["steps"] if str(step.get("uses", "")).startswith("actions/checkout")]
     assert checkouts and all((step.get("with") or {}).get("persist-credentials") is False for step in checkouts)
+
+
+def test_ci_runs_the_js_adapter_against_a_real_runner_without_package_hooks():
+    _, jobs = _ci()
+    steps = [step for job in jobs.values() if "if" not in job for step in job["steps"]]
+    installs = [str(step.get("run", "")) for step in steps if "npm ci" in str(step.get("run", ""))]
+    assert installs and all("--ignore-scripts" in run and "tests/fixtures/js-jest" in run for run in installs)
+    required = [step for step in steps if (step.get("env") or {}).get("ASSERTIVA_REQUIRE_JS") == "1"]
+    assert any("integration" in str(step.get("run", "")) for step in required)  # JS tests may not silently skip in CI

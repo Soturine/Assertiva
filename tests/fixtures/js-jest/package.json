@@ -1,0 +1,15 @@
+{
+  "name": "assertiva-js-jest-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Jest project used by Assertiva's own adapter tests.",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "30.5.2"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

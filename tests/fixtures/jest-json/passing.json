@@ -1,0 +1,389 @@
+{
+ "numFailedTestSuites": 0,
+ "numFailedTests": 0,
+ "numPassedTestSuites": 1,
+ "numPassedTests": 3,
+ "numPendingTestSuites": 0,
+ "numPendingTests": 1,
+ "numRuntimeErrorTestSuites": 0,
+ "numTodoTests": 1,
+ "numTotalTestSuites": 1,
+ "numTotalTests": 5,
+ "openHandles": [],
+ "snapshot": {
+  "added": 0,
+  "didUpdate": false,
+  "failure": false,
+  "filesAdded": 0,
+  "filesRemoved": 0,
+  "filesRemovedList": [],
+  "filesUnmatched": 0,
+  "filesUpdated": 0,
+  "matched": 0,
+  "total": 0,
+  "unchecked": 0,
+  "uncheckedKeysByFile": [],
+  "unmatched": 0,
+  "updated": 0
+ },
+ "startTime": 1791299060995,
+ "success": true,
+ "testResults": [
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "duration": 2,
+     "failing": false,
+     "failureDetails": [],
+     "failureMessages": [],
+     "fullName": "discount discount(100, VIP) is 90",
+     "invocations": 1,
+     "location": {
+      "column": 5,
+      "line": 7
+     },
+     "numPassingAsserts": 1,
+     "retryMessages": [],
+     "retryReasons": [],
+     "status": "passed",
+     "title": "discount(100, VIP) is 90",
+     "startAt": 1791299061387
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "duration": 0,
+     "failing": false,
+     "failureDetails": [],
+     "failureMessages": [],
+     "fullName": "discount discount(150, REGULAR) is 150",
+     "invocations": 1,
+     "location": {
+      "column": 5,
+      "line": 7
+     },
+     "numPassingAsserts": 1,
+     "retryMessages": [],
+     "retryReasons": [],
+     "status": "passed",
+     "title": "discount(150, REGULAR) is 150",
+     "startAt": 1791299061391
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "duration": 2,
+     "failing": false,
+     "failureDetails": [],
+     "failureMessages": [],
+     "fullName": "discount rejects a negative total",
+     "invocations": 1,
+     "location": {
+      "column": 3,
+      "line": 11
+     },
+     "numPassingAsserts": 1,
+     "retryMessages": [],
+     "retryReasons": [],
+     "status": "passed",
+     "title": "rejects a negative total",
+     "startAt": 1791299061391
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "duration": null,
+     "failing": false,
+     "failureDetails": [],
+     "failureMessages": [],
+     "fullName": "discount waits for a currency rule",
+     "invocations": 1,
+     "location": {
+      "column": 8,
+      "line": 15
+     },
+     "numPassingAsserts": 0,
+     "retryMessages": [],
+     "retryReasons": [],
+     "status": "pending",
+     "title": "waits for a currency rule",
+     "startAt": 1791299061393
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "duration": null,
+     "failing": false,
+     "failureDetails": [],
+     "failureMessages": [],
+     "fullName": "discount handles rounding of fractional cents",
+     "invocations": 1,
+     "location": {
+      "column": 8,
+      "line": 19
+     },
+     "numPassingAsserts": 0,
+     "retryMessages": [],
+     "retryReasons": [],
+     "status": "todo",
+     "title": "handles rounding of fractional cents",
+     "startAt": 1791299061393
+    }
+   ],
+   "endTime": 1791299061394,
+   "message": "",
+   "name": "<ROOT>\\__tests__\\price.test.js",
+   "startTime": 1791299061112,
+   "status": "focused",
+   "summary": ""
+  }
+ ],
+ "wasInterrupted": false,
+ "coverageMap": {
+  "<ROOT>\\src\\price.js": {
+   "path": "<ROOT>\\src\\price.js",
+   "statementMap": {
+    "0": {
+     "start": {
+      "line": 2,
+      "column": 2
+     },
+     "end": {
+      "line": 6,
+      "column": 3
+     }
+    },
+    "1": {
+     "start": {
+      "line": 3,
+      "column": 18
+     },
+     "end": {
+      "line": 3,
+      "column": 45
+     }
+    },
+    "2": {
+     "start": {
+      "line": 4,
+      "column": 4
+     },
+     "end": {
+      "line": 4,
+      "column": 34
+     }
+    },
+    "3": {
+     "start": {
+      "line": 5,
+      "column": 4
+     },
+     "end": {
+      "line": 5,
+      "column": 16
+     }
+    },
+    "4": {
+     "start": {
+      "line": 7,
+      "column": 2
+     },
+     "end": {
+      "line": 9,
+      "column": 3
+     }
+    },
+    "5": {
+     "start": {
+      "line": 8,
+      "column": 4
+     },
+     "end": {
+      "line": 8,
+      "column": 40
+     }
+    },
+    "6": {
+     "start": {
+      "line": 10,
+      "column": 2
+     },
+     "end": {
+      "line": 10,
+      "column": 15
+     }
+    },
+    "7": {
+     "start": {
+      "line": 13,
+      "column": 0
+     },
+     "end": {
+      "line": 13,
+      "column": 30
+     }
+    }
+   },
+   "fnMap": {
+    "0": {
+     "name": "discount",
+     "decl": {
+      "start": {
+       "line": 1,
+       "column": 9
+      },
+      "end": {
+       "line": 1,
+       "column": 17
+      }
+     },
+     "loc": {
+      "start": {
+       "line": 1,
+       "column": 31
+      },
+      "end": {
+       "line": 11,
+       "column": 1
+      }
+     },
+     "line": 1
+    }
+   },
+   "branchMap": {
+    "0": {
+     "loc": {
+      "start": {
+       "line": 2,
+       "column": 2
+      },
+      "end": {
+       "line": 6,
+       "column": 3
+      }
+     },
+     "type": "if",
+     "locations": [
+      {
+       "start": {
+        "line": 2,
+        "column": 2
+       },
+       "end": {
+        "line": 6,
+        "column": 3
+       }
+      },
+      {
+       "start": {},
+       "end": {}
+      }
+     ],
+     "line": 2
+    },
+    "1": {
+     "loc": {
+      "start": {
+       "line": 7,
+       "column": 2
+      },
+      "end": {
+       "line": 9,
+       "column": 3
+      }
+     },
+     "type": "if",
+     "locations": [
+      {
+       "start": {
+        "line": 7,
+        "column": 2
+       },
+       "end": {
+        "line": 9,
+        "column": 3
+       }
+      },
+      {
+       "start": {},
+       "end": {}
+      }
+     ],
+     "line": 7
+    },
+    "2": {
+     "loc": {
+      "start": {
+       "line": 7,
+       "column": 6
+      },
+      "end": {
+       "line": 7,
+       "column": 36
+      }
+     },
+     "type": "binary-expr",
+     "locations": [
+      {
+       "start": {
+        "line": 7,
+        "column": 6
+       },
+       "end": {
+        "line": 7,
+        "column": 20
+       }
+      },
+      {
+       "start": {
+        "line": 7,
+        "column": 24
+       },
+       "end": {
+        "line": 7,
+        "column": 36
+       }
+      }
+     ],
+     "line": 7
+    }
+   },
+   "s": {
+    "0": 3,
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 2,
+    "5": 1,
+    "6": 1,
+    "7": 1
+   },
+   "f": {
+    "0": 3
+   },
+   "b": {
+    "0": [
+     1,
+     2
+    ],
+    "1": [
+     1,
+     1
+    ],
+    "2": [
+     2,
+     1
+    ]
+   },
+   "_coverageSchema": "1a1c01bbd47fc00a2c39e90264f33305004495a9",
+   "hash": "1ad159eacc9d9d1bc5efe2054eb49e95967bb39d"
+  }
+ }
+}

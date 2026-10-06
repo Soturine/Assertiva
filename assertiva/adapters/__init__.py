@@ -13,9 +13,10 @@ from assertiva.verification import SupportLevel
 def surface_adapters() -> list:
     """Adapters that discover declared/observed verification checks."""
     from .github_actions import GitHubActionsAdapter
+    from .package_scripts import PackageScriptsAdapter
     from .pre_commit import PreCommitAdapter
 
-    return [GitHubActionsAdapter(), PreCommitAdapter()]
+    return [GitHubActionsAdapter(), PreCommitAdapter(), PackageScriptsAdapter()]
 
 
 def _python_package(python=None):
@@ -30,8 +31,14 @@ def _pytest(python=None):
     return PytestNativeAdapter(python=python)
 
 
+def _jest(python=None):
+    from .jest import JestAdapter
+
+    return JestAdapter(python=python)
+
+
 # Plain lists of factories (called with the target interpreter); no plugin machinery.
-RUNNER_FACTORIES = [_pytest]
+RUNNER_FACTORIES = [_pytest, _jest]
 ARTIFACT_FACTORIES = [_python_package]
 
 

@@ -39,6 +39,6 @@ Typical families include:
 - container/startup/health/deployment verification;
 - portable report formats and custom project commands.
 
-Executable reference adapters today: pytest (native + static), Python packaging, GitHub Actions, pre-commit, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
+Executable reference adapters today: pytest (native + static), Jest, Python packaging, GitHub Actions, pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
 
 First-party support is incremental. The absence of a dedicated adapter does not make a project unsupported: preserve observed commands and declared checks generically, mark unknown capabilities honestly, and avoid guessing semantics.

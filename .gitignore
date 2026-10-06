@@ -8,3 +8,6 @@ dist/
 *.egg-info/
 .venv/
 .wheel-smoke/
+
+# JS fixture dependencies are installed by npm ci, never committed
+node_modules/

@@ -26,7 +26,7 @@ Assertiva does not replace test frameworks, linters, build systems, CI/CD platfo
 ## Layers
 1. SKILL.md owns agent behavior and claim boundaries.
 2. scripts/ owns deterministic repetitive parsing/validation/summarization.
-3. schemas/ owns normalized records.
+3. `schemas/assurance-report.schema.json` is the machine-readable contract of the one report model; records inside it are owned by the code that produces them.
 4. future adapters translate runner-specific capabilities without redefining assurance semantics.
 5. raw evidence may stay outside model context with retrievable references.
 6. agent reasoning interprets oracle authority, uncertainty, and claim strength.

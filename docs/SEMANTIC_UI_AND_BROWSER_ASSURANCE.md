@@ -320,9 +320,9 @@ Adapter-specific names are examples, not core policy.
 
 ## Structured evidence
 
-The canonical locator-analysis record is [`ui-locator-evidence.schema.json`](../schemas/ui-locator-evidence.schema.json).
+Implemented locator evidence is a set of informational counts per locator kind in the assurance report (see STATUS). A richer per-locator record is not specified until a consumer needs it.
 
-An observation may use [`assertion-observation.schema.json`](../schemas/assertion-observation.schema.json) with:
+An assertion observation, when one is recorded, should carry:
 - a broad `surface`;
 - optional `subsurface`;
 - platform/framework identity;

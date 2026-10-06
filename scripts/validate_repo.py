@@ -16,11 +16,7 @@ REQUIRED = [
     'docs/NEGATIVE_PATH_AND_ERROR_ASSURANCE.md',
     'docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md',
     'research/2026-09-30-ecosystem-benchmark.md','evals/README.md','evals/CASE_SPEC.md',
-    'schemas/test-run.schema.json','schemas/failure-cluster.schema.json',
-    'schemas/selection-decision.schema.json','schemas/assertion-observation.schema.json',
-    'schemas/ui-locator-evidence.schema.json','schemas/verification-check.schema.json',
-    'schemas/assurance-report.schema.json','schemas/test-composition.schema.json',
-    'schemas/candidate-qualification.schema.json','schemas/error-contract.schema.json'
+    'schemas/assurance-report.schema.json',
 ]
 
 def main():

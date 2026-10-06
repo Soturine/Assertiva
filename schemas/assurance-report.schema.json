@@ -151,7 +151,81 @@
       "type": [
         "object",
         "null"
-      ]
+      ],
+      "properties": {
+        "ready_for_review": {
+          "type": "boolean"
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "stage",
+              "status",
+              "checks"
+            ],
+            "properties": {
+              "stage": {
+                "enum": [
+                  "EXECUTION",
+                  "BEHAVIORAL_ASSURANCE",
+                  "FAULT_SENSITIVITY",
+                  "DELIVERY_FIDELITY",
+                  "STABILITY_AND_COST"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "PASS",
+                  "FAIL",
+                  "BLOCKED",
+                  "NOT_RUN",
+                  "UNKNOWN"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "check",
+                    "status",
+                    "summary"
+                  ],
+                  "properties": {
+                    "check": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "enum": [
+                        "PASS",
+                        "FAIL",
+                        "BLOCKED",
+                        "NOT_RUN",
+                        "UNKNOWN"
+                      ]
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "evidence_refs": {
+                      "type": "array"
+                    },
+                    "limitations": {
+                      "type": "array"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
     },
     "remaining_unknowns": {
       "type": "array",
@@ -159,7 +233,68 @@
         "type": "string"
       },
       "description": "Evidence that was not produced: UNKNOWN/NOT_RUN/BLOCKED stages and unmeasured metrics."
+    },
+    "workflow": {
+      "enum": [
+        "audit",
+        "improve"
+      ]
+    },
+    "status": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "recommendations": {
+      "type": "array"
+    },
+    "verification_surface": {
+      "type": "array"
+    },
+    "applied_delta": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "execution_budget": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "report_path": {
+      "type": "string"
+    },
+    "test_selection": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "impact-based selection: selected/not_selected with reasons, widening, confidence category"
+    },
+    "history": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "history signals: stability per invocation, fingerprints, durations, previous state"
+    },
+    "delivery": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "declared vs CI-selected matrix and artifact lineage"
+    },
+    "review_candidates": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "concentrations for human review; never findings or gates"
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

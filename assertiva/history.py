@@ -77,7 +77,6 @@ class Observation:
     environment: str
     outcome: str | None
     duration_s: float | None
-    attempt: int
     attempts: int | None
     fingerprint: str | None
 
@@ -250,13 +249,26 @@ class HistoryStore:
         for start in range(0, len(ids), 500):
             chunk = ids[start:start + 500]
             query = (
-                "SELECT i.invocation_id, s.id, s.revision, r.environment, i.outcome, i.duration_s, i.attempt, i.attempts, i.fingerprint"
+                "SELECT i.invocation_id, s.id, s.revision, r.environment, i.outcome, i.duration_s, i.attempts, i.fingerprint"
                 " FROM invocations i JOIN runs r ON r.id = i.run_id JOIN states s ON s.id = r.state_id"
                 f" WHERE i.invocation_id IN ({','.join('?' * len(chunk))}) ORDER BY s.id"
             )
             for row in self.db.execute(query, chunk):
                 found.setdefault(row[0], []).append(Observation(*row[1:]))
         return found
+
+    def previous_state(self, state_id: int) -> dict | None:
+        """The state recorded before ``state_id`` for the same workflow and state, with its summaries."""
+        row = self.db.execute(
+            "SELECT p.recorded_at, p.revision, p.vcs_revision, p.coverage, p.qualification, p.artifacts FROM states p"
+            " JOIN states s ON s.id = ? WHERE p.workflow = s.workflow AND p.state = s.state AND p.id < s.id ORDER BY p.id DESC LIMIT 1",
+            (state_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {"recorded_at": row[0], "revision": row[1], "vcs_revision": row[2],
+                "coverage": json.loads(row[3]) if row[3] else None, "qualification": json.loads(row[4]) if row[4] else None,
+                "artifacts": json.loads(row[5]) if row[5] else []}
 
     def fingerprint_count(self, value: str) -> int:
         return self.db.execute("SELECT COUNT(*) FROM invocations WHERE fingerprint = ?", (value,)).fetchone()[0]
@@ -305,7 +317,7 @@ def summarize(store: HistoryStore, state_id: int, revision: str, runs: list[RunE
             "fingerprint_occurrences": store.fingerprint_count(fp[0]) if fp else 0,
         })
     return {
-        "enabled": True, "store": str(store.path), "states_recorded": store.state_count(),
+        "enabled": True, "store": str(store.path), "states_recorded": store.state_count(), "previous_state": store.previous_state(state_id),
         "invocations": entries[:limit], "durations": sorted(timings, key=lambda t: -(t["p95"] or t["p50"]))[:10],
         "limitations": ["history covers only runs recorded on this machine",
                         "a single failure is never called flaky; percentiles need enough samples"],

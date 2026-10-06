@@ -22,7 +22,6 @@ from pathlib import Path
 
 class Relation(str, Enum):
     IMPORTS = "IMPORTS"
-    COVERS = "COVERS"
     DECLARES = "DECLARES"
     MATERIALIZES = "MATERIALIZES"
     DEPENDS_ON_FIXTURE = "DEPENDS_ON_FIXTURE"

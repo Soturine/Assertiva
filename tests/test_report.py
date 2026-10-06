@@ -52,6 +52,10 @@ def improve_states(calc_project):
 def assert_schema_shape(report):
     for key in SCHEMA["required"]:
         assert key in report
+    assert set(report) <= set(SCHEMA["properties"]), set(report) - set(SCHEMA["properties"])  # the contract tracks the report
+    for stage in (report.get("candidate_qualification") or {}).get("stages", []):
+        assert stage["stage"] in SCHEMA["properties"]["candidate_qualification"]["properties"]["stages"]["items"]["properties"]["stage"]["enum"]
+        assert all({"check", "status", "summary"} <= set(check) for check in stage["checks"])
     assert set(report["states"]) <= set(SCHEMA["properties"]["states"]["properties"])
     for key in SCHEMA["properties"]["claim_boundary"]["required"]:
         assert isinstance(report["claim_boundary"][key], list)

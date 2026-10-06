@@ -1,5 +1,5 @@
 """Python/pytest impact edges: imports (E3), pytest-declared fixture scope and configuration (E1),
-declarations, base-test materialization, helpers, coverage.py dynamic contexts (E0), naming (E4).
+declarations, base-test materialization, helpers and naming (E4).
 
 Imports are resolved only to project files, the way Python would find them from the project root,
 a ``src`` layout, or the test file's rootdir-less base directory (pytest's default import mode).
@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import json
 from pathlib import Path, PurePosixPath
 
 from assertiva.impact import ImpactContribution, ImpactEdge, Relation, UnknownRelation
@@ -352,39 +351,3 @@ class PythonImpactAdapter:
             else:
                 edge(rel, target, Relation.IMPORTS, "E3", "static import resolved to a project file", *limitations)
         return imported
-
-
-def covers_edges(report: str | Path, graph, revision: str) -> list[ImpactEdge]:
-    """COVERS edges (E0) from a coverage.py JSON report produced with dynamic contexts.
-
-    ``revision`` is the revision the report was produced at; the graph keeps edges from any other
-    revision aside. Contexts may be pytest node ids (``path::name|phase``) or qualified names.
-    """
-    data = json.loads(Path(report).read_text(encoding="utf-8"))
-    root = Path(graph.root) if getattr(graph, "root", None) else None
-    project = _Project(Path("."), sorted(graph.nodes))
-    names = {name: test for test in graph.tests for name in project.module_names(test)}
-    out: dict[tuple[str, str], ImpactEdge] = {}
-    for measured, info in (data.get("files") or {}).items():
-        rel = measured.replace("\\", "/")
-        if root is not None and Path(measured).is_absolute():
-            try:
-                rel = Path(measured).resolve().relative_to(root).as_posix()
-            except ValueError:
-                continue
-        if rel not in graph.nodes:
-            continue
-        for contexts in (info.get("contexts") or {}).values():
-            for context in contexts:
-                context = context.split("|", 1)[0]
-                if not context:
-                    continue
-                if "::" in context:
-                    test = context.split("::", 1)[0]
-                else:
-                    test = next((t for n, t in sorted(names.items(), key=lambda kv: -len(kv[0]))
-                                 if context == n or context.startswith(n + ".")), None)
-                if test in graph.tests and test != rel:
-                    out[(test, rel)] = ImpactEdge(test, rel, Relation.COVERS, revision, "E0", "coverage.py dynamic contexts",
-                                                  ("the test executed this file; that does not prove it checks its behavior",))
-    return list(out.values())

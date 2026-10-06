@@ -4,7 +4,7 @@ import ast
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .ci import CiPytestInvocation, discover_github_actions_pytest, path_selected_by_ci
+from .ci import CiPytestInvocation, discover_ci_pytest, path_selected_by_ci
 from .adapters.coverage_reports import load_coverage_report
 from .models import CoverageSummary, Finding, TestCompositionRelation, TestDefinition
 
@@ -382,7 +382,7 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
     root = Path(root)
     tests = discover_pytest_definitions(root)
     materializations = discover_pytest_composition(root)
-    ci = discover_github_actions_pytest(root)
+    ci = discover_ci_pytest(root)
     coverage = load_coverage_report(coverage_json) if coverage_json else None
     if coverage is not None and coverage.error:
         coverage = None
@@ -396,7 +396,7 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
         findings.append(
             Finding(
                 "CI_PYTEST_NOT_OBSERVED",
-                "Pytest-style test evidence exists, but no pytest invocation was observed in GitHub Actions.",
+                "Pytest-style test evidence exists, but no pytest invocation was observed in CI configuration.",
                 {"direct_test_count": len(tests), "static_materialization_count": len(materializations)},
                 severity="medium",
                 recommendation="Add the test suite to the delivery pipeline or record where it is enforced.",
@@ -408,7 +408,7 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
             findings.append(
                 Finding(
                     "CI_TEST_EXECUTION_GAP",
-                    "Some discovered pytest files are outside observed GitHub Actions pytest scopes.",
+                    "Some discovered pytest files are outside the pytest scopes observed in CI configuration.",
                     {"unobserved_test_files": missing},
                 )
             )

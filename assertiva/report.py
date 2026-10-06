@@ -468,8 +468,17 @@ def _history_html(report: dict) -> str:
     table = ('<div class="scroll"><table><caption>Invocations with history signals</caption><thead><tr><th scope="col">Invocation</th>'
              '<th scope="col">Stability</th><th scope="col">Evidence</th><th scope="col">Failure signature</th>'
              f'<th scope="col">Same fingerprint recorded</th></tr></thead><tbody>{rows}</tbody></table></div>') if rows else "<p>No instability or failure in the recorded history for these invocations.</p>"
+    previous = history.get("previous_state")
+    earlier = "<p>No earlier state of this kind was recorded.</p>"
+    if previous:
+        coverage = ", ".join(f'{kind} {c["covered"]}/{c["total"]}' for kind, c in ((previous.get("coverage") or {}).get("counts") or {}).items())
+        artifacts = ", ".join(f'{a["artifact"]} sha256 {(a["sha256"] or "?")[:12]} {a["status"]}' for a in previous.get("artifacts") or [])
+        pillars = ", ".join(f"{k} {v}" for k, v in (previous.get("qualification") or {}).items())
+        earlier = _list([f'recorded {previous["recorded_at"]} at revision {previous["revision"][:12]}',
+                         *([f"coverage: {coverage}"] if coverage else []), *([f"artifacts: {artifacts}"] if artifacts else []),
+                         *([f"qualification: {pillars}"] if pillars else [])], "")
     return ('<section id="history" aria-labelledby="h-history"><h2 id="h-history">History</h2>'
-            f'<p>{history["states_recorded"]} recorded state(s) for this project.</p>{table}<h3>Durations</h3>{timings}'
+            f'<p>{history["states_recorded"]} recorded state(s) for this project.</p>{table}<h3>Previously recorded</h3>{earlier}<h3>Durations</h3>{timings}'
             f'{_list(history["limitations"], "")}</section>')
 
 

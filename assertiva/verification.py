@@ -15,15 +15,11 @@ class VerificationKind(str, Enum):
     MUTATION = "MUTATION"
     BUILD = "BUILD"
     PACKAGE = "PACKAGE"
-    SCHEMA = "SCHEMA"
     MIGRATION = "MIGRATION"
-    GENERATED_CODE = "GENERATED_CODE"
     LOCALIZATION = "LOCALIZATION"
     SECURITY = "SECURITY"
     DEPENDENCY = "DEPENDENCY"
     CONTAINER = "CONTAINER"
-    STARTUP = "STARTUP"
-    HEALTH = "HEALTH"
     DEPLOY = "DEPLOY"
     CUSTOM = "CUSTOM"
     UNKNOWN = "UNKNOWN"
@@ -37,7 +33,6 @@ class VerificationOrigin(str, Enum):
     PACKAGE = "PACKAGE"
     DEPLOY = "DEPLOY"
     DECLARED = "DECLARED"
-    OBSERVED = "OBSERVED"
     UNKNOWN = "UNKNOWN"
 
 
@@ -90,15 +85,6 @@ class VerificationSurface:
 
     def ids(self) -> set[str]:
         return {check.check_id for check in self.checks}
-
-
-def verification_gap(
-    declared_or_local: Iterable[VerificationCheck],
-    delivery: Iterable[VerificationCheck],
-) -> set[str]:
-    expected = {check.check_id for check in declared_or_local}
-    observed = {check.check_id for check in delivery}
-    return expected - observed
 
 
 def discover_surface(root) -> VerificationSurface:

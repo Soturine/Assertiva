@@ -45,8 +45,15 @@ def test_schema_is_versioned_and_newer_schemas_are_refused(tmp_path):
 
 def test_only_useful_evidence_is_kept_never_raw_output_or_secrets(store):
     message = "AssertionError: token=hunter2 at /tmp/pytest-of-x/pytest-9/test_a0/tests/test_a.py:12\n" + "x" * 50_000
-    store.record("audit", "current", "rev1", "abc", [run(Outcome.FAILED, message)],
-                 selection={"confidence": "PROVEN_PATHS"}, selection_reasons={"tests/test_a.py": "depends on calc.py"})
+    first = store.record("audit", "current", "rev1", "abc", [run(Outcome.FAILED, message)],
+                         selection={"confidence": "PROVEN_PATHS"}, selection_reasons={"tests/test_a.py": "depends on calc.py"},
+                         coverage={"tool": "coverage.py", "counts": {"line": {"covered": 5, "total": 8}}},
+                         artifacts=[{"kind": "wheel", "artifact": "shop.whl", "sha256": "ab" * 32, "status": "PASS"}],
+                         qualification={"EXECUTION": "PASS"})
+    second = store.record("audit", "current", "rev2", "def", [run()])
+    previous = store.previous_state(second)
+    assert previous["coverage"]["counts"]["line"] == {"covered": 5, "total": 8} and previous["artifacts"][0]["sha256"] == "ab" * 32
+    assert previous["qualification"] == {"EXECUTION": "PASS"} and store.previous_state(first) is None
     dump = "\n".join(store.db.iterdump())
     assert "hunter2" not in dump and "pytest-of-x" not in dump and "x" * 300 not in dump
     row = store.db.execute("SELECT outcome, selection_reason, fingerprint, failure_signature FROM invocations").fetchone()
@@ -122,6 +129,7 @@ def test_summary_reports_failures_with_their_group(store):
     [entry] = summary["invocations"]
     assert entry["stability"] == "CONSISTENT_FAILURE" and entry["fingerprint_occurrences"] == 2
     assert summary["states_recorded"] == 2 and first < second
+    assert summary["previous_state"]["revision"] == "rev1"  # what was recorded before, for comparison
 
 
 def test_history_can_be_disabled(tmp_path, monkeypatch):

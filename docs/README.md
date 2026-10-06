@@ -51,7 +51,7 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 - [Research Index](../research/README.md) — dated evidence, not permanent policy.
 - [Eval Catalog](../evals/README.md)
 - [Eval Case Contract](../evals/CASE_SPEC.md)
-- `../schemas/` — normalized machine-readable records.
+- `../schemas/assurance-report.schema.json` — the report contract (every top-level key the report emits).
 - `../examples/` — example normalized records.
 
 ## Authority rule

@@ -37,12 +37,13 @@ def pytest_scopes(runner_args: list[str] | tuple[str, ...]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(scopes))
 
 
-def discover_github_actions_pytest(root: str | Path) -> list[CiPytestInvocation]:
-    from .adapters.github_actions import GitHubActionsAdapter
+def discover_ci_pytest(root: str | Path) -> list[CiPytestInvocation]:
+    """pytest invocations declared by any recognized CI configuration (the Verification Surface)."""
+    from .verification import VerificationOrigin, discover_surface
 
     return [
         CiPytestInvocation(check.source.split("#")[0], check.command, pytest_scopes(check.metadata.get("runner_args", ())))
-        for check in GitHubActionsAdapter().discover(Path(root))
+        for check in discover_surface(Path(root)).by_origin(VerificationOrigin.CI)
         if check.tool == "pytest" and check.command
     ]
 

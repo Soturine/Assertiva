@@ -1,8 +1,6 @@
 """Revision-scoped impact graph: only provable relations, every edge tied to a revision and an evidence tier."""
 
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -131,7 +129,7 @@ def test_a_graph_never_answers_for_another_revision(tmp_path):
     graph = build_impact_graph(project(tmp_path, BASE))
     with pytest.raises(StaleGraphError):
         graph.require("another-revision")
-    foreign = ImpactEdge("tests/test_calc.py", "calc.py", Relation.COVERS, "another-revision", "E0", "coverage contexts")
+    foreign = ImpactEdge("tests/test_calc.py", "calc.py", Relation.IMPORTS, "another-revision", "E3", "an older analysis")
     graph.add(foreign)
     assert foreign not in graph.edges and foreign in graph.stale
     assert any("another revision" in lim for lim in graph.limitations)
@@ -152,37 +150,3 @@ def test_naming_heuristics_are_never_facts(tmp_path):
 def test_unparseable_file_is_unknown(tmp_path):
     graph = build_impact_graph(project(tmp_path, {**BASE, "broken.py": "def x(:\n"}))
     assert any(u.node == "broken.py" and "parse" in u.reason for u in graph.unknowns)
-
-
-def test_runtime_coverage_contexts_become_covers_edges(tmp_path):
-    from assertiva.adapters.python_impact import covers_edges
-
-    graph = build_impact_graph(project(tmp_path, BASE))
-    report = {"files": {
-        "calc.py": {"contexts": {"2": ["tests.test_calc.test_add|run", "tests/test_service.py::test_total|run"]}},
-        "service.py": {"contexts": {"4": ["tests/test_service.py::test_total|run"], "1": [""]}},
-    }}
-    write(tmp_path / "cov.json", json.dumps(report))
-    for edge in covers_edges(tmp_path / "cov.json", graph, revision=graph.revision):
-        graph.add(edge)
-    covers = edges(graph, Relation.COVERS)
-    assert ("tests/test_calc.py", "calc.py", Relation.COVERS, "E0") in covers
-    assert ("tests/test_service.py", "calc.py", Relation.COVERS, "E0") in covers
-    stale = covers_edges(tmp_path / "cov.json", graph, revision="older-revision")
-    for edge in stale:
-        graph.add(edge)
-    assert len(graph.stale) == len(stale) and stale
-
-
-@pytest.mark.integration
-def test_real_coverage_contexts_from_a_test_run(tmp_path):
-    from assertiva.adapters.python_impact import covers_edges
-
-    root = project(tmp_path, {**BASE, ".coveragerc": "[run]\ndynamic_context = test_function\n"})
-    graph = build_impact_graph(root)
-    run = lambda *args: subprocess.run([sys.executable, "-m", "coverage", *args], cwd=root, capture_output=True, text=True)
-    assert run("run", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests").returncode == 0
-    assert run("json", "--show-contexts", "-o", "cov.json").returncode == 0
-    covers = {(e.source, e.target) for e in covers_edges(root / "cov.json", graph, revision=graph.revision)}
-    assert ("tests/test_service.py", "calc.py") in covers and ("tests/test_calc.py", "calc.py") in covers
-    assert ("tests/test_calc.py", "service.py") not in covers  # runtime evidence is precise where imports are not

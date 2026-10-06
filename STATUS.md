@@ -4,7 +4,7 @@
 
 M0 (foundation and contracts) and M1 (executable audit + improve vertical slice, closed 2026-10-06) are complete. M2 has started with scale hardening; see ROADMAP.md for what is done and what is not.
 
-Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations; it never branches on a tool name (a test enforces this for mutation tools).
+Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations. Contract tests drive measurement, qualification and the report with fake adapters (a runner with non-pytest ids, a non-wheel artifact, coverage from another source), and fail if a core module names a tool or parses a runner's id syntax.
 
 ## IMPLEMENTED (executable, tested)
 

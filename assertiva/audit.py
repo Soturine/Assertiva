@@ -135,10 +135,13 @@ def run_audit(
             limitations.append("test evidence is UNKNOWN for this toolchain until an adapter or portable report is available")
         static_total = 0
         for adapter in adapters:
-            static = adapter.static_audit(root, coverage_json)
+            static_audit = getattr(adapter, "static_audit", None)
+            if static_audit is None:
+                continue
+            static = static_audit(root, coverage_json)
             findings.extend(static.findings)
             static_total += len(static.tests) + len(static.materializations)
-            limitations.append(f"{adapter.adapter_id}: static inventory is bounded AST analysis, not native collection")
+            limitations.append(f"{adapter.adapter_id}: static inventory is bounded source analysis, not native collection")
         if execute and adapters:
             current = measure(root, "current", "isolated-project-copy", python, reason="requested: audit --execute")
         else:

@@ -42,7 +42,7 @@ The core is small and tool-neutral; tool knowledge lives in `assertiva/adapters/
 | `adapters/mutation.py`, `adapters/junit.py` | portable mutation and test-result reports |
 | `adapters/github_actions.py`, `adapters/pre_commit.py`, `adapters/commands.py` | declared CI steps, hooks, command classification and reproduction plans |
 
-Adapter protocol, by capability: runner adapters expose `supports`, `run`/`collect`, `static_signals`, `static_negative_paths`, `static_audit` and `reproduction_args(check)`; artifact adapters expose `supports` and `qualify`; surface adapters expose `supports` and `discover`; report adapters turn a file into normalized records. The core never branches on a tool name.
+Adapters are registered in plain factory lists in `assertiva/adapters/__init__.py`. Adapter protocol, by capability: runner adapters expose `supports`, `run`/`collect`, `static_signals`, `static_negative_paths`, `static_audit` and `reproduction_args(check)`; artifact adapters expose `supports` and `qualify`; surface adapters expose `supports` and `discover`; report adapters turn a file into normalized records. The core never branches on a tool name.
 
 ## Execution budget
 

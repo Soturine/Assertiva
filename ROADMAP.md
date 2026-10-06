@@ -54,7 +54,7 @@ Scale and hardening
 - [x] CI reproducibility and Python 3.11 compatibility (current official actions, constrained installs, minimum-Python job)
 
 Cross-stack
-- [ ] cross-stack core contract tests (fake runner/coverage/artifact adapters)
+- [x] cross-stack core contract tests (fake runner/coverage/artifact adapters)
 - [ ] first JavaScript/TypeScript test adapter
 - [ ] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
 - [ ] Playwright semantic browser evidence (declared / selected / executed projects)

@@ -164,7 +164,7 @@ def _candidate_tests_stage(changes: list[CandidateTestChange], candidate: StateE
         return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could execute candidate tests", *candidate.limitations)
     changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
     touched = [inv for inv in _invocations(candidate) if changed & set(inv.source_paths)]
-    errors = [e for run in candidate.runs for e in run.collection_errors if e.split("::")[0] in changed]
+    errors = [e for run in candidate.runs for e in run.collection_errors if run.metadata.get("error_sources", {}).get(e) in changed]
     if errors:
         return _stage(stage, StageStatus.FAIL, "candidate test files failed to collect: " + ", ".join(errors))
     if not touched:
@@ -235,7 +235,8 @@ def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> Qualifica
     if weakened:
         return _stage(stage, StageStatus.FAIL, "negative-path evidence weakened: " + ", ".join(weakened), provenance)
     changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
-    touched = {tid: dims for tid, dims in candidate.negative_paths.items() if tid.split("::")[0] in changed}
+    sources = {inv.materialization_id: set(inv.source_paths) for inv in _invocations(candidate)}
+    touched = {tid: dims for tid, dims in candidate.negative_paths.items() if changed & sources.get(tid, set())}
     if not touched:
         return _stage(stage, StageStatus.UNKNOWN, "the candidate does not add or modify negative-path tests", provenance)
     outcomes: dict[str, set] = {}

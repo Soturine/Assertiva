@@ -1,11 +1,38 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from .ci import discover_github_actions_pytest, path_selected_by_ci
+from .ci import CiPytestInvocation, discover_github_actions_pytest, path_selected_by_ci
 from .coverage import load_coverage_json
-from .models import Finding, PytestAssuranceReport, TestCompositionRelation, TestDefinition
+from .models import CoverageSummary, Finding, TestCompositionRelation, TestDefinition
+
+
+@dataclass
+class PytestAssuranceReport:
+    root: Path
+    tests: list[TestDefinition]
+    ci_invocations: list[CiPytestInvocation]
+    findings: list[Finding]
+    coverage: CoverageSummary | None = None
+    materializations: list[TestCompositionRelation] = field(default_factory=list)
+
+    @property
+    def smoke_like_count(self) -> int:
+        return sum(test.smoke_like for test in self.tests)
+
+    @property
+    def smoke_ratio(self) -> float:
+        return self.smoke_like_count / len(self.tests) if self.tests else 0.0
+
+    @property
+    def expected_error_count(self) -> int:
+        return sum("EXPECTED_ERROR_CONTRACT" in test.assertion_kinds for test in self.tests)
+
+    def has_finding(self, code: str) -> bool:
+        return any(f.code == code for f in self.findings)
+
 
 _WEAK = {
     "NO_ASSERTION",
@@ -369,6 +396,8 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
                 "CI_PYTEST_NOT_OBSERVED",
                 "Pytest-style test evidence exists, but no pytest invocation was observed in GitHub Actions.",
                 {"direct_test_count": len(tests), "static_materialization_count": len(materializations)},
+                severity="medium",
+                recommendation="Add the test suite to the delivery pipeline or record where it is enforced.",
             )
         )
     if tests and ci:

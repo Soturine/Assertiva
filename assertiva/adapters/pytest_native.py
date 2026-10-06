@@ -211,6 +211,7 @@ class PytestNativeAdapter:
         for record in records:
             if record["type"] == "collect_error":
                 evidence.collection_errors.append(record["nodeid"] or "<session>")
+                evidence.metadata.setdefault("error_sources", {})[record["nodeid"] or "<session>"] = (record["nodeid"] or "").split("::", 1)[0]
             elif record["type"] == "deselected":
                 evidence.deselected.append(record["nodeid"])
             elif record["type"] == "report":

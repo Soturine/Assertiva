@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
-from .models import CiPytestInvocation
+
+@dataclass(frozen=True)
+class CiPytestInvocation:
+    workflow: str
+    command: str
+    scopes: tuple[str, ...] = ()
+
+    @property
+    def runs_all_tests(self) -> bool:
+        return not self.scopes
+
 
 _OPTIONS_WITH_VALUES = {
     "-k", "-m", "-c", "-p", "-o", "--maxfail", "--tb", "--junitxml", "--junit-xml", "--ignore", "--ignore-glob",

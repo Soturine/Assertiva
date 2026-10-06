@@ -192,17 +192,6 @@ class TestCompositionRelation:
 
 
 @dataclass(frozen=True)
-class CiPytestInvocation:
-    workflow: str
-    command: str
-    scopes: tuple[str, ...] = ()
-
-    @property
-    def runs_all_tests(self) -> bool:
-        return not self.scopes
-
-
-@dataclass(frozen=True)
 class CoverageSummary:
     line_percent: float | None = None
     branch_percent: float | None = None
@@ -214,28 +203,5 @@ class Finding:
     code: str
     summary: str
     evidence: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class PytestAssuranceReport:
-    root: Path
-    tests: list[TestDefinition]
-    ci_invocations: list[CiPytestInvocation]
-    findings: list[Finding]
-    coverage: CoverageSummary | None = None
-    materializations: list[TestCompositionRelation] = field(default_factory=list)
-
-    @property
-    def smoke_like_count(self) -> int:
-        return sum(test.smoke_like for test in self.tests)
-
-    @property
-    def smoke_ratio(self) -> float:
-        return self.smoke_like_count / len(self.tests) if self.tests else 0.0
-
-    @property
-    def expected_error_count(self) -> int:
-        return sum("EXPECTED_ERROR_CONTRACT" in test.assertion_kinds for test in self.tests)
-
-    def has_finding(self, code: str) -> bool:
-        return any(f.code == code for f in self.findings)
+    severity: str | None = None  # set by the producing adapter for its own findings
+    recommendation: str | None = None

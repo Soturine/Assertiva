@@ -18,17 +18,30 @@ def surface_adapters() -> list:
     return [GitHubActionsAdapter(), PreCommitAdapter()]
 
 
-def artifact_adapters(root: str | Path, python: str | None = None) -> list:
-    """Adapters that build and verify a deliverable artifact for the project at ``root``."""
+def _python_package(python=None):
     from .python_package import PythonPackageAdapter
 
-    candidates = [PythonPackageAdapter(python=python)]
+    return PythonPackageAdapter(python=python)
+
+
+def _pytest(python=None):
+    from .pytest_native import PytestNativeAdapter
+
+    return PytestNativeAdapter(python=python)
+
+
+# Plain lists of factories (called with the target interpreter); no plugin machinery.
+RUNNER_FACTORIES = [_pytest]
+ARTIFACT_FACTORIES = [_python_package]
+
+
+def artifact_adapters(root: str | Path, python: str | None = None) -> list:
+    """Adapters that build and verify a deliverable artifact for the project at ``root``."""
+    candidates = [factory(python=python) for factory in ARTIFACT_FACTORIES]
     return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
 
 
 def runner_adapters(root: str | Path, python: str | None = None) -> list:
     """Executable test-runner adapters that support the project at ``root``."""
-    from .pytest_native import PytestNativeAdapter
-
-    candidates = [PytestNativeAdapter(python=python)]
+    candidates = [factory(python=python) for factory in RUNNER_FACTORIES]
     return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]

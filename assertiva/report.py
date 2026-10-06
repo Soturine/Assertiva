@@ -28,7 +28,7 @@ _SEVERITY = {
     "ARTIFACT_QUALIFICATION_FAILED": "high", "PROJECT_LINK_ESCAPES_ROOT": "high", "BROKEN_PROJECT_LINK": "medium",
     "NESTED_REPOSITORY": "info", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
-    "CI_PYTEST_NOT_OBSERVED": "medium", "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
+    "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "info", "NO_DELIVERY_PIPELINE_OBSERVED": "info",
     "UNCLASSIFIED_VERIFICATION": "info", "NO_TESTS_DISCOVERED": "info", "STATIC_INVENTORY_DIVERGES_FROM_NATIVE": "info",
@@ -41,11 +41,10 @@ _RECOMMENDATION = {
     "ERROR_STATUS_ONLY_SIGNAL": "Also assert the structured error (code/field/path) and the state after rejection.",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "Expect the specific error type/code the contract defines instead of a broad base exception.",
     "CI_TEST_EXECUTION_GAP": "Run the unobserved test paths in CI or document why they are excluded from the delivery gate.",
-    "CI_PYTEST_NOT_OBSERVED": "Add the test suite to the delivery pipeline or record where it is enforced.",
     "LOCAL_CHECK_NOT_OBSERVED_IN_CI": "Run these local checks in CI (or the hook runner) so a green pipeline covers them.",
     "CI_ONLY_CHECK": "Make CI-only validators runnable locally so local green approximates pipeline green.",
     "UNCLASSIFIED_VERIFICATION": "Declare what the unclassified checks verify, or add an adapter; until then they stay UNKNOWN.",
-    "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "Provide portable evidence (JUnit XML, coverage reports) or an adapter for this toolchain.",
+    "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "Provide portable evidence (standard test-result and coverage reports) or an adapter for this toolchain.",
     "NATIVE_COLLECTION_ERRORS": "Fix collection errors first: tests that cannot be collected provide no evidence.",
     "NATIVE_TESTS_FAILING": "Triage failing tests before trusting any other metric in this report.",
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
@@ -98,15 +97,15 @@ def _mutation_summary(run) -> dict:
 
 def _finding(finding: Any) -> dict:
     data = to_jsonable(finding)
-    data["severity"] = _SEVERITY.get(data["code"], "medium")
+    data["severity"] = data.get("severity") or _SEVERITY.get(data["code"], "medium")
     return data
 
 
 def _recommendations(findings: list[dict]) -> list[dict]:
     return [
-        {"finding": f["code"], "recommendation": _RECOMMENDATION[f["code"]], "status": "PROPOSED"}
+        {"finding": f["code"], "recommendation": f.get("recommendation") or _RECOMMENDATION[f["code"]], "status": "PROPOSED"}
         for f in findings
-        if f["code"] in _RECOMMENDATION
+        if f.get("recommendation") or f["code"] in _RECOMMENDATION
     ]
 
 
@@ -241,7 +240,7 @@ def improve_report(session, result, applied=None) -> dict:
             f"{s.stage.value} ({s.status.value}): {s.summary}" for s in q.stages
             if s.status in (StageStatus.UNKNOWN, StageStatus.NOT_RUN, StageStatus.BLOCKED)
         ] + [f"metric {d.name}: not measured in both states" for d in q.metric_deltas if d.state is DeltaState.UNKNOWN],
-        "provenance": {"assertiva_version": __version__, "python": session.python, "read_only_until_approval": True},
+        "provenance": {"assertiva_version": __version__, "interpreter": session.python, "read_only_until_approval": True},
         "execution_budget": execution_budget(
             "qualification", [*result.baseline_evidence.budget, *result.candidate_evidence.budget, *result.budget]
         ),

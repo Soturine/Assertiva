@@ -127,6 +127,16 @@ def test_interpreter_paths_are_normalized_before_wrappers():
     assert (tested.kind, tested.tool) == (VerificationKind.TEST, "pytest")
 
 
+def test_interpreter_options_before_dash_m_are_unwrapped():
+    """Found by dogfooding: `python -X utf8 -m unittest discover -s tests` was an unknown command."""
+    from assertiva.adapters.commands import classify_command
+
+    tested = classify_command("python -X utf8 -m unittest discover -s tests")
+    assert (tested.kind, tested.tool, tested.runner_args) == (VerificationKind.TEST, "unittest", ("discover", "-s", "tests"))
+    assert classify_command("python3.12 -u -W error -m pytest -q").tool == "pytest"
+    assert classify_command('python -c "import x"').kind is VerificationKind.UNKNOWN
+
+
 def test_unparseable_workflow_is_unknown_not_silently_empty(tmp_path):
     write(tmp_path / ".github" / "workflows" / "broken.yml", "jobs: [unclosed\n")
     surface = discover_surface(tmp_path)

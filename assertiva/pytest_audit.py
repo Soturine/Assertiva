@@ -4,7 +4,7 @@ import ast
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .ci import CiPytestInvocation, discover_ci_pytest, path_selected_by_ci
+from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, path_selected_by_ci
 from .adapters.coverage_reports import load_coverage_report
 from .models import CoverageSummary, Finding, TestCompositionRelation, TestDefinition
 
@@ -197,11 +197,26 @@ def negative_path_evidence(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tupl
     return ordered, tuple(dict.fromkeys(error_types)), unobserved
 
 
+def _unittest_assertion_kind(call: ast.Call) -> str | None:
+    """`self.assert*(...)` read like the equivalent plain `assert` (unittest.TestCase oracles)."""
+    func = call.func
+    if not (isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id == "self"
+            and func.attr.startswith("assert")) or func.attr in _RAISES | {"assertWarns", "assertWarnsRegex"}:
+        return None
+    if func.attr in {"assertIsNone", "assertIsNotNone"}:
+        return "EXISTENCE_ONLY"
+    if func.attr == "assertEqual" and len(call.args) == 2:
+        left, right = call.args
+        if isinstance(left, ast.Attribute) and left.attr == "status_code" and isinstance(right, ast.Constant) and isinstance(right.value, int):
+            return "HTTP_STATUS_ONLY" if 200 <= right.value <= 299 else "ERROR_STATUS_ONLY" if right.value >= 400 else "BEHAVIORAL_ASSERTION"
+    return "BEHAVIORAL_ASSERTION"
+
+
 def _function_assertions(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, ...]:
     kinds = [_assertion_kind(item) for item in ast.walk(node) if isinstance(item, ast.Assert)]
     for item in ast.walk(node):
         if isinstance(item, ast.Call):
-            kind = _expected_failure_kind(item)
+            kind = _expected_failure_kind(item) or _unittest_assertion_kind(item)
             if kind:
                 kinds.append(kind)
     normalized = tuple(dict.fromkeys(kinds))
@@ -383,6 +398,7 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
     tests = discover_pytest_definitions(root)
     materializations = discover_pytest_composition(root)
     ci = discover_ci_pytest(root)
+    unittest_ci = discover_ci_unittest(root)
     coverage = load_coverage_report(coverage_json) if coverage_json else None
     if coverage is not None and coverage.error:
         coverage = None
@@ -392,7 +408,25 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
         findings.append(
             Finding("NO_TESTS_DISCOVERED", "No pytest-style definitions were found by bounded static inventory.")
         )
-    if (tests or materializations) and not ci:
+    if (tests or materializations) and not ci and unittest_ci:
+        findings.append(
+            Finding(
+                "CI_RUNS_PYTHON_UNITTEST",
+                "CI runs the Python tests with unittest (declared configuration). Assertiva has no native unittest "
+                "adapter: it can execute these tests only through pytest, so equivalence with the CI run is UNKNOWN.",
+                {
+                    "ci_commands": [inv.command for inv in unittest_ci],
+                    "ci_runner": "DECLARED",
+                    "native_unittest_execution": "UNSUPPORTED",
+                    "limitations": [
+                        "unittest collects only unittest.TestCase tests matching its discovery pattern; "
+                        "plain pytest-style functions in the same files are not run by it",
+                    ],
+                },
+                severity="info",
+            )
+        )
+    if (tests or materializations) and not ci and not unittest_ci:
         findings.append(
             Finding(
                 "CI_PYTEST_NOT_OBSERVED",
@@ -402,13 +436,13 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
                 recommendation="Add the test suite to the delivery pipeline or record where it is enforced.",
             )
         )
-    if tests and ci:
-        missing = sorted({test.path for test in tests if not path_selected_by_ci(test.path, ci)})
+    if tests and (ci or unittest_ci):
+        missing = sorted({test.path for test in tests if not path_selected_by_ci(test.path, ci + unittest_ci)})
         if missing:
             findings.append(
                 Finding(
                     "CI_TEST_EXECUTION_GAP",
-                    "Some discovered pytest files are outside the pytest scopes observed in CI configuration.",
+                    "Some discovered test files are outside the test scopes observed in CI configuration.",
                     {"unobserved_test_files": missing},
                 )
             )

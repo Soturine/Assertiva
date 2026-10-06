@@ -16,6 +16,8 @@ from assertiva.verification import VerificationKind as K
 
 _SPLIT = re.compile(r"\s*(?:&&|\|\||;)\s*")
 _ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_PYTHON = re.compile(r"^(?:python(?:\d+(?:\.\d+)?)?|py)$")
+_PYTHON_OPTIONS_WITH_VALUES = {"-X", "-W", "--check-hash-based-pycs"}
 _WRAPPERS = {("python", "-m"), ("python3", "-m"), ("py", "-m"), ("uv", "run"), ("poetry", "run"), ("pipenv", "run"), ("npx",), ("pnpm", "exec"), ("yarn",)}
 
 # (tool, optional subcommand) -> kind. Subcommand None matches any.
@@ -72,6 +74,11 @@ def _tokens(segment: str) -> list[str]:
         tokens[0] = PurePosixPath(tokens[0].replace("\\", "/")).name  # .venv/bin/pytest -> pytest
     if tokens and tokens[0].endswith(".exe"):
         tokens[0] = tokens[0][:-4]
+    if tokens and _PYTHON.match(tokens[0]):  # python -X utf8 -u -m unittest -> python -m unittest
+        rest, i = tokens[1:], 0
+        while i < len(rest) and rest[i].startswith("-") and rest[i] not in {"-m", "-c", "-"}:
+            i += 2 if rest[i] in _PYTHON_OPTIONS_WITH_VALUES else 1
+        tokens = ["python", *rest[i:]]
     changed = True
     while changed and tokens:
         changed = False

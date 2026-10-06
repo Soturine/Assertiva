@@ -112,6 +112,42 @@ def test_bare_pytest_represents_observed_full_scope(tmp_path):
     assert not audit_pytest_project(tmp_path).has_finding("CI_TEST_EXECUTION_GAP")
 
 
+_UNITTEST_CASE = "import unittest\n\nclass TestX(unittest.TestCase):\n    def test_x(self):\n        self.assertEqual(1 + 1, 2)\n"
+
+
+def test_unittest_in_ci_is_the_suite_in_ci_with_native_support_kept_apart(tmp_path):
+    """Found by dogfooding: a CI running `python -X utf8 -m unittest discover -s tests` got CI_PYTEST_NOT_OBSERVED."""
+    write(tmp_path / "tests" / "test_x.py", _UNITTEST_CASE)
+    write(tmp_path / ".github" / "workflows" / "ci.yml",
+          "jobs:\n  test:\n    steps:\n      - run: python -X utf8 -m unittest discover -s tests\n")
+    report = audit_pytest_project(tmp_path)
+    assert not report.has_finding("CI_PYTEST_NOT_OBSERVED")
+    assert not report.has_finding("CI_TEST_EXECUTION_GAP")
+    [finding] = [f for f in report.findings if f.code == "CI_RUNS_PYTHON_UNITTEST"]
+    assert finding.evidence["ci_runner"] == "DECLARED"
+    assert finding.evidence["native_unittest_execution"] == "UNSUPPORTED"
+
+
+def test_unittest_assertions_are_oracles_not_missing_assertions(tmp_path):
+    """Found by the same smoke: every `self.assert*` test read as NO_ASSERTION and raised WEAK_ORACLE_SIGNAL."""
+    write(tmp_path / "tests" / "test_x.py",
+          "import unittest\n\nclass TestX(unittest.TestCase):\n"
+          "    def test_value(self):\n        self.assertEqual(add(1, 1), 2)\n"
+          "    def test_exists(self):\n        self.assertIsNotNone(make())\n"
+          "    def test_status(self):\n        self.assertEqual(client.get('/').status_code, 200)\n")
+    kinds = {t.name: t.assertion_kinds for t in discover_pytest_definitions(tmp_path)}
+    assert kinds == {"test_value": ("BEHAVIORAL_ASSERTION",), "test_exists": ("EXISTENCE_ONLY",), "test_status": ("HTTP_STATUS_ONLY",)}
+
+
+def test_tests_outside_the_unittest_start_directory_are_a_ci_gap(tmp_path):
+    write(tmp_path / "tests" / "test_x.py", _UNITTEST_CASE)
+    write(tmp_path / "other" / "test_y.py", _UNITTEST_CASE)
+    write(tmp_path / ".github" / "workflows" / "ci.yml", "jobs:\n  test:\n    steps:\n      - run: python -m unittest discover -s tests\n")
+    report = audit_pytest_project(tmp_path)
+    [gap] = [f for f in report.findings if f.code == "CI_TEST_EXECUTION_GAP"]
+    assert gap.evidence["unobserved_test_files"] == ["other/test_y.py"]
+
+
 def test_detects_smoke_dominant_suite(tmp_path):
     write(
         tmp_path / "tests" / "test_smoke.py",

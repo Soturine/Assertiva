@@ -111,6 +111,7 @@ def parse_maven_reports(root: str | Path, previous: dict[str, tuple[int, int]] |
                     invocation_id=invocation_id, declaration_id=f"{classname}#{method}", materialization_id=f"{classname}#{method}",
                     parameters_id=match.group("index") if match else None, markers=(f"maven:{phase}",), outcome=inv.outcome,
                     duration_s=inv.duration_s, message=message, source_paths=_source(root, classname),
+                    attempts=1 + flaky + reruns,
                 ))
         matrix[f"phase {phase} ({plugin})"] = "EXECUTED" if executed else ("SELECTED" if reports[phase] else "NOT_RUN")
     run.metadata["matrix"] = matrix

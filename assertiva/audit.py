@@ -17,6 +17,7 @@ from .evidence import StateEvidence, attach_mutation, measure, mutant_label
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
 from .process import scoped
+from .history import record_state
 from .report import audit_model, execution_budget, selection_summary
 from .selection import select_changes
 from .verification import discover_surface, surface_findings
@@ -182,6 +183,16 @@ def run_audit(
     report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
     report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
     report["test_selection"] = selection_summary(selection)
+    report["history"] = None
+    if execute and current.runs:
+        reasons = {test: why[0].reason for test, why in (selection.selected.items() if selection else ())}
+        selection_brief = {"confidence": selection.confidence.value, "full": selection.full} if selection else None
+        coverage = next((c for c in [*current.coverage, *(r.coverage for r in current.runs)] if c and c.error is None), None)
+        report["history"] = record_state(
+            root, "audit", "current", baseline.digest, baseline.revision, current.runs, selection=selection_brief,
+            selection_reasons=reasons, coverage={"tool": coverage.tool, "counts": coverage.counts} if coverage else None,
+            artifacts=[{"kind": a.kind, "artifact": a.artifact, "sha256": a.sha256, "status": a.status.value} for a in current.artifacts],
+        )
     if selection is not None:
         boundary = report["claim_boundary"]
         counts = report["test_selection"]["counts"]

@@ -41,7 +41,7 @@ def test_alternating_outcome_is_a_flaky_signal_and_first_failure_is_kept(session
     write(session.workspace / "tests" / "test_flaky.py", counter_test(tmp_path / "count", "n % 2 == 1"))
     result = qualify_candidate(session)
     record = next(r for r in result.stability.records if r.invocation_id == "tests/test_flaky.py::test_counted")
-    assert record.verdict == "FLAKY_SIGNAL"
+    assert record.verdict == "OBSERVED_UNSTABLE_CURRENT_RUN"
     assert record.outcomes[0] is Outcome.FAILED and Outcome.PASSED in record.outcomes[1:]
     q = result.qualification
     assert stage(q).status is StageStatus.FAIL
@@ -53,7 +53,7 @@ def test_consistent_pass_is_stable_within_the_observed_runs_only(session):
     write(session.workspace / "tests" / "test_new.py", "def test_new():\n    assert 2 * 3 == 6\n")
     result = qualify_candidate(session)
     [record] = result.stability.records
-    assert record.verdict == "STABLE" and len(record.outcomes) == 3
+    assert record.verdict == "NO_INSTABILITY_OBSERVED" and len(record.outcomes) == 3
     assert stage(result.qualification).status is StageStatus.PASS
     assert "no instability observed in 3 executions" in stage(result.qualification).summary
 

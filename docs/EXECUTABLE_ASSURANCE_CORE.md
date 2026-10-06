@@ -31,12 +31,14 @@ The core is small and tool-neutral; tool knowledge lives in `assertiva/adapters/
 | --- | --- |
 | `workspace.py` | fingerprints, baseline, isolated candidate (worktree/copy), change set, approved apply, read-only guard, Assertiva-owned state location |
 | `evidence.py` | measuring one state in a disposable copy, negative controls, attaching mutation reports, direction-aware metrics and state comparison |
-| `improve.py` | improve session, qualification stages, bounded stability reruns, stage timings |
+| `improve.py` | improve session, qualification pillars and their checks, bounded stability reruns, check timings |
+| `impact.py`, `selection.py`, `components.py` | revision-scoped impact graph; the only selection/widening/confidence policy; workspace component facts |
+| `history.py` | local SQLite history (schema-versioned), the stability vocabulary for reruns and history, duration percentiles, deterministic failure fingerprints |
 | `audit.py` | read-only audit over runner/artifact adapters, portable reports and the Verification Surface |
 | `report.py` | the single Assurance Report model and its HTML rendering |
 | `verification.py` | VerificationCheck/Surface and generic local-vs-delivery parity findings |
 | `process.py` | bounded, non-interactive, timed subprocess execution and the execution trace |
-| `candidate.py`, `models.py` | stage/metric/change, runner, mutation, artifact and stability records |
+| `candidate.py`, `models.py` | pillar/check/metric/change, runner, mutation, artifact and stability records |
 | `adapters/pytest_native.py`, `pytest_audit.py` | native pytest collection/execution, coverage, static oracle and failure-contract signals, CI-check reproduction |
 | `adapters/python_package.py` | wheel build, isolated install, import origin, tests against the artifact |
 | `adapters/mutation.py`, `adapters/junit.py` | portable mutation and test-result reports |

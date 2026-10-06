@@ -67,9 +67,9 @@ Impact and selection
 - [x] monorepo affected sets (npm workspaces, Python subprojects)
 
 History
-- [ ] minimal revision-aware history store
-- [ ] historical flake / order / duration intelligence
-- [ ] deterministic failure fingerprinting and clustering
+- [x] minimal revision-aware history store (local SQLite, schema-versioned, optional)
+- [x] historical flake / duration intelligence (order dependence: not measured)
+- [x] deterministic failure fingerprinting and conservative grouping
 
 Delivery
 - [ ] Azure Pipelines, GitLab CI, Jenkins verification discovery with matrix gaps (declared / selected / executed / deployed)

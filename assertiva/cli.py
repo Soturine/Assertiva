@@ -185,6 +185,7 @@ def _result_from(data: dict):
         }),
         timings=list(data["timings"]),
         budget=[BudgetDecision(**d) for d in data.get("budget", [])],
+        history=data.get("history"),
     )
 
 

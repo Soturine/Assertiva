@@ -45,6 +45,7 @@ from .evidence import (
     state_from_dict,
     to_jsonable,
 )
+from .history import Stability, classify_attempts, record_state
 from .models import BudgetDecision, MutantStatus, Outcome, StabilityEvidence, StabilityRecord
 from .process import run_command, scoped, traced_stage
 from .verification import GateMode, VerificationOrigin, discover_surface
@@ -94,6 +95,7 @@ class QualificationResult:
     stability: StabilityEvidence = field(default_factory=StabilityEvidence)
     timings: list[dict] = field(default_factory=list)
     budget: list[BudgetDecision] = field(default_factory=list)
+    history: dict | None = None
 
 
 @dataclass
@@ -130,6 +132,8 @@ def start_improve(root: str | Path, python: str | None = None) -> ImproveSession
         workspace = create_workspace(baseline)
         baseline_copy = snapshot(root, directory / "baseline")
         baseline_evidence = measure(baseline_copy, "baseline", "isolated-baseline-copy", python, reason="baseline for improve", origin=root)
+        record_state(root, "improve", "baseline", baseline.digest, baseline.revision, baseline_evidence.runs,
+                     coverage=_coverage_counts(baseline_evidence), artifacts=_artifact_identity(baseline_evidence))
     session = ImproveSession(root, directory, baseline, workspace, baseline_copy, python, baseline_evidence)
     session.save()
     return session
@@ -407,17 +411,17 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
     return _stage(stage, StageStatus.PASS, summary + "; all gating checks passed", *notes)
 
 
+def _coverage_counts(state: StateEvidence) -> dict | None:
+    summary = next((c for c in [*state.coverage, *(r.coverage for r in state.runs)] if c and c.error is None), None)
+    return {"tool": summary.tool, "counts": summary.counts} if summary else None
+
+
+def _artifact_identity(state: StateEvidence) -> list[dict]:
+    return [{"kind": a.kind, "artifact": a.artifact, "sha256": a.sha256, "status": a.status.value} for a in state.artifacts]
+
+
 MAX_STABILITY_INVOCATIONS = 50
 MAX_STABILITY_RERUNS = 2
-
-
-def _verdict(outcomes: tuple) -> str:
-    if len(outcomes) < 2 or None in outcomes:
-        return "INSUFFICIENT_EVIDENCE"
-    failing = {Outcome.FAILED, Outcome.ERROR}
-    if all(o in failing for o in outcomes):
-        return "CONSISTENT_FAILURE"
-    return "STABLE" if len(set(outcomes)) == 1 else "FLAKY_SIGNAL"
 
 
 def _stability(session: ImproveSession, changes, candidate: StateEvidence, reruns: int) -> StabilityEvidence:
@@ -454,7 +458,8 @@ def _stability(session: ImproveSession, changes, candidate: StateEvidence, rerun
     for iid in selected:
         attempts = [first[iid], *later[iid]]
         outcomes = tuple(inv.outcome for inv in attempts)
-        evidence.records.append(StabilityRecord(iid, outcomes, tuple(inv.duration_s for inv in attempts), _verdict(outcomes)))
+        evidence.records.append(StabilityRecord(iid, outcomes, tuple(inv.duration_s for inv in attempts), classify_attempts(outcomes).value))
+        evidence.messages[iid] = tuple(inv.message for inv in attempts)
     return evidence
 
 
@@ -465,10 +470,11 @@ def _stability_stage(stability: StabilityEvidence, deltas) -> CheckResult:
     bounds = ("absence of observed instability is not proof of stability", "order dependence was not measured", *stability.limitations)
     if not stability.records:
         return _stage(stage, StageStatus.NOT_RUN, f"no relevant invocation was rerun; {cost}", *bounds)
-    by = {v: [r for r in stability.records if r.verdict == v] for v in ("FLAKY_SIGNAL", "INSUFFICIENT_EVIDENCE", "CONSISTENT_FAILURE")}
-    if by["FLAKY_SIGNAL"]:
-        shown = ", ".join(f"{r.invocation_id} ({'/'.join(o.value if o else '?' for o in r.outcomes)})" for r in by["FLAKY_SIGNAL"][:5])
-        return _stage(stage, StageStatus.FAIL, f"FLAKY_SIGNAL: {shown}; {cost}", *bounds)
+    unstable = Stability.OBSERVED_UNSTABLE_CURRENT_RUN.value
+    by = {v: [r for r in stability.records if r.verdict == v] for v in (unstable, "INSUFFICIENT_EVIDENCE", "CONSISTENT_FAILURE")}
+    if by[unstable]:
+        shown = ", ".join(f"{r.invocation_id} ({'/'.join(o.value if o else '?' for o in r.outcomes)})" for r in by[unstable][:5])
+        return _stage(stage, StageStatus.FAIL, f"{unstable}: {shown}; {cost}", *bounds)
     if by["INSUFFICIENT_EVIDENCE"] or by["CONSISTENT_FAILURE"]:
         notes = [f"{len(by['CONSISTENT_FAILURE'])} consistently failing (see CANDIDATE_TESTS)"] if by["CONSISTENT_FAILURE"] else []
         notes += [f"{len(by['INSUFFICIENT_EVIDENCE'])} with insufficient reruns"] if by["INSUFFICIENT_EVIDENCE"] else []
@@ -542,7 +548,17 @@ def qualify_candidate(
             if stability.records else "no relevant invocation to rerun, reruns disabled, or execution budget exhausted",
         ))
         stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()), stability, timed, budget)
-    result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls, stability, timings, budget)
+    q = CandidateQualification(changes, deltas, stages)
+    reruns = {}
+    for r in stability.records:  # later attempts, kept beside the first outcome
+        messages = stability.messages.get(r.invocation_id) or (None,) * len(r.outcomes)
+        reruns[r.invocation_id] = list(zip(r.outcomes[1:], r.durations_s[1:], messages[1:]))
+    history = record_state(
+        session.root, "improve", "candidate", capture_baseline(session.workspace).digest, session.baseline.revision, candidate.runs,
+        reruns=reruns, qualification={s.stage.value: s.status.value for s in q.stages},
+        coverage=_coverage_counts(candidate), artifacts=_artifact_identity(candidate),
+    )
+    result = QualificationResult(q, baseline, candidate, baseline_controls, stability, timings, budget, history)
     (session.directory / "qualification.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result
 
@@ -571,6 +587,9 @@ def apply_approved(
         for c in applied
     )
     evidence = measure(session.root, "applied", "applied-project-copy", session.python, reason="post-apply verification")
+    applied_tree = capture_baseline(session.root)
+    record_state(session.root, "improve", "applied", applied_tree.digest, applied_tree.revision, evidence.runs,
+                 coverage=_coverage_counts(evidence), artifacts=_artifact_identity(evidence))
     result = AppliedResult(applied, evidence, files_match)
     (session.directory / "applied.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result

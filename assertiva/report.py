@@ -445,6 +445,28 @@ def selection_summary(selection) -> dict | None:
     return data
 
 
+def _history_html(report: dict) -> str:
+    history = report.get("history")
+    if not history:
+        return ""
+    if not history.get("enabled"):
+        return ('<section id="history" aria-labelledby="h-history"><h2 id="h-history">History</h2>'
+                f'{_list(history.get("limitations") or [], "History was not used.")}</section>')
+    rows = "".join(
+        f'<tr><th scope="row"><code>{_e(e["invocation_id"])}</code></th><td><span class="chip">{_e(e["stability"])}</span></td>'
+        f'<td>{_e(e["note"])}</td><td>{_e(e["failure_signature"] or "")}</td><td>{e["fingerprint_occurrences"] or ""}</td></tr>'
+        for e in history["invocations"]
+    )
+    timings = _list([f'{t["invocation_id"]}: p50 {t["p50"]}s' + (f', p95 {t["p95"]}s' if t["p95"] is not None else "") + f' ({t["samples"]} samples)'
+                     for t in history["durations"]], "Not enough samples for duration percentiles yet.")
+    table = ('<div class="scroll"><table><caption>Invocations with history signals</caption><thead><tr><th scope="col">Invocation</th>'
+             '<th scope="col">Stability</th><th scope="col">Evidence</th><th scope="col">Failure signature</th>'
+             f'<th scope="col">Same fingerprint recorded</th></tr></thead><tbody>{rows}</tbody></table></div>') if rows else "<p>No instability or failure in the recorded history for these invocations.</p>"
+    return ('<section id="history" aria-labelledby="h-history"><h2 id="h-history">History</h2>'
+            f'<p>{history["states_recorded"]} recorded state(s) for this project.</p>{table}<h3>Durations</h3>{timings}'
+            f'{_list(history["limitations"], "")}</section>')
+
+
 def _selection_html(report: dict) -> str:
     selection = report.get("test_selection")
     if not selection:
@@ -667,6 +689,8 @@ def render_html(report: dict) -> str:
     sections = [("summary", "Summary"), ("metrics", "States and metrics")]
     if report.get("test_selection"):
         sections.append(("selection", "Test selection"))
+    if report.get("history"):
+        sections.append(("history", "History"))
     if report.get("candidate_qualification"):
         sections.append(("qualification", "Qualification"))
     if any((s or {}).get("negative_paths") for s in report["states"].values()):
@@ -704,7 +728,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_selection_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_selection_html(report)}{_history_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

@@ -116,7 +116,7 @@ class StabilityRecord:
     invocation_id: str
     outcomes: tuple["Outcome | None", ...]  # first execution first; never replaced by later ones
     durations_s: tuple[float | None, ...]
-    verdict: str  # STABLE / FLAKY_SIGNAL / CONSISTENT_FAILURE / INSUFFICIENT_EVIDENCE
+    verdict: str  # history.Stability value for this run's attempts
 
 
 @dataclass
@@ -125,6 +125,7 @@ class StabilityEvidence:
     records: list[StabilityRecord] = field(default_factory=list)
     commands: list[str] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
+    messages: dict[str, tuple] = field(default_factory=dict)  # failure messages per attempt (for fingerprints)
 
 
 @dataclass(frozen=True)
@@ -146,6 +147,7 @@ class TestInvocation:
     custom: bool = False
     message: str | None = None
     source_paths: tuple[str, ...] = ()  # project files that define this invocation
+    attempts: int | None = None  # runner-reported attempts (retries); the outcome is the final one
 
 
 @dataclass

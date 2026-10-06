@@ -99,7 +99,7 @@ def parse_jest_results(data: dict | str, root: str | Path) -> RunEvidence:
                     invocation_id=invocation_id, declaration_id=declaration, materialization_id=invocation_id,
                     parameters_id=item.get("title") if key and locations.get(key, 0) > 1 else None,
                     outcome=_OUTCOMES.get(status, Outcome.NOT_RUN), duration_s=duration / 1000 if duration is not None else None,
-                    message=message, source_paths=(rel,),
+                    message=message, source_paths=(rel,), attempts=invocations,
                 )
             )
     if retried:

@@ -193,7 +193,7 @@ def parse_playwright_results(data: dict | str, root: str | Path) -> RunEvidence:
             invocation_id=invocation_id, declaration_id=declaration, materialization_id=f"{declaration} [{project}]",
             parameters_id=spec.get("title") if shared.get((project, line, column), 0) > 1 else None,
             markers=markers, outcome=outcome, duration_s=sum(durations) / 1000 if durations else None,
-            message=message, source_paths=(rel,),
+            message=message, source_paths=(rel,), attempts=len(results) or None,
         ))
 
     for suite in suites:

@@ -118,4 +118,7 @@ def test_cli_runs_leave_a_trace_outside_the_project(calc_project, capsys, assert
     assert trace.is_file() and trace.is_relative_to(assertiva_home)
     events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
     assert any(e["event"] == "command_end" and e["returncode"] == 0 for e in events)
+    # every command is attributable to a phase, so a hang names what was running
+    assert all(e["stage"] for e in events if e["event"].startswith("command"))
+    assert {"current:pytest-native"} <= {e["stage"] for e in events}
     assert process.TRACE_PATH is None  # not left enabled for later callers

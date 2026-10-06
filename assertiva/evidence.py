@@ -26,6 +26,7 @@ from .models import (
     RunEvidence,
     TestInvocation,
 )
+from .process import traced_stage
 from .workspace import snapshot
 
 
@@ -142,15 +143,19 @@ def measure(
     copy = snapshot(source)
     try:
         for adapter in adapters:
-            state.runs.append(adapter.run(copy, coverage=True))
+            with traced_stage(f"{label}:{adapter.adapter_id}"):
+                state.runs.append(adapter.run(copy, coverage=True))
             for name, value in adapter.static_signals(copy).items():
                 state.static[name] = state.static.get(name, 0) + value
             state.negative_paths.update(adapter.static_negative_paths(copy))
     finally:
         shutil.rmtree(copy, ignore_errors=True)
-    state.negative_controls = [run_negative_control(source, control, adapters) for control in negative_controls]
+    with traced_stage(f"{label}:negative-controls"):
+        state.negative_controls = [run_negative_control(source, control, adapters) for control in negative_controls]
     if artifacts:
-        state.artifacts = [adapter.qualify(source) for adapter in artifact_adapters(source, python)]
+        for adapter in artifact_adapters(source, python):
+            with traced_stage(f"{label}:{adapter.adapter_id}"):
+                state.artifacts.append(adapter.qualify(source))
     return state
 
 

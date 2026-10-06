@@ -43,6 +43,72 @@ _SITE_PROBE = (
     "print(json.dumps([d for d in dict.fromkeys(dirs) if os.path.isdir(d)]))"
 )
 
+# Declared-dependency view: copy only the distributions the wheel declares (transitively,
+# markers evaluated) from the target environment. Runs in the target interpreter; offline.
+_DEPS_VIEW = r"""
+import json, os, re, shutil, sys
+from importlib import metadata
+try:
+    from packaging.requirements import Requirement
+except ImportError:
+    try:
+        from pip._vendor.packaging.requirements import Requirement
+    except ImportError:
+        Requirement = None
+requirements, view = json.loads(sys.argv[1]), sys.argv[2]
+norm = lambda n: re.sub(r"[-_.]+", "-", n).lower()
+seen, missing, unsupported, queue = set(), [], [], [(r, ()) for r in requirements]
+while queue:
+    text, extras = queue.pop()
+    if Requirement is None:
+        if ";" in text:
+            unsupported.append(text)
+            continue
+        name, wanted = re.split(r"[ <>=!~\[(]", text.strip(), maxsplit=1)[0], ()
+    else:
+        req = Requirement(text)
+        if req.marker and not any(req.marker.evaluate({"extra": e}) for e in (extras or ("",))):
+            continue
+        name, wanted = req.name, tuple(req.extras)
+    if norm(name) in seen:
+        continue
+    seen.add(norm(name))
+    try:
+        dist = metadata.distribution(name)
+    except metadata.PackageNotFoundError:
+        missing.append(name)
+        continue
+    base = str(dist.locate_file(""))
+    for entry in dist.files or []:
+        source = str(dist.locate_file(entry))
+        rel = os.path.relpath(source, base)
+        if rel.startswith("..") or not os.path.isfile(source):
+            continue
+        target = os.path.join(view, rel)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy2(source, target)
+    queue.extend((r, wanted) for r in dist.requires or [])
+print(json.dumps({"resolved": sorted(seen), "missing": missing, "unsupported": unsupported}))
+"""
+# Import every module of the installed package; report modules nothing declared provides.
+_CLOSURE_PROBE = r"""
+import importlib, json, pkgutil, sys
+tops, missing, errors = sys.argv[1:], set(), []
+def visit(name):
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError as exc:
+        missing.add(exc.name or str(exc))
+    except Exception as exc:
+        errors.append((name + ": " + type(exc).__name__ + ": " + str(exc))[:200])
+for top in tops:
+    module = visit(top)
+    if module is not None and hasattr(module, "__path__"):
+        for info in pkgutil.walk_packages(module.__path__, top + "."):
+            visit(info.name)
+print(json.dumps({"missing": sorted(m for m in missing if m.split(".")[0] not in tops), "errors": errors}))
+"""
+
 
 def _pyproject(root: Path) -> dict:
     path = root / "pyproject.toml"
@@ -67,6 +133,21 @@ def _top_level(names: list[str]) -> list[str]:
         elif "/" not in name and name.endswith(".py"):
             tops.add(name[:-3])
     return sorted(tops)
+
+
+def _fidelity(evidence: ArtifactEvidence) -> dict[str, str]:
+    """What the artifact evidence proves, dimension by dimension (never one blanket claim)."""
+    checks = {c.name: c.status.value for c in evidence.checks}
+    isolation = checks.get("import", "NOT_RUN")
+    if isolation == "PASS" and evidence.status is StageStatus.UNKNOWN and "tests" not in checks:
+        isolation = "UNKNOWN"  # imports resolved outside the artifact
+    return {
+        "ARTIFACT_SOURCE_ISOLATION": isolation,
+        "ARTIFACT_TARGET_ENV_COMPATIBILITY": checks.get("tests", "NOT_RUN"),
+        "DECLARED_DEPENDENCY_CLOSURE": checks.get("dependency_closure", "NOT_RUN"),
+        "CLEAN_INSTALL": "NOT_RUN",
+        "SDIST": "NOT_RUN",
+    }
 
 
 def _clean_env() -> dict:
@@ -122,6 +203,14 @@ class PythonPackageAdapter:
     def _qualify(self, root: Path) -> ArtifactEvidence:
         evidence = ArtifactEvidence(adapter_id=self.adapter_id, kind="wheel", status=StageStatus.PASS)
         evidence.limitations.append("only the wheel was built and verified; the sdist was not")
+        evidence.limitations.append("no clean install from a package index was performed (offline)")
+        try:
+            self._qualify_into(root, evidence)
+        finally:
+            evidence.fidelity = _fidelity(evidence)
+        return evidence
+
+    def _qualify_into(self, root: Path, evidence: ArtifactEvidence) -> None:
         with tempfile.TemporaryDirectory(prefix="assertiva-artifact-") as tmp:
             tmp = Path(tmp)
             work, dist, outside = snapshot(root, tmp / "src"), tmp / "dist", tmp / "outside"
@@ -142,7 +231,7 @@ class PythonPackageAdapter:
             if result.ok and not wheels:
                 result.returncode = -1
             if not self._check(evidence, "build", result):
-                return evidence
+                return
             wheel = wheels[0]
             evidence.artifact = wheel.name
             evidence.sha256 = hashlib.sha256(wheel.read_bytes()).hexdigest()
@@ -151,9 +240,15 @@ class PythonPackageAdapter:
             tops = _top_level(names)
             evidence.omitted_files = self._omitted(work, tops, set(names))
 
+            with zipfile.ZipFile(wheel) as archive:
+                metadata = next((archive.read(n).decode("utf-8", "replace") for n in names if n.endswith(".dist-info/METADATA")), "")
+            requirements = [line.split(":", 1)[1].strip() for line in metadata.splitlines() if line.startswith("Requires-Dist:")]
             venv = tmp / "venv"
-            if not self._check(evidence, "install", self._install(venv, wheel, outside)):
-                return evidence
+            sites = self._run([self.python, "-c", _SITE_PROBE], outside)
+            target_sites = json.loads(sites.stdout) if sites.ok else []
+            installed, wheel_site = self._install(venv, wheel, outside, target_sites)
+            if not self._check(evidence, "install", installed):
+                return
             vpy = _venv_python(venv)
 
             probe = self._run([vpy, "-c", _IMPORT_PROBE, *tops], outside)
@@ -169,34 +264,77 @@ class PythonPackageAdapter:
             else:
                 detail = "; ".join(f"{k} -> {v}" for k, v in origins.items())
             if not self._check(evidence, "import", probe, detail):
-                return evidence
+                return
             if shadowed:
                 evidence.status = StageStatus.UNKNOWN
                 evidence.limitations.append("imports did not resolve to the installed artifact: " + ", ".join(shadowed))
-                return evidence
+                return
 
             self._tests_against_artifact(evidence, work, tops, vpy, tmp)
-        return evidence
+            self._dependency_closure(evidence, wheel_site, tops, requirements, tmp, outside)
 
-    def _install(self, venv: Path, wheel: Path, cwd: Path) -> CommandResult:
+    def _dependency_closure(self, evidence: ArtifactEvidence, wheel_site: str | None, tops: list[str], requirements: list[str], tmp: Path, cwd: Path) -> None:
+        """Import every module of the installed wheel where only its declared dependencies exist.
+
+        The clean venv sees the wheel's installed files as a plain path entry (so the host
+        environment linked from that venv stays invisible) plus a view of the declared
+        dependencies copied from the target environment.
+        """
+        view, venv = tmp / "declared-deps", tmp / "closure-venv"
+        view.mkdir()
+        resolved = self._run([self.python, "-c", _DEPS_VIEW, json.dumps(requirements), view], cwd)
+        created = self._run([self.python, "-m", "venv", "--without-pip", venv], cwd)
+        closure_site = self._run([_venv_python(venv), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"], cwd)
+        ready = resolved.ok and bool(wheel_site) and created.ok and closure_site.ok
+        if ready:
+            Path(closure_site.stdout.strip()).joinpath("assertiva-closure.pth").write_text(
+                f"{wheel_site}\n{view}\n", encoding="utf-8"
+            )
+        if not ready:
+            failed = next((r.summary() for r in (resolved, created, closure_site) if not r.ok), "installed wheel location unknown")
+            status, detail = StageStatus.BLOCKED, "could not prepare the declared-dependency environment: " + failed
+        else:
+            deps = json.loads(resolved.stdout.strip().splitlines()[-1])
+            probe = self._run([_venv_python(venv), "-c", _CLOSURE_PROBE, *tops], cwd)
+            found = json.loads(probe.stdout.strip().splitlines()[-1]) if probe.ok and probe.stdout.strip() else None
+            if deps["missing"] or deps["unsupported"]:
+                status = StageStatus.UNKNOWN
+                detail = "declared dependencies not available offline in the target environment: " + ", ".join(deps["missing"] + deps["unsupported"])
+            elif found is None:
+                status, detail = StageStatus.BLOCKED, "closure probe did not run: " + probe.summary()
+            elif found["missing"]:
+                status = StageStatus.FAIL
+                detail = "imports modules no declared dependency provides: " + ", ".join(found["missing"])
+            elif found["errors"]:
+                status, detail = StageStatus.UNKNOWN, "modules failed to import for other reasons: " + "; ".join(found["errors"][:3])
+            else:
+                status = StageStatus.PASS
+                detail = f"every module imports with only declared dependencies ({', '.join(deps['resolved']) or 'none'})"
+        evidence.checks.append(ArtifactCheck("dependency_closure", status, "clean venv + declared dependencies only", None, detail))
+        if status is StageStatus.FAIL or (status is not StageStatus.PASS and evidence.status is StageStatus.PASS):
+            evidence.status = status
+
+    def _install(self, venv: Path, wheel: Path, cwd: Path, visible_sites: list[str]) -> tuple[CommandResult, str | None]:
+        """Install the wheel with --no-deps into a fresh venv that also sees ``visible_sites``.
+
+        Returns the install result and the venv's site-packages (where the wheel's files are).
+        """
         # A pip-less venv plus `pip --python` performs the same isolated install without
         # bootstrapping pip into every environment (seconds per venv).
         created = self._run([self.python, "-m", "venv", "--without-pip", venv], cwd)
         if not created.ok:
-            return created
-        # Make the target environment's dependencies visible *after* the venv's own site-packages.
-        sites = self._run([self.python, "-c", _SITE_PROBE], cwd)
+            return created, None
         venv_site = self._run([_venv_python(venv), "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"], cwd)
-        if sites.ok and venv_site.ok:
-            Path(venv_site.stdout.strip()).joinpath("assertiva-target-env.pth").write_text(
-                "\n".join(json.loads(sites.stdout)) + "\n", encoding="utf-8"
+        if venv_site.ok and visible_sites:  # visible *after* the venv's own site-packages
+            Path(venv_site.stdout.strip()).joinpath("assertiva-visible-sites.pth").write_text(
+                "\n".join(visible_sites) + "\n", encoding="utf-8"
             )
         install = ["install", "--no-deps", "--no-index", "--disable-pip-version-check", wheel]
         result = self._run([self.python, "-m", "pip", "--python", _venv_python(venv), *install], cwd)
         if result.returncode and "no such option: --python" in result.stderr:  # pip < 22.3
             self._run([_venv_python(venv), "-m", "ensurepip", "--default-pip"], cwd)
             result = self._run([_venv_python(venv), "-m", "pip", *install], cwd)
-        return result
+        return result, (venv_site.stdout.strip() if venv_site.ok else None)
 
     def _omitted(self, work: Path, tops: list[str], names: set[str]) -> list[str]:
         """Non-code files inside packaged directories that the wheel does not contain (E3 signal)."""

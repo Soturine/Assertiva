@@ -29,6 +29,8 @@ Typical false-green cases include:
 - Docker image builds but process startup/health fails;
 - retries or allow-failure semantics hide first-failure evidence.
 
+Artifact evidence must name what it proved. Tests passing against an installed wheel while the target environment is visible prove compatibility with that environment, not that the wheel declares everything it imports; declared-dependency closure is a separate claim, and so are a clean index install and the sdist.
+
 Assertiva should report exactly what is evidenced and what remains unknown, rather than saying "all tests passed; deployment is safe."
 
 

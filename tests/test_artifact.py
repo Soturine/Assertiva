@@ -53,7 +53,7 @@ def test_complete_package_is_qualified_from_the_installed_artifact(tmp_path):
     evidence = ADAPTER.qualify(make_package(tmp_path / "ok"))
     assert evidence.status is StageStatus.PASS, evidence
     assert evidence.artifact.endswith(".whl") and re.fullmatch(r"[0-9a-f]{64}", evidence.sha256)
-    assert [c.name for c in evidence.checks] == ["build", "install", "import", "tests"]
+    assert [c.name for c in evidence.checks] == ["build", "install", "import", "tests", "dependency_closure"]
     assert all(c.status is StageStatus.PASS for c in evidence.checks)
     assert "site-packages" in check(evidence, "import").detail
     assert any("sdist" in item for item in evidence.limitations)  # only the wheel was verified
@@ -212,3 +212,70 @@ def test_interpreter_capability_probes_are_cached(tmp_path):
     probes = [c for c in commands if c[1] == "-c" and c[2].startswith("import ") and "\n" not in c[2]]
     assert probes  # capabilities were probed...
     assert len(probes) == len({(c[0], c[2]) for c in probes})  # ...once per interpreter
+
+
+# --- dependency closure: target-env compatibility is not a declared-dependency proof ----
+
+def closure_package(root, imports, declared=(), submodule=False):
+    deps = "dependencies = [" + ", ".join(f'"{d}"' for d in declared) + "]\n"
+    make_package(root, extra_project=deps)
+    body = "".join(f"import {m}\n" for m in imports)
+    if submodule:
+        write(root / "greet" / "extras.py", body)  # only a submodule imports it
+    else:
+        init = (root / "greet" / "__init__.py").read_text(encoding="utf-8")
+        write(root / "greet" / "__init__.py", body + init)
+    return root
+
+
+def test_undeclared_host_dependency_is_a_closure_failure(tmp_path):
+    evidence = ADAPTER.qualify(closure_package(tmp_path / "undeclared", ["yaml"]))
+    assert check(evidence, "tests").status is StageStatus.PASS  # works in the target environment...
+    closure = check(evidence, "dependency_closure")
+    assert closure.status is StageStatus.FAIL and "yaml" in closure.detail  # ...but not for someone installing the wheel
+    assert evidence.fidelity["ARTIFACT_TARGET_ENV_COMPATIBILITY"] == "PASS"
+    assert evidence.fidelity["DECLARED_DEPENDENCY_CLOSURE"] == "FAIL"
+    assert evidence.status is StageStatus.FAIL
+
+
+def test_undeclared_import_in_a_submodule_is_found(tmp_path):
+    evidence = ADAPTER.qualify(closure_package(tmp_path / "lazy", ["yaml"], submodule=True))
+    assert check(evidence, "dependency_closure").status is StageStatus.FAIL
+
+
+def test_declared_dependency_closes(tmp_path):
+    evidence = ADAPTER.qualify(closure_package(tmp_path / "declared", ["yaml"], declared=["PyYAML>=6"]))
+    assert check(evidence, "dependency_closure").status is StageStatus.PASS, evidence
+    assert evidence.status is StageStatus.PASS
+
+
+def test_declared_dependency_unavailable_offline_is_unknown_not_pass(tmp_path):
+    evidence = ADAPTER.qualify(closure_package(tmp_path / "missing", [], declared=["definitely-not-installed-pkg>=1"]))
+    closure = check(evidence, "dependency_closure")
+    assert closure.status is StageStatus.UNKNOWN and "definitely-not-installed-pkg" in closure.detail
+    assert evidence.status is StageStatus.UNKNOWN
+
+
+def test_fidelity_states_what_was_and_was_not_verified(tmp_path):
+    evidence = ADAPTER.qualify(make_package(tmp_path / "fid"))
+    assert evidence.fidelity == {
+        "ARTIFACT_SOURCE_ISOLATION": "PASS",
+        "ARTIFACT_TARGET_ENV_COMPATIBILITY": "PASS",
+        "DECLARED_DEPENDENCY_CLOSURE": "PASS",
+        "CLEAN_INSTALL": "NOT_RUN",
+        "SDIST": "NOT_RUN",
+    }
+
+
+def test_report_states_artifact_fidelity_dimensions(tmp_path, capsys):
+    import json
+
+    from assertiva import cli
+
+    root = closure_package(tmp_path / "rep", ["yaml"])
+    cli.main(["audit", str(root), "--execute", "--python", sys.executable, "--output", "json"])
+    report = json.loads(capsys.readouterr().out)
+    [artifact] = report["states"]["current"]["artifacts"]
+    assert artifact["fidelity"]["DECLARED_DEPENDENCY_CLOSURE"] == "FAIL"
+    html = open(report["report_path"], encoding="utf-8").read()
+    assert "declared dependency closure FAIL" in html and "sdist NOT_RUN" in html

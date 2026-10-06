@@ -49,7 +49,7 @@ Scale and hardening
 - [x] execution budget: bounded nested qualification depth, same-target recursion refusal, equivalent-evidence reuse, recorded reasons
 - [x] filesystem/path boundaries (symlinks, junctions, escapes, nested repos, case collisions)
 - [x] transactional approved apply with rollback
-- [ ] artifact fidelity vs dependency closure (clean install)
+- [x] artifact fidelity vs dependency closure (offline declared-dependency closure; clean index install and sdist still NOT_RUN)
 - [ ] run-scoped runtime capability evidence
 - [ ] CI reproducibility and Python 3.11 compatibility
 

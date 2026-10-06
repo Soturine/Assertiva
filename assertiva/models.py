@@ -99,6 +99,7 @@ class ArtifactEvidence:
     environment: dict[str, Any] = field(default_factory=dict)
     omitted_files: list[str] = field(default_factory=list)
     limitations: list[str] = field(default_factory=list)
+    fidelity: dict[str, str] = field(default_factory=dict)  # dimension -> status: what this evidence proves
 
 
 @dataclass(frozen=True)

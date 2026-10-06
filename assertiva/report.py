@@ -395,10 +395,14 @@ def _artifact_html(report: dict) -> str:
                 f'<li><span class="chip {c["status"].lower()}">{_e(c["status"])}</span> {_e(c["name"])}: {_e(c["detail"])}</li>'
                 for c in a["checks"]
             )
+            fidelity = (
+                '<p class="note">Proves: ' + ", ".join(f"{_e(k.lower().replace('_', ' '))} {_e(v)}" for k, v in a.get("fidelity", {}).items()) + "</p>"
+                if a.get("fidelity") else ""
+            )
             rows.append(
                 f'<tr><th scope="row">{_e(_STATE_LABELS[key])}</th><td>{_e(a["kind"])} <code>{_e(a["artifact"] or "not built")}</code><br>'
                 f'<span class="note">sha256 {_e((a["sha256"] or "—")[:16])}</span></td>'
-                f'<td><span class="chip {a["status"].lower()}">{_e(a["status"])}</span></td><td><ul>{checks}</ul></td>'
+                f'<td><span class="chip {a["status"].lower()}">{_e(a["status"])}</span></td><td><ul>{checks}</ul>{fidelity}</td>'
                 f'<td>{_list(a["limitations"] + (["missing from artifact: " + ", ".join(a["omitted_files"][:10])] if a["omitted_files"] else []), "None.")}</td></tr>'
             )
     if not rows:

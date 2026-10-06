@@ -69,7 +69,7 @@ The runtime, not only the prompt, enforces write boundaries.
 
 Read-only analysis artifacts and reports should default to Assertiva-owned storage outside the audited repository so an audit does not dirty the working tree.
 
-Project boundaries are part of the write policy: links are entries identified by their target and never followed, content outside the project root is never copied in as project material, and an approved change is refused if its path traverses outside the project, passes through a linked directory, introduces a link leaving the project, or collides with an existing path by case only.
+Project boundaries are part of the write policy: links are entries identified by their target and never followed, content outside the project root is never copied in as project material, and an approved change is refused if its path traverses outside the project, passes through a linked directory, introduces a link leaving the project, or collides with an existing path by case only. Application is all-or-nothing: if any approved change fails to install or the result does not match the candidate, every touched file is restored.
 
 ## Assurance Report
 

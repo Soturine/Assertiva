@@ -26,7 +26,7 @@ from .improve import (
     start_improve,
 )
 from .report import improve_report, write_report
-from .workspace import Approval, ApprovalRequiredError, ProjectModifiedError, StaleBaselineError, state_dir
+from .workspace import Approval, ApplyFailedError, ApprovalRequiredError, ProjectModifiedError, StaleBaselineError, state_dir
 
 
 class UsageError(Exception):
@@ -224,6 +224,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except StaleBaselineError as exc:
         print(f"assertiva: refused: {exc}", file=sys.stderr)
+        return 2
+    except ApplyFailedError as exc:
+        print(f"assertiva: {exc}", file=sys.stderr)
         return 2
     except ProjectModifiedError as exc:
         print(f"assertiva: READ-ONLY VIOLATION: {exc}", file=sys.stderr)

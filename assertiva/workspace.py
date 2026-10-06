@@ -505,19 +505,89 @@ def apply_changes(
     if stale:
         raise StaleBaselineError(stale)
 
-    for change in approved:
-        target, source = project_root / change.path, workspace / change.path
-        if os.path.lexists(target) and is_link(target):
-            _unlink_link(target)
-        if change.kind is CandidateChangeKind.RETIRE_CANDIDATE:
-            if os.path.lexists(target):
-                target.unlink()
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if is_link(source):
-            _, where = _link_identity(workspace, source)
-            if not _make_link(target, project_root / where, os.path.isdir(source)):
-                raise PathBoundaryError([f"{change.path}: the link cannot be reproduced on this platform"])
-        else:
-            shutil.copy2(source, target, follow_symlinks=False)
+    _transaction(project_root, workspace, approved)
     return approved
+
+
+class ApplyFailedError(RuntimeError):
+    pass
+
+
+_STAGED = ".assertiva-staged"
+
+
+def _transaction(project: Path, workspace: Path, approved: list[CandidateTestChange]) -> None:
+    """Stage, back up, install, verify; on any failure restore everything touched."""
+    backup_dir = Path(tempfile.mkdtemp(prefix="assertiva-apply-backup-"))
+    backups: dict[str, tuple[str, str] | None] = {}  # path -> ("file", backup) | ("link", target) | None
+    created: list[Path] = []
+    staged: dict[str, Path] = {}
+    touched: list[CandidateTestChange] = []
+    try:
+        for index, change in enumerate(approved):
+            target = project / change.path
+            if os.path.lexists(target):
+                if is_link(target):
+                    backups[change.path] = ("link", str(_real(target)))
+                else:
+                    shutil.copy2(target, backup_dir / str(index), follow_symlinks=False)
+                    backups[change.path] = ("file", str(backup_dir / str(index)))
+            else:
+                backups[change.path] = None
+            if change.kind is CandidateChangeKind.RETIRE_CANDIDATE or is_link(workspace / change.path):
+                continue
+            for parent in reversed([*target.parents]):
+                if parent != project and project in parent.parents and not os.path.lexists(parent):
+                    parent.mkdir()
+                    created.append(parent)
+            staged[change.path] = target.with_name(target.name + _STAGED)
+            shutil.copy2(workspace / change.path, staged[change.path], follow_symlinks=False)
+        for change in approved:
+            touched.append(change)
+            _install(project, workspace, change, staged.get(change.path))
+        mismatched = [c.path for c in approved if entry_digest(project, c.path) != c.candidate_fingerprint]
+        if mismatched:
+            raise ApplyFailedError("applied content does not match the candidate: " + ", ".join(mismatched))
+    except Exception as exc:
+        _rollback(project, touched, backups)
+        for path in staged.values():
+            if os.path.lexists(path):
+                path.unlink()
+        for directory in reversed(created):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        raise ApplyFailedError(f"apply failed and was rolled back: {exc}") from exc
+    finally:
+        remove_tree(backup_dir)
+
+
+def _install(project: Path, workspace: Path, change: CandidateTestChange, staged: Path | None) -> None:
+    target, source = project / change.path, workspace / change.path
+    if os.path.lexists(target) and is_link(target):
+        _unlink_link(target)
+    if change.kind is CandidateChangeKind.RETIRE_CANDIDATE:
+        if os.path.lexists(target):
+            target.unlink()
+    elif is_link(source):
+        _, where = _link_identity(workspace, source)
+        if not _make_link(target, project / where, os.path.isdir(source)):
+            raise PathBoundaryError([f"{change.path}: the link cannot be reproduced on this platform"])
+    else:
+        os.replace(staged, target)  # atomic per file
+
+
+def _rollback(project: Path, touched: list[CandidateTestChange], backups: dict) -> None:
+    for change in reversed(touched):
+        target = project / change.path
+        if os.path.lexists(target):
+            if is_link(target):
+                _unlink_link(target)
+            else:
+                target.unlink()
+        original = backups.get(change.path)
+        if original and original[0] == "file":
+            shutil.copy2(original[1], target, follow_symlinks=False)
+        elif original and original[0] == "link":
+            _make_link(target, Path(original[1]), os.path.isdir(original[1]))

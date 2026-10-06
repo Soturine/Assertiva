@@ -50,8 +50,9 @@ from .workspace import (
     capture_baseline,
     change_set,
     create_workspace,
-    file_digest,
+    entry_digest,
     read_only_guard,
+    remove_tree,
     remove_workspace,
     snapshot,
     state_dir,
@@ -130,7 +131,7 @@ def start_improve(root: str | Path, python: str | None = None) -> ImproveSession
 
 def discard_session(session: ImproveSession) -> None:
     remove_workspace(session.baseline, session.workspace)
-    shutil.rmtree(session.directory, ignore_errors=True)
+    remove_tree(session.directory)
 
 
 def _stage(stage: QualificationStage, status: StageStatus, summary: str, *limitations: str) -> QualificationStageResult:
@@ -191,10 +192,10 @@ def _regression_stage(session: ImproveSession, changes: list[CandidateTestChange
         try:
             for path in restore:
                 (copy / path).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(session.baseline_copy / path, copy / path)
+                shutil.copy2(session.baseline_copy / path, copy / path, follow_symlinks=False)
             runs = [adapter.run(copy) for adapter in runner_adapters(copy, session.python)]
         finally:
-            shutil.rmtree(copy, ignore_errors=True)
+            remove_tree(copy)
     else:
         runs = candidate.runs
     if any(run.status is StageStatus.BLOCKED for run in runs):
@@ -370,7 +371,7 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
             if check.metadata.get("condition"):
                 notes.append(f"{label}: condition `{check.metadata['condition']}` was not evaluated")
     finally:
-        shutil.rmtree(copy, ignore_errors=True)
+        remove_tree(copy)
     summary = f"reproduced {reproduced}/{len(delivery)} delivery checks locally"
     if StageStatus.FAIL in gating:
         return _stage(stage, StageStatus.FAIL, summary + "; a reproduced gating check failed", *notes)
@@ -423,7 +424,7 @@ def _stability(session: ImproveSession, changes, candidate: StateEvidence, rerun
                     if inv.invocation_id in later:
                         later[inv.invocation_id].append(inv)
         finally:
-            shutil.rmtree(copy, ignore_errors=True)
+            remove_tree(copy)
     evidence.attempts = 1 + reruns
     for iid in selected:
         attempts = [first[iid], *later[iid]]
@@ -543,7 +544,7 @@ def apply_approved(
     changes = qualified.qualification.changes if isinstance(qualified, QualificationResult) else qualified
     applied = apply_changes(session.root, session.baseline, session.workspace, changes, approval)
     files_match = all(
-        (file_digest(session.root / c.path) if (session.root / c.path).is_file() else None) == c.candidate_fingerprint
+        entry_digest(session.root, c.path) == c.candidate_fingerprint
         for c in applied
     )
     evidence = measure(session.root, "applied", "applied-project-copy", session.python, reason="post-apply verification")

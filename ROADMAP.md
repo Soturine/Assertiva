@@ -47,7 +47,7 @@ Make the proven model scale, generalize beyond Python and select evidence withou
 
 Scale and hardening
 - [x] execution budget: bounded nested qualification depth, same-target recursion refusal, equivalent-evidence reuse, recorded reasons
-- [ ] filesystem/path boundaries (symlinks, junctions, escapes, nested repos, case collisions)
+- [x] filesystem/path boundaries (symlinks, junctions, escapes, nested repos, case collisions)
 - [ ] transactional approved apply with rollback
 - [ ] artifact fidelity vs dependency closure (clean install)
 - [ ] run-scoped runtime capability evidence

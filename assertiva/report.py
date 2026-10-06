@@ -25,7 +25,8 @@ _SEVERITY = {
     "CI_TEST_EXECUTION_GAP": "high", "LOCAL_CHECK_NOT_OBSERVED_IN_CI": "high", "HIGH_COVERAGE_WEAK_ORACLE": "high",
     "SUITE_SMOKE_DOMINANT": "high", "MUTATION_SURVIVORS": "high", "MUTATION_REPORT_UNREADABLE": "medium",
     "MUTATION_REPORT_SOURCE_MISMATCH": "medium",
-    "ARTIFACT_QUALIFICATION_FAILED": "high", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
+    "ARTIFACT_QUALIFICATION_FAILED": "high", "PROJECT_LINK_ESCAPES_ROOT": "high", "BROKEN_PROJECT_LINK": "medium",
+    "NESTED_REPOSITORY": "info", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
     "CI_PYTEST_NOT_OBSERVED": "medium", "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
@@ -53,6 +54,7 @@ _RECOMMENDATION = {
     "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "Assert the machine code/field the error contract carries, as the other tests for the same error do.",
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "After the expected rejection, assert that no partial write or forbidden side effect happened.",
     "ASYNC_FAILURE_NOT_OBSERVED": "Await (or gather) the created task so its failure can fail the test.",
+    "PROJECT_LINK_ESCAPES_ROOT": "Replace links that leave the project with project files or declared external dependencies.",
     "ARTIFACT_OMITS_SOURCE_FILES": "Confirm the listed files are intentionally excluded from the artifact, or add them as package data.",
 }
 

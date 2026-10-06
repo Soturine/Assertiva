@@ -17,7 +17,7 @@ from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
 from .report import audit_model, execution_budget
 from .verification import discover_surface, surface_findings
-from .workspace import capture_baseline, read_only_guard
+from .workspace import boundary_report, capture_baseline, read_only_guard
 
 
 def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]:
@@ -44,6 +44,25 @@ def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]
                 },
             )
         )
+    return findings
+
+
+def _boundary_findings(report: dict) -> list[Finding]:
+    findings = []
+    if report["external_links"]:
+        findings.append(Finding(
+            "PROJECT_LINK_ESCAPES_ROOT",
+            "Project links point outside the project root; they are not followed or copied, but executions can reach their targets.",
+            {"links": report["external_links"][:30]},
+        ))
+    if report["broken_links"]:
+        findings.append(Finding("BROKEN_PROJECT_LINK", "Some project links point to nothing.", {"links": report["broken_links"][:30]}))
+    if report["nested_repositories"]:
+        findings.append(Finding(
+            "NESTED_REPOSITORY",
+            "Nested repositories or submodules are included from the working tree; their own history is not inspected.",
+            {"paths": report["nested_repositories"][:30]},
+        ))
     return findings
 
 
@@ -136,6 +155,7 @@ def run_audit(
         findings.extend(_mutation_findings(current))
         findings.extend(_artifact_findings(current))
         findings.extend(surface_findings(surface))
+        findings.extend(_boundary_findings(boundary_report(root)))
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)

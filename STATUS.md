@@ -49,6 +49,11 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Pipeline-equivalent reproduction reuses the candidate run when a delivery check selects the same tests (only cosmetic flags differ) and records the reuse.
 - Audit, improve and the report record each expensive evidence decision: EXECUTED / REUSED / NOT_RUN / BLOCKED with its reason.
 
+### Filesystem boundaries (M2)
+- Links (symlinks, Windows junctions) are project entries identified by their target and are never followed: fingerprints and copies never include outside content, internal links are rebased into copies (they cannot point back into the original), and copies are removed without following links.
+- Apply refuses traversal paths, writes through a linked directory (in the project or the candidate), candidate links that leave the project and case-only collisions, all before writing anything.
+- Nested repositories are included from the working tree and reported; links leaving the project are reported (`PROJECT_LINK_ESCAPES_ROOT`). The executable bit is part of a file's digest on POSIX.
+
 ### Execution provenance
 - Every subprocess runs non-interactively with a timeout and bounded output; each stage and command writes start/end events (stage such as `current:pytest-native`, command, start, timeout, return code, duration, timeout classification) to a trace under `ASSERTIVA_HOME` as it happens; the report links the trace.
 

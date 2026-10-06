@@ -6,7 +6,6 @@ measured directory. Metrics carry an explicit direction; there is no aggregate s
 
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass, field, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
@@ -28,7 +27,7 @@ from .models import (
     TestInvocation,
 )
 from .process import execution_refusal, traced_stage
-from .workspace import snapshot
+from .workspace import boundary_report, remove_tree, snapshot
 
 
 @dataclass(frozen=True)
@@ -89,7 +88,7 @@ def run_negative_control(source: Path, control: NegativeControl, adapters: list)
         target.write_text(text.replace(control.find, control.replace), encoding="utf-8")
         runs = [adapter.run(copy, args=list(control.tests)) for adapter in adapters]
     finally:
-        shutil.rmtree(copy, ignore_errors=True)
+        remove_tree(copy)
 
     if any(run.collection_errors for run in runs):
         return result(ControlOutcome.INVALID, "the control broke collection/compilation instead of behavior")
@@ -141,6 +140,11 @@ def measure(
     source = Path(source)
     adapters = runner_adapters(source, python)
     state = StateEvidence(label=label, observed_in=observed_in)
+    escaping = boundary_report(source)["external_links"]
+    if escaping:
+        state.limitations.append(
+            "project links point outside its root (" + ", ".join(escaping[:5]) + "); executions may reach their targets"
+        )
     if not adapters:
         state.limitations.append("no executable runner adapter recognized this project; test evidence is UNKNOWN")
     refusal = execution_refusal()
@@ -158,7 +162,7 @@ def measure(
                 state.static[name] = state.static.get(name, 0) + value
             state.negative_paths.update(adapter.static_negative_paths(copy))
     finally:
-        shutil.rmtree(copy, ignore_errors=True)
+        remove_tree(copy)
     with traced_stage(f"{label}:negative-controls"):
         state.negative_controls = [run_negative_control(source, control, adapters) for control in negative_controls]
     if artifacts:

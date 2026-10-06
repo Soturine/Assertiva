@@ -99,8 +99,9 @@ def test_selector_never_claims_total_confidence_when_an_unknown_path_exists(tmp_
         "loader.py": "import importlib\n\ndef load(name):\n    return importlib.import_module(name)\n",
         "tests/test_loader.py": "from loader import load\n\ndef test_load():\n    assert load('calc')\n",
     })
+    graph = build_impact_graph(root)
     for change in ("calc.py", "service.py", "tests/test_calc.py", "loader.py"):
-        selection = select(root, change)
+        selection = select_tests(graph, [FileChange(change, "M")], revision=graph.revision)
         assert selection.confidence is not Confidence.PROVEN_PATHS, change
         assert selection.unknown_dependencies, change
 

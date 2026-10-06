@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from assertiva.candidate import CandidateChangeKind, DeltaState, QualificationStage, StageStatus
+from assertiva.candidate import CandidateChangeKind, DeltaState, QualificationCheck, QualificationStage, StageStatus
 from assertiva.evidence import ControlOutcome, NegativeControl
 from assertiva.improve import (
     apply_approved,
@@ -31,7 +31,7 @@ MULTIPLY_CONTROL = NegativeControl(
 
 
 def stage(qualification, name):
-    return next(s for s in qualification.stages if s.stage is name)
+    return qualification.check(name)
 
 
 def delta(qualification, name):
@@ -82,8 +82,8 @@ def test_candidate_evidence_is_compared_with_metric_semantics(session):
     q = result.qualification
     assert delta(q, "weak_oracle_tests").state is DeltaState.UNCHANGED
     assert delta(q, "test_invocations").state is DeltaState.CHANGED  # count is contextual
-    assert stage(q, QualificationStage.CANDIDATE_TESTS).status is StageStatus.PASS
-    assert stage(q, QualificationStage.ORIGINAL_REGRESSION).status is StageStatus.PASS
+    assert stage(q, QualificationCheck.CANDIDATE_TESTS).status is StageStatus.PASS
+    assert stage(q, QualificationCheck.ORIGINAL_REGRESSION).status is StageStatus.PASS
     assert [(c.path, c.kind) for c in q.changes] == [("tests/test_strong.py", CandidateChangeKind.ADD)]
     assert result.candidate_evidence.observed_in == "isolated-candidate-copy"
 
@@ -97,7 +97,7 @@ def test_branch_coverage_is_compared_when_measurable(calc_project):
     finally:
         discard_session(session)
     assert delta(q, "branch_coverage").state is DeltaState.IMPROVED
-    assert stage(q, QualificationStage.COVERAGE_AND_ORACLES).status is StageStatus.PASS
+    assert stage(q, QualificationCheck.COVERAGE_AND_ORACLES).status is StageStatus.PASS
 
 
 def test_fewer_tests_can_still_be_better_evidence(session):
@@ -120,8 +120,8 @@ def test_weakened_test_cannot_hide_production_regression(session):
         encoding="utf-8",
     )
     q = qualify_candidate(session).qualification
-    assert stage(q, QualificationStage.CANDIDATE_TESTS).status is StageStatus.PASS
-    regression = stage(q, QualificationStage.ORIGINAL_REGRESSION)
+    assert stage(q, QualificationCheck.CANDIDATE_TESTS).status is StageStatus.PASS
+    regression = stage(q, QualificationCheck.ORIGINAL_REGRESSION)
     assert regression.status is StageStatus.FAIL
     assert "tests/test_calc.py::test_add_value" in regression.summary
     assert not q.ready_for_review
@@ -135,34 +135,32 @@ def test_negative_control_survivor_is_reported_and_candidate_can_kill_it(session
     assert baseline_controls == {"add-becomes-multiply": ControlOutcome.SURVIVED}
     assert candidate_controls == {"add-becomes-multiply": ControlOutcome.KILLED}
     q = result.qualification
-    assert stage(q, QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS).status is StageStatus.PASS
+    assert stage(q, QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS).status is StageStatus.PASS
     assert delta(q, "negative_controls_survived").state is DeltaState.IMPROVED
 
 
 def test_negative_control_surviving_candidate_fails_stage(session):
     q = qualify_candidate(session, negative_controls=[MULTIPLY_CONTROL]).qualification
-    assert stage(q, QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS).status is StageStatus.FAIL
+    assert stage(q, QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS).status is StageStatus.FAIL
 
 
 def test_inapplicable_negative_control_is_invalid_not_killed(session):
     control = NegativeControl("missing", "calc.py", "return nothing_like_this", "return 0", "n/a")
     result = qualify_candidate(session, negative_controls=[control])
     assert result.candidate_evidence.negative_controls[0].outcome is ControlOutcome.INVALID
-    stage_result = stage(result.qualification, QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS)
+    stage_result = stage(result.qualification, QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS)
     assert stage_result.status is StageStatus.UNKNOWN
 
 
 def test_unavailable_stages_are_never_reported_as_pass(session):
     write(session.workspace / "tests" / "test_strong.py", STRONG_TEST)
     q = qualify_candidate(session).qualification
-    for name in (
-        QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS,
-        QualificationStage.BUILD_AND_ARTIFACT,
-        QualificationStage.PREVIEW_DEPLOY,
-    ):
+    for name in (QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS, QualificationCheck.BUILD_AND_ARTIFACT):
         assert stage(q, name).status is StageStatus.NOT_RUN
         assert stage(q, name).limitations
-    assert len(q.stages) == len(QualificationStage)
+    # five pillars; a pillar whose checks all did not run is NOT_RUN, never PASS
+    assert [s.stage for s in q.stages] == list(QualificationStage) and len(q.checks) == len(QualificationCheck)
+    assert {s.stage: s.status for s in q.stages}[QualificationStage.FAULT_SENSITIVITY] is StageStatus.NOT_RUN
 
 
 def test_post_apply_verifies_applied_state(session, calc_project):
@@ -198,7 +196,7 @@ def test_pipeline_equivalent_partial_reproduction_is_unknown_not_pass(calc_proje
     session = start_improve(calc_project, python=PY)
     try:
         write(session.workspace / "tests" / "test_strong.py", STRONG_TEST)
-        result = stage(qualify_candidate(session).qualification, QualificationStage.PIPELINE_EQUIVALENT)
+        result = stage(qualify_candidate(session).qualification, QualificationCheck.PIPELINE_EQUIVALENT)
     finally:
         discard_session(session)
     assert result.status is StageStatus.UNKNOWN
@@ -211,7 +209,7 @@ def test_pipeline_equivalent_pass_requires_every_delivery_check(calc_project):
     session = start_improve(calc_project, python=PY)
     try:
         write(session.workspace / "tests" / "test_strong.py", STRONG_TEST)
-        result = stage(qualify_candidate(session).qualification, QualificationStage.PIPELINE_EQUIVALENT)
+        result = stage(qualify_candidate(session).qualification, QualificationCheck.PIPELINE_EQUIVALENT)
     finally:
         discard_session(session)
     assert result.status is StageStatus.PASS
@@ -222,14 +220,14 @@ def test_pipeline_equivalent_fails_when_reproduced_check_fails(calc_project):
     session = start_improve(calc_project, python=PY)
     try:
         (session.workspace / "calc.py").write_text("def add(a, b):\n    return a - b\n", encoding="utf-8")
-        result = stage(qualify_candidate(session).qualification, QualificationStage.PIPELINE_EQUIVALENT)
+        result = stage(qualify_candidate(session).qualification, QualificationCheck.PIPELINE_EQUIVALENT)
     finally:
         discard_session(session)
     assert result.status is StageStatus.FAIL
 
 
 def test_pipeline_equivalent_without_pipeline_is_not_run(session):
-    result = stage(qualify_candidate(session).qualification, QualificationStage.PIPELINE_EQUIVALENT)
+    result = stage(qualify_candidate(session).qualification, QualificationCheck.PIPELINE_EQUIVALENT)
     assert result.status is StageStatus.NOT_RUN
     assert result.limitations
 
@@ -243,6 +241,6 @@ def test_project_without_runner_adapter_is_unknown_not_green(tmp_path):
         q = qualify_candidate(session).qualification
     finally:
         discard_session(session)
-    assert stage(q, QualificationStage.CANDIDATE_TESTS).status is StageStatus.UNKNOWN
-    assert stage(q, QualificationStage.ORIGINAL_REGRESSION).status is StageStatus.UNKNOWN
-    assert not any(s.status is StageStatus.PASS for s in q.stages)
+    assert stage(q, QualificationCheck.CANDIDATE_TESTS).status is StageStatus.UNKNOWN
+    assert stage(q, QualificationCheck.ORIGINAL_REGRESSION).status is StageStatus.UNKNOWN
+    assert not any(s.status is StageStatus.PASS for s in q.checks)

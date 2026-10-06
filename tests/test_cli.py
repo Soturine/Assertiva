@@ -100,6 +100,6 @@ def test_negative_controls_file_feeds_qualification(calc_project, tmp_path, caps
     controls.write_text(json.dumps([{"control_id": "c1", "path": "calc.py", "find": "return a + b", "replace": "return a * b", "claim": "sum"}]))
     run(capsys, "improve", str(calc_project))
     _, report = run(capsys, "improve", str(calc_project), "--negative-controls", str(controls))
-    stage = next(s for s in report["candidate_qualification"]["stages"] if s["stage"] == "MUTATION_OR_NEGATIVE_CONTROLS")
+    stage = next(c for s in report["candidate_qualification"]["stages"] for c in s["checks"] if c["check"] == "MUTATION_OR_NEGATIVE_CONTROLS")
     assert stage["status"] == "FAIL"  # baseline suite cannot tell + from * for add(2, 2)
     cli.main(["improve", str(calc_project), "--discard"])

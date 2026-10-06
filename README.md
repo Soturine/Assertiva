@@ -150,7 +150,7 @@ Reports (JSON + self-contained HTML) and execution traces are written under `ASS
 What runs today:
 - runtime-enforced read-only audit (exit code 3 if any project file changed);
 - isolated candidate (Git worktree or copy), ADD / MODIFY / RETIRE_CANDIDATE change sets, explicit approval by change id, stale-baseline refusal, post-apply verification;
-- ten qualification stages: native discovery and candidate tests, original regression against the candidate, coverage/oracle deltas, negative-path depth, negative controls and ingested mutation reports, pipeline-equivalent reproduction (discovered → authorized → executed), built/installed wheel qualification, preview deploy (never production; NOT_RUN without an adapter) and bounded stability;
+- five qualification pillars — execution (native discovery, candidate tests), behavioral assurance (original regression against the candidate, coverage/oracle deltas, negative-path depth), fault sensitivity (negative controls, ingested mutation reports), delivery fidelity (pipeline-equivalent reproduction: discovered → authorized → executed; built/installed artifact qualification) and stability and cost; preview deployment is reported as not evidenced, never run against production;
 - one Assurance Report with baseline/candidate/applied states, Evidence Delta, remaining unknowns and "What does green prove?" — no aggregate score.
 
 See [STATUS.md](STATUS.md) for the IMPLEMENTED / SPECIFIED / PLANNED split, [ROADMAP.md](ROADMAP.md), [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md).

@@ -71,20 +71,17 @@ The safer equivalent is:
 
 No automatic deletion of original tests.
 
-## Qualification stages
+## Qualification pillars
 
-1. **Static and discovery** — candidate files parse/collect and identities are known.
-2. **Candidate tests** — generated/modified tests execute with their intended oracle.
-3. **Original regression** — existing tests remain valid unless an approved contract change says otherwise.
-4. **Coverage and oracle evidence** — line/branch/condition/etc. plus assertion/oracle strength.
-5. **Negative paths** — validation/errors/rollback/state effects/recovery.
-6. **Mutation or negative controls** — does the suite detect meaningful injected defects?
-7. **Pipeline equivalent** — run the same relevant checks the delivery pipeline expects when safely reproducible.
-8. **Build and artifact** — package/image/startup evidence where applicable.
-9. **Preview deploy** — optional non-production/ephemeral environment only when a safe adapter and explicit authorization exist.
-10. **Stability and cost** — flake/retry/runtime/resource impact.
+Five pillars, each aggregating its checks (FAIL > BLOCKED > UNKNOWN > PASS; a check that did not run never passes a pillar on its own and stays visible):
 
-Production deployment is never the default qualification mechanism.
+1. **Execution** — static/discovery (candidate files parse/collect, identities known) and candidate tests (generated/modified tests execute with their intended oracle).
+2. **Behavioral assurance** — original regression (existing tests remain valid unless an approved contract change says otherwise), coverage and oracle evidence, negative paths.
+3. **Fault sensitivity** — mutation or deliberate negative controls: does the suite detect meaningful injected defects?
+4. **Delivery fidelity** — pipeline-equivalent checks when safely reproducible; build and artifact evidence.
+5. **Stability and cost** — flake/retry/runtime/resource impact.
+
+A non-production preview environment is not a pillar: until a safe adapter and explicit authorization exist it is reported as not evidenced. Production deployment is never a qualification mechanism.
 
 ## Before / after metrics
 

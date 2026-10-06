@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from assertiva import process
-from assertiva.candidate import QualificationStage, StageStatus
+from assertiva.candidate import QualificationCheck, StageStatus
 
 from conftest import write
 
@@ -104,7 +104,7 @@ def test_equivalent_evidence_is_not_reexecuted_without_reason(calc_project, tmp_
     events = [json.loads(line) for line in (tmp_path / "trace.jsonl").read_text(encoding="utf-8").splitlines()]
     in_pipeline = [e for e in events if e["event"] == "command_start" and e["stage"] == "PIPELINE_EQUIVALENT"]
     assert not any("pytest" in " ".join(e["command"]) for e in in_pipeline)
-    pipeline = next(s for s in result.qualification.stages if s.stage is QualificationStage.PIPELINE_EQUIVALENT)
+    pipeline = result.qualification.check(QualificationCheck.PIPELINE_EQUIVALENT)
     assert pipeline.status is StageStatus.PASS
     assert any("reused" in note for note in pipeline.limitations)
     assert any(d.decision == "REUSED" and "pytest -q" in d.reason for d in result.budget)

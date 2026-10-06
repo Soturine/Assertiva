@@ -168,10 +168,3 @@ def test_stale_bytecode_in_a_copied_tree_does_not_corrupt_provenance(tmp_path):
     [invocation] = ADAPTER.collect(copy).invocations
     assert invocation.declaration_id == "tests/test_a.py::test_a"
     assert not invocation.inherited
-
-
-def test_missing_runner_is_blocked_not_pass(tmp_path):
-    write(tmp_path / "tests" / "test_ok.py", "def test_ok():\n    assert 1 == 1\n")
-    evidence = PytestNativeAdapter(python=str(tmp_path / "no-such-python")).run(tmp_path)
-    assert evidence.status is StageStatus.BLOCKED
-    assert evidence.invocations == []

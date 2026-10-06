@@ -207,9 +207,10 @@ def improve_report(session, result, applied=None) -> dict:
         {**to_jsonable(c), "diff": _diff(session.baseline_copy / c.path, session.workspace / c.path, c.path)}
         for c in q.changes
     ]
-    observed = [f"{s.stage.value}: {s.summary}" for s in q.stages if s.status is StageStatus.PASS]
-    not_evidenced = [f"{s.stage.value} ({s.status.value}): {s.summary}" for s in q.stages if s.status is not StageStatus.PASS]
-    limitations = sorted({l for s in q.stages for l in s.limitations})
+    observed = [f"{c.check.value}: {c.summary}" for c in q.checks if c.status is StageStatus.PASS]
+    not_evidenced = [f"{c.check.value} ({c.status.value}): {c.summary}" for c in q.checks if c.status is not StageStatus.PASS]
+    not_evidenced.append("preview/deployment behavior: no authorized non-production preview adapter; production is never used to qualify tests")
+    limitations = sorted({l for c in q.checks for l in c.limitations})
     if applied is None:
         limitations.insert(0, "Candidate evidence was observed in an isolated copy; the candidate is not applied to the project.")
     else:
@@ -245,9 +246,10 @@ def improve_report(session, result, applied=None) -> dict:
         },
         "claim_boundary": {"observed": observed, "not_evidenced": not_evidenced, "limitations": limitations},
         "remaining_unknowns": [
-            f"{s.stage.value} ({s.status.value}): {s.summary}" for s in q.stages
+            f"{s.check.value} ({s.status.value}): {s.summary}" for s in q.checks
             if s.status in (StageStatus.UNKNOWN, StageStatus.NOT_RUN, StageStatus.BLOCKED)
-        ] + [f"metric {d.name}: not measured in both states" for d in q.metric_deltas if d.state is DeltaState.UNKNOWN],
+        ] + [f"metric {d.name}: not measured in both states" for d in q.metric_deltas if d.state is DeltaState.UNKNOWN]
+        + ["preview/deployment behavior: no authorized non-production preview adapter"],
         "provenance": {"assertiva_version": __version__, "interpreter": session.python, "read_only_until_approval": True},
         "execution_budget": execution_budget(
             "qualification", [*result.baseline_evidence.budget, *result.candidate_evidence.budget, *result.budget]
@@ -522,13 +524,17 @@ def _stages_html(report: dict) -> str:
     if not q:
         return ""
     rows = "".join(
-        f'<tr><th scope="row">{_e(s["stage"])}</th><td><span class="chip {s["status"].lower()}">{_e(s["status"])}</span></td>'
-        f'<td>{_e(s["summary"])}{_list(s["limitations"], "") if s["limitations"] else ""}</td></tr>'
+        f'<tr><th scope="row">{_e(s["stage"])}</th><td><span class="chip {s["status"].lower()}">{_e(s["status"])}</span></td><td></td></tr>'
+        + "".join(
+            f'<tr><td>{_e(c["check"])}</td><td><span class="chip {c["status"].lower()}">{_e(c["status"])}</span></td>'
+            f'<td>{_e(c["summary"])}{_list(c["limitations"], "") if c["limitations"] else ""}</td></tr>'
+            for c in s["checks"]
+        )
         for s in q["stages"]
     )
     return (
         '<section id="qualification" aria-labelledby="h-qual"><h2 id="h-qual">Candidate qualification (test-the-tests)</h2>'
-        f'<p>Ready for review: <strong>{"yes" if q["ready_for_review"] else "no"}</strong>. Unavailable stages are never shown as PASS.</p>'
+        f'<p>Ready for review: <strong>{"yes" if q["ready_for_review"] else "no"}</strong>. Five assurance pillars, each with its checks; a check that did not run is never shown as PASS.</p>'
         '<div class="scroll"><table><caption>Qualification stages</caption><thead><tr><th scope="col">Stage</th>'
         f'<th scope="col">Status</th><th scope="col">Evidence and limitations</th></tr></thead><tbody>{rows}</tbody></table></div>'
         f"{_stability_html(q)}</section>"

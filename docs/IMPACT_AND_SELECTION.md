@@ -24,6 +24,8 @@ Combining independent sources can improve recall.
 - Revision-scoped: the revision is the content digest of the analyzed tree (the Git commit is kept as provenance). A graph refuses questions about another revision, and edges observed at another revision are kept aside, never used.
 - Unprovable relations are unknowns, not edges: computed dynamic imports, unparseable files. Unresolved references are kept so a deleted or renamed file can still be traced to the files that referred to it.
 - First slice, Python: imports resolved to project files (root, `src` layout, pytest's rootdir-less base directory, relative imports, parent packages, literal dynamic imports), `conftest.py` scope and pytest configuration files (E1), static declarations, base-test materialization and test helpers (E3), coverage.py dynamic contexts (E0), `test_<module>.py` naming (E4).
+- `conftest.py` is split into units: module-level code, `pytest_*` hooks and autouse fixtures reach every test in scope; a regular fixture reaches only tests that request it by name (parameters, `usefixtures`, literal `getfixturevalue`), and a computed request or indirect parametrization reaches every unit; helpers reach the fixtures and tests that use them. A modified `conftest.py` is compared unit by unit against the base revision; removed units or no structural change fall back to the whole scope. Imports made by a `conftest.py` still reach every test in its scope (import-time effects cannot be narrowed).
+- Graph queries reuse in-memory indexes (by source, by target, unknowns by node) built once per graph state.
 
 ## Selection (implemented, M2)
 

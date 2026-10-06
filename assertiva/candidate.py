@@ -27,6 +27,18 @@ class DeltaState(str, Enum):
 
 
 class QualificationStage(str, Enum):
+    """The five assurance pillars a candidate is qualified on."""
+
+    EXECUTION = "EXECUTION"
+    BEHAVIORAL_ASSURANCE = "BEHAVIORAL_ASSURANCE"
+    FAULT_SENSITIVITY = "FAULT_SENSITIVITY"
+    DELIVERY_FIDELITY = "DELIVERY_FIDELITY"
+    STABILITY_AND_COST = "STABILITY_AND_COST"
+
+
+class QualificationCheck(str, Enum):
+    """Checks inside a pillar; each keeps its own status and evidence."""
+
     STATIC_AND_DISCOVERY = "STATIC_AND_DISCOVERY"
     CANDIDATE_TESTS = "CANDIDATE_TESTS"
     ORIGINAL_REGRESSION = "ORIGINAL_REGRESSION"
@@ -35,8 +47,18 @@ class QualificationStage(str, Enum):
     MUTATION_OR_NEGATIVE_CONTROLS = "MUTATION_OR_NEGATIVE_CONTROLS"
     PIPELINE_EQUIVALENT = "PIPELINE_EQUIVALENT"
     BUILD_AND_ARTIFACT = "BUILD_AND_ARTIFACT"
-    PREVIEW_DEPLOY = "PREVIEW_DEPLOY"
     STABILITY_AND_COST = "STABILITY_AND_COST"
+
+
+PILLARS: dict[QualificationStage, tuple[QualificationCheck, ...]] = {
+    QualificationStage.EXECUTION: (QualificationCheck.STATIC_AND_DISCOVERY, QualificationCheck.CANDIDATE_TESTS),
+    QualificationStage.BEHAVIORAL_ASSURANCE: (
+        QualificationCheck.ORIGINAL_REGRESSION, QualificationCheck.COVERAGE_AND_ORACLES, QualificationCheck.NEGATIVE_PATHS,
+    ),
+    QualificationStage.FAULT_SENSITIVITY: (QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS,),
+    QualificationStage.DELIVERY_FIDELITY: (QualificationCheck.PIPELINE_EQUIVALENT, QualificationCheck.BUILD_AND_ARTIFACT),
+    QualificationStage.STABILITY_AND_COST: (QualificationCheck.STABILITY_AND_COST,),
+}
 
 
 class StageStatus(str, Enum):
@@ -87,12 +109,31 @@ class CandidateTestChange:
 
 
 @dataclass(frozen=True)
-class QualificationStageResult:
-    stage: QualificationStage
+class CheckResult:
+    check: QualificationCheck
     status: StageStatus
     summary: str
     evidence_refs: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class QualificationStageResult:
+    stage: QualificationStage
+    status: StageStatus
+    summary: str
+    checks: tuple[CheckResult, ...] = ()
+
+
+_SEVERITY = (StageStatus.FAIL, StageStatus.BLOCKED, StageStatus.UNKNOWN, StageStatus.PASS)
+
+
+def pillar(stage: QualificationStage, checks: list[CheckResult]) -> QualificationStageResult:
+    """FAIL > BLOCKED > UNKNOWN > PASS; a NOT_RUN check never passes a pillar on its own and stays listed."""
+    statuses = {c.status for c in checks}
+    status = next((s for s in _SEVERITY if s in statuses), StageStatus.NOT_RUN)
+    summary = "; ".join(f"{c.check.value} {c.status.value}" for c in checks)
+    return QualificationStageResult(stage, status, summary, tuple(checks))
 
 
 @dataclass
@@ -100,6 +141,13 @@ class CandidateQualification:
     changes: list[CandidateTestChange] = field(default_factory=list)
     metric_deltas: list[MetricDelta] = field(default_factory=list)
     stages: list[QualificationStageResult] = field(default_factory=list)
+
+    @property
+    def checks(self) -> list[CheckResult]:
+        return [check for stage in self.stages for check in stage.checks]
+
+    def check(self, name: QualificationCheck) -> CheckResult:
+        return next(c for c in self.checks if c.check is name)
 
     @property
     def ready_for_review(self) -> bool:

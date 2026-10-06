@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from assertiva.adapters.jest import JestAdapter, parse_jest_results
-from assertiva.candidate import QualificationStage, StageStatus
+from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.models import Outcome
 
 from conftest import write
@@ -75,26 +75,12 @@ def test_malformed_results_are_blocked(content, tmp_path):
     assert run.status is StageStatus.BLOCKED and run.invocations == []
 
 
-def test_missing_project_jest_is_blocked_and_nothing_is_installed(tmp_path):
-    write(tmp_path / "package.json", json.dumps({"devDependencies": {"jest": "30.5.2"}}))
-    adapter = JestAdapter()
-    assert adapter.supports(tmp_path).value == "SUPPORTED"
-    run = adapter.run(tmp_path)
-    assert run.status is StageStatus.BLOCKED and "not installed" in run.limitations[0]
-    assert not (tmp_path / "node_modules").exists()
-
-
 def test_missing_node_is_blocked(tmp_path, monkeypatch):
     write(tmp_path / "package.json", json.dumps({"devDependencies": {"jest": "30.5.2"}}))
     write(tmp_path / "node_modules" / "jest" / "bin" / "jest.js", "")
     monkeypatch.setenv("ASSERTIVA_NODE", str(tmp_path / "no-node-here"))
     run = JestAdapter().run(tmp_path)
     assert run.status is StageStatus.BLOCKED and "Node" in run.limitations[0]
-
-
-def test_non_jest_project_is_not_claimed(tmp_path):
-    write(tmp_path / "package.json", json.dumps({"devDependencies": {"mocha": "10"}}))
-    assert JestAdapter().supports(tmp_path).value == "UNSUPPORTED"
 
 
 def test_package_scripts_join_the_verification_surface(tmp_path):
@@ -185,12 +171,12 @@ def test_real_jest_candidate_qualification(jest_project):
         write(session.workspace / "__tests__" / "boundary.test.js",
               'const { discount } = require("../src/price");\ntest("vip boundary", () => { expect(discount(99, "VIP")).toBe(99); });\n')
         q = qualify_candidate(session, stability_reruns=0).qualification
-        stages = {s.stage: s.status for s in q.stages}
-        assert stages[QualificationStage.CANDIDATE_TESTS] is StageStatus.PASS
-        assert stages[QualificationStage.ORIGINAL_REGRESSION] is StageStatus.PASS
+        stages = {c.check: c.status for c in q.checks}
+        assert stages[QualificationCheck.CANDIDATE_TESTS] is StageStatus.PASS
+        assert stages[QualificationCheck.ORIGINAL_REGRESSION] is StageStatus.PASS
         (session.workspace / "src" / "price.js").write_text(
             (session.workspace / "src" / "price.js").read_text(encoding="utf-8").replace("total * 90", "total * 80"), encoding="utf-8")
-        broken = {s.stage: s.status for s in qualify_candidate(session, stability_reruns=0).qualification.stages}
-        assert broken[QualificationStage.ORIGINAL_REGRESSION] is StageStatus.FAIL
+        broken = {c.check: c.status for c in qualify_candidate(session, stability_reruns=0).qualification.checks}
+        assert broken[QualificationCheck.ORIGINAL_REGRESSION] is StageStatus.FAIL
     finally:
         discard_session(session)

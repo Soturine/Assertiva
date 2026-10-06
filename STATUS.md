@@ -20,16 +20,17 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - One command with internal phases: start (baseline measured in an isolated copy + candidate workspace) → qualify → `--approve <change ids>` → apply → post-apply verification; `--discard` drops the session.
 - Candidate workspace: detached Git worktree for a clean repository root, otherwise a copy; verified against the baseline fingerprint, including uncommitted work.
 - Change set ADD / MODIFY / RETIRE_CANDIDATE with fingerprints and diffs; originals are never commented out or deleted without approval; apply refuses atomically when the project file or the candidate changed since qualification.
-- Qualification stages (PASS / FAIL / BLOCKED / NOT_RUN / UNKNOWN; unavailable is never PASS):
-  - STATIC_AND_DISCOVERY, CANDIDATE_TESTS from native collection/execution;
-  - ORIGINAL_REGRESSION: unchanged original tests rerun against the candidate;
-  - COVERAGE_AND_ORACLES: line/branch coverage (measured, or ingested with `--coverage-report baseline=…|candidate=…`) and weak-oracle deltas; covered and total are compared as counts, and a percentage over a changed denominator is UNKNOWN with the note shown in the report (80/100 → 90/120: covered up, total changed, percent down), never a pass or a fail by percentage alone;
-  - NEGATIVE_PATHS: static failure-contract dimensions (E3) combined with runtime outcomes; fails when the candidate weakens negative-path evidence;
-  - MUTATION_OR_NEGATIVE_CONTROLS: deliberate negative controls (run on baseline and candidate) and ingested mutation reports (`--mutation-report baseline=…|candidate=…`), side by side; any surviving or uncovered mutant fails the stage whatever the score; reports produced for other source are not used;
-  - PIPELINE_EQUIVALENT: DISCOVERED → AUTHORIZED → EXECUTED. Native runner checks and recognized side-effect-free checks (lint, format, typecheck, static analysis, package/build) run in the disposable copy; migration/container/startup/health/unknown commands only with `--run-check CHECK_ID`; deploy/publish never; compound shell steps are not reproduced; allowed-failure keeps its meaning; a matrix reproduced in one environment is partial;
-  - BUILD_AND_ARTIFACT: wheel built from a copy, installed with `--no-deps` into a fresh environment, imports checked to resolve to the artifact, tests run against it with the source packages removed; reports the exact wheel and sha256;
-  - PREVIEW_DEPLOY: NOT_RUN (no authorized non-production adapter; production is never used);
+- Qualification: five pillars — EXECUTION, BEHAVIORAL_ASSURANCE, FAULT_SENSITIVITY, DELIVERY_FIDELITY, STABILITY_AND_COST — each aggregating its checks (FAIL > BLOCKED > UNKNOWN > PASS; a check that did not run never passes a pillar on its own and stays listed under remaining unknowns). Checks (PASS / FAIL / BLOCKED / NOT_RUN / UNKNOWN; unavailable is never PASS):
+  - EXECUTION: STATIC_AND_DISCOVERY, CANDIDATE_TESTS from native collection/execution;
+  - BEHAVIORAL_ASSURANCE:
+    ORIGINAL_REGRESSION: unchanged original tests rerun against the candidate;
+    COVERAGE_AND_ORACLES: line/branch coverage (measured, or ingested with `--coverage-report baseline=…|candidate=…`) and weak-oracle deltas; covered and total are compared as counts, and a percentage over a changed denominator is UNKNOWN with the note shown in the report (80/100 → 90/120: covered up, total changed, percent down), never a pass or a fail by percentage alone;
+    NEGATIVE_PATHS: static failure-contract dimensions (E3) combined with runtime outcomes; fails when the candidate weakens negative-path evidence;
+  - FAULT_SENSITIVITY: MUTATION_OR_NEGATIVE_CONTROLS: deliberate negative controls (run on baseline and candidate) and ingested mutation reports (`--mutation-report baseline=…|candidate=…`), side by side; any surviving or uncovered mutant fails the stage whatever the score; reports produced for other source are not used;
+  - DELIVERY_FIDELITY: PIPELINE_EQUIVALENT: DISCOVERED → AUTHORIZED → EXECUTED. Native runner checks and recognized side-effect-free checks (lint, format, typecheck, static analysis, package/build) run in the disposable copy; migration/container/startup/health/unknown commands only with `--run-check CHECK_ID`; deploy/publish never; compound shell steps are not reproduced; allowed-failure keeps its meaning; a matrix reproduced in one environment is partial;
+    BUILD_AND_ARTIFACT: wheel built from a copy, installed with `--no-deps` into a fresh environment, imports checked to resolve to the artifact, tests run against it with the source packages removed; reports the exact wheel and sha256;
   - STABILITY_AND_COST: bounded reruns (≤2) of touched and failing invocations (≤50); first outcome kept; STABLE / FLAKY_SIGNAL / CONSISTENT_FAILURE / INSUFFICIENT_EVIDENCE plus the runtime delta.
+- Preview/deployment behavior is not a stage: with no authorized non-production adapter it appears only under "not evidenced" (production is never used).
 - Metric deltas with explicit direction; test count is contextual; runtime and mutation counts are directional only when comparable (same invocations / same number of evaluated mutants).
 
 ### Adapters

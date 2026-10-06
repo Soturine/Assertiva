@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from assertiva.adapters.python_package import PythonPackageAdapter
-from assertiva.candidate import DeltaState, QualificationStage, StageStatus
+from assertiva.candidate import DeltaState, QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 
 from conftest import write
@@ -107,7 +107,7 @@ def test_unsupported_project_leaves_stage_not_run(calc_project):
         q = qualify_candidate(session).qualification
     finally:
         discard_session(session)
-    stage = next(s for s in q.stages if s.stage is QualificationStage.BUILD_AND_ARTIFACT)
+    stage = next(s for s in q.checks if s.check is QualificationCheck.BUILD_AND_ARTIFACT)
     assert stage.status is StageStatus.NOT_RUN
 
 
@@ -121,7 +121,7 @@ def test_candidate_fixing_the_artifact_is_an_improvement(tmp_path):
         q = qualify_candidate(session).qualification
     finally:
         discard_session(session)
-    stage = next(s for s in q.stages if s.stage is QualificationStage.BUILD_AND_ARTIFACT)
+    stage = next(s for s in q.checks if s.check is QualificationCheck.BUILD_AND_ARTIFACT)
     assert stage.status is StageStatus.PASS
     assert "greet-0.1.0" in stage.summary and ".whl" in stage.summary
     assert next(d for d in q.metric_deltas if d.name == "artifact_qualified").state is DeltaState.IMPROVED
@@ -136,7 +136,7 @@ def test_candidate_breaking_the_artifact_fails_the_stage(tmp_path):
         q = qualify_candidate(session).qualification
     finally:
         discard_session(session)
-    stage = next(s for s in q.stages if s.stage is QualificationStage.BUILD_AND_ARTIFACT)
+    stage = next(s for s in q.checks if s.check is QualificationCheck.BUILD_AND_ARTIFACT)
     assert stage.status is StageStatus.FAIL
     assert next(d for d in q.metric_deltas if d.name == "artifact_qualified").state is DeltaState.REGRESSED
     assert not q.ready_for_review

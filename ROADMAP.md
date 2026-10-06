@@ -22,7 +22,7 @@ Audit and improve as a working, dogfooded vertical slice.
 - [x] isolated candidate workspace (Git worktree or copy) verified against the baseline
 - [x] change set with ADD / MODIFY / RETIRE_CANDIDATE, fingerprints and diffs
 - [x] explicit approval by change id, atomic stale-baseline refusal, post-apply verification
-- [x] candidate qualification stages with honest NOT_RUN / UNKNOWN / BLOCKED
+- [x] candidate qualification (five pillars with internal checks) with honest NOT_RUN / UNKNOWN / BLOCKED
 - [x] original regression against the candidate
 - [x] deliberate negative controls on baseline and candidate
 - [x] mutation report ingestion: mutation-testing-elements JSON (Stryker family), PIT XML, mutmut stats
@@ -38,7 +38,7 @@ Audit and improve as a working, dogfooded vertical slice.
 - [x] Assurance Report model + accessible self-contained HTML
 - [x] execution trace with stage/command timing and timeout provenance
 - [x] CI dogfood: installed wheel audits this repository, runs it natively and qualifies its own wheel (on demand / release tags)
-- [x] fast feedback separated from full qualification: test markers, fast-suite cost guard, parallel per-commit CI, fixture-based installed-CLI invariant
+- [x] fast feedback separated from full qualification: test markers, slow-test reporting in the fast suite, parallel per-commit CI, fixture-based installed-CLI invariant
 
 Deferred out of M1 (tracked in STATUS as SPECIFIED): final visual design of the HTML report (waiting for the visual reference), sdist verification, Cosmic Ray, JUnit/mutation evidence as improve candidate state for non-native runners, order dependence.
 
@@ -77,7 +77,7 @@ Delivery
 - [ ] shared-oracle concentration, redundancy and mock-away review candidates
 
 Dogfood
-- [ ] matched full-suite vs selected+widening experiments with known injected defects (miss rate first)
+- [x] matched full-suite vs selected+widening experiments with known injected defects (miss rate first): `tests/test_selection_experiment.py`, 0 misses in 12 controlled defects
 
 ## M3 — Productization & Empirical Validation
 - [ ] stable CLI contract and project policy/config

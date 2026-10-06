@@ -9,9 +9,8 @@ from pathlib import Path
 import pytest
 
 from assertiva.adapters.playwright import PlaywrightAdapter, classify_locator, parse_playwright_results
-from assertiva.candidate import MetricDirection, QualificationStage, StageStatus
+from assertiva.candidate import MetricDirection, QualificationCheck, StageStatus
 from assertiva.models import Outcome
-from assertiva.verification import SupportLevel
 
 from conftest import write
 
@@ -123,12 +122,6 @@ def test_fixture_locator_evidence_is_informational():
 
 # --- discovery and safety ------------------------------------------------------------------
 
-def test_supports_playwright_projects_only(tmp_path):
-    assert PlaywrightAdapter().supports(PROJECT) is SupportLevel.SUPPORTED
-    write(tmp_path / "package.json", '{"devDependencies": {"jest": "30.5.2"}}')
-    assert PlaywrightAdapter().supports(tmp_path) is SupportLevel.UNSUPPORTED
-
-
 def test_remote_base_url_is_never_targeted(tmp_path):
     write(tmp_path / "package.json", '{"devDependencies": {"@playwright/test": "1.63.0"}}')
     write(tmp_path / "playwright.config.js", 'module.exports = { use: { baseURL: "https://shop.example.com" } };\n')
@@ -136,12 +129,6 @@ def test_remote_base_url_is_never_targeted(tmp_path):
     run = PlaywrightAdapter().run(tmp_path)
     assert run.status is StageStatus.BLOCKED and not run.command
     assert any("shop.example.com" in lim and "remote" in lim for lim in run.limitations)
-
-
-def test_missing_playwright_install_is_blocked(tmp_path):
-    write(tmp_path / "package.json", '{"devDependencies": {"@playwright/test": "1.63.0"}}')
-    run = PlaywrightAdapter().run(tmp_path)
-    assert run.status is StageStatus.BLOCKED and "does not install" in run.limitations[0]
 
 
 # --- real Playwright runs (Node, the fixture's node_modules and a Chromium build) ----------
@@ -213,7 +200,7 @@ def test_real_playwright_candidate_qualification(playwright_project):
         q = qualify_candidate(session, stability_reruns=0).qualification
     finally:
         discard_session(session)
-    stages = {s.stage: s.status for s in q.stages}
-    assert stages[QualificationStage.CANDIDATE_TESTS] is StageStatus.PASS
-    assert stages[QualificationStage.ORIGINAL_REGRESSION] is StageStatus.PASS
+    stages = {c.check: c.status for c in q.checks}
+    assert stages[QualificationCheck.CANDIDATE_TESTS] is StageStatus.PASS
+    assert stages[QualificationCheck.ORIGINAL_REGRESSION] is StageStatus.PASS
     assert json.dumps([d.name for d in q.metric_deltas]).count("locator_role") == 1

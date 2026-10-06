@@ -82,6 +82,8 @@ class ImpactContribution:
     nodes: set[str] = field(default_factory=set)
     # source -> project paths an unresolved reference could have named (to trace deleted files)
     unresolved: dict[str, set[str]] = field(default_factory=dict)
+    # file -> unit -> digest, for files an adapter can split into units (compared across revisions)
+    units: dict[str, dict[str, str]] = field(default_factory=dict)
     limitations: list[str] = field(default_factory=list)
 
 
@@ -94,6 +96,7 @@ class ImpactGraph:
     nodes: set[str] = field(default_factory=set)
     unresolved: dict[str, set[str]] = field(default_factory=dict)
     stale: list[ImpactEdge] = field(default_factory=list)
+    units: dict[str, dict[str, str]] = field(default_factory=dict)
     limitations: list[str] = field(default_factory=list)
     git_revision: str | None = None
     root: str | None = None
@@ -112,6 +115,7 @@ class ImpactGraph:
             return
         self.edges.append(edge)
         self.nodes |= {edge.source, edge.target}
+        self._indexes = None
 
     def merge(self, contribution: ImpactContribution) -> None:
         for edge in contribution.edges:
@@ -124,7 +128,25 @@ class ImpactGraph:
         self.nodes |= contribution.nodes | contribution.tests
         for source, candidates in contribution.unresolved.items():
             self.unresolved.setdefault(source, set()).update(candidates)
+        self.units.update(contribution.units)
         self.limitations += contribution.limitations
+        self._indexes = None
+
+    def _index(self, include_heuristic: bool):
+        """(by_source, by_target, unknowns_by_node), built once per graph state and reused by every query."""
+        indexes = getattr(self, "_indexes", None) or {}
+        if include_heuristic not in indexes:
+            by_source: dict[str, list[ImpactEdge]] = {}
+            by_target: dict[str, list[ImpactEdge]] = {}
+            for edge in self._usable(include_heuristic):
+                by_source.setdefault(edge.source, []).append(edge)
+                by_target.setdefault(edge.target, []).append(edge)
+            unknowns: dict[str, list[UnknownRelation]] = {}
+            for unknown in self.unknowns:
+                unknowns.setdefault(unknown.node, []).append(unknown)
+            indexes[include_heuristic] = (by_source, by_target, unknowns)
+            self._indexes = indexes  # in memory only: not a field, never serialized
+        return indexes[include_heuristic]
 
     def facts(self) -> list[ImpactEdge]:
         return [edge for edge in self.edges if not edge.heuristic]
@@ -134,9 +156,7 @@ class ImpactGraph:
 
     def affected_tests(self, changed: set[str], include_heuristic: bool = True) -> dict[str, list[ImpactEdge]]:
         """Tests with a path to a changed node, each with the edges proving it (test first)."""
-        by_target: dict[str, list[ImpactEdge]] = {}
-        for edge in self._usable(include_heuristic):
-            by_target.setdefault(edge.target, []).append(edge)
+        _, by_target, _ = self._index(include_heuristic)
         toward: dict[str, ImpactEdge | None] = {node: None for node in changed}
         queue = deque(sorted(changed))
         while queue:
@@ -156,9 +176,7 @@ class ImpactGraph:
 
     def closure(self, node: str, include_heuristic: bool = False) -> set[str]:
         """Everything ``node`` depends on (forward reachability)."""
-        by_source: dict[str, list[ImpactEdge]] = {}
-        for edge in self._usable(include_heuristic):
-            by_source.setdefault(edge.source, []).append(edge)
+        by_source, _, _ = self._index(include_heuristic)
         seen, queue = {node}, deque([node])
         while queue:
             for edge in by_source.get(queue.popleft(), []):
@@ -168,8 +186,8 @@ class ImpactGraph:
         return seen
 
     def unknowns_reached_by(self, test: str) -> list[UnknownRelation]:
-        reached = self.closure(test)
-        return [unknown for unknown in self.unknowns if unknown.node in reached]
+        _, _, unknowns = self._index(False)
+        return [unknown for node in sorted(self.closure(test)) for unknown in unknowns.get(node, ())]
 
     def importers_of_missing(self, path: str) -> set[str]:
         """Nodes holding an unresolved reference that could have named ``path`` (e.g. a deleted file)."""

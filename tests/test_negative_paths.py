@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from assertiva.candidate import DeltaState, QualificationStage, StageStatus
+from assertiva.candidate import DeltaState, QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 from assertiva.pytest_audit import audit_pytest_project, discover_pytest_definitions
 
@@ -143,7 +143,7 @@ def neg_session(tmp_path):
 
 
 def stage(q):
-    return next(s for s in q.stages if s.stage is QualificationStage.NEGATIVE_PATHS)
+    return next(s for s in q.checks if s.check is QualificationCheck.NEGATIVE_PATHS)
 
 
 @pytest.mark.integration

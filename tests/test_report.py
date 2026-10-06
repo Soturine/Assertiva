@@ -83,7 +83,7 @@ def test_applied_column_appears_only_after_approved_application(improve_states):
 def test_report_bounds_what_green_proves(improve_states):
     session, result = improve_states
     boundary = improve_report(session, result)["claim_boundary"]
-    assert any("PREVIEW_DEPLOY" in item for item in boundary["not_evidenced"])
+    assert any("preview/deployment" in item for item in boundary["not_evidenced"])
     assert any("ORIGINAL_REGRESSION" in item for item in boundary["observed"])
     assert any("not applied" in item.lower() for item in boundary["limitations"])
 

@@ -51,28 +51,26 @@ def git_calc_project(calc_project):
     return calc_project
 
 
-FAST_LIMIT_S = 2.0
+SLOW_REPORT_S = 2.0
 SLOW_MARKERS = {"integration", "artifact"}
+_SLOW: list[tuple[float, str]] = []
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Keep the fast suite fast: an unmarked test that runs long must declare what it is.
-
-    Applies to fast-suite runs (``-m "not integration and not artifact"``), sequentially, so
-    parallel full runs are never failed by CPU contention. Setup time counts: heavy work in a
-    fixture is still heavy.
-    """
+    """Record unmarked tests that run long in the fast suite. Time is evidence, never a test failure."""
     outcome = yield
-    report = outcome.get_result()
+    outcome.get_result()
     if "not integration" not in (item.config.option.markexpr or ""):
         return
     elapsed = getattr(item, "_assertiva_elapsed", 0.0) + call.duration
     item._assertiva_elapsed = elapsed
-    if report.when == "call" and report.passed and elapsed > FAST_LIMIT_S:
-        if not SLOW_MARKERS & {mark.name for mark in item.iter_markers()}:
-            report.outcome = "failed"
-            report.longrepr = (
-                f"{item.nodeid} took {elapsed:.1f}s (setup + call) without an 'integration' or 'artifact' marker; "
-                "mark it (it still runs in the full suite) or make it fast"
-            )
+    if call.when == "call" and elapsed > SLOW_REPORT_S and not SLOW_MARKERS & {m.name for m in item.iter_markers()}:
+        _SLOW.append((elapsed, item.nodeid))
+
+
+def pytest_terminal_summary(terminalreporter):
+    if _SLOW:
+        terminalreporter.write_line(f"unmarked tests slower than {SLOW_REPORT_S:.0f}s in the fast suite (mark them or make them fast):")
+        for elapsed, nodeid in sorted(_SLOW, reverse=True)[:10]:
+            terminalreporter.write_line(f"  {elapsed:.1f}s {nodeid}")

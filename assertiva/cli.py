@@ -138,7 +138,9 @@ def _improve(args: argparse.Namespace) -> int:
     report["report_path"] = str(write_report(report, directory, "improve"))
     q = result.qualification
     lines = [f"Candidate qualification: {report['status']} (not applied)"]
-    lines += [f"  {s.stage.value:<32} {s.status.value:<8} {s.summary}" for s in q.stages]
+    for s in q.stages:
+        lines.append(f"  {s.stage.value:<32} {s.status.value}")
+        lines += [f"    {c.check.value:<30} {c.status.value:<8} {c.summary}" for c in s.checks]
     lines += [f"  change {c.kind.value:<17} {c.change_id}" for c in q.changes]
     lines += [f"Report: {report['report_path']}"]
     if q.changes:
@@ -151,7 +153,7 @@ def _result_from(data: dict):
     """Rebuild the qualification result persisted at qualification time."""
     from .candidate import (
         CandidateChangeKind, CandidateQualification, CandidateTestChange, DeltaState, MetricDelta,
-        QualificationStage, QualificationStageResult, StageStatus,
+        CheckResult, QualificationCheck, QualificationStage, QualificationStageResult, StageStatus,
     )
     from .evidence import ControlOutcome, NegativeControlResult, state_from_dict
     from .improve import QualificationResult
@@ -165,7 +167,8 @@ def _result_from(data: dict):
             stages=[
                 QualificationStageResult(
                     QualificationStage(s["stage"]), StageStatus(s["status"]), s["summary"],
-                    tuple(s["evidence_refs"]), tuple(s["limitations"]),
+                    tuple(CheckResult(QualificationCheck(c["check"]), StageStatus(c["status"]), c["summary"],
+                                      tuple(c["evidence_refs"]), tuple(c["limitations"])) for c in s["checks"]),
                 )
                 for s in q["stages"]
             ],

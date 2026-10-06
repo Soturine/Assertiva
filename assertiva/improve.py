@@ -24,9 +24,12 @@ from .candidate import (
     CandidateQualification,
     CandidateTestChange,
     DeltaState,
-    QualificationStage,
+    PILLARS,
+    CheckResult,
+    QualificationCheck,
     QualificationStageResult,
     StageStatus,
+    pillar,
 )
 from .evidence import (
     ControlOutcome,
@@ -137,16 +140,16 @@ def discard_session(session: ImproveSession) -> None:
     remove_tree(session.directory)
 
 
-def _stage(stage: QualificationStage, status: StageStatus, summary: str, *limitations: str) -> QualificationStageResult:
-    return QualificationStageResult(stage, status, summary, limitations=tuple(limitations))
+def _stage(check: QualificationCheck, status: StageStatus, summary: str, *limitations: str) -> CheckResult:
+    return CheckResult(check, status, summary, limitations=tuple(limitations))
 
 
 def _invocations(state: StateEvidence):
     return [inv for run in state.runs for inv in run.invocations]
 
 
-def _discovery_stage(candidate: StateEvidence) -> QualificationStageResult:
-    stage = QualificationStage.STATIC_AND_DISCOVERY
+def _discovery_stage(candidate: StateEvidence) -> CheckResult:
+    stage = QualificationCheck.STATIC_AND_DISCOVERY
     if not candidate.runs:
         return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could discover candidate tests", *candidate.limitations)
     errors = [error for run in candidate.runs for error in run.collection_errors]
@@ -160,8 +163,8 @@ def _discovery_stage(candidate: StateEvidence) -> QualificationStageResult:
     return _stage(stage, StageStatus.PASS, f"{count} invocations collected natively without errors")
 
 
-def _candidate_tests_stage(changes: list[CandidateTestChange], candidate: StateEvidence) -> QualificationStageResult:
-    stage = QualificationStage.CANDIDATE_TESTS
+def _candidate_tests_stage(changes: list[CandidateTestChange], candidate: StateEvidence) -> CheckResult:
+    stage = QualificationCheck.CANDIDATE_TESTS
     if not candidate.runs:
         return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could execute candidate tests", *candidate.limitations)
     changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
@@ -179,9 +182,9 @@ def _candidate_tests_stage(changes: list[CandidateTestChange], candidate: StateE
     return _stage(stage, StageStatus.PASS, f"{len(touched)} added/modified invocations executed without failure")
 
 
-def _regression_stage(session: ImproveSession, changes: list[CandidateTestChange], candidate: StateEvidence) -> QualificationStageResult:
+def _regression_stage(session: ImproveSession, changes: list[CandidateTestChange], candidate: StateEvidence) -> CheckResult:
     """Run the unchanged original tests against the candidate."""
-    stage = QualificationStage.ORIGINAL_REGRESSION
+    stage = QualificationCheck.ORIGINAL_REGRESSION
     baseline = session.baseline_evidence
     if not baseline.runs or not candidate.runs:
         return _stage(stage, StageStatus.UNKNOWN, "no runner adapter produced baseline/candidate execution evidence")
@@ -212,23 +215,12 @@ def _regression_stage(session: ImproveSession, changes: list[CandidateTestChange
     return _stage(stage, StageStatus.PASS, f"all {len(protected)} originally passing invocations still pass{restored}")
 
 
-def _delta_stage(stage: QualificationStage, deltas, names: tuple[str, ...], required: tuple[str, ...], missing_note: str) -> QualificationStageResult:
-    relevant = [d for d in deltas if d.name in names]
-    regressed = [d.name for d in relevant if d.state is DeltaState.REGRESSED]
-    if regressed:
-        return _stage(stage, StageStatus.FAIL, "regressed: " + ", ".join(regressed))
-    present = {d.name for d in relevant if d.state is not DeltaState.UNKNOWN}
-    if not set(required) <= present:
-        return _stage(stage, StageStatus.UNKNOWN, "partial evidence: " + (", ".join(sorted(present)) or "none"), missing_note)
-    return _stage(stage, StageStatus.PASS, "no regression in " + ", ".join(sorted(present)))
-
-
 _WEAK_NEGATIVE = {"ERROR_TYPE", "PROTOCOL_STATUS"}
 
 
-def _coverage_stage(deltas) -> QualificationStageResult:
+def _coverage_stage(deltas) -> CheckResult:
     """Coverage counts and percentages, never a blind percentage comparison across populations."""
-    stage = QualificationStage.COVERAGE_AND_ORACLES
+    stage = QualificationCheck.COVERAGE_AND_ORACLES
     by = {d.name: d for d in deltas}
     regressed = [d.name for d in deltas if d.name in ("line_coverage", "branch_coverage", "weak_oracle_tests") and d.state is DeltaState.REGRESSED]
     for kind in ("line", "branch"):
@@ -254,9 +246,9 @@ def _coverage_stage(deltas) -> QualificationStageResult:
     return _stage(stage, StageStatus.PASS, "no regression in " + ", ".join(sorted(present)))
 
 
-def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> QualificationStageResult:
+def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> CheckResult:
     """Static failure-contract dimensions (E3) combined with runtime outcomes (E1)."""
-    stage = QualificationStage.NEGATIVE_PATHS
+    stage = QualificationCheck.NEGATIVE_PATHS
     provenance = "dimensions are static AST signals (E3); outcomes come from the native run (E1); rollback and external side effects are not evidenced"
     weakened = [
         d.name for d in deltas
@@ -283,9 +275,9 @@ def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> Qualifica
     return _stage(stage, StageStatus.PASS, summary, provenance)
 
 
-def _mutation_stage(candidate: StateEvidence) -> QualificationStageResult:
+def _mutation_stage(candidate: StateEvidence) -> CheckResult:
     """Negative controls and mutation reports are separate evidence; both are reported."""
-    stage = QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS
+    stage = QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS
     controls, runs = candidate.negative_controls, candidate.mutation
     if not controls and not runs:
         return _stage(
@@ -333,8 +325,8 @@ def _mutation_stage(candidate: StateEvidence) -> QualificationStageResult:
     return _stage(stage, StageStatus.PASS, "; ".join(passed), *limitations)
 
 
-def _artifact_stage(candidate: StateEvidence) -> QualificationStageResult:
-    stage = QualificationStage.BUILD_AND_ARTIFACT
+def _artifact_stage(candidate: StateEvidence) -> CheckResult:
+    stage = QualificationCheck.BUILD_AND_ARTIFACT
     if not candidate.artifacts:
         return _stage(stage, StageStatus.NOT_RUN, "no build/package adapter supports this project", "source-tree tests do not prove a built artifact")
     parts, limitations = [], []
@@ -360,9 +352,9 @@ def _run_declared(argv: tuple[str, ...], copy: Path, python: str | None) -> tupl
     return (StageStatus.PASS if result.ok else StageStatus.FAIL), result.summary()
 
 
-def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: StateEvidence, budget: list) -> QualificationStageResult:
+def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: StateEvidence, budget: list) -> CheckResult:
     """Reproduce the candidate's own delivery checks: DISCOVERED -> AUTHORIZED -> EXECUTED."""
-    stage = QualificationStage.PIPELINE_EQUIVALENT
+    stage = QualificationCheck.PIPELINE_EQUIVALENT
     delivery = discover_surface(session.workspace).by_origin(VerificationOrigin.CI)
     if not delivery:
         return _stage(stage, StageStatus.NOT_RUN, "no delivery pipeline was discovered", "delivery-path verification is UNKNOWN")
@@ -378,11 +370,11 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
             measured = next((r for r in candidate.runs if runner and r.adapter_id == runner[0].adapter_id), None)
             if runner and measured and runner[0].equivalent_to_default(runner[1]):
                 status, detail = measured.status, f"reused equivalent candidate run ({len(measured.invocations)} invocations, coverage-instrumented)"
-                budget.append(BudgetDecision(QualificationStage.PIPELINE_EQUIVALENT.value, "REUSED", f"{label}: equivalent to the candidate run"))
+                budget.append(BudgetDecision(QualificationCheck.PIPELINE_EQUIVALENT.value, "REUSED", f"{label}: equivalent to the candidate run"))
             elif runner:
                 run = runner[0].run(copy, args=runner[1])
                 status, detail = run.status, f"{len(run.invocations)} invocations"
-                budget.append(BudgetDecision(QualificationStage.PIPELINE_EQUIVALENT.value, "EXECUTED", f"{label}: selects differently from the candidate run"))
+                budget.append(BudgetDecision(QualificationCheck.PIPELINE_EQUIVALENT.value, "EXECUTED", f"{label}: selects differently from the candidate run"))
             else:
                 plan = reproduction_plan(check, session.python or sys.executable)
                 if plan.argv is None:
@@ -466,8 +458,8 @@ def _stability(session: ImproveSession, changes, candidate: StateEvidence, rerun
     return evidence
 
 
-def _stability_stage(stability: StabilityEvidence, deltas) -> QualificationStageResult:
-    stage = QualificationStage.STABILITY_AND_COST
+def _stability_stage(stability: StabilityEvidence, deltas) -> CheckResult:
+    stage = QualificationCheck.STABILITY_AND_COST
     wall = next((d for d in deltas if d.name == "wall_clock_s"), None)
     cost = f"wall clock {wall.baseline}s -> {wall.candidate}s ({wall.state.value})" if wall else "wall clock unknown"
     bounds = ("absence of observed instability is not proof of stability", "order dependence was not measured", *stability.limitations)
@@ -488,22 +480,18 @@ def _stability_stage(stability: StabilityEvidence, deltas) -> QualificationStage
 
 
 def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed, budget: list) -> list[QualificationStageResult]:
-    plan = [
-        (QualificationStage.STATIC_AND_DISCOVERY, lambda: _discovery_stage(candidate)),
-        (QualificationStage.CANDIDATE_TESTS, lambda: _candidate_tests_stage(changes, candidate)),
-        (QualificationStage.ORIGINAL_REGRESSION, lambda: _regression_stage(session, changes, candidate)),
-        (QualificationStage.COVERAGE_AND_ORACLES, lambda: _coverage_stage(deltas)),
-        (QualificationStage.NEGATIVE_PATHS, lambda: _negative_path_stage(changes, candidate, deltas)),
-        (QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS, lambda: _mutation_stage(candidate)),
-        (QualificationStage.PIPELINE_EQUIVALENT, lambda: _pipeline_stage(session, authorized, candidate, budget)),
-        (QualificationStage.BUILD_AND_ARTIFACT, lambda: _artifact_stage(candidate)),
-        (QualificationStage.PREVIEW_DEPLOY, lambda: _stage(
-            QualificationStage.PREVIEW_DEPLOY, StageStatus.NOT_RUN,
-            "no authorized non-production preview adapter", "production is never used to qualify tests",
-        )),
-        (QualificationStage.STABILITY_AND_COST, lambda: _stability_stage(stability, deltas)),
-    ]
-    return [timed(stage.value, build) for stage, build in plan]
+    plan = {
+        QualificationCheck.STATIC_AND_DISCOVERY: lambda: _discovery_stage(candidate),
+        QualificationCheck.CANDIDATE_TESTS: lambda: _candidate_tests_stage(changes, candidate),
+        QualificationCheck.ORIGINAL_REGRESSION: lambda: _regression_stage(session, changes, candidate),
+        QualificationCheck.COVERAGE_AND_ORACLES: lambda: _coverage_stage(deltas),
+        QualificationCheck.NEGATIVE_PATHS: lambda: _negative_path_stage(changes, candidate, deltas),
+        QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS: lambda: _mutation_stage(candidate),
+        QualificationCheck.PIPELINE_EQUIVALENT: lambda: _pipeline_stage(session, authorized, candidate, budget),
+        QualificationCheck.BUILD_AND_ARTIFACT: lambda: _artifact_stage(candidate),
+        QualificationCheck.STABILITY_AND_COST: lambda: _stability_stage(stability, deltas),
+    }
+    return [pillar(stage, [timed(check.value, plan[check]) for check in checks]) for stage, checks in PILLARS.items()]
 
 
 @scoped
@@ -548,7 +536,7 @@ def qualify_candidate(
         budget: list[BudgetDecision] = []
         stability = timed("stability-reruns", lambda: _stability(session, changes, candidate, stability_reruns))
         budget.append(BudgetDecision(
-            QualificationStage.STABILITY_AND_COST.value,
+            QualificationCheck.STABILITY_AND_COST.value,
             "EXECUTED" if stability.records else "NOT_RUN",
             f"reran {len(stability.records)} candidate-touched or failing invocations {stability.attempts - 1}x"
             if stability.records else "no relevant invocation to rerun, reruns disabled, or execution budget exhausted",

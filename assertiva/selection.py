@@ -99,6 +99,7 @@ def select_tests(
     base: str | None = None,
     must_run: set[str] | frozenset = frozenset(),
     components=None,
+    previous_units: dict[str, dict[str, str]] | None = None,
 ) -> TestSelection:
     """Select tests for ``changes``; ``components`` (a component graph) adds declared cross-component impact."""
     selection = TestSelection(revision=revision, base=base, graph_revision=graph.revision, git_revision=graph.git_revision,
@@ -160,6 +161,13 @@ def select_tests(
             continue
         if path in configuration:
             widen(Trigger.CONFIGURATION, path, "framework, project or build configuration affects every test")
+        units = _changed_units(graph, previous_units or {}, change)
+        if units:
+            narrowed = graph.affected_tests({f"{path}::{u}" for u in units}, include_heuristic=False)
+            for test, edges in narrowed.items():
+                add(test, SelectionReason(f"depends on changed unit(s) of {path}: {', '.join(sorted(units))}", _weakest(edges), _path(edges)))
+            if narrowed:
+                continue
         proven = graph.affected_tests({path}, include_heuristic=False)
         if path in fixtures:
             widen(Trigger.SHARED_FIXTURE, path, f"shared fixture/hook file: every test in its scope ({len(proven)}) is selected", full=False)
@@ -183,20 +191,22 @@ def select_tests(
                 widen(Trigger.NO_PROVEN_PATH, path, "no proven path from this change to any test; no edge found is not evidence that no test is needed")
 
     if changes:
-        for test in sorted(graph.tests):
-            reached = graph.unknowns_reached_by(test)
-            if reached:
-                for unknown in reached:
-                    if unknown not in selection.unknown_dependencies:
-                        selection.unknown_dependencies.append(unknown)
-                add(test, SelectionReason(f"depends on {reached[0].node}, whose dependencies are unknown: {reached[0].reason}",
+        # one reverse search per unknown node (not one closure per test)
+        for unknown in sorted(graph.unknowns, key=lambda u: (u.node, u.reason)):
+            reaching = graph.affected_tests({unknown.node}, include_heuristic=False)
+            if not reaching:
+                continue
+            if unknown not in selection.unknown_dependencies:
+                selection.unknown_dependencies.append(unknown)
+            for test in reaching:
+                add(test, SelectionReason(f"depends on {unknown.node}, whose dependencies are unknown: {unknown.reason}",
                                           None, (), Trigger.UNKNOWN_RELATION))
         if selection.unknown_dependencies:
             widen(Trigger.UNKNOWN_RELATION, None,
                   f"{len(selection.unknown_dependencies)} unknown relation(s) reachable from tests; every test reaching one is selected",
                   full=False)
     if components is not None and changes:
-        selection.affected_components = components.affected(changes).components
+        selection.affected_components = components.affected(changes)
         for component in components.components.values():
             if component.unknown_dependencies:
                 unknown = UnknownRelation(component.path, "declares dependencies that could not be resolved: "
@@ -208,6 +218,14 @@ def select_tests(
     for test in sorted(must_run):
         add(test, SelectionReason("known failing test or reproducer", None))
     return _finish(selection, graph)
+
+
+def _changed_units(graph: ImpactGraph, previous: dict[str, dict[str, str]], change: FileChange) -> set[str]:
+    """Units of a modified file whose content changed; empty (follow the whole file) unless provably narrower."""
+    current, before = graph.units.get(change.path), previous.get(change.path)
+    if change.status != "M" or current is None or before is None or set(before) - set(current):
+        return set()  # removed or renamed units: whoever used them is not traceable at this revision
+    return {unit for unit, digest in current.items() if before.get(unit) != digest}
 
 
 def _finish(selection: TestSelection, graph: ImpactGraph) -> TestSelection:
@@ -236,6 +254,9 @@ def select_changes(root: str | Path, base: str, must_run: set[str] | frozenset =
     from .components import build_component_graph
     from .impact import build_impact_graph
 
+    from .adapters import impact_adapters
+    from .workspace import _git
+
     graph = build_impact_graph(root)
     components = build_component_graph(root, revision=graph.revision)
     try:
@@ -245,8 +266,16 @@ def select_changes(root: str | Path, base: str, must_run: set[str] | frozenset =
                                   git_revision=graph.git_revision, limitations=[CLAIM])
         selection.widening.append(Widening(Trigger.CHANGES_UNKNOWN, None, True, str(exc)))
         return _finish(selection, graph)
+    previous_units = {}
+    for change in changes:
+        if change.status == "M" and change.path in graph.units:
+            text = _git(Path(root), "show", f"{base}:./{change.path}")
+            for adapter in impact_adapters(root):
+                digests = adapter.unit_digests(change.path, text) if text is not None and hasattr(adapter, "unit_digests") else None
+                if digests is not None:
+                    previous_units[change.path] = digests
     return select_tests(graph, changes, revision=graph.revision, base=base, must_run=must_run,
-                        components=components if components.components else None)
+                        components=components if components.components else None, previous_units=previous_units)
 
 
 def changed_files(root: str | Path, base: str) -> list[FileChange]:

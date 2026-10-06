@@ -6,7 +6,7 @@ import sys
 import pytest
 
 from assertiva import process
-from assertiva.candidate import QualificationStage, StageStatus
+from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 from assertiva.models import Outcome
 
@@ -25,8 +25,8 @@ def counter_test(counter, fail_when):
     )
 
 
-def stage(q, name=QualificationStage.STABILITY_AND_COST):
-    return next(s for s in q.stages if s.stage is name)
+def stage(q, name=QualificationCheck.STABILITY_AND_COST):
+    return q.check(name)
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def test_alternating_outcome_is_a_flaky_signal_and_first_failure_is_kept(session
     assert record.outcomes[0] is Outcome.FAILED and Outcome.PASSED in record.outcomes[1:]
     q = result.qualification
     assert stage(q).status is StageStatus.FAIL
-    assert stage(q, QualificationStage.CANDIDATE_TESTS).status is StageStatus.FAIL  # a later pass does not erase it
+    assert stage(q, QualificationCheck.CANDIDATE_TESTS).status is StageStatus.FAIL  # a later pass does not erase it
 
 
 @pytest.mark.integration

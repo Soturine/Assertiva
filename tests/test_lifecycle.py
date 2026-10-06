@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from assertiva.candidate import QualificationStage, StageStatus
+from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 from assertiva.verification import discover_surface
 
@@ -32,7 +32,7 @@ def check_id(root, command):
 
 def pipeline(session, **kwargs):
     q = qualify_candidate(session, **kwargs).qualification
-    return next(s for s in q.stages if s.stage is QualificationStage.PIPELINE_EQUIVALENT), q
+    return next(s for s in q.checks if s.check is QualificationCheck.PIPELINE_EQUIVALENT), q
 
 
 @pytest.fixture
@@ -181,5 +181,5 @@ def test_cli_run_check_authorizes_a_single_discovered_check(project, capsys):
     cli.main(["improve", str(root), "--python", sys.executable, "--run-check", target, "--output", "json"])
     report = json.loads(capsys.readouterr().out)
     cli.main(["improve", str(root), "--discard"])
-    stage = next(s for s in report["candidate_qualification"]["stages"] if s["stage"] == "PIPELINE_EQUIVALENT")
+    stage = next(c for s in report["candidate_qualification"]["stages"] for c in s["checks"] if c["check"] == "PIPELINE_EQUIVALENT")
     assert marker.exists() and stage["status"] == "PASS"

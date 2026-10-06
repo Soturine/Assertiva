@@ -42,33 +42,44 @@ def test_declared_components_and_dependencies(tmp_path):
 
 
 def test_change_inside_one_package(tmp_path):
-    result = affected(project(tmp_path, JS), "packages/docs/index.js")
-    assert set(result.components) == {"@acme/docs"} and not result.full
+    assert set(affected(project(tmp_path, JS), "packages/docs/index.js")) == {"@acme/docs"}
 
 
 def test_shared_package_reaches_its_dependents_transitively(tmp_path):
     result = affected(project(tmp_path, JS), "packages/core/index.js")
-    assert set(result.components) == {"@acme/core", "@acme/ui", "web"}
-    assert "depends on" in result.components["web"]
+    assert set(result) == {"@acme/core", "@acme/ui", "web"}
+    assert "depends on" in result["web"]
+
+
+def js_select(root, path):
+    graph = build_impact_graph(root)
+    return select_tests(graph, [FileChange(path, "M")], revision=graph.revision, components=build_component_graph(root))
 
 
 @pytest.mark.parametrize("path", ["package.json", "package-lock.json"])
 def test_workspace_configuration_affects_every_component(tmp_path, path):
-    result = affected(project(tmp_path, JS), path)
-    assert result.full and result.widening[0].trigger is Trigger.CONFIGURATION
+    root = project(tmp_path, JS)
+    assert set(affected(root, path)) == {"@acme/core", "@acme/ui", "@acme/docs", "web"}
+    selection = js_select(root, path)
+    assert selection.full and Trigger.CONFIGURATION in {w.trigger for w in selection.widening}
 
 
 def test_root_file_outside_components_widens(tmp_path):
-    result = affected(project(tmp_path, {**JS, "tsconfig.base.json": "{}"}), "tsconfig.base.json")
-    assert result.full and result.widening[0].trigger is Trigger.UNMAPPED_CHANGE
+    root = project(tmp_path, {**JS, "tsconfig.base.json": "{}"})
+    assert affected(root, "tsconfig.base.json") == {}  # a fact: no component owns it
+    selection = js_select(root, "tsconfig.base.json")
+    assert selection.full and Trigger.UNMAPPED_CHANGE in {w.trigger for w in selection.widening}
 
 
 def test_unknown_dependency_widens(tmp_path):
     files = {**JS, "packages/tool/package.json": npm("tool", {"@acme/missing": "workspace:*", "x": "file:../../vendor/x"})}
-    graph = build_component_graph(project(tmp_path, files))
+    root = project(tmp_path, files)
+    graph = build_component_graph(root)
     assert len(graph.components["tool"].unknown_dependencies) == 2
-    result = graph.affected([FileChange("packages/docs/index.js", "M")])
-    assert "tool" in result.components and Trigger.UNKNOWN_RELATION in {w.trigger for w in result.widening}
+    assert "unknown dependencies" in graph.affected([FileChange("packages/docs/index.js", "M")])["tool"]
+    selection = js_select(root, "packages/docs/index.js")
+    assert [u.node for u in selection.unknown_dependencies] == ["packages/tool"]
+    assert selection.confidence is not Confidence.PROVEN_PATHS
 
 
 def test_layout_without_declared_workspaces_has_no_components(tmp_path):

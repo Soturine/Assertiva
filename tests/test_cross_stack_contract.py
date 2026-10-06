@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from assertiva import adapters
-from assertiva.candidate import DeltaState, QualificationStage, StageStatus
+from assertiva.candidate import DeltaState, QualificationCheck, StageStatus
 from assertiva import models
 from assertiva.models import ArtifactCheck, ArtifactEvidence, CoverageSummary, Outcome, RunEvidence
 from assertiva.verification import SupportLevel
@@ -120,11 +120,11 @@ def test_generic_coverage_and_artifact_evidence_reach_qualification(fake_stack):
         discard_session(session)
     deltas = {d.name: d.state for d in q.metric_deltas}
     assert deltas["branch_coverage"] is DeltaState.IMPROVED and deltas["line_coverage"] is DeltaState.IMPROVED
-    stages = {s.stage: s for s in q.stages}
-    assert stages[QualificationStage.CANDIDATE_TESTS].status is StageStatus.PASS
-    assert stages[QualificationStage.ORIGINAL_REGRESSION].status is StageStatus.PASS
-    assert stages[QualificationStage.BUILD_AND_ARTIFACT].status is StageStatus.PASS
-    assert "bundle app.bundle" in stages[QualificationStage.BUILD_AND_ARTIFACT].summary
+    stages = {c.check: c for c in q.checks}
+    assert stages[QualificationCheck.CANDIDATE_TESTS].status is StageStatus.PASS
+    assert stages[QualificationCheck.ORIGINAL_REGRESSION].status is StageStatus.PASS
+    assert stages[QualificationCheck.BUILD_AND_ARTIFACT].status is StageStatus.PASS
+    assert "bundle app.bundle" in stages[QualificationCheck.BUILD_AND_ARTIFACT].summary
 
 
 def test_collection_errors_are_attributed_by_the_adapter_not_by_id_syntax(fake_stack):
@@ -138,7 +138,7 @@ def test_collection_errors_are_attributed_by_the_adapter_not_by_id_syntax(fake_s
         q = qualify_candidate(session).qualification
     finally:
         discard_session(session)
-    candidate_tests = next(s for s in q.stages if s.stage is QualificationStage.CANDIDATE_TESTS)
+    candidate_tests = next(s for s in q.checks if s.check is QualificationCheck.CANDIDATE_TESTS)
     assert candidate_tests.status is StageStatus.FAIL and "the broken suite" in candidate_tests.summary
 
 
@@ -182,3 +182,53 @@ def test_core_modules_do_not_parse_runner_id_syntax(module):
 
     text = (Path(assertiva.__file__).parent / module).read_text(encoding="utf-8")
     assert 'split("::")' not in text and "split('::')" not in text, module
+
+
+# --- universal runner contracts (adapter-specific behavior stays in each adapter's tests) ---------
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+OWN_PROJECT = {"pytest-native": None, "jest": "js-jest", "playwright": "js-playwright", "maven": "java-maven"}
+
+
+def _runner(adapter_id):
+    from assertiva.adapters.jest import JestAdapter
+    from assertiva.adapters.maven import MavenAdapter
+    from assertiva.adapters.playwright import PlaywrightAdapter
+    from assertiva.adapters.pytest_native import PytestNativeAdapter
+
+    return {"pytest-native": PytestNativeAdapter, "jest": JestAdapter, "playwright": PlaywrightAdapter, "maven": MavenAdapter}[adapter_id]
+
+
+@pytest.mark.parametrize("adapter_id", list(OWN_PROJECT))
+def test_each_runner_claims_exactly_its_own_project(adapter_id, tmp_path):
+    python_project = tmp_path / "py"
+    write(python_project / "tests" / "test_ok.py", "def test_ok():\n    assert True\n")
+    projects = {name: (FIXTURE_DIR / folder if folder else python_project) for name, folder in OWN_PROJECT.items()}
+    adapter = _runner(adapter_id)()
+    claimed = {name for name, root in projects.items() if adapter.supports(root) is SupportLevel.SUPPORTED}
+    assert claimed == {adapter_id}
+
+
+UNAVAILABLE = {
+    "pytest-native": ({"tests/test_ok.py": "def test_ok():\n    assert 1 == 1\n"}, {}, {"python": "no-such-python"}),
+    "jest": ({"package.json": '{"devDependencies": {"jest": "30.5.2"}}'}, {}, {}),
+    "playwright": ({"package.json": '{"devDependencies": {"@playwright/test": "1.63.0"}}'}, {}, {}),
+    "maven": ({"pom.xml": "<project/>", "mvnw": "#!/bin/sh\necho must never run\n"}, {"ASSERTIVA_MAVEN": "missing/mvn"}, {}),
+}
+
+
+@pytest.mark.parametrize("adapter_id", list(UNAVAILABLE))
+def test_unavailable_runner_is_blocked_never_pass_and_installs_nothing(adapter_id, tmp_path, monkeypatch):
+    from assertiva.workspace import tree_fingerprint
+
+    files, env, kwargs = UNAVAILABLE[adapter_id]
+    for rel, text in files.items():
+        write(tmp_path / rel, text)
+    for name, value in env.items():
+        monkeypatch.setenv(name, str(tmp_path / value))
+    if "python" in kwargs:
+        kwargs = {"python": str(tmp_path / kwargs["python"])}
+    before = tree_fingerprint(tmp_path)
+    run = _runner(adapter_id)(**kwargs).run(tmp_path)
+    assert run.status is StageStatus.BLOCKED and run.invocations == [] and run.limitations
+    assert tree_fingerprint(tmp_path) == before  # nothing installed, no wrapper or build output

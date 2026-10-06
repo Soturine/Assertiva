@@ -244,3 +244,66 @@ def test_pytest_subset_keeps_the_full_runs_rootdir():
     assert PytestNativeAdapter().selection_args(["pkg/b/test_b.py", "pkg/a/test_a.py", "web/x.test.js"]) == [
         "--rootdir=.", "pkg/a/test_a.py", "pkg/b/test_b.py"]
     assert PytestNativeAdapter().selection_args(["web/x.test.js"]) == []
+
+
+# --- conftest.py: explicit fixtures vs autouse/hooks/module code --------------------------------
+
+CONFTEST = (
+    "import pytest\n\n\ndef make_row():\n    return {'id': 1}\n\n\n"
+    "@pytest.fixture\ndef row():\n    return make_row()\n\n\n"
+    "@pytest.fixture\ndef clock():\n    return 0\n\n\n"
+    "@pytest.fixture(autouse=True)\ndef env(monkeypatch):\n    monkeypatch.setenv('X', '1')\n\n\n"
+    "def pytest_configure(config):\n    pass\n"
+)
+FIXTURE_PROJECT = {
+    **BASE,
+    "tests/conftest.py": CONFTEST,
+    "tests/test_rows.py": "def test_row(row):\n    assert row['id'] == 1\n",
+    "tests/test_clock.py": "def test_clock(clock):\n    assert clock == 0\n",
+    "tests/test_dynamic.py": "def test_any(request):\n    name = 'clo' + 'ck'\n    assert request.getfixturevalue(name) == 0\n",
+}
+
+
+def select_conftest(tmp_path, new_conftest):
+    from assertiva.adapters.python_impact import PythonImpactAdapter
+
+    root = project(tmp_path, {**FIXTURE_PROJECT, "tests/conftest.py": new_conftest})
+    graph = build_impact_graph(root)
+    before = PythonImpactAdapter().unit_digests("tests/conftest.py", CONFTEST)
+    return select_tests(graph, [FileChange("tests/conftest.py", "M")], revision=graph.revision,
+                        previous_units={"tests/conftest.py": before})
+
+
+EVERY = {"tests/test_calc.py", "tests/test_service.py", "tests/test_rows.py", "tests/test_clock.py", "tests/test_dynamic.py"}
+
+
+def test_changed_fixture_selects_only_tests_that_request_it(tmp_path):
+    selection = select_conftest(tmp_path, CONFTEST.replace("return 0", "return 1"))
+    assert set(selection.selected) == {"tests/test_clock.py", "tests/test_dynamic.py"}  # dynamic request may use any fixture
+
+
+def test_changed_helper_reaches_fixtures_that_use_it(tmp_path):
+    selection = select_conftest(tmp_path, CONFTEST.replace("{'id': 1}", "{'id': 2}"))
+    assert set(selection.selected) == {"tests/test_rows.py", "tests/test_dynamic.py"}
+
+
+@pytest.mark.parametrize("change", [
+    ("monkeypatch.setenv('X', '1')", "monkeypatch.setenv('X', '2')"),  # autouse fixture
+    ("def pytest_configure(config):\n    pass", "def pytest_configure(config):\n    config.x = 1"),  # hook
+    ("import pytest\n", "import pytest\nimport os\n"),  # module-level code
+])
+def test_autouse_hooks_and_module_code_reach_every_test_in_scope(tmp_path, change):
+    assert set(select_conftest(tmp_path, CONFTEST.replace(*change)).selected) == EVERY
+
+
+def test_removed_fixture_falls_back_to_the_whole_scope(tmp_path):
+    selection = select_conftest(tmp_path, CONFTEST.replace("@pytest.fixture\ndef clock():\n    return 0\n\n\n", ""))
+    assert set(selection.selected) == EVERY and Trigger.SHARED_FIXTURE in triggers(selection)
+
+
+def test_conftest_units_are_compared_against_the_base_revision(tmp_path):
+    root = _repo(project(tmp_path, FIXTURE_PROJECT))
+    write(root / "tests/conftest.py", CONFTEST.replace("return 0", "return 1"))
+    from assertiva.selection import select_changes
+
+    assert set(select_changes(root, "HEAD").selected) == {"tests/test_clock.py", "tests/test_dynamic.py"}

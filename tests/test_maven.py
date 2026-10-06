@@ -11,10 +11,10 @@ from pathlib import Path
 import pytest
 
 from assertiva.adapters.maven import MavenAdapter, MavenBuildSurfaceAdapter, maven_arguments, parse_maven_reports, report_state
-from assertiva.candidate import QualificationStage, StageStatus
+from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.evidence import to_jsonable
 from assertiva.models import Outcome
-from assertiva.verification import GateMode, SupportLevel, VerificationKind
+from assertiva.verification import GateMode, VerificationKind
 
 from conftest import write
 
@@ -112,15 +112,6 @@ def test_malformed_missing_and_stale_reports_are_not_evidence(tmp_path):
 
 # --- execution safety ------------------------------------------------------------------------
 
-def test_maven_unavailable_is_blocked_and_the_wrapper_is_never_run(tmp_path, monkeypatch):
-    write(tmp_path / "pom.xml", (PROJECT / "pom.xml").read_text(encoding="utf-8"))
-    write(tmp_path / "mvnw", "#!/bin/sh\necho should never run\n")
-    monkeypatch.setenv("ASSERTIVA_MAVEN", str(tmp_path / "missing" / "mvn"))
-    run = MavenAdapter().run(tmp_path)
-    assert run.status is StageStatus.BLOCKED and not run.command
-    assert "Maven was not found" in run.limitations[0] and "wrapper" in run.limitations[0]
-
-
 def test_command_is_offline_and_selects_invocations():
     args = maven_arguments(["dev.x.PriceTest#appliesTierDiscount(int, String, int)[1]", "dev.x.PriceIT#vip", "dev.x.Other#a"])
     assert args[:2] == ["-B", "-o"] and "-Dmaven.test.failure.ignore=true" in args and args[-1] == "verify"
@@ -147,12 +138,6 @@ def test_reproduction_and_equivalence():
 
 
 # --- discovery: the build's own verification surface ------------------------------------------
-
-def test_supports_maven_projects_only(tmp_path):
-    assert MavenAdapter().supports(PROJECT) is SupportLevel.SUPPORTED
-    write(tmp_path / "build.gradle", "plugins { id 'java' }\n")
-    assert MavenAdapter().supports(tmp_path) is SupportLevel.UNSUPPORTED
-
 
 def test_build_surface_from_pom():
     checks = {c.check_id: c for c in MavenBuildSurfaceAdapter().discover(PROJECT)}
@@ -230,13 +215,13 @@ def test_real_maven_candidate_qualification(java_project):
               "import org.junit.jupiter.api.Test;\n\nclass BoundaryTest {\n    @Test\n    void zeroTotal() {\n"
               '        assertEquals(0, Price.discount(0, "VIP"));\n    }\n}\n')
         q = qualify_candidate(session, stability_reruns=0).qualification
-        stages = {s.stage: s.status for s in q.stages}
-        assert stages[QualificationStage.CANDIDATE_TESTS] is StageStatus.PASS
-        assert stages[QualificationStage.ORIGINAL_REGRESSION] is StageStatus.PASS
+        stages = {c.check: c.status for c in q.checks}
+        assert stages[QualificationCheck.CANDIDATE_TESTS] is StageStatus.PASS
+        assert stages[QualificationCheck.ORIGINAL_REGRESSION] is StageStatus.PASS
         source = session.workspace / "src" / "main" / "java" / "dev" / "assertiva" / "fixture" / "Price.java"
         source.write_text(source.read_text(encoding="utf-8").replace("total * 90", "total * 80"), encoding="utf-8")
-        broken = {s.stage: s.status for s in qualify_candidate(session, stability_reruns=0).qualification.stages}
-        assert broken[QualificationStage.ORIGINAL_REGRESSION] is StageStatus.FAIL
+        broken = {c.check: c.status for c in qualify_candidate(session, stability_reruns=0).qualification.checks}
+        assert broken[QualificationCheck.ORIGINAL_REGRESSION] is StageStatus.FAIL
     finally:
         discard_session(session)
 

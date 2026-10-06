@@ -1,9 +1,9 @@
 """Workspace components (packages/modules) and which of them a change affects.
 
-Only explicit layouts count: adapters report components and dependencies declared by manifests
-(E1), the workspace configuration files that affect every component, and dependencies they could
-not resolve (unknowns). A component affected by a change takes its declared dependents with it,
-transitively. Files outside every component, workspace configuration and unknown dependencies widen.
+Facts only. Adapters report components and dependencies declared by manifests (E1), the workspace
+configuration files that affect every component, and dependencies they could not resolve (unknowns).
+A component affected by a change takes its declared dependents with it, transitively. What to run
+about it (widening, fallback, confidence) is decided by the selection, nowhere else.
 """
 
 from __future__ import annotations
@@ -32,16 +32,6 @@ class ComponentContribution:
 
 
 @dataclass
-class AffectedSet:
-    components: dict[str, str] = field(default_factory=dict)  # name -> why it is affected
-    widening: list = field(default_factory=list)  # selection.Widening entries
-
-    @property
-    def full(self) -> bool:
-        return any(w.full for w in self.widening)
-
-
-@dataclass
 class ComponentGraph:
     revision: str
     components: dict[str, Component] = field(default_factory=dict)
@@ -67,32 +57,26 @@ class ComponentGraph:
                     queue.append(dependent)
         return found
 
-    def affected(self, changes) -> AffectedSet:
-        from .selection import Trigger, Widening
-
-        result = AffectedSet()
+    def affected(self, changes) -> dict[str, str]:
+        """Components a change affects, and why (facts only; widening is the selection's policy)."""
+        affected: dict[str, str] = {}
         for change in changes:
             for path in dict.fromkeys(p for p in (change.path, change.old_path) if p):
                 if path in self.workspace_files:
-                    result.widening.append(Widening(Trigger.CONFIGURATION, path, True, "workspace configuration affects every component"))
+                    for name in self.components:
+                        affected.setdefault(name, f"workspace configuration changed ({path})")
                     continue
                 owner = self.owner(path)
                 if owner is None:
-                    result.widening.append(Widening(Trigger.UNMAPPED_CHANGE, path, True, "the file belongs to no declared component"))
                     continue
-                result.components.setdefault(owner.name, "contains a changed file")
+                affected.setdefault(owner.name, "contains a changed file")
                 for dependent, through in self.dependents(owner.name).items():
-                    result.components.setdefault(dependent, f"depends on {through} ({self.components[dependent].manifest})")
-        uncertain = [c for c in self.components.values() if c.unknown_dependencies]
-        if changes and uncertain:
-            for component in uncertain:
-                result.components.setdefault(component.name, "has unknown dependencies: " + ", ".join(component.unknown_dependencies))
-            result.widening.append(Widening(Trigger.UNKNOWN_RELATION, None, False,
-                                            f"{len(uncertain)} component(s) declare dependencies that could not be resolved; they are always affected"))
-        if result.full:
-            for name in self.components:
-                result.components.setdefault(name, "widened: every component")
-        return result
+                    affected.setdefault(dependent, f"depends on {through} ({self.components[dependent].manifest})")
+        if changes:
+            for component in self.components.values():
+                if component.unknown_dependencies:
+                    affected.setdefault(component.name, "has unknown dependencies: " + ", ".join(component.unknown_dependencies))
+        return affected
 
 
 def build_component_graph(root: str | Path, revision: str | None = None, adapters: list | None = None) -> ComponentGraph:

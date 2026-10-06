@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from assertiva.candidate import QualificationStage, StageStatus
+from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 from assertiva.report import improve_report, render_html
 
@@ -112,7 +112,7 @@ def names(report, bucket):
 
 
 def stages(q):
-    return {s.stage: s for s in q.stages}
+    return {c.check: c for c in q.checks}
 
 
 @pytest.fixture
@@ -142,11 +142,11 @@ def test_real_improvement_is_shown_dimension_by_dimension(improved):
     assert "test_invocations" not in names(report, "improved")
     by = stages(result.qualification)
     for stage in (
-        QualificationStage.ORIGINAL_REGRESSION, QualificationStage.COVERAGE_AND_ORACLES, QualificationStage.NEGATIVE_PATHS,
-        QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS, QualificationStage.BUILD_AND_ARTIFACT, QualificationStage.STABILITY_AND_COST,
+        QualificationCheck.ORIGINAL_REGRESSION, QualificationCheck.COVERAGE_AND_ORACLES, QualificationCheck.NEGATIVE_PATHS,
+        QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS, QualificationCheck.BUILD_AND_ARTIFACT, QualificationCheck.STABILITY_AND_COST,
     ):
         assert by[stage].status is StageStatus.PASS, (stage, by[stage])
-    assert by[QualificationStage.PREVIEW_DEPLOY].status is StageStatus.NOT_RUN
+    assert any("preview/deployment" in item for item in report["claim_boundary"]["not_evidenced"])
     assert result.qualification.ready_for_review
     assert report["states"]["applied"] is None
 
@@ -155,7 +155,7 @@ def test_report_has_no_aggregate_score_and_keeps_unknowns(improved):
     _, _, report = improved
     assert not re.search(r'"[a-z_]*score[a-z_]*"\s*:', json.dumps(report))
     unknowns = " ".join(report["remaining_unknowns"])
-    assert "PREVIEW_DEPLOY" in unknowns and "PIPELINE_EQUIVALENT" in unknowns
+    assert "preview/deployment" in unknowns and "PIPELINE_EQUIVALENT" in unknowns
 
 
 def test_html_distinguishes_statuses_and_shows_provenance(improved):
@@ -191,8 +191,8 @@ def test_more_tests_and_coverage_cannot_hide_worse_evidence(worse):
     assert {"mutation_survived", "mutation_killed", "artifact_qualified"} <= names(report, "regressed")
     assert "test_invocations" in names(report, "changed")
     by = stages(result.qualification)
-    assert by[QualificationStage.ORIGINAL_REGRESSION].status is StageStatus.FAIL
-    assert by[QualificationStage.BUILD_AND_ARTIFACT].status is StageStatus.FAIL
-    assert by[QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS].status is StageStatus.FAIL
+    assert by[QualificationCheck.ORIGINAL_REGRESSION].status is StageStatus.FAIL
+    assert by[QualificationCheck.BUILD_AND_ARTIFACT].status is StageStatus.FAIL
+    assert by[QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS].status is StageStatus.FAIL
     assert not result.qualification.ready_for_review
     assert report["status"] == "NEEDS_ATTENTION"

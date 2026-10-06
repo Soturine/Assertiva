@@ -7,7 +7,7 @@ import sys
 import pytest
 
 from assertiva.adapters.coverage_reports import load_coverage_report
-from assertiva.candidate import DeltaState, QualificationStage, StageStatus
+from assertiva.candidate import DeltaState, QualificationCheck, StageStatus
 
 from conftest import write
 
@@ -147,7 +147,7 @@ def test_coverage_stage_does_not_pass_when_the_population_changed(calc_project, 
         q = qualify_candidate(session, stability_reruns=0, coverage_reports={"candidate": session.workspace / "lcov.info"}).qualification
     finally:
         discard_session(session)
-    stage = next(s for s in q.stages if s.stage is QualificationStage.COVERAGE_AND_ORACLES)
+    stage = next(s for s in q.checks if s.check is QualificationCheck.COVERAGE_AND_ORACLES)
     assert stage.status is expected
 
 

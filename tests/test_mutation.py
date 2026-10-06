@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from assertiva.adapters.mutation import load_mutation_report
-from assertiva.candidate import DeltaState, QualificationStage, StageStatus
+from assertiva.candidate import DeltaState, QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 from assertiva.models import MutantStatus
 
@@ -130,7 +130,7 @@ def test_core_modules_do_not_branch_on_mutation_tools():
 # --- qualification -----------------------------------------------------------------
 
 def stage(q):
-    return next(s for s in q.stages if s.stage is QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS)
+    return next(s for s in q.checks if s.check is QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS)
 
 
 def delta(q, name):
@@ -236,7 +236,7 @@ def test_improve_cli_accepts_state_targeted_mutation_reports(calc_project, tmp_p
     capsys.readouterr()
     cli.main(["improve", str(calc_project), "--python", sys.executable, "--mutation-report", f"candidate={report}", "--output", "json"])
     payload = json.loads(capsys.readouterr().out)
-    stage = next(s for s in payload["candidate_qualification"]["stages"] if s["stage"] == "MUTATION_OR_NEGATIVE_CONTROLS")
+    stage = next(c for s in payload["candidate_qualification"]["stages"] for c in s["checks"] if c["check"] == "MUTATION_OR_NEGATIVE_CONTROLS")
     assert stage["status"] == "PASS"
     assert cli.main(["improve", str(calc_project), "--mutation-report", "elsewhere=x.json"]) == 2
     cli.main(["improve", str(calc_project), "--discard"])

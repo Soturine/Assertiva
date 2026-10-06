@@ -76,6 +76,16 @@ generic Assertiva policy
 
 Adapters can be written for any ecosystem. Portable formats and generic command preservation provide fallback when there is no first-party adapter.
 
+## Discovered, authorized, executed
+
+A check found in CI, hooks or project configuration is **discovered**, not safe to run. Assertiva keeps three states apart:
+
+- **discovered** — preserved with command, kind, gate and limitations;
+- **authorized** — recognized side-effect-free checks (lint, format, type check, static analysis, package/build) are reproducible in a disposable copy; anything else (migration, container, startup, health, unknown/custom) needs an explicit human authorization of that check id; deploy/publish checks are never executed;
+- **executed** — only then does the check produce evidence, and only in a disposable copy.
+
+Compound shell steps, expressions and working-directory steps are not reproduced. Allowed-failure checks keep their meaning; a matrix reproduced in one environment is partial evidence.
+
 ## Support claim
 
 Assertiva aims to be universal at the **model and extension architecture** level. Concrete native support is incremental and must be reported honestly. "Framework-neutral" must never be used to imply that every framework is already deeply understood.

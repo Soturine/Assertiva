@@ -83,7 +83,10 @@ Reports/artifacts should default to Assertiva-owned storage outside the audited 
 ### Driving `assertiva improve`
 
 1. `assertiva improve` measures the baseline and prints a candidate workspace. Write candidate changes **only there**.
-2. `assertiva improve` again qualifies the candidate. Optionally pass `--negative-controls <file.json>`: a list of `{"control_id", "path", "find", "replace", "claim", "tests"?}` deliberate behavior-breaking edits that the tests claiming `claim` must detect. They run only in disposable copies.
+2. `assertiva improve` again qualifies the candidate. Optionally pass:
+   - `--negative-controls <file.json>`: a list of `{"control_id", "path", "find", "replace", "claim", "tests"?}` deliberate behavior-breaking edits that the tests claiming `claim` must detect (run only in disposable copies);
+   - `--mutation-report baseline=<path>` / `candidate=<path>`: existing mutation-tool reports for each state (run the tool in the corresponding workspace; Assertiva ingests, it does not mutate);
+   - `--run-check <CHECK_ID>`: only when the human authorizes running a specific discovered delivery check (migration, container, custom command). Never authorize deploy/publish checks; Assertiva will not run them anyway.
 3. Show the report to the human. Never pass `--approve` on your own initiative: approval names specific change ids and belongs to the human.
 4. `--discard` drops the candidate without touching the project.
 
@@ -256,4 +259,4 @@ Core policy is framework/language/provider neutral. Adapters expose capabilities
 
 ## Current maturity
 
-M1 (Executable Assurance) is active. `assertiva audit` (runtime read-only, optional `--execute` in a disposable copy) and `assertiva improve` (isolated candidate, qualification stages, explicit approval, post-apply verification) are executable for the pytest / GitHub Actions / pre-commit reference adapters. Mutation-tool adapters, build/artifact and preview-deploy stages, other runners and CI providers, impact graphs, history and MCP remain roadmap work; see STATUS.md.
+M1 (Executable Assurance) is complete. `assertiva audit` and `assertiva improve` are executable end to end for the pytest / Python packaging / GitHub Actions / pre-commit reference adapters, with JUnit XML and mutation-report ingestion as portable evidence. Other runners and CI providers, impact graphs, history and MCP are M2/M3 work; see STATUS.md for exact claim boundaries.

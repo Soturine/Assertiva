@@ -64,6 +64,12 @@ Preserve runner-native semantics:
 - infrastructure/environment failure is ERROR/BLOCKED by default;
 - skip/abort/assumption/xfail is not PASS.
 
+## Executable signals
+
+Adapters report which parts of a failure contract a test observes, as portable dimensions: `ERROR_TYPE`, `MESSAGE`, `MACHINE_CODE`, `FIELD_OR_PATH`, `STRUCTURED_CONTEXT`, `PROTOCOL_STATUS`, `STATE_AFTER_REJECTION`, `ASYNC_OBSERVED`. Static dimensions are E3 signals: an assertion after a rejection is a state signal, not proof of rollback.
+
+Findings must be supported by the suite itself, not by a universal rule: a type-only check is flagged when other tests show that error carries a code or field; a missing post-rejection check is flagged when other tests practice it.
+
 ## Validation classes
 
 When relevant, include missing, null/empty, malformed, type mismatch, min/max boundaries, just-inside/exactly-at/just-outside boundaries, conflicting fields, duplicates/idempotency, unauthorized/forbidden, invalid state transition, stale/version conflict, dependency unavailable/timeout, malformed external payload and partial/concurrent failure.

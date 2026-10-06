@@ -30,16 +30,19 @@ The core is small and tool-neutral; tool knowledge lives in `assertiva/adapters/
 | Module | Owns |
 | --- | --- |
 | `workspace.py` | fingerprints, baseline, isolated candidate (worktree/copy), change set, approved apply, read-only guard, Assertiva-owned state location |
-| `evidence.py` | measuring one state in a disposable copy, negative controls, direction-aware metrics and state comparison |
-| `improve.py` | improve session and qualification stages |
-| `audit.py` | read-only audit over runner adapters and the Verification Surface |
+| `evidence.py` | measuring one state in a disposable copy, negative controls, attaching mutation reports, direction-aware metrics and state comparison |
+| `improve.py` | improve session, qualification stages, bounded stability reruns, stage timings |
+| `audit.py` | read-only audit over runner/artifact adapters, portable reports and the Verification Surface |
 | `report.py` | the single Assurance Report model and its HTML rendering |
 | `verification.py` | VerificationCheck/Surface and generic local-vs-delivery parity findings |
-| `candidate.py`, `models.py` | stage/metric/change and runner-evidence records |
-| `adapters/pytest_native.py` | native pytest collection/execution, coverage, static signals, CI-check reproduction |
-| `adapters/github_actions.py`, `adapters/pre_commit.py`, `adapters/commands.py` | declared CI steps, hooks and command classification |
+| `process.py` | bounded, non-interactive, timed subprocess execution and the execution trace |
+| `candidate.py`, `models.py` | stage/metric/change, runner, mutation, artifact and stability records |
+| `adapters/pytest_native.py`, `pytest_audit.py` | native pytest collection/execution, coverage, static oracle and failure-contract signals, CI-check reproduction |
+| `adapters/python_package.py` | wheel build, isolated install, import origin, tests against the artifact |
+| `adapters/mutation.py`, `adapters/junit.py` | portable mutation and test-result reports |
+| `adapters/github_actions.py`, `adapters/pre_commit.py`, `adapters/commands.py` | declared CI steps, hooks, command classification and reproduction plans |
 
-Adapter protocol, by capability: runner adapters expose `supports`, `run`/`collect`, `static_signals`, `static_audit` and `reproduction_args(check)`; surface adapters expose `supports` and `discover`. The core never branches on a tool name.
+Adapter protocol, by capability: runner adapters expose `supports`, `run`/`collect`, `static_signals`, `static_negative_paths`, `static_audit` and `reproduction_args(check)`; artifact adapters expose `supports` and `qualify`; surface adapters expose `supports` and `discover`; report adapters turn a file into normalized records. The core never branches on a tool name.
 
 ## TDD rule
 

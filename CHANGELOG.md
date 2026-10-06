@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0] — 2026-10-06 — M1 Executable Assurance closed
+
+### Added
+- Mutation report ingestion (mutation-testing-elements JSON, PIT XML, mutmut stats) next to negative controls; survivors fail qualification whatever the score; reports for other source are not used.
+- Built and installed wheel qualification: import origin checked, tests run against the artifact with source packages removed.
+- Declared lifecycle checks with discovered / authorized / executed separation (`improve --run-check`); deploy/publish never runs.
+- Negative-path depth: failure-contract dimensions per test and evidence-supported findings.
+- Bounded stability reruns with first-failure preservation; execution trace with stage/command timing and timeouts.
+- Portable JUnit XML evidence (`audit --junit-xml`); the summarizer script shares the parser.
+- Report sections for negative paths, mutation, artifact, stability, run provenance and remaining unknowns; distinct styles for every status.
+- End-to-end adversarial qualification tests (real improvement vs. more tests with worse evidence).
+
+### Changed
+- `ERROR_STATUS_ONLY_SIGNAL` no longer fires when the error body's code/field is asserted.
+- Linters/type checkers/package builds discovered in CI are now reproduced in the candidate copy; unrecognized commands are listed but not run.
+- Durations are measured with a high-resolution clock (Windows `monotonic()` ticks in ~15.6 ms steps).
+- Audit phases are labelled in the execution trace (for example `current:pytest-native`, `current:python-package`).
+- Fast feedback is separated from full qualification: tests are marked `integration`/`artifact`, a guard keeps the fast suite fast, per-commit CI runs in ~2 min, and the full self-dogfood runs on demand and for `v*` tags. Artifact environments no longer bootstrap pip per venv and capability probes are cached per interpreter. Full suite 418.5 s sequential → 141 s parallel.
+
 ## [0.3.0] — 2026-10-05
 
 ### Added

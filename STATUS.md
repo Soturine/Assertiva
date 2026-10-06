@@ -1,59 +1,77 @@
 # Status
 
-## Current milestone: M1 — Executable Assurance (active)
+## Current milestone: M1 — Executable Assurance ✅ (closed 2026-10-06)
 
-M0 (foundation and contracts) is complete. M1 turns those contracts into an executable core behind two commands: `assertiva audit` and `assertiva improve`. Python/pytest, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**.
+M0 (foundation and contracts) and M1 (executable audit + improve vertical slice) are complete. Next: M2 — Cross-stack Intelligence (not started).
+
+Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations; it never branches on a tool name (a test enforces this for mutation tools).
 
 ## IMPLEMENTED (executable, tested)
 
-### Audit
-- `assertiva audit` runs inside a runtime read-only guard: a fingerprint of every project file (including caches and ignored files) is compared before and after; any change exits with code 3.
-- Tests execute only with `--execute`, always in a disposable copy; reports and state go to `ASSERTIVA_HOME` (default `~/.assertiva`), which must be outside the project.
-- Static (AST) pytest inventory, oracle/negative-path signals and coverage.py JSON ingestion; native pytest evidence with `--execute`.
-- Verification Surface discovery: GitHub Actions steps and pre-commit hooks become `VerificationCheck`s (test, lint, format, typecheck, package, security, dependency, migration, container, unknown/custom...), keeping `continue-on-error`, conditions and matrices. Unrecognized commands/actions stay UNKNOWN.
-- Findings include `LOCAL_CHECK_NOT_OBSERVED_IN_CI`, `CI_ONLY_CHECK`, `UNCLASSIFIED_VERIFICATION`, `NO_DELIVERY_PIPELINE_OBSERVED`, `NATIVE_COLLECTION_ERRORS`, `NATIVE_TESTS_FAILING`, `STATIC_INVENTORY_DIVERGES_FROM_NATIVE` and the earlier static findings.
-- Unknown toolchains report `UNKNOWN`, never "0 tests".
+### Audit — `assertiva audit`
+- Runtime read-only guard: every project file (including caches and ignored files) is fingerprinted before and after; any change exits with code 3.
+- Static (AST) pytest inventory and oracle/negative-path signals; coverage.py JSON; tests execute only with `--execute`, always in a disposable copy.
+- With `--execute`: native pytest evidence plus built/installed artifact qualification.
+- `--mutation-report PATH` and `--junit-xml PATH` ingest existing tool output as portable evidence.
+- Verification Surface from GitHub Actions and pre-commit with local-vs-CI parity findings; unknown commands/actions stay UNKNOWN.
+- Reports, state and traces live in `ASSERTIVA_HOME` (default `~/.assertiva`), which must be outside the project.
 
-### Improve
-- One command with internal phases: start (baseline measured in an isolated copy + candidate workspace) → qualify → `--approve <change ids>` → apply → post-apply verification. `--discard` drops the session.
-- Candidate workspace: detached Git worktree for a clean repository root, otherwise a copy; verified against the baseline fingerprint (including uncommitted work).
-- Change set from baseline vs candidate: ADD / MODIFY / RETIRE_CANDIDATE with original and candidate fingerprints and a reviewable diff. Originals are never commented out or deleted without approval.
-- Apply requires explicit change ids, refuses atomically if the project file or the candidate changed since qualification, and verifies the applied files and the applied project's native run.
-- Qualification stages, each PASS / FAIL / BLOCKED / NOT_RUN / UNKNOWN:
-  - STATIC_AND_DISCOVERY and CANDIDATE_TESTS from native collection/execution;
-  - ORIGINAL_REGRESSION: unchanged original tests rerun against the candidate (a weakened test cannot hide a production regression);
-  - COVERAGE_AND_ORACLES: line/branch coverage (when coverage.py exists in the target interpreter) plus weak-oracle deltas;
-  - NEGATIVE_PATHS: static signals only, so it is never PASS yet;
-  - MUTATION_OR_NEGATIVE_CONTROLS: deliberate find/replace negative controls run on baseline and candidate (KILLED / SURVIVED / INVALID);
-  - PIPELINE_EQUIVALENT: reproduces delivery checks an adapter understands; partial reproduction is UNKNOWN;
-  - BUILD_AND_ARTIFACT, PREVIEW_DEPLOY: NOT_RUN; STABILITY_AND_COST: UNKNOWN (single run).
-- Metric deltas with explicit direction (HIGHER/LOWER_IS_BETTER, CONTEXTUAL, INFORMATIONAL); test count is contextual; runtime is directional only when the same invocations ran.
+### Improve — `assertiva improve`
+- One command with internal phases: start (baseline measured in an isolated copy + candidate workspace) → qualify → `--approve <change ids>` → apply → post-apply verification; `--discard` drops the session.
+- Candidate workspace: detached Git worktree for a clean repository root, otherwise a copy; verified against the baseline fingerprint, including uncommitted work.
+- Change set ADD / MODIFY / RETIRE_CANDIDATE with fingerprints and diffs; originals are never commented out or deleted without approval; apply refuses atomically when the project file or the candidate changed since qualification.
+- Qualification stages (PASS / FAIL / BLOCKED / NOT_RUN / UNKNOWN; unavailable is never PASS):
+  - STATIC_AND_DISCOVERY, CANDIDATE_TESTS from native collection/execution;
+  - ORIGINAL_REGRESSION: unchanged original tests rerun against the candidate;
+  - COVERAGE_AND_ORACLES: line/branch coverage (when coverage.py is in the target interpreter) and weak-oracle deltas;
+  - NEGATIVE_PATHS: static failure-contract dimensions (E3) combined with runtime outcomes; fails when the candidate weakens negative-path evidence;
+  - MUTATION_OR_NEGATIVE_CONTROLS: deliberate negative controls (run on baseline and candidate) and ingested mutation reports (`--mutation-report baseline=…|candidate=…`), side by side; any surviving or uncovered mutant fails the stage whatever the score; reports produced for other source are not used;
+  - PIPELINE_EQUIVALENT: DISCOVERED → AUTHORIZED → EXECUTED. Native runner checks and recognized side-effect-free checks (lint, format, typecheck, static analysis, package/build) run in the disposable copy; migration/container/startup/health/unknown commands only with `--run-check CHECK_ID`; deploy/publish never; compound shell steps are not reproduced; allowed-failure keeps its meaning; a matrix reproduced in one environment is partial;
+  - BUILD_AND_ARTIFACT: wheel built from a copy, installed with `--no-deps` into a fresh environment, imports checked to resolve to the artifact, tests run against it with the source packages removed; reports the exact wheel and sha256;
+  - PREVIEW_DEPLOY: NOT_RUN (no authorized non-production adapter; production is never used);
+  - STABILITY_AND_COST: bounded reruns (≤2) of touched and failing invocations (≤50); first outcome kept; STABLE / FLAKY_SIGNAL / CONSISTENT_FAILURE / INSUFFICIENT_EVIDENCE plus the runtime delta.
+- Metric deltas with explicit direction; test count is contextual; runtime and mutation counts are directional only when comparable (same invocations / same number of evaluated mutants).
 
-### Native pytest adapter
-- Recording plugin loaded from outside the tree; no bytecode or cache is written to the measured directory and stale in-tree bytecode is never loaded.
-- Invocation ids, parameter ids, markers, `-k`/`-m`/path filters (deselected recorded), skip / xfail / xpass / fail / error, collection errors, custom collected items (with limitation), declaration → materialization for inherited tests (including cross-module), coverage via coverage.py.
-- No tests collected → UNKNOWN; runner unavailable → BLOCKED.
+### Adapters
+- **pytest (native + static):** invocation and parameter ids, markers, `-k`/`-m`/path filters (deselection recorded), skip / xfail / xpass / fail / error, collection errors, custom items, inherited and cross-module materialization, coverage, failure-contract dimensions (error type, message, machine code, field/path, structured context, protocol status, state after rejection, awaited async failure), unobserved async tasks. No bytecode or cache written into measured trees; stale in-tree bytecode never loaded.
+- **Python packaging:** wheel build (local backend without isolation when importable, otherwise isolated), install, import origin, tests against the artifact, files in packaged directories missing from the wheel.
+- **Mutation reports:** mutation-testing-elements JSON (Stryker family), PIT `mutations.xml`, mutmut CI stats (aggregate only). Native statuses preserved.
+- **JUnit XML:** nested suites, duplicates, failures/errors/skips, properties, timestamps, bounded output; declared format limits.
+- **GitHub Actions, pre-commit, command classification** with reproduction plans.
 
 ### Report
-- One report model (`schemas/assurance-report.schema.json`) for audit (CURRENT + findings + recommendations + unknowns) and improve (BASELINE vs CANDIDATE, then APPLIED only after approval).
-- Self-contained HTML: semantic landmarks, keyboard-accessible native controls, light/dark, severity/kind filters, expandable findings and diffs, chart only from measured pairs with the metrics table as its equivalent, Verification Surface, qualification stages, Evidence Delta and "What does green prove?".
+- One model (`schemas/assurance-report.schema.json`): audit = CURRENT + findings + recommendations + remaining unknowns; improve = BASELINE vs CANDIDATE (+ APPLIED only after approval).
+- Self-contained accessible HTML: landmarks, native keyboard controls, light/dark, filters, expandable findings and diffs, chart only from measured pairs with the metrics table as its equivalent, sections for qualification + stability, negative paths, mutation, artifact, runs/provenance (executed vs ingested), Verification Surface, Evidence Delta, "What does green prove?" and remaining unknowns. PASS / FAIL / BLOCKED / UNKNOWN / NOT_RUN each have a distinct style.
 
-### Dogfood
-- CI runs the validator and the suite, builds the wheel, smoke-runs the installed CLI from outside the tree, and audits this repository with `--execute`, failing if the working tree changed or the native run is not PASS.
+### Execution provenance
+- Every subprocess runs non-interactively with a timeout and bounded output; each stage and command writes start/end events (stage such as `current:pytest-native`, command, start, timeout, return code, duration, timeout classification) to a trace under `ASSERTIVA_HOME` as it happens; the report links the trace.
 
-## SPECIFIED (documented contracts, not yet executable)
-- Mutation-tool adapters (mutmut, Cosmic Ray, Stryker, PIT, Stryker.NET) feeding the negative-control stage.
-- Rejection state-effect/rollback evidence for negative paths.
-- Build/package/startup/health qualification and source-tree vs artifact parity.
+### Fast feedback ≠ full qualification
+- Tests are marked by what they run: unmarked = fast/core, `integration` = real tooling in subprocesses, `artifact` = wheel builds. The three groups add up to the whole suite (88 + 68 + 18 = 174); a conftest guard fails any unmarked test that becomes slow (>2 s including setup).
+- Per-commit CI (~2 min): validator, fast suite, integration + artifact suites in parallel, wheel build, installed-CLI smoke, and the read-only invariant through the installed CLI (`audit --execute` and an `improve` qualification) on a small generated package.
+- Full self-dogfood (on demand / `v*` tags): the installed wheel audits this repository with `--execute`, runs the suite natively and again against Assertiva's own installed wheel, and must leave the tree unchanged. Last run (2026-10-06, `9169cf7`): 174 invocations PASS, wheel build/install/import/tests PASS, 4m25s.
+
+| | Before (2026-10-05) | After (2026-10-06) |
+| --- | --- | --- |
+| Full suite, local | 170 tests, 418.5 s sequential | 174 tests, 141 s parallel |
+| Fast/core suite | — | 88 tests, ~5 s local, 1.8 s CI |
+| Artifact tests, sequential | 195.8 s | 139.1 s (2 more tests) |
+| Per-commit CI | 8–16 min (full self-dogfood every commit) | 1m51s |
+
+## SPECIFIED (documented, not executable)
+- Running mutation tools (Assertiva only ingests their reports); Cosmic Ray ingestion (its `cr-xml` cannot distinguish pending from killed).
+- sdist verification; startup/health/migration checks beyond explicitly authorized declared commands.
+- Rollback / forbidden side-effect / idempotency evidence beyond static post-rejection assertions.
+- JUnit XML and mutation reports as *improve* candidate-state evidence for non-native runners (audit only today).
 - Authorized remote CI execution and non-production preview deployment.
-- Flake/retry/order-dependence measurement.
-- Semantic UI/browser, harness fidelity, fixtures/doubles analysis beyond the documented model.
+- Order dependence, historical flakiness and failure clustering.
 
 ## PLANNED
-See [ROADMAP.md](ROADMAP.md): other runners (Jest/Vitest, Playwright, JUnit, .NET), Azure Pipelines/GitLab CI/Jenkins, impact graph, history, MCP, benchmarks.
+See [ROADMAP.md](ROADMAP.md): M2 cross-stack adapters (Jest/Vitest, Playwright, JUnit/Gradle/Maven, .NET, Go/Rust), Azure Pipelines/GitLab/Jenkins, impact graph, history; M3 stable CLI/MCP, evidence store, benchmarks.
 
 ## Claim boundary
-- Static inventory is not native collection; the GitHub Actions adapter reads declared configuration (E2), not run evidence, and does not evaluate expressions, reusable workflows or branch protection.
-- Pipeline-equivalent reproduction covers only checks an adapter understands, in the local environment, not CI matrices.
-- Coverage scope follows the project's coverage configuration (or coverage.py defaults).
-- Negative controls are provided by the caller; Assertiva does not yet generate mutants.
+- Static inventory and negative-path dimensions are E3 signals, not runtime proof; a post-rejection assertion is not rollback proof.
+- CI configuration is declared evidence (E2): Assertiva does not evaluate expressions, reusable workflows or branch protection, and reproduces only checks it understands, in the local environment.
+- Ingested reports (mutation, JUnit) are tied to the measured state only when they carry source content; otherwise the limitation is stated.
+- Stability verdicts mean "no instability observed in N executions", not "not flaky".
+- A ~55-minute local execution seen on 2026-10-05 was not reproduced; the per-command trace exists so a recurrence can be diagnosed rather than guessed.

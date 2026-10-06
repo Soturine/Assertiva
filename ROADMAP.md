@@ -15,8 +15,8 @@ TDD rule for every item: reproduce the false-green or evidence gap first, then i
 - [x] schemas, examples, eval catalog, JUnit summarizer, repository validator
 - [x] first static pytest inventory, bounded CI scope gaps, coverage.py JSON, smoke/weak-oracle findings
 
-## M1 — Executable Assurance (active)
-Audit and improve as a working vertical slice.
+## M1 — Executable Assurance ✅
+Audit and improve as a working, dogfooded vertical slice.
 
 - [x] runtime-enforced read-only audit (tree fingerprint guard) with artifacts outside the project
 - [x] isolated candidate workspace (Git worktree or copy) verified against the baseline
@@ -25,22 +25,24 @@ Audit and improve as a working vertical slice.
 - [x] candidate qualification stages with honest NOT_RUN / UNKNOWN / BLOCKED
 - [x] original regression against the candidate
 - [x] deliberate negative controls on baseline and candidate
+- [x] mutation report ingestion: mutation-testing-elements JSON (Stryker family), PIT XML, mutmut stats
 - [x] direction-aware baseline vs candidate deltas without a composite score
 - [x] native pytest collection/execution: ids, parameters, markers, filters, skip/xfail/xpass, collection errors, custom items, inherited materialization
 - [x] coverage.py line/branch measurement in qualification
 - [x] Verification Surface discovery from GitHub Actions and pre-commit; local-vs-CI parity findings
-- [x] pipeline-equivalent reproduction of adapter-understood delivery checks
+- [x] pipeline-equivalent reproduction with discovered / authorized / executed separation
+- [x] built and installed wheel qualification (import origin, tests against the artifact)
+- [x] negative-path depth: failure-contract dimensions + evidence-supported findings
+- [x] bounded stability signal with first-failure preservation
+- [x] JUnit XML portable result fallback (audit)
 - [x] Assurance Report model + accessible self-contained HTML
-- [x] CI dogfood: installed wheel audits this repository with native execution
-- [ ] mutation report ingestion (Stryker mutation-testing-elements JSON, PIT XML, mutmut / Cosmic Ray)
-- [ ] build/package/installed-artifact stage (source tree vs wheel/sdist parity)
-- [ ] startup/health/migration/container stage via declared project commands
-- [ ] rerun-based stability signal (first failure preserved)
-- [ ] expected-error depth: structured error fields and state after rejection
-- [ ] JUnit XML / portable report ingestion as a generic runner fallback
-- [ ] final visual design of the HTML report (after the visual reference is provided)
+- [x] execution trace with stage/command timing and timeout provenance
+- [x] CI dogfood: installed wheel audits this repository, runs it natively and qualifies its own wheel (on demand / release tags)
+- [x] fast feedback separated from full qualification: test markers, fast-suite cost guard, parallel per-commit CI, fixture-based installed-CLI invariant
 
-## M2 — Cross-stack Intelligence
+Deferred out of M1 (tracked in STATUS as SPECIFIED): final visual design of the HTML report (waiting for the visual reference), sdist verification, Cosmic Ray, JUnit/mutation evidence as improve candidate state for non-native runners, order dependence.
+
+## M2 — Cross-stack Intelligence (next)
 - [ ] runner adapters: Jest/Vitest, Playwright (+ semantic locator/accessibility evidence), JUnit/Gradle/Maven, .NET, Go/Rust
 - [ ] CI adapters: Azure Pipelines, GitLab CI, Jenkins / generic command graph
 - [ ] LCOV/Cobertura/JaCoCo coverage ingestion

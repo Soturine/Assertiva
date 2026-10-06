@@ -124,32 +124,34 @@ See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
 ## Current status
 
-Assertiva is in **M1 — Executable Assurance (active)**. `audit` and `improve` work end to end for the first reference adapters (pytest, GitHub Actions, pre-commit); other ecosystems report UNKNOWN rather than "0 tests".
+**M1 — Executable Assurance is complete.** `audit` and `improve` work end to end for the reference adapters (pytest, Python packaging, GitHub Actions, pre-commit) with portable fallbacks (JUnit XML, mutation reports). Other ecosystems report UNKNOWN rather than "0 tests". Next: M2 — Cross-stack Intelligence.
 
 ```bash
 python -m pip install -e .
 
-# Read-only audit (static); add --execute to run tests natively in a disposable copy.
+# Read-only audit (static); --execute also runs tests and qualifies the built artifact, in disposable copies.
 assertiva audit .
-assertiva audit . --execute --coverage-json coverage.json --output json
+assertiva audit . --execute --coverage-json coverage.json --mutation-report mutation.json --junit-xml results.xml
 
 # Improve: one command, called again at each step.
 assertiva improve .                      # measure baseline, create the candidate workspace
 #   ...write candidate changes in the printed workspace...
-assertiva improve . --negative-controls controls.json   # qualify; project still untouched
+assertiva improve . --negative-controls controls.json \
+                    --mutation-report baseline=base.json --mutation-report candidate=cand.json \
+                    --run-check <CHECK_ID>               # qualify; the project is still untouched
 assertiva improve . --approve tests/test_new.py          # apply only the approved changes, then verify
 assertiva improve . --discard                            # or drop the candidate
 ```
 
-Reports (JSON + self-contained HTML) are written under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project. `--python` selects the project's interpreter.
+Developing Assertiva itself: `pytest -m "not integration and not artifact"` gives fast feedback (~5 s); `pytest -n auto` runs everything (all tests still run in CI on every commit).
+
+Reports (JSON + self-contained HTML) and execution traces are written under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project. `--python` selects the project's interpreter.
 
 What runs today:
 - runtime-enforced read-only audit (exit code 3 if any project file changed);
-- isolated candidate (Git worktree or copy) with ADD / MODIFY / RETIRE_CANDIDATE change sets, explicit approval by change id, stale-baseline refusal and post-apply verification;
-- qualification stages including original regression against the candidate, coverage/oracle deltas, deliberate negative controls and pipeline-equivalent reproduction; unavailable stages are NOT_RUN/UNKNOWN, never PASS;
-- native pytest evidence (invocations, parameters, markers, skip/xfail/xpass, collection errors, inherited materialization, coverage);
-- Verification Surface from GitHub Actions and pre-commit with local-vs-CI parity findings;
-- one Assurance Report model with baseline/candidate/applied states and "What does green prove?".
+- isolated candidate (Git worktree or copy), ADD / MODIFY / RETIRE_CANDIDATE change sets, explicit approval by change id, stale-baseline refusal, post-apply verification;
+- ten qualification stages: native discovery and candidate tests, original regression against the candidate, coverage/oracle deltas, negative-path depth, negative controls and ingested mutation reports, pipeline-equivalent reproduction (discovered → authorized → executed), built/installed wheel qualification, preview deploy (never production; NOT_RUN without an adapter) and bounded stability;
+- one Assurance Report with baseline/candidate/applied states, Evidence Delta, remaining unknowns and "What does green prove?" — no aggregate score.
 
 See [STATUS.md](STATUS.md) for the IMPLEMENTED / SPECIFIED / PLANNED split, [ROADMAP.md](ROADMAP.md), [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md).
 

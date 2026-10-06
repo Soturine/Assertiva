@@ -42,15 +42,42 @@ Audit and improve as a working, dogfooded vertical slice.
 
 Deferred out of M1 (tracked in STATUS as SPECIFIED): final visual design of the HTML report (waiting for the visual reference), sdist verification, Cosmic Ray, JUnit/mutation evidence as improve candidate state for non-native runners, order dependence.
 
-## M2 — Cross-stack Intelligence (next)
-- [ ] runner adapters: Jest/Vitest, Playwright (+ semantic locator/accessibility evidence), JUnit/Gradle/Maven, .NET, Go/Rust
-- [ ] CI adapters: Azure Pipelines, GitLab CI, Jenkins / generic command graph
-- [ ] LCOV/Cobertura/JaCoCo coverage ingestion
-- [ ] runtime/OS/browser/database matrix gaps; tested vs deployed artifact lineage
-- [ ] change impact: diff + symbols, dependency and composition/lifecycle graph, conservative widening, monorepo affected set
-- [ ] history: flake, duration/cost, failure fingerprinting and clustering, E2E stage mapping
-- [ ] shared-oracle concentration, redundancy, mock-away and snapshot provenance analysis
-- [ ] authorized remote CI execution and non-production preview deployment as adapter capabilities
+## M2 — Scale & Cross-Stack Intelligence (active)
+Make the proven model scale, generalize beyond Python and select evidence without fabricating confidence. Internal areas (not separate milestones): scale hardening, cross-stack adapters, impact and selection, history, delivery.
+
+Scale and hardening
+- [x] execution budget: bounded nested qualification depth, same-target recursion refusal, equivalent-evidence reuse, recorded reasons
+- [ ] filesystem/path boundaries (symlinks, junctions, escapes, nested repos, case collisions)
+- [ ] transactional approved apply with rollback
+- [ ] artifact fidelity vs dependency closure (clean install)
+- [ ] run-scoped runtime capability evidence
+- [ ] CI reproducibility and Python 3.11 compatibility
+
+Cross-stack
+- [ ] cross-stack core contract tests (fake runner/coverage/artifact adapters)
+- [ ] first JavaScript/TypeScript test adapter
+- [ ] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
+- [ ] Playwright semantic browser evidence (declared / selected / executed projects)
+- [ ] Java test evidence (JUnit Platform, Surefire/Failsafe, Gradle, JaCoCo)
+- [ ] .NET / Go / Rust, only if the core is still simple after the above
+
+Impact and selection
+- [ ] revision-scoped test impact graph with evidence tiers
+- [ ] test selection with conservative widening (never "no impact found = nothing to run")
+- [ ] monorepo affected sets
+
+History
+- [ ] minimal revision-aware history store
+- [ ] historical flake / order / duration intelligence
+- [ ] deterministic failure fingerprinting and clustering
+
+Delivery
+- [ ] Azure Pipelines, GitLab CI, Jenkins verification discovery with matrix gaps (declared / selected / executed / deployed)
+- [ ] tested vs published vs deployed artifact lineage
+- [ ] shared-oracle concentration, redundancy and mock-away review candidates
+
+Dogfood
+- [ ] matched full-suite vs selected+widening experiments with known injected defects (miss rate first)
 
 ## M3 — Productization & Empirical Validation
 - [ ] stable CLI contract and project policy/config

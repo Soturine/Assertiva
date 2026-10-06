@@ -18,6 +18,7 @@ from .models import (
     DETECTED,
     ArtifactCheck,
     ArtifactEvidence,
+    BudgetDecision,
     CoverageSummary,
     MutantRecord,
     MutantStatus,
@@ -26,7 +27,7 @@ from .models import (
     RunEvidence,
     TestInvocation,
 )
-from .process import traced_stage
+from .process import execution_refusal, traced_stage
 from .workspace import snapshot
 
 
@@ -66,6 +67,7 @@ class StateEvidence:
     limitations: list[str] = field(default_factory=list)
     mutation: list[MutationRun] = field(default_factory=list)
     artifacts: list[ArtifactEvidence] = field(default_factory=list)
+    budget: list[BudgetDecision] = field(default_factory=list)
     negative_paths: dict[str, list[str]] = field(default_factory=dict)  # test id -> dimensions (E3)
 
     def invocation_ids(self) -> set[str]:
@@ -134,12 +136,19 @@ def measure(
     python: str | None = None,
     negative_controls: list[NegativeControl] | tuple = (),
     artifacts: bool = True,
+    reason: str = "state measurement",
 ) -> StateEvidence:
     source = Path(source)
     adapters = runner_adapters(source, python)
     state = StateEvidence(label=label, observed_in=observed_in)
     if not adapters:
         state.limitations.append("no executable runner adapter recognized this project; test evidence is UNKNOWN")
+    refusal = execution_refusal()
+    state.budget.append(BudgetDecision(
+        "tests",
+        "BLOCKED" if refusal and adapters else ("EXECUTED" if adapters else "NOT_RUN"),
+        refusal if refusal and adapters else (reason if adapters else "no runner adapter supports this project"),
+    ))
     copy = snapshot(source)
     try:
         for adapter in adapters:
@@ -155,7 +164,13 @@ def measure(
     if artifacts:
         for adapter in artifact_adapters(source, python):
             with traced_stage(f"{label}:{adapter.adapter_id}"):
-                state.artifacts.append(adapter.qualify(source))
+                evidence = adapter.qualify(source)
+            state.artifacts.append(evidence)
+            blocked = evidence.status is StageStatus.BLOCKED and evidence.limitations
+            state.budget.append(BudgetDecision(
+                f"artifact:{adapter.adapter_id}", "BLOCKED" if blocked else "EXECUTED",
+                evidence.limitations[0] if blocked else f"{adapter.adapter_id} builds a deliverable for this project",
+            ))
     return state
 
 
@@ -280,6 +295,7 @@ def state_from_dict(data: dict) -> StateEvidence:
         ],
         limitations=list(data["limitations"]),
         negative_paths={k: list(v) for k, v in data.get("negative_paths", {}).items()},
+        budget=[BudgetDecision(**d) for d in data.get("budget", [])],
         mutation=[
             MutationRun(**{
                 **m,

@@ -44,6 +44,10 @@ The core is small and tool-neutral; tool knowledge lives in `assertiva/adapters/
 
 Adapter protocol, by capability: runner adapters expose `supports`, `run`/`collect`, `static_signals`, `static_negative_paths`, `static_audit` and `reproduction_args(check)`; artifact adapters expose `supports` and `qualify`; surface adapters expose `supports` and `discover`; report adapters turn a file into normalized records. The core never branches on a tool name.
 
+## Execution budget
+
+Expensive evidence is produced only when requested or needed. Every child process inherits a nesting depth and project code is not executed beyond depth 2; an outer run marks the target it qualifies so nested runs cannot qualify it again; equivalent evidence (as judged by the adapter) is reused instead of re-executed. Every decision is recorded as EXECUTED / REUSED / NOT_RUN / BLOCKED with a reason, and a refusal is never a PASS.
+
 ## TDD rule
 
 Every new capability should begin with an executable fixture/reproduction of a false-green or evidence gap, then implementation.

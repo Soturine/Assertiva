@@ -20,7 +20,7 @@ from pathlib import Path
 
 from assertiva.candidate import StageStatus
 from assertiva.models import ArtifactCheck, ArtifactEvidence
-from assertiva.process import CommandResult, module_available, run_command
+from assertiva.process import CommandResult, active_target, execution_refusal, is_active, module_available, run_command
 from assertiva.verification import SupportLevel
 from assertiva.workspace import project_files, snapshot
 
@@ -103,8 +103,23 @@ class PythonPackageAdapter:
         backend = (_pyproject(root).get("build-system") or {}).get("build-backend", "setuptools.build_meta:__legacy__")
         return module_available(self.python, backend.split(":")[0].split(".")[0])
 
+    def identity(self, root: Path) -> str:
+        project = _pyproject(Path(root)).get("project") or {}
+        return f"{project.get('name') or Path(root).resolve().name}=={project.get('version') or '?'}"
+
     def qualify(self, root: str | Path) -> ArtifactEvidence:
         root = Path(root)
+        identity = self.identity(root)
+        refusal = execution_refusal() or (
+            f"recursive artifact qualification of {identity} refused: an outer run is already qualifying it"
+            if is_active("artifact", identity) else None
+        )
+        if refusal:
+            return ArtifactEvidence(adapter_id=self.adapter_id, kind="wheel", status=StageStatus.BLOCKED, limitations=[refusal])
+        with active_target("artifact", identity):
+            return self._qualify(root)
+
+    def _qualify(self, root: Path) -> ArtifactEvidence:
         evidence = ArtifactEvidence(adapter_id=self.adapter_id, kind="wheel", status=StageStatus.PASS)
         evidence.limitations.append("only the wheel was built and verified; the sdist was not")
         with tempfile.TemporaryDirectory(prefix="assertiva-artifact-") as tmp:

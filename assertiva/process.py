@@ -77,6 +77,52 @@ class CommandResult:
         return f"exit {self.returncode} in {self.duration_s}s" + (": " + " | ".join(tail) if tail and self.returncode else "")
 
 
+# --- execution budget ------------------------------------------------------------------
+# Every child process inherits depth + 1. Executing project code is refused at MAX_DEPTH:
+# depth 0 (a user run) may run project tests (depth 1) whose own tests may qualify small
+# fixtures (depth 2); anything deeper is self-qualification amplifying cost.
+MAX_DEPTH = 2
+DEPTH_ENV = "ASSERTIVA_DEPTH"
+TARGETS_ENV = "ASSERTIVA_ACTIVE_TARGETS"
+
+
+def current_depth() -> int:
+    try:
+        return max(int(os.environ.get(DEPTH_ENV, "0")), 0)
+    except ValueError:
+        return MAX_DEPTH  # unreadable: assume the budget is spent rather than unlimited
+
+
+def execution_refusal() -> str | None:
+    depth = current_depth()
+    if depth >= MAX_DEPTH:
+        return f"execution budget: nested Assertiva depth {depth} reached the limit of {MAX_DEPTH}; project code was not executed"
+    return None
+
+
+def _targets() -> list[str]:
+    return [t for t in os.environ.get(TARGETS_ENV, "").split("|") if t]
+
+
+def is_active(kind: str, identity: str) -> bool:
+    """Whether an outer run is already producing this kind of evidence for this target."""
+    return f"{kind}:{identity}" in _targets()
+
+
+@contextmanager
+def active_target(kind: str, identity: str):
+    """Mark a target as being qualified so nested runs (child processes) can detect recursion."""
+    previous = os.environ.get(TARGETS_ENV)
+    os.environ[TARGETS_ENV] = "|".join([*_targets(), f"{kind}:{identity}"])
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(TARGETS_ENV, None)
+        else:
+            os.environ[TARGETS_ENV] = previous
+
+
 _MODULES: dict[tuple[str, str], bool] = {}
 
 
@@ -95,6 +141,10 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
         command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
     )
     trace("command_start", command=result.command, cwd=result.cwd, timeout_s=timeout_s)
+    env = dict(os.environ if env is None else env)
+    env[DEPTH_ENV] = str(current_depth() + 1)
+    if os.environ.get(TARGETS_ENV):
+        env[TARGETS_ENV] = os.environ[TARGETS_ENV]
     try:
         completed = subprocess.run(
             result.command, cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",

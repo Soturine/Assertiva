@@ -14,8 +14,8 @@ from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label
 from .candidate import StageStatus
-from .models import Finding, MutantStatus, Outcome
-from .report import audit_model
+from .models import BudgetDecision, Finding, MutantStatus, Outcome
+from .report import audit_model, execution_budget
 from .verification import discover_surface, surface_findings
 from .workspace import capture_baseline, read_only_guard
 
@@ -119,9 +119,11 @@ def run_audit(
             static_total += len(static.tests) + len(static.materializations)
             limitations.append(f"{adapter.adapter_id}: static inventory is bounded AST analysis, not native collection")
         if execute and adapters:
-            current = measure(root, "current", "isolated-project-copy", python)
+            current = measure(root, "current", "isolated-project-copy", python, reason="requested: audit --execute")
         else:
             current = StateEvidence("current", "static-analysis")
+            not_requested = "not requested: fast static feedback; audit --execute runs tests and artifact checks"
+            current.budget += [BudgetDecision("tests", "NOT_RUN", not_requested), BudgetDecision("artifact", "NOT_RUN", not_requested)]
             for adapter in adapters:
                 current.static.update(adapter.static_signals(root))
             if adapters:
@@ -137,4 +139,6 @@ def run_audit(
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)
-    return audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
+    report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
+    report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
+    return report

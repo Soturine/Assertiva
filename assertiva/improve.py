@@ -40,7 +40,7 @@ from .evidence import (
     state_from_dict,
     to_jsonable,
 )
-from .models import MutantStatus, Outcome, StabilityEvidence, StabilityRecord
+from .models import BudgetDecision, MutantStatus, Outcome, StabilityEvidence, StabilityRecord
 from .process import run_command, traced_stage
 from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
@@ -87,6 +87,7 @@ class QualificationResult:
     baseline_controls: list[NegativeControlResult] = field(default_factory=list)
     stability: StabilityEvidence = field(default_factory=StabilityEvidence)
     timings: list[dict] = field(default_factory=list)
+    budget: list[BudgetDecision] = field(default_factory=list)
 
 
 @dataclass
@@ -121,7 +122,7 @@ def start_improve(root: str | Path, python: str | None = None) -> ImproveSession
         baseline = capture_baseline(root)
         workspace = create_workspace(baseline)
         baseline_copy = snapshot(root, directory / "baseline")
-        baseline_evidence = measure(baseline_copy, "baseline", "isolated-baseline-copy", python)
+        baseline_evidence = measure(baseline_copy, "baseline", "isolated-baseline-copy", python, reason="baseline for improve")
     session = ImproveSession(root, directory, baseline, workspace, baseline_copy, python, baseline_evidence)
     session.save()
     return session
@@ -325,7 +326,7 @@ def _run_declared(argv: tuple[str, ...], copy: Path, python: str | None) -> tupl
     return (StageStatus.PASS if result.ok else StageStatus.FAIL), result.summary()
 
 
-def _pipeline_stage(session: ImproveSession, authorized: set[str]) -> QualificationStageResult:
+def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: StateEvidence, budget: list) -> QualificationStageResult:
     """Reproduce the candidate's own delivery checks: DISCOVERED -> AUTHORIZED -> EXECUTED."""
     stage = QualificationStage.PIPELINE_EQUIVALENT
     delivery = discover_surface(session.workspace).by_origin(VerificationOrigin.CI)
@@ -340,9 +341,14 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str]) -> Qualificat
         for check in delivery:
             label = f"{check.command or check.tool or check.check_id} [{check.kind.value}]"
             runner = next(((a, args) for a in adapters if (args := a.reproduction_args(check)) is not None), None)
-            if runner:
+            measured = next((r for r in candidate.runs if runner and r.adapter_id == runner[0].adapter_id), None)
+            if runner and measured and runner[0].equivalent_to_default(runner[1]):
+                status, detail = measured.status, f"reused equivalent candidate run ({len(measured.invocations)} invocations, coverage-instrumented)"
+                budget.append(BudgetDecision(QualificationStage.PIPELINE_EQUIVALENT.value, "REUSED", f"{label}: equivalent to the candidate run"))
+            elif runner:
                 run = runner[0].run(copy, args=runner[1])
                 status, detail = run.status, f"{len(run.invocations)} invocations"
+                budget.append(BudgetDecision(QualificationStage.PIPELINE_EQUIVALENT.value, "EXECUTED", f"{label}: selects differently from the candidate run"))
             else:
                 plan = reproduction_plan(check, session.python or sys.executable)
                 if plan.argv is None:
@@ -393,7 +399,7 @@ def _stability(session: ImproveSession, changes, candidate: StateEvidence, rerun
     evidence = StabilityEvidence()
     reruns = min(max(reruns, 0), MAX_STABILITY_RERUNS)
     adapters = runner_adapters(session.workspace, session.python)
-    if not reruns or not candidate.runs or not adapters:
+    if not reruns or not adapters or not any(run.status is not StageStatus.BLOCKED for run in candidate.runs):
         return evidence
     changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
     first = {inv.invocation_id: inv for inv in _invocations(candidate)}
@@ -447,7 +453,7 @@ def _stability_stage(stability: StabilityEvidence, deltas) -> QualificationStage
     )
 
 
-def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed) -> list[QualificationStageResult]:
+def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed, budget: list) -> list[QualificationStageResult]:
     plan = [
         (QualificationStage.STATIC_AND_DISCOVERY, lambda: _discovery_stage(candidate)),
         (QualificationStage.CANDIDATE_TESTS, lambda: _candidate_tests_stage(changes, candidate)),
@@ -460,7 +466,7 @@ def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, 
         )),
         (QualificationStage.NEGATIVE_PATHS, lambda: _negative_path_stage(changes, candidate, deltas)),
         (QualificationStage.MUTATION_OR_NEGATIVE_CONTROLS, lambda: _mutation_stage(candidate)),
-        (QualificationStage.PIPELINE_EQUIVALENT, lambda: _pipeline_stage(session, authorized)),
+        (QualificationStage.PIPELINE_EQUIVALENT, lambda: _pipeline_stage(session, authorized, candidate, budget)),
         (QualificationStage.BUILD_AND_ARTIFACT, lambda: _artifact_stage(candidate)),
         (QualificationStage.PREVIEW_DEPLOY, lambda: _stage(
             QualificationStage.PREVIEW_DEPLOY, StageStatus.NOT_RUN,
@@ -495,7 +501,7 @@ def qualify_candidate(
 
     changes = change_set(session.baseline, session.workspace)
     with read_only_guard(session.root):
-        candidate = timed("candidate-measure", lambda: measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls))
+        candidate = timed("candidate-measure", lambda: measure(session.workspace, "candidate", "isolated-candidate-copy", session.python, controls, reason="candidate qualification"))
         adapters = runner_adapters(session.baseline_copy, session.python)
         baseline_controls = timed("baseline-controls", lambda: [run_negative_control(session.baseline_copy, c, adapters) for c in controls])
         baseline = StateEvidence(**{**vars(session.baseline_evidence), "negative_controls": baseline_controls, "mutation": []})
@@ -504,9 +510,16 @@ def qualify_candidate(
         if "candidate" in reports:
             attach_mutation(candidate, load_mutation_report(reports["candidate"]), session.workspace)
         deltas = compare_states(baseline, candidate)
+        budget: list[BudgetDecision] = []
         stability = timed("stability-reruns", lambda: _stability(session, changes, candidate, stability_reruns))
-        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()), stability, timed)
-    result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls, stability, timings)
+        budget.append(BudgetDecision(
+            QualificationStage.STABILITY_AND_COST.value,
+            "EXECUTED" if stability.records else "NOT_RUN",
+            f"reran {len(stability.records)} candidate-touched or failing invocations {stability.attempts - 1}x"
+            if stability.records else "no relevant invocation to rerun, reruns disabled, or execution budget exhausted",
+        ))
+        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()), stability, timed, budget)
+    result = QualificationResult(CandidateQualification(changes, deltas, stages), baseline, candidate, baseline_controls, stability, timings, budget)
     (session.directory / "qualification.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result
 
@@ -533,7 +546,7 @@ def apply_approved(
         (file_digest(session.root / c.path) if (session.root / c.path).is_file() else None) == c.candidate_fingerprint
         for c in applied
     )
-    evidence = measure(session.root, "applied", "applied-project-copy", session.python)
+    evidence = measure(session.root, "applied", "applied-project-copy", session.python, reason="post-apply verification")
     result = AppliedResult(applied, evidence, files_match)
     (session.directory / "applied.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result

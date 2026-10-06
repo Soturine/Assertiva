@@ -102,6 +102,15 @@ class ArtifactEvidence:
 
 
 @dataclass(frozen=True)
+class BudgetDecision:
+    """Why a piece of expensive evidence was (or was not) produced."""
+
+    stage: str
+    decision: str  # EXECUTED / REUSED / NOT_RUN / BLOCKED
+    reason: str
+
+
+@dataclass(frozen=True)
 class StabilityRecord:
     invocation_id: str
     outcomes: tuple["Outcome | None", ...]  # first execution first; never replaced by later ones

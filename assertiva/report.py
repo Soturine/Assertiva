@@ -16,6 +16,7 @@ from typing import Any
 
 from . import __version__
 from .candidate import DeltaState, MetricDirection, StageStatus
+from .process import MAX_DEPTH, current_depth
 from .evidence import StateEvidence, compare_states, mutant_label, state_metrics, to_jsonable
 
 REPORT_VERSION = "1"
@@ -239,6 +240,17 @@ def improve_report(session, result, applied=None) -> dict:
             if s.status in (StageStatus.UNKNOWN, StageStatus.NOT_RUN, StageStatus.BLOCKED)
         ] + [f"metric {d.name}: not measured in both states" for d in q.metric_deltas if d.state is DeltaState.UNKNOWN],
         "provenance": {"assertiva_version": __version__, "python": session.python, "read_only_until_approval": True},
+        "execution_budget": execution_budget(
+            "qualification", [*result.baseline_evidence.budget, *result.candidate_evidence.budget, *result.budget]
+        ),
+    }
+
+
+def execution_budget(level: str, decisions) -> dict:
+    """How much was executed, reused or refused, and why (never a quality score)."""
+    return {
+        "level": level, "depth": current_depth(), "max_depth": MAX_DEPTH,
+        "decisions": [to_jsonable(d) for d in decisions],
     }
 
 
@@ -398,6 +410,24 @@ def _artifact_html(report: dict) -> str:
     )
 
 
+def _budget_html(report: dict) -> str:
+    budget = report.get("execution_budget")
+    if not budget:
+        return ""
+    rows = "".join(
+        f'<tr><th scope="row">{_e(d["stage"])}</th><td><span class="chip {d["decision"].lower()}">{_e(d["decision"])}</span></td>'
+        f'<td>{_e(d["reason"])}</td></tr>'
+        for d in budget["decisions"]
+    )
+    return (
+        '<section id="budget" aria-labelledby="h-budget"><h2 id="h-budget">Execution budget</h2>'
+        f'<p>Level: <strong>{_e(budget["level"])}</strong>; nesting depth {_e(budget["depth"])} of {_e(budget["max_depth"])}. '
+        "Expensive evidence runs only when requested or needed, equivalent evidence is reused, and refusals are never PASS.</p>"
+        '<div class="scroll"><table><caption>What ran, what was reused or refused, and why</caption><thead><tr>'
+        f'<th scope="col">Evidence</th><th scope="col">Decision</th><th scope="col">Reason</th></tr></thead><tbody>{rows}</tbody></table></div></section>'
+    )
+
+
 def _runs_html(report: dict) -> str:
     rows = []
     for key, state in report["states"].items():
@@ -535,7 +565,7 @@ caption{text-align:left;color:var(--muted);padding:6px 0}th,td{border:1px solid 
 .pass{color:var(--pass)}.fail{color:var(--fail);font-weight:700}.blocked{color:var(--warn);border-style:double}
 .unknown{color:var(--unk);border-style:dotted}.not_run{color:var(--unk);border-style:dashed;opacity:.8}
 .improved,.killed,.stable,.applied{color:var(--pass)}.regressed,.high,.survived,.flaky_signal,.consistent_failure{color:var(--fail)}
-.medium,.retire_candidate{color:var(--warn)}.info,.changed,.unchanged,.insufficient_evidence{color:var(--unk)}
+.medium,.retire_candidate,.reused{color:var(--warn)}.executed{color:var(--pass)}.info,.changed,.unchanged,.insufficient_evidence{color:var(--unk)}
 details{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin:6px 0}summary{cursor:pointer}
 pre{overflow-x:auto;font-size:.85em}.filters{margin:8px 0}figure{margin:12px 0}
 svg .lbl,svg .val{fill:var(--fg);font-size:11px}.bar.baseline{fill:var(--c-baseline)}.bar.candidate{fill:var(--c-candidate)}
@@ -576,7 +606,7 @@ def render_html(report: dict) -> str:
     if report["findings"] or report["workflow"] == "audit":
         sections.append(("findings", "Findings"))
     sections += [
-        ("runs", "Runs"), ("surface-section", "Verification surface"), ("green", "What does green prove?"),
+        ("runs", "Runs"), ("budget", "Budget"), ("surface-section", "Verification surface"), ("green", "What does green prove?"),
         ("unknowns", "Remaining unknowns"), ("provenance", "Provenance"),
     ]
     nav = "".join(f'<li><a href="#{i}">{_e(t)}</a></li>' for i, t in sections)
@@ -600,7 +630,7 @@ def render_html(report: dict) -> str:
 <section id="summary" aria-labelledby="h-summary"><h2 id="h-summary">Summary</h2>
 <p>Workflow: <strong>{_e(report['workflow'])}</strong>. States shown: {_e(', '.join(states_present) or 'none')}.</p>{applied_note}{delta_html}</section>
 <section id="metrics" aria-labelledby="h-metrics"><h2 id="h-metrics">States and metrics</h2>{table}{chart}</section>
-{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_findings_html(report)}{_surface_html(report)}
+{_stages_html(report)}{_negative_html(report)}{_mutation_html(report)}{_artifact_html(report)}{_changes_html(report)}{_runs_html(report)}{_budget_html(report)}{_findings_html(report)}{_surface_html(report)}
 <section id="green" aria-labelledby="h-green"><h2 id="h-green">What does green prove?</h2><div class="boundary">
 <div><h3>Observed</h3>{_list(boundary['observed'], 'Nothing was observed.')}</div>
 <div><h3>Not evidenced</h3>{_list(boundary['not_evidenced'], 'Nothing listed.')}</div>

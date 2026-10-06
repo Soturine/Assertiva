@@ -153,7 +153,7 @@ def _result_from(data: dict):
     )
     from .evidence import ControlOutcome, NegativeControlResult, state_from_dict
     from .improve import QualificationResult
-    from .models import Outcome, StabilityEvidence, StabilityRecord
+    from .models import BudgetDecision, Outcome, StabilityEvidence, StabilityRecord
 
     q = data["qualification"]
     return QualificationResult(
@@ -179,6 +179,7 @@ def _result_from(data: dict):
             ],
         }),
         timings=list(data["timings"]),
+        budget=[BudgetDecision(**d) for d in data.get("budget", [])],
     )
 
 

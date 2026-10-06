@@ -19,7 +19,7 @@ from pathlib import Path
 from assertiva.candidate import StageStatus
 from assertiva.coverage import load_coverage_json
 from assertiva.models import CoverageSummary, Outcome, RunEvidence, TestInvocation
-from assertiva.process import module_available, run_command
+from assertiva.process import execution_refusal, module_available, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
@@ -27,6 +27,8 @@ from .base import AdapterCapability
 _PLUGIN_MODULE = "assertiva_pytest_evidence"
 _PLUGIN_SOURCE = Path(__file__).with_name("_pytest_evidence_plugin.py")
 _CONFIG_MARKERS = ("pytest.ini", "conftest.py")
+_COSMETIC = {"-q", "-qq", "-v", "-vv", "-vvv", "-s", "-ra", "-rA", "-rN", "--quiet", "--verbose", "--disable-warnings", "--no-header"}
+_COSMETIC_PREFIXES = ("--tb=", "--color=", "--junitxml=", "--junit-xml=", "--durations=")
 _REPORT_OPTIONS = {"--junitxml", "--junit-xml", "--html", "--cov-report", "--result-log", "--report-log"}
 _SECTION_MARKERS = {"pyproject.toml": "[tool.pytest", "setup.cfg": "[tool:pytest]", "tox.ini": "[pytest]"}
 
@@ -144,7 +146,14 @@ class PytestNativeAdapter:
     def run(self, root: str | Path, args: list[str] | None = None, coverage: bool = False) -> RunEvidence:
         return self._invoke(Path(root), list(args or []), mode="execute", coverage=coverage)
 
+    def equivalent_to_default(self, args: list[str]) -> bool:
+        """Whether a run with ``args`` selects and runs exactly what a default run does."""
+        return all(arg in _COSMETIC or arg.startswith(_COSMETIC_PREFIXES) for arg in args)
+
     def _invoke(self, root: Path, args: list[str], mode: str, coverage: bool = False) -> RunEvidence:
+        refusal = execution_refusal()
+        if refusal:
+            return RunEvidence(adapter_id=self.adapter_id, mode=mode, status=StageStatus.BLOCKED, limitations=[refusal])
         with tempfile.TemporaryDirectory(prefix="assertiva-pytest-") as tmp:
             plugin_dir = Path(tmp)
             (plugin_dir / f"{_PLUGIN_MODULE}.py").write_text(_PLUGIN_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")

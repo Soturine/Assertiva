@@ -1,8 +1,8 @@
 # Status
 
-## Current milestone: M1 — Executable Assurance ✅ (closed 2026-10-06)
+## Current milestone: M2 — Scale & Cross-Stack Intelligence (active)
 
-M0 (foundation and contracts) and M1 (executable audit + improve vertical slice) are complete. Next: M2 — Cross-stack Intelligence (not started).
+M0 (foundation and contracts) and M1 (executable audit + improve vertical slice, closed 2026-10-06) are complete. M2 has started with scale hardening; see ROADMAP.md for what is done and what is not.
 
 Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations; it never branches on a tool name (a test enforces this for mutation tools).
 
@@ -42,6 +42,12 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 ### Report
 - One model (`schemas/assurance-report.schema.json`): audit = CURRENT + findings + recommendations + remaining unknowns; improve = BASELINE vs CANDIDATE (+ APPLIED only after approval).
 - Self-contained accessible HTML: landmarks, native keyboard controls, light/dark, filters, expandable findings and diffs, chart only from measured pairs with the metrics table as its equivalent, sections for qualification + stability, negative paths, mutation, artifact, runs/provenance (executed vs ingested), Verification Surface, Evidence Delta, "What does green prove?" and remaining unknowns. PASS / FAIL / BLOCKED / UNKNOWN / NOT_RUN each have a distinct style.
+
+### Execution budget (M2)
+- Child processes inherit a nesting depth; at depth 2 Assertiva refuses to execute project code (BLOCKED, never PASS). A project whose tests audit themselves stops after one nested level instead of recursing until timeouts.
+- Artifact qualification refuses to re-qualify a target an outer run is already qualifying (same `name==version`).
+- Pipeline-equivalent reproduction reuses the candidate run when a delivery check selects the same tests (only cosmetic flags differ) and records the reuse.
+- Audit, improve and the report record each expensive evidence decision: EXECUTED / REUSED / NOT_RUN / BLOCKED with its reason.
 
 ### Execution provenance
 - Every subprocess runs non-interactively with a timeout and bounded output; each stage and command writes start/end events (stage such as `current:pytest-native`, command, start, timeout, return code, duration, timeout classification) to a trace under `ASSERTIVA_HOME` as it happens; the report links the trace.

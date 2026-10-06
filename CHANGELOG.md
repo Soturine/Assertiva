@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0] — 2026-10-06 — M2 Scale & Cross-Stack Intelligence closed
+
+### Added
+- Scale hardening: execution budget (bounded nested qualification, same-target recursion refusal, equivalent-evidence reuse), filesystem/path boundaries, transactional approved apply with rollback, artifact fidelity vs declared-dependency closure, run-scoped capability evidence with credential redaction.
+- Cross-stack runners through one tool-neutral core: Jest, Playwright (declared/selected/executed projects, engines, retries, attachments, informational locator evidence) and Maven (Surefire/Failsafe phases, reruns, parameterized identity, JaCoCo, build surface). Portable coverage: coverage.py, istanbul, LCOV, Cobertura, JaCoCo with counts; a percentage over a changed denominator is never judged blindly.
+- Impact and selection: revision-scoped impact graph (content digest, tiered and provenanced edges, unknowns instead of guesses), `audit --changed-since REV` with conservative widening, fixture-level `conftest.py` granularity, minimal monorepo affected set (npm workspaces, Python subprojects); permanent matched experiment: 0 misses in 12 controlled defects.
+- History: local schema-versioned SQLite store (optional), one stability vocabulary for reruns and history, duration percentiles only with enough samples, deterministic failure fingerprints, previous-state comparison in reports.
+- Delivery: Azure Pipelines, GitLab CI and Jenkins next to GitHub Actions through one CI normalization (declared/selected/executed/deploys), matrix gaps against declared runtimes and browser projects, artifact lineage findings, review candidates (never gates).
+
+### Changed
+- The heavy `dogfood` CI job is now `runtime-self-qualification` (deep deterministic qualification of the runtime, on demand and on `v*` tags): it runs the fast/core suite natively and against the installed wheel instead of repeating the suites ordinary CI already ran (24m45 → 102 s on the same tree, identical artifact fidelity); deselected tests are declared in the report.
+- Candidate qualification converged from ten stages to five pillars (execution, behavioral assurance, fault sensitivity, delivery fidelity, stability and cost) with their checks; preview deployment is reported as not evidenced instead of a stage that never ran.
+- Stability verdicts renamed: STABLE → NO_INSTABILITY_OBSERVED, FLAKY_SIGNAL → OBSERVED_UNSTABLE_CURRENT_RUN.
+- The fast suite reports slow unmarked tests instead of failing them on a 2-second limit.
+- The pytest static audit reads CI scope from every recognized CI provider, not only GitHub Actions.
+
+### Added (evaluation)
+- `evals/semantic.py`: semantic Skill evaluation with a hidden rubric (the agent sees `SKILL.md`, the scenario and tools; a separate judge sees the rubric and answers PASS/FAIL/REVIEW with justification, no score); one new grader-ready case (self-audit of this repository); first baseline in `evals/results/`.
+
+### Removed
+- Seventeen design schemas with no consumer (one of them still described the ten stages); `schemas/assurance-report.schema.json` is the single report contract and now lists every key the report emits.
+- Dead code and states with no producer: an unused adapter Protocol, `verification_gap`, an unwired coverage-context ingester, unused verification kinds/origins.
+
 ## [0.4.0] — 2026-10-06 — M1 Executable Assurance closed
 
 ### Added

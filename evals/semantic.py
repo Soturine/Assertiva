@@ -139,12 +139,15 @@ def main(argv: list[str] | None = None) -> int:
             folder = args.out / case
             (folder / "judge.md").write_text(judge_context(case, (folder / "response.md").read_text(encoding="utf-8")), encoding="utf-8")
     else:
-        rows, failures = [], []
+        rows, failures, not_run = [], [], []
         for folder in sorted(p for p in args.out.iterdir() if p.is_dir()):
+            if not (folder / "response.md").is_file():
+                not_run.append(f"- {folder.name}: NOT_RUN (no agent response in this run)")
+                continue
             try:
                 verdict = parse_verdict((folder / "verdict.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError) as exc:  # an infrastructure failure is recorded, never a pass
-                failures.append(f"- {folder.name}: no valid verdict ({exc})")
+            except (OSError, ValueError) as exc:  # an infrastructure failure is recorded, never a pass or a fail
+                failures.append(f"- {folder.name}: NOT_JUDGED_INFRA ({type(exc).__name__})")
                 continue
             rows.append(f"### {folder.name}: {verdict['verdict']}\n\n{verdict['justification']}\n\n"
                         + "\n".join(f"- {k}: {v}" for k, v in verdict.get("dimensions", {}).items())
@@ -155,8 +158,8 @@ def main(argv: list[str] | None = None) -> int:
                   f"Revision `{_revision()}`. Evaluated agent: {args.agent}. Judge: {args.judge} (separate context, private rubric).\n"
                   "Verdicts are semantic judgments, not scores; REVIEW needs a human.\n\n")
         args.results.mkdir(parents=True, exist_ok=True)
-        (args.results / "README.md").write_text(header + "\n\n".join(rows) + ("\n\n## Not judged\n" + "\n".join(failures) if failures else "") + "\n",
-                                encoding="utf-8")
+        tail = ("\n\n## Not judged\n" + "\n".join(failures) if failures else "") + ("\n\n## Not run\n" + "\n".join(not_run) if not_run else "")
+        (args.results / "README.md").write_text(header + "\n\n".join(rows) + tail + "\n", encoding="utf-8")
     return 0
 
 

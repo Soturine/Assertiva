@@ -68,6 +68,8 @@ def test_missing_verdict_is_recorded_as_not_judged_never_as_pass(tmp_path):
     (out / "CASE_A" / "verdict.json").write_text('{"verdict": "PASS", "justification": "ok"}', encoding="utf-8")
     (out / "CASE_B").mkdir()
     (out / "CASE_B" / "response.md").write_text("answer", encoding="utf-8")
+    (out / "CASE_C").mkdir()  # prepared but never run: not a verdict of any kind
     semantic.main(["record", "--out", str(out), "--results", str(tmp_path / "results"), "--agent", "a", "--judge", "j"])
     page = (tmp_path / "results" / "README.md").read_text(encoding="utf-8")
-    assert "CASE_A: PASS" in page and "Not judged" in page and "CASE_B: no valid verdict" in page
+    assert "CASE_A: PASS" in page and "CASE_B: NOT_JUDGED_INFRA" in page and "CASE_C: NOT_RUN" in page
+    assert "FAIL" not in page.split("## Not judged")[1]  # infrastructure is never a fail

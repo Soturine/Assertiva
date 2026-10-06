@@ -132,9 +132,19 @@ def test_summary_reports_failures_with_their_group(store):
     assert summary["previous_state"]["revision"] == "rev1"  # what was recorded before, for comparison
 
 
+@pytest.mark.integration
 def test_history_can_be_disabled(tmp_path, monkeypatch):
+    from conftest import write
+
     monkeypatch.setenv("ASSERTIVA_HISTORY", "off")
     assert HistoryStore.for_project(tmp_path / "project") is None
+    # and nothing is written when an audited run records its state
+    write(tmp_path / "project" / "tests" / "test_a.py", "def test_a():\n    assert True\n")
+    from assertiva.audit import run_audit
+
+    report = run_audit(tmp_path / "project", execute=True, python=sys.executable)
+    assert report["history"]["enabled"] is False
+    assert not list((tmp_path / "assertiva-home").rglob("history.sqlite3"))
 
 
 @pytest.mark.integration

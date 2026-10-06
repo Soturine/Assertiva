@@ -1,8 +1,8 @@
 # Status
 
-## Current milestone: M2 — Scale & Cross-Stack Intelligence (active)
+## Current milestone: M2 — Scale & Cross-Stack Intelligence: DONE (2026-10-06)
 
-M0 (foundation and contracts) and M1 (executable audit + improve vertical slice, closed 2026-10-06) are complete. M2 has started with scale hardening; see ROADMAP.md for what is done and what is not.
+M0 (foundation and contracts), M1 (executable audit + improve vertical slice) and M2 (scale, cross-stack, impact & selection, history, delivery; closed 2026-10-06, version 0.5.0) are complete. M3 has not started. ROADMAP.md lists exactly what exists and what was explicitly not required (.NET, Go, Rust, Vitest, Gradle).
 
 Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations. Contract tests drive measurement, qualification and the report with fake adapters (a runner with non-pytest ids, a non-wheel artifact, coverage from another source), and fail if a core module names a tool or parses a runner's id syntax.
 
@@ -124,14 +124,19 @@ Tests are marked by what they run (unmarked = fast/core, `integration`, `artifac
 - Rollback / forbidden side-effect / idempotency evidence beyond static post-rejection assertions.
 - JUnit XML and mutation reports as *improve* candidate-state evidence for non-native runners (audit only today).
 - Authorized remote CI execution and non-production preview deployment.
-- Order dependence, historical flakiness and failure clustering.
+- Order dependence; failure clustering beyond identical deterministic fingerprints; runtime coverage mapping (E0) into the impact graph (a coverage report cannot prove its revision); impact graphs for languages other than Python (their changes widen to the full suite); subset execution for runners other than pytest.
 
 ## PLANNED
-See [ROADMAP.md](ROADMAP.md): M2 cross-stack adapters (Jest/Vitest, Playwright, JUnit/Gradle/Maven, .NET, Go/Rust), Azure Pipelines/GitLab/Jenkins, impact graph, history; M3 stable CLI/MCP, evidence store, benchmarks.
+See [ROADMAP.md](ROADMAP.md): M3 (productization and empirical validation) has not started. Explicitly not required for M2 and not implemented: .NET, Go, Rust, Vitest, Gradle.
 
 ## Claim boundary
 - Static inventory and negative-path dimensions are E3 signals, not runtime proof; a post-rejection assertion is not rollback proof.
 - CI configuration is declared evidence (E2): Assertiva does not evaluate expressions, reusable workflows or branch protection, and reproduces only checks it understands, in the local environment.
 - Ingested reports (mutation, JUnit) are tied to the measured state only when they carry source content; otherwise the limitation is stated.
-- Stability verdicts mean "no instability observed in N executions", not "not flaky".
+- Stability verdicts mean "no instability observed in N executions", not "not flaky"; history covers only runs recorded on this machine.
+- A green selected set proves only that the selected tests passed at that revision; widening never makes a selection complete, and E4 heuristics never narrow a run. The matched experiment (0 misses in 12 controlled defects) is evidence for those cases, not a universal claim.
+- Delivery findings come from configuration: whether a CI job was selected or executed, and which bytes were published or deployed, stay UNKNOWN without run evidence.
+- Semantic Skill evaluation (first baseline, 2026-10-06, `b053fb3`): four cases (high coverage with weak oracle, heuristic selector overreach, retry until green, and an open self-audit of this repository) were answered by an agent given only `SKILL.md`, the scenario and tools, then judged in one separate context against private rubrics: 4 PASS. It is a mechanism proof on one model family with a same-family judge, not a benchmark; five other prepared cases were not run. The self-audit's gaps are recorded below.
+- Known gaps from that self-audit and from M2: CI runs on Linux only (the Windows boundary/link/long-path code has no Windows CI job); branch protection on `main` is an owner setting, so green CI is advisory; the safety-critical logic (read-only guard, transactional apply, aggregation) has no mutation or negative-control evidence of its own.
+- A one-off fast-suite failure during M2 (a parallel run, output lost) did not recur in 14 reruns, the full suite or CI; its cause is unknown and it is not called flaky. The fast suite now reports slow tests instead of failing on time.
 - A ~55-minute local execution seen on 2026-10-05 was not reproduced; the per-command trace exists so a recurrence can be diagnosed rather than guessed.

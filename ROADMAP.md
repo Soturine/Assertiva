@@ -42,7 +42,7 @@ Audit and improve as a working, dogfooded vertical slice.
 
 Deferred out of M1 (tracked in STATUS as SPECIFIED): final visual design of the HTML report (waiting for the visual reference), sdist verification, Cosmic Ray, JUnit/mutation evidence as improve candidate state for non-native runners, order dependence.
 
-## M2 — Scale & Cross-Stack Intelligence (active)
+## M2 — Scale & Cross-Stack Intelligence (done, 2026-10-06)
 Make the proven model scale, generalize beyond Python and select evidence without fabricating confidence. Internal areas (not separate milestones): scale hardening, cross-stack adapters, impact and selection, history, delivery.
 
 Scale and hardening
@@ -59,7 +59,7 @@ Cross-stack
 - [x] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
 - [x] Playwright semantic browser evidence (declared / selected / executed projects)
 - [x] Java test evidence (JUnit Platform via Maven Surefire/Failsafe, JaCoCo; Gradle not yet)
-- [ ] .NET / Go / Rust, only if the core is still simple after the above
+- .NET / Go / Rust, Vitest, Gradle: not required for M2 (Python, Jest, Playwright and Maven/Java proved the cross-stack core); not implemented
 
 Impact and selection
 - [x] revision-scoped test impact graph with evidence tiers

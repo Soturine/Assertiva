@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.3] — 2026-10-06 — unittest.TestCase static discovery
+
+Patch release; M2 stays closed, M3 has not started. Closes the inventory limitation recorded in 0.5.2.
+
+### Fixed
+- The static inventory, inherited-test composition, review candidates and impact declarations recognized only classes named `Test*`. `unittest.TestCase` subclasses are now recognized whatever their name, through `import unittest [as u]`, `from unittest import TestCase [as T]` and same-module inheritance, with unittest's `test` method prefix. A plain class with `test_*` methods is not treated as a TestCase.
+- Classes with test methods whose bases cannot be resolved statically (imported from another module, computed, metaclass) are reported as TEST_CLASS_COLLECTION_UNKNOWN instead of being dropped silently or guessed; native collection stays authoritative.
+
 ## [0.5.2] — 2026-10-06 — Real-world dogfood fixes
 
 Patch release; M2 stays closed, M3 has not started. Found by running `/assertiva` 0.5.1 on functional-test-designer.

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, path_selected_by_ci
 from .adapters.coverage_reports import load_coverage_report
+from .adapters.python_test_classes import TESTCASE_METHOD_PREFIX, ClassKind, classify_classes
 from .models import CoverageSummary, Finding, TestCompositionRelation, TestDefinition
 
 
@@ -238,12 +239,17 @@ def has_pytest_surface(root: str | Path) -> bool:
     return bool(_test_files(Path(root)))
 
 
-def _direct_test_methods(node: ast.ClassDef) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
+def _method_prefix(kind: ClassKind) -> str | None:
+    """Method prefix the collecting runner uses for this class kind; None when the class is not collected."""
+    return {ClassKind.TESTCASE: TESTCASE_METHOD_PREFIX, ClassKind.PYTEST_CLASS: "test_"}.get(kind)
+
+
+def _direct_test_methods(node: ast.ClassDef, prefix: str = "test_") -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
     return {
         item.name: item
         for item in node.body
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and item.name.startswith("test_")
+        and item.name.startswith(prefix)
     }
 
 
@@ -260,6 +266,7 @@ def _ancestor_test_methods(
     class_name: str,
     class_map: dict[str, ast.ClassDef],
     seen: tuple[str, ...] = (),
+    prefix: str = "test_",
 ) -> dict[str, tuple[str, ast.FunctionDef | ast.AsyncFunctionDef]]:
     if class_name in seen:
         return {}
@@ -272,9 +279,9 @@ def _ancestor_test_methods(
         base = class_map.get(base_name)
         if base is None:
             continue
-        for method_name, method in _direct_test_methods(base).items():
+        for method_name, method in _direct_test_methods(base, prefix).items():
             methods.setdefault(method_name, (base_name, method))
-        inherited = _ancestor_test_methods(base_name, class_map, seen + (class_name,))
+        inherited = _ancestor_test_methods(base_name, class_map, seen + (class_name,), prefix)
         for method_name, declaration in inherited.items():
             methods.setdefault(method_name, declaration)
     return methods
@@ -297,11 +304,13 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
 
         rel = str(path.relative_to(root)).replace("\\", "/")
         class_map = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
+        kinds = classify_classes(tree)
         for class_name, class_node in class_map.items():
-            if not class_name.startswith("Test"):
+            prefix = _method_prefix(kinds[class_name])
+            if prefix is None:
                 continue
-            overridden = set(_direct_test_methods(class_node))
-            inherited = _ancestor_test_methods(class_name, class_map)
+            overridden = set(_direct_test_methods(class_node, prefix))
+            inherited = _ancestor_test_methods(class_name, class_map, prefix=prefix)
             for method_name, (declaration_class, declaration_node) in inherited.items():
                 if method_name in overridden:
                     continue
@@ -338,13 +347,32 @@ def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
         except (SyntaxError, UnicodeDecodeError):
             continue
         rel = str(path.relative_to(root)).replace("\\", "/")
+        kinds = classify_classes(tree)
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
                 out.append(_definition(f"{rel}::{node.name}", rel, node))
-            elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
-                for child in node.body:
-                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test_"):
-                        out.append(_definition(f"{rel}::{node.name}::{child.name}", rel, child))
+            elif isinstance(node, ast.ClassDef) and (prefix := _method_prefix(kinds[node.name])):
+                for name, child in _direct_test_methods(node, prefix).items():
+                    out.append(_definition(f"{rel}::{node.name}::{name}", rel, child))
+    return out
+
+
+def unresolved_test_classes(root: str | Path) -> list[str]:
+    """Classes with test-like methods whose collection cannot be decided statically (bases not resolvable)."""
+    root = Path(root)
+    out: list[str] = []
+    for path in _test_files(root):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        rel = str(path.relative_to(root)).replace("\\", "/")
+        kinds = classify_classes(tree)
+        out += [
+            f"{rel}::{node.name}" for node in tree.body
+            if isinstance(node, ast.ClassDef) and kinds[node.name] is ClassKind.UNRESOLVED
+            and _direct_test_methods(node, TESTCASE_METHOD_PREFIX)
+        ]
     return out
 
 
@@ -407,6 +435,17 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
     if not tests and not materializations:
         findings.append(
             Finding("NO_TESTS_DISCOVERED", "No pytest-style definitions were found by bounded static inventory.")
+        )
+    unresolved = unresolved_test_classes(root)
+    if unresolved:
+        findings.append(
+            Finding(
+                "TEST_CLASS_COLLECTION_UNKNOWN",
+                "These classes have test methods but bases the static inventory cannot resolve (imported from another "
+                "module, computed or metaclass-based); whether a runner collects them is UNKNOWN until native collection.",
+                {"classes": unresolved[:30], "count": len(unresolved)},
+                severity="info",
+            )
         )
     if (tests or materializations) and not ci and unittest_ci:
         findings.append(
@@ -520,10 +559,11 @@ _SNAPSHOT_ASSERTIONS = {"assert_match_snapshot", "assert_snapshot", "match_snaps
 
 
 def _test_functions(tree: ast.Module):
+    kinds = classify_classes(tree)
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
             yield node.name, node, []
-        elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+        elif isinstance(node, ast.ClassDef) and _method_prefix(kinds[node.name]):
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name.startswith("test"):
                     yield f"{node.name}::{item.name}", item, node.decorator_list

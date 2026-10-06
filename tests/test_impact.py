@@ -97,6 +97,12 @@ def test_declarations_are_recorded(tmp_path):
     assert ("tests/test_calc.py::test_add", "tests/test_calc.py", Relation.DECLARES, "E1") in edges(graph, Relation.DECLARES)
 
 
+def test_testcase_declarations_do_not_depend_on_the_test_prefix(tmp_path):
+    files = {**BASE, "tests/test_perm.py": "import unittest\n\nclass PermissionsTests(unittest.TestCase):\n    def test_read(self):\n        pass\n"}
+    graph = build_impact_graph(project(tmp_path, files))
+    assert ("tests/test_perm.py::PermissionsTests::test_read", "tests/test_perm.py", Relation.DECLARES, "E1") in edges(graph, Relation.DECLARES)
+
+
 def test_dynamic_import_is_unknown_never_guessed(tmp_path):
     graph = build_impact_graph(project(tmp_path, {
         "plugins/__init__.py": "",

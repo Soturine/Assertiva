@@ -12,6 +12,7 @@ import ast
 import hashlib
 from pathlib import Path, PurePosixPath
 
+from assertiva.adapters.python_test_classes import ClassKind, classify_classes
 from assertiva.impact import ImpactContribution, ImpactEdge, Relation, UnknownRelation
 
 _CONFIGS = ("pytest.ini", ".pytest.ini", "pyproject.toml", "tox.ini", "setup.cfg")
@@ -254,11 +255,12 @@ class PythonImpactAdapter:
 
     @staticmethod
     def _declarations(rel: str, tree: ast.Module, edge) -> None:
-        provenance = "pytest default collection rules (test_* functions, Test* classes)"
+        provenance = "pytest default collection rules (test_* functions, Test* classes, unittest.TestCase subclasses)"
+        kinds = classify_classes(tree)
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
                 edge(f"{rel}::{node.name}", rel, Relation.DECLARES, "E1", provenance, "static: native collection is authoritative")
-            elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+            elif isinstance(node, ast.ClassDef) and kinds[node.name] in {ClassKind.TESTCASE, ClassKind.PYTEST_CLASS}:
                 for item in node.body:
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name.startswith("test"):
                         edge(f"{rel}::{node.name}::{item.name}", rel, Relation.DECLARES, "E1", provenance, "static: native collection is authoritative")
@@ -333,9 +335,10 @@ class PythonImpactAdapter:
         for target in plugins:
             if target != rel:
                 edge(rel, target, Relation.IMPORTS, "E1", "pytest_plugins declaration (pytest imports these modules)")
-        bases = {
+        collected = {name for name, kind in classify_classes(tree).items() if kind is not ClassKind.NOT_COLLECTED}
+        bases = {  # unresolved classes count too: a missed edge would drop tests, an extra one only widens
             base.id if isinstance(base, ast.Name) else base.value.id
-            for node in ast.walk(tree) if isinstance(node, ast.ClassDef) and node.name.startswith("Test")
+            for node in ast.walk(tree) if isinstance(node, ast.ClassDef) and (node.name.startswith("Test") or node.name in collected)
             for base in node.bases
             if isinstance(base, ast.Name) or (isinstance(base, ast.Attribute) and isinstance(base.value, ast.Name))
         }

@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from assertiva.pytest_audit import (
     audit_pytest_project,
     discover_pytest_composition,
@@ -55,6 +57,68 @@ def test_override_prevents_inherited_materialization_of_same_method(tmp_path):
         "        assert 2 == 2\n",
     )
     assert discover_pytest_composition(tmp_path) == []
+
+
+def _ids(tmp_path, source):
+    write(tmp_path / "tests" / "test_m.py", source)
+    return [t.node_id.split("::", 1)[1] for t in discover_pytest_definitions(tmp_path)]
+
+
+def test_testcase_named_test_is_collected(tmp_path):
+    assert _ids(tmp_path, "import unittest\n\nclass TestUser(unittest.TestCase):\n    def test_x(self):\n        self.assertEqual(1, 1)\n") == ["TestUser::test_x"]
+
+
+def test_testcase_is_collected_whatever_its_name(tmp_path):
+    """Found by dogfooding: only `Test*` classes were inventoried, so unittest suites named `*Tests` vanished."""
+    assert _ids(tmp_path, "import unittest\n\nclass UserPermissionsTests(unittest.TestCase):\n"
+                          "    def test_x(self):\n        self.assertEqual(1, 1)\n"
+                          "    def testLegacyName(self):\n        self.assertTrue(True)\n") == [
+        "UserPermissionsTests::test_x", "UserPermissionsTests::testLegacyName"]  # unittest's prefix is `test`
+
+
+@pytest.mark.parametrize("imports, base", [
+    ("from unittest import TestCase", "TestCase"),
+    ("from unittest import TestCase as TC", "TC"),
+    ("import unittest as ut", "ut.TestCase"),
+    ("from unittest import IsolatedAsyncioTestCase", "IsolatedAsyncioTestCase"),
+])
+def test_testcase_aliases_are_resolved(tmp_path, imports, base):
+    assert _ids(tmp_path, f"{imports}\n\nclass AssetCrudCase({base}):\n    def test_x(self):\n        pass\n") == ["AssetCrudCase::test_x"]
+
+
+def test_local_subclass_of_a_testcase_is_collected(tmp_path):
+    source = ("from unittest import TestCase\n\nclass MyBase(TestCase):\n    def helper(self):\n        return 1\n\n"
+              "class ConcreteBehavior(MyBase):\n    def test_x(self):\n        self.assertEqual(self.helper(), 1)\n")
+    assert _ids(tmp_path, source) == ["ConcreteBehavior::test_x"]
+
+
+def test_plain_class_with_test_methods_is_not_a_testcase(tmp_path):
+    source = ("import unittest\n\nclass Helpers:\n    def test_x(self):\n        assert 1\n\n"
+              "class Widget(dict):\n    def test_y(self):\n        assert 1\n")
+    assert _ids(tmp_path, source) == []
+    assert not audit_pytest_project(tmp_path).has_finding("TEST_CLASS_COLLECTION_UNKNOWN")
+
+
+def test_testcase_inheritance_materializes_without_the_test_prefix(tmp_path):
+    write(tmp_path / "tests" / "test_crud.py",
+          "import unittest\n\nclass CrudContract(unittest.TestCase):\n    def test_create(self):\n        self.assertTrue(True)\n\n"
+          "class CustomerCrud(CrudContract):\n    pass\n\n"
+          "class ProductCrud(CrudContract):\n    def test_create(self):\n        self.assertEqual(1, 1)\n")
+    assert [t.node_id.split("::", 1)[1] for t in discover_pytest_definitions(tmp_path)] == [
+        "CrudContract::test_create", "ProductCrud::test_create"]
+    assert [r.materialization_id.split("::", 1)[1] for r in discover_pytest_composition(tmp_path)] == ["CustomerCrud::test_create"]
+
+
+@pytest.mark.parametrize("source", [
+    "from tests.base import BaseCase\n\nclass PermissionsCase(BaseCase):\n    def test_x(self):\n        pass\n",
+    "from django.test import TestCase\n\nclass PermissionsCase(TestCase):\n    def test_x(self):\n        pass\n",
+    "class PermissionsCase(make_base()):\n    def test_x(self):\n        pass\n",
+    "class PermissionsCase(metaclass=Registry):\n    def test_x(self):\n        pass\n",
+])
+def test_unresolvable_bases_stay_unknown_not_guessed(tmp_path, source):
+    assert _ids(tmp_path, source) == []
+    [finding] = [f for f in audit_pytest_project(tmp_path).findings if f.code == "TEST_CLASS_COLLECTION_UNKNOWN"]
+    assert finding.evidence["classes"] == ["tests/test_m.py::PermissionsCase"]
 
 
 def test_expected_exception_is_assertion_evidence(tmp_path):

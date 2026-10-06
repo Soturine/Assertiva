@@ -66,8 +66,8 @@ jobs:
           improve = json.load(open("/tmp/fixture-improve.json"))
           assert improve["states"]["applied"] is None
           assert [c["change_id"] for c in improve["change_set"]["changes"]] == ["tests/test_boundary.py"]
-          stages = {s["stage"]: s["status"] for s in improve["candidate_qualification"]["stages"]}
-          assert stages["ORIGINAL_REGRESSION"] == "PASS" and stages["BUILD_AND_ARTIFACT"] == "PASS", stages
+          checks = {c["check"]: c["status"] for s in improve["candidate_qualification"]["stages"] for c in s["checks"]}
+          assert checks["ORIGINAL_REGRESSION"] == "PASS" and checks["BUILD_AND_ARTIFACT"] == "PASS", checks
           print("fixture audit + improve qualified; project unchanged")
           EOF
 

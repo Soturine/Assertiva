@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.2] — 2026-10-06 — Real-world dogfood fixes
+
+Patch release; M2 stays closed, M3 has not started. Found by running `/assertiva` 0.5.1 on functional-test-designer.
+
+### Fixed
+- A CI running `python -X utf8 -m unittest discover -s tests` produced CI_PYTEST_NOT_OBSERVED ("add the test suite to the delivery pipeline"). Interpreter options before `-m` are unwrapped, unittest invocations and their discovery scope are read from CI, and CI_RUNS_PYTHON_UNITTEST keeps the declared CI runner apart from the unsupported native unittest execution (equivalence UNKNOWN).
+- `self.assert*` calls in unittest tests were read as missing assertions and raised WEAK_ORACLE_SIGNAL; they now map like the equivalent plain `assert`.
+- The Skill reads `report_path` by parsing the whole audit JSON (never a truncated view), confirms the file exists, and reports a missing field as an engine defect.
+- The Skill orders evidence by cost: CI head SHA against HEAD and fresh evidence before a full local run, which must say what it adds.
+
+### Added
+- Semantic cases: engine-backed report handoff, cost-aware evidence ordering for HEAD (prepared, not yet run).
+
+### Known limitations
+- PROJECT_LINK_ESCAPES_ROOT still fires for a Skill installed through a link (e.g. `.claude/skills/assertiva`); a generic external-tooling policy is M3 material.
+- The static inventory collects `Test*` classes only; a `unittest.TestCase` subclass with another name is not inventoried.
+
 ## [0.5.1] — 2026-10-06 — Skill polish and Skill ↔ engine integration
 
 Patch release; M2 stays closed, M3 has not started. Gaps from the first real use of the Skill on another project.

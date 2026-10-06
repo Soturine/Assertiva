@@ -60,6 +60,10 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Declared-dependency closure is checked offline: a clean environment sees only the wheel and the distributions it declares (resolved transitively with markers from the target environment) and every module of the package is imported. An undeclared import fails; a declared dependency that is not installed locally makes closure UNKNOWN, never PASS.
 - Clean install from a package index and the sdist are NOT_RUN and reported as such.
 
+### CI reproducibility (M2)
+- CI installs are constrained by `constraints.txt`, uses the current official checkout/setup-python actions without persisted credentials, and runs a light Python 3.11 job (the declared minimum): fast suite, wheel build/install and CLI smoke. Contract tests keep the minimum-Python job tied to `requires-python`.
+- Branch protection on `main` is not configured; requiring the CI checks is recommended in CONTRIBUTING.md (owner decision).
+
 ### Execution provenance
 - Interpreter capability probes are evidence about one run: reused within a run (CLI command, audit, improve step), re-probed by the next, keyed by interpreter identity, never cached outside a run.
 - Credential-looking values in recorded commands (`token=`, `password=`, `user:pass@` URLs) are redacted in traces.

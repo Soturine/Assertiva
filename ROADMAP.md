@@ -51,7 +51,7 @@ Scale and hardening
 - [x] transactional approved apply with rollback
 - [x] artifact fidelity vs dependency closure (offline declared-dependency closure; clean index install and sdist still NOT_RUN)
 - [x] run-scoped runtime capability evidence and credential redaction in traces
-- [ ] CI reproducibility and Python 3.11 compatibility
+- [x] CI reproducibility and Python 3.11 compatibility (current official actions, constrained installs, minimum-Python job)
 
 Cross-stack
 - [ ] cross-stack core contract tests (fake runner/coverage/artifact adapters)

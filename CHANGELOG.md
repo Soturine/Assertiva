@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.5] — 2026-10-07 — Assurance Report: decision-first second pass (presentation only)
+
+Patch release; M2 stays closed, M3 has not started. The report model, findings, severities, tiers, adapters and qualification logic are unchanged.
+
+### Changed
+- The report has two layers. The decision layer gives the conclusion in words with its reason, whether there is execution evidence or only inspection, the next step only when the evidence ranks one (ties are listed as ties), and Confirmed / Needs attention / Not proven. Heuristic (E3) positives are shown as signals, never as confirmed. "What does green prove?" is now the audit scope: each area with its evidence strength (executed or verified, measured or ingested, inspected, declared, not proven).
+- Improve leads with candidate readiness, what blocks review, the delta counts and "not applied"; the delta lists regressions first and collapses unchanged metrics. The baseline/candidate bar chart was removed.
+- Findings lead with title, consequence and links to evidence and fix; recommendations are grouped by priority (do first, high, important, optional) and always marked proposed. Metrics start with a summary by domain; full tables, checks, runs and provenance are disclosure panels. Navigation has five areas and tracks the active one.
+- Typography and layout: editorial verdict, fewer cards and less uppercase, a ruled ledger, tablet and phone layouts checked from 1920 px to 390 px.
+
+### Fixed
+- With pt-BR selected, the claim boundary, qualification summaries, limitations, change reasons and dynamic finding summaries stayed in English. The engine's sentences are now localized by their exact templates (technical values kept as written); text with no template appears only in technical detail, marked as original. Contract tests guard every engine sentence and the decision layer.
+
 ## [0.5.4] — 2026-10-07 — Assurance Report redesign (presentation only)
 
 Patch release; M2 stays closed, M3 has not started. The report model, adapters, evidence and qualification logic are unchanged.

@@ -160,6 +160,8 @@ def test_report_renders_without_python_or_pytest_fields(fake_stack):
     report = run_audit(fake_stack, execute=True)
     html = render_html(report)
     assert "fake-runner" in html and "fake-bundler" in html and "bundle loads PASS" in html
+    for path in (str(fake_stack.parent), json.dumps(str(fake_stack.parent))[1:-1]):  # the test's temp dir, not report content
+        html = html.replace(path, "<tmp>")
     assert not re.search(r"pytest|wheel|python", html, re.I)
 
 

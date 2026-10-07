@@ -39,6 +39,32 @@ def parse(html):
     return parser
 
 
+class _Columns(HTMLParser):
+    """State keys shown as metric-table column headers."""
+
+    def __init__(self):
+        super().__init__()
+        self.in_col, self.states = False, set()
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        key = attrs.get("data-i18n") or ""
+        if tag == "th":
+            self.in_col = attrs.get("scope") == "col"
+        elif self.in_col and key.startswith("state.") and not key.startswith("state.note"):
+            self.states.add(key.split(".", 1)[1])
+
+    def handle_endtag(self, tag):
+        if tag == "th":
+            self.in_col = False
+
+
+def state_columns(html):
+    parser = _Columns()
+    parser.feed(html)
+    return parser.states
+
+
 @pytest.fixture
 def improve_states(calc_project):
     session = start_improve(calc_project, python=sys.executable)
@@ -70,8 +96,22 @@ def test_improve_report_shows_baseline_vs_candidate_never_applied(improve_states
     assert report["states"]["candidate"]["observed_in"] == "isolated-candidate-copy"
     html = render_html(report)
     assert "Not applied" in html
-    assert re.search(r'<th scope="col">Candidate\b', html)
-    assert not re.search(r'<th scope="col">Applied\b', html)
+    assert state_columns(html) == {"baseline", "candidate"}
+
+
+@pytest.mark.integration
+def test_improve_page_separates_proposed_candidate_from_applied(improve_states):
+    session, result = improve_states
+    report = improve_report(session, result)
+    html = render_html(report)
+    assert 'data-i18n="not_applied.banner"' in html and 'data-i18n="mode.improve"' in html
+    assert 'data-i18n="mode.improve_applied"' not in html
+    assert html.count('class="panel stage"') == len(report["candidate_qualification"]["stages"])
+    assert '<details class="change">' in html and "+    assert add(2, 3) == 5" in html
+    assert 'id="delta"' in html
+    action = html[html.index('class="decision d-next"'):]
+    action = action[:action.index("</article>")]
+    assert ('data-i18n="decision.next.review"' in action) == (report["status"] == "READY_FOR_REVIEW")  # review, never "apply"
 
 
 @pytest.mark.integration
@@ -80,7 +120,7 @@ def test_applied_column_appears_only_after_approved_application(improve_states):
     applied = apply_approved(session, result, Approval(frozenset({"tests/test_strong.py"}), "reviewer"))
     report = improve_report(session, result, applied)
     assert report["states"]["applied"]["observed_in"] == "applied-project-copy"
-    assert re.search(r'<th scope="col">Applied\b', render_html(report))
+    assert state_columns(render_html(report)) == {"baseline", "candidate", "applied"}
 
 
 @pytest.mark.integration
@@ -122,8 +162,8 @@ def test_html_is_self_contained_semantic_and_accessible(improve_states):
     for tag, attrs in doc.attrs:
         if tag == "th":
             assert attrs.get("scope") in {"col", "row"}
-        if tag == "svg":
-            assert attrs.get("role") == "img" and attrs.get("aria-labelledby")
+        if tag == "svg":  # decorative icons are hidden; anything meaningful is a labelled image
+            assert attrs.get("aria-hidden") == "true" or (attrs.get("role") == "img" and attrs.get("aria-labelledby"))
         if tag in {"input", "select", "button"}:
             assert attrs.get("aria-label") or attrs.get("id")
     assert doc.tags.count("table") == html.count("<caption")
@@ -136,7 +176,7 @@ def test_charts_have_table_equivalents_and_no_invented_data(tmp_path):
     write(tmp_path / "README.md", "nothing executable\n")
     report = audit_report(tmp_path)
     html = render_html(report)
-    assert "<svg" not in html  # no measured metric pairs -> no chart
+    assert 'role="img"' not in html  # no measured metric pairs -> no chart
     assert report["status"] == "UNKNOWN"
 
 

@@ -108,50 +108,32 @@ APPLIED
 
 Never describe candidate results as already present in the project.
 
-## Visual design
+## Visual contract
 
-The HTML report should be polished, calm, responsive and understandable without reading raw logs.
+The HTML report is one self-contained, offline page (inline CSS and a small progressive-enhancement script; no CDN, web font, framework or network request). It works without JavaScript; the script adds language and theme switching, filters, copy buttons and opening a finding from a link. Rendering lives in `assertiva/report_html.py`, the presentation catalog in `assertiva/report_i18n.py`; neither changes the report model.
 
-Use:
-- a concise project/revision header;
-- clear status chips for observed, inferred, unknown and blocked evidence;
-- summary cards for the most important metrics;
-- before/candidate/applied comparisons;
-- accessible charts with accompanying text/table equivalents;
-- filters for severity, evidence type, runner, verification kind and status;
-- expandable findings with evidence, provenance and limitations;
-- a change-set view for added/modified/removal-candidate tests;
-- a verification-surface view for local/hooks/CI/build/deploy checks;
-- an "What does green prove?" section;
-- an "Evidence Delta" section;
-- links/references to raw artifacts without flooding the main page;
-- light and dark theme support;
-- keyboard navigation and semantic HTML.
+The page reads in four areas:
 
-Avoid visual noise, vanity dashboards and invented composite quality scores.
+1. **Overview** — project, revision, workspace state, workflow and states shown (Current, or Baseline vs Candidate, + Applied); the report status in words with its raw value; the decision surface; key evidence cards; **What does green prove?** (Observed / Not evidenced / Limitations); highest-priority findings; recommended improvements grouped by domain.
+2. **Evidence** — candidate qualification and change set (improve), metrics by state, evidence delta, negative paths, mutation, built artifact, delivery, selection, history.
+3. **Verification** — the verification surface grouped by origin (local, hooks, CI, build, …) with the full command, gate and tier behind each row plus a table view; runs and provenance; execution budget.
+4. **Details** — all findings with severity/category/search filters, remaining unknowns, provenance pairs, the raw report JSON.
 
-## Recommended report sections
+Decision surface rules (presentation only; no new semantics):
 
-1. Executive summary
-2. Current / Candidate / Applied comparison
-3. Test inventory
-4. Outcomes and stability
-5. Coverage
-6. Assertion and oracle quality
-7. Negative-path and validation evidence
-8. Test composition/materialization
-9. Fidelity and integration evidence
-10. Verification surface
-11. CI/CD and delivery parity
-12. Mutation / negative-control evidence when available
-13. Performance and runtime cost
-14. Findings and priorities
-15. Proposed/applied change set
-16. Evidence Delta
-17. What green proves now
-18. Remaining gaps and unknowns
-19. Environment, revision, adapters and provenance
-20. Raw artifact references
+- **What is working** lists evidence-backed strengths drawn from structured data only (a run that passed, a qualified artifact, no surviving mutant, detected negative controls, passed qualification checks), each with its tier. The absence of a finding is never shown as a strength.
+- **What needs attention** lists high and medium findings and failed or blocked qualification checks.
+- **What is not evidenced** is the claim boundary's not-evidenced list.
+- **What to improve next** is an existing recommendation, and only when the evidence ranks one: a finding whose own recommendation says it comes first (collection errors, failing tests), or a single finding at the highest severity. Otherwise the page says no single next action can be selected.
+- The overall status is never painted as success; green belongs to specific evidence.
+
+Each finding shows a human title, severity, category, evidence basis (tier), what was observed, why it matters, the evidence (affected items, progressively disclosed), the recommended improvement marked **Proposed** (proposed ≠ applied ≠ verified), what would close it, and technical details (finding code, original text, raw evidence). Title, category, basis, "why it matters" and "what would close it" come from a catalog keyed by finding code; "why" restates the consequence the engine's own text states and "close" negates the detection condition.
+
+Metrics use display names with the metric id beneath; the delta column appears only when states are compared. Charts are drawn only for compared states and sit next to tables with the same numbers. Status is never conveyed by color alone (icon and text), and the page supports keyboard navigation, light and dark themes and reduced motion, with no horizontal scroll down to phone width.
+
+### Languages
+
+English (canonical) and Brazilian Portuguese. The choice is remembered when browser storage is available; otherwise the browser language decides, falling back to English. Text is looked up by stable key; engine sentences are translated only when they match a fixed English template exactly, and otherwise appear as written, marked `lang="en"`. Finding codes, metric ids, enums, commands, paths, hashes, revisions, adapter names and raw evidence are never translated. Only the strings a page uses are embedded.
 
 ## Metric discipline
 

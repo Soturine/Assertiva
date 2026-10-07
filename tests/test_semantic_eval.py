@@ -28,6 +28,33 @@ def test_agent_context_never_contains_the_private_rubric(case):
     assert "<skill>" in context and semantic.DEFAULT_TASK in context or "Prompt / task" in sections
 
 
+@pytest.mark.parametrize("case", CASES)
+def test_agent_context_does_not_announce_the_case_title(case):
+    """A case title names the failure mode under test; the evaluated agent sees only the scenario and the task."""
+    title, sections = semantic.case_sections(case)
+    visible = "\n".join(sections.get(name, "") for name in semantic.AGENT_SECTIONS)
+    if title not in visible:
+        assert title not in semantic.agent_context(case)
+
+
+def test_agent_context_carries_the_skill_and_every_reference_it_can_load():
+    context = semantic.agent_context("SELF_AUDIT_ASSERTIVA")
+    assert semantic.SKILL_FILES, "the Skill ships references for progressive disclosure"
+    for path in semantic.SKILL_FILES:
+        rel = path.relative_to(semantic.ROOT).as_posix()
+        assert f'<skill-file path="{rel}">' in context and path.read_text(encoding="utf-8") in context
+
+
+@pytest.mark.parametrize("case", sorted(p.name for p in semantic.FIXTURES.iterdir() if p.is_dir()))
+def test_a_case_with_a_fixture_works_on_that_project_not_on_this_repository(case, tmp_path):
+    assert case in CASES, "every fixture belongs to a case"
+    semantic.main(["prepare", "--out", str(tmp_path), "--workspace", case])
+    workspace = tmp_path / case / "workspace"
+    assert (workspace / "pyproject.toml").is_file()
+    assert not (workspace / "evals").exists() and not (workspace / "SKILL.md").exists()
+    assert str(workspace) in (tmp_path / case / "agent.md").read_text(encoding="utf-8")
+
+
 def test_judge_context_holds_the_full_rubric_and_the_response():
     _, sections = semantic.case_sections("SELF_AUDIT_ASSERTIVA")
     context = semantic.judge_context("SELF_AUDIT_ASSERTIVA", "my answer")

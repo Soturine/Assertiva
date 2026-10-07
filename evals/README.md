@@ -9,7 +9,7 @@ Grade behavior, evidence honesty and cost-aware reasoning, not whether an agent 
 
 ## Hidden-rubric protocol ([`semantic.py`](semantic.py))
 
-1. `python evals/semantic.py prepare --out DIR CASE ...` writes each case's agent context: `SKILL.md`, the case title, context and task, and the allowed tools. Expected/prohibited behavior, evidence requirements, scoring dimensions, acceptable alternatives and the pass condition are private. With `--workspace`, the agent works on a copy of the repository without `evals/`.
+1. `python evals/semantic.py prepare --out DIR CASE ...` writes each case's agent context: `SKILL.md` and the references it may load, the case context and task, and the allowed tools. The title, expected/prohibited behavior, evidence requirements, scoring dimensions, acceptable alternatives and the pass condition are private. With `--workspace`, the agent works on the case's fixture project when it has one, otherwise on a copy of this repository without `evals/`.
 2. The evaluated agent answers from that context only (`response.md`; tool use listed in an evidence log).
 3. `python evals/semantic.py judge --out DIR CASE ...` writes the judge context: the full case and the response. The judge, in a separate context, returns PASS, FAIL or REVIEW with a justification per dimension: correctness, evidence grounding, overclaim avoidance, treatment of UNKNOWN, cost-aware evidence choice, safety, claim boundary, material alternatives. No score; no keyword, regex, exact-answer or topic-order grading; equivalent answers in other words pass.
 4. `python evals/semantic.py record --out DIR --results evals/results/NAME --agent ... --judge ...` validates every verdict and keeps verdicts, justifications, responses and provenance (revision, agent, judge). A missing or malformed verdict is recorded as not judged, never as a pass.
@@ -64,3 +64,16 @@ Each run preserves revision, agent, judge, tool permissions and results; infrast
 - [Dependency reproducibility for a library](cases/LIBRARY_LOCKFILE_RECOMMENDATION.md)
 - [Engine-backed report handoff](cases/ENGINE_BACKED_REPORT_HANDOFF.md)
 - [Cost-aware evidence ordering for HEAD](cases/COST_AWARE_HEAD_EVIDENCE_ORDERING.md)
+
+## Agent-led investigation cases
+
+Do the agent's choices of evidence, its stopping point and its priorities follow the question? Two run on executable fixture projects (`evals/fixtures/<CASE>`, prepared with `--workspace`).
+
+- [Evidence saturation on a short audit request](cases/EVIDENCE_SATURATION.md) (fixture)
+- [Tool choice for a narrow question](cases/TOOL_CHOICE_FREEDOM.md)
+- [A true engine fact with no product impact](cases/CONTEXTUAL_FALSE_POSITIVE.md)
+- [An assurance gap the engine does not flag](cases/SEMANTIC_FINDING_NOT_SEEDED_BY_ENGINE.md) (fixture)
+- [Many candidates, a small sample](cases/SAMPLE_OVERGENERALIZATION.md)
+- [Stop when the question is answered](cases/STOP_WHEN_ENOUGH.md)
+- [Provenance is not importance](cases/ENGINE_FACT_VS_SEMANTIC_IMPORTANCE.md)
+- [The delivered report agrees with the conclusion](cases/REPORT_RECONCILIATION.md)

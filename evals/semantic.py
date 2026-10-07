@@ -4,10 +4,11 @@
     python evals/semantic.py judge --out DIR CASE_ID
     python evals/semantic.py record --out DIR --results evals/results/NAME --agent LABEL --judge LABEL
 
-``prepare`` writes, per case, ``agent.md``: SKILL.md + the case title, context and task, and
-nothing else (expected/prohibited behavior, evidence requirements, scoring, alternatives and pass
-conditions are the private rubric). With ``--workspace`` it also writes a copy of this repository
-without ``evals/``, so an agent that may read files cannot read the rubric. An agent runs on
+``prepare`` writes, per case, ``agent.md``: the Skill (SKILL.md and the references it may load) + the
+case context and task, and nothing else (the title, expected/prohibited behavior, evidence requirements,
+scoring, alternatives and pass conditions are the private rubric). With ``--workspace`` it also writes
+the project the agent works on: the case's fixture under ``evals/fixtures/<CASE>`` when it has one,
+otherwise a copy of this repository without ``evals/``, so an agent that may read files cannot read the rubric. An agent runs on
 ``agent.md`` and writes ``response.md``. ``judge`` writes ``judge.md``: the full case + the response
 for a separate judge, which answers with a JSON verdict (PASS / FAIL / REVIEW + justification;
 no score). ``record`` validates every verdict and writes ``README.md`` (verdicts, justifications,
@@ -29,6 +30,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = ROOT / "evals" / "cases"
+FIXTURES = ROOT / "evals" / "fixtures"
+SKILL_FILES = sorted((ROOT / "references").glob("*.md"))
 AGENT_SECTIONS = ("Context", "Context / fixture", "Prompt / task")
 VERDICTS = {"PASS", "FAIL", "REVIEW"}
 DIMENSIONS = (
@@ -46,17 +49,31 @@ def case_sections(case_id: str) -> tuple[str, dict[str, str]]:
     return title, {parts[i].strip(): parts[i + 1].strip() for i in range(1, len(parts) - 1, 2)}
 
 
+def fixture(case_id: str) -> Path | None:
+    path = FIXTURES / case_id
+    return path if path.is_dir() else None
+
+
 def agent_context(case_id: str, workspace: Path | None = None) -> str:
-    """What the evaluated agent may see: the Skill, the scenario and the task. Never the rubric."""
-    title, sections = case_sections(case_id)
+    """What the evaluated agent may see: the Skill, the scenario and the task. Never the rubric or the title."""
+    _title, sections = case_sections(case_id)
     context = "\n\n".join(sections[name] for name in ("Context", "Context / fixture") if name in sections)
     task = sections.get("Prompt / task", DEFAULT_TASK)
-    tools = (f"You may read files and run commands only inside `{workspace}` (a copy of the repository). "
-             "Do not read anything outside it. End with an evidence log: every file you read and command you ran."
-             if workspace else "Answer from this context only; do not read files or run commands.")
+    if workspace and fixture(case_id):
+        tools = (f"The project is `{workspace}`. You may read files and run commands there. Engine reports and "
+                 "temporary copies outside it may be read; nothing else outside it. "
+                 "End with an evidence log: every file you read and command you ran.")
+    elif workspace:
+        tools = (f"You may read files and run commands only inside `{workspace}` (a copy of the repository). "
+                 "Do not read anything outside it. End with an evidence log: every file you read and command you ran.")
+    else:
+        tools = "Answer from this context only; do not read files or run commands."
     skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-    return (f"You are using the following Skill.\n\n<skill>\n{skill}\n</skill>\n\n"
-            f"# Task: {title}\n\n## Context\n{context}\n\n## Task\n{task}\n\n## Tools\n{tools}\n")
+    files = "".join(f'<skill-file path="{p.relative_to(ROOT).as_posix()}">\n{p.read_text(encoding="utf-8")}\n</skill-file>\n'
+                    for p in SKILL_FILES)
+    return ("You are using the following Skill. Its reference files are included; load them as the Skill directs.\n\n"
+            f"<skill>\n{skill}\n</skill>\n\n{files}\n"
+            f"# Task\n\n## Context\n{context}\n\n## Request\n{task}\n\n## Tools\n{tools}\n")
 
 
 def judge_context(case_id: str, response: str) -> str:
@@ -142,7 +159,16 @@ def main(argv: list[str] | None = None) -> int:
         for case in args.cases:
             folder = args.out / case
             folder.mkdir(parents=True, exist_ok=True)
-            workspace = workspace_copy(folder / "workspace") if args.workspace else None
+            workspace = None
+            if args.workspace:
+                project = fixture(case)
+                workspace = folder / "workspace"
+                if project:
+                    if workspace.exists():
+                        shutil.rmtree(workspace)
+                    shutil.copytree(project, workspace, ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
+                else:
+                    workspace_copy(workspace)
             (folder / "agent.md").write_text(agent_context(case, workspace), encoding="utf-8")
     elif args.step == "judge":
         for case in args.cases:

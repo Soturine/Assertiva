@@ -62,7 +62,8 @@ def test_the_context_really_is_gitless_sourceless_and_installed(installed_contex
     )
     assert probe.ok, probe.summary()
     imported, identity = json.loads(probe.stdout.strip().splitlines()[-1])
-    assert Path(imported).resolve().is_relative_to(Path(python).resolve().parents[1])  # the wheel, not the checkout
+    # the wheel, not the checkout; the venv directory is resolved, not its interpreter (a symlink to the system one on POSIX)
+    assert Path(imported).resolve().is_relative_to(Path(python).parents[1].resolve())
     assert identity["install"] == "installed-package" and identity["revision"] is None and identity["dirty"] is None
 
 

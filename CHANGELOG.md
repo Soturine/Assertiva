@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.8] — 2026-10-07 — Identity of the native-divergence check, passed counts, report redesign
+
+Patch release; M2 stays closed, M3 has not started.
+
+### Fixed
+- `STATIC_INVENTORY_DIVERGES_FROM_NATIVE` compared two different identities: the static inventory (direct definitions plus inherited/composed materializations, never expanding `parametrize`) against native invocations (one per parameter case). Every parameterized suite reported a divergence even when both sides saw the same 409 runnable nodes. The check now compares distinct native materializations; the finding's evidence records `native_materializations` and, separately, `native_invocations`. Regressions: a 4-case parametrize plus one test is not a divergence; tests generated at import time, which static inspection cannot see, still are. Known limit: on a deselected or partial run the static total still counts every discovered test.
+- The decision layer said "530 test cases executed and passed" for a run with 522 passed and 8 skipped: it counted a passing run's invocations. Run summaries now carry per-outcome counts (`outcomes`), and the page states passed cases and names skipped and expected failures separately ("522 test cases passed · 8 skipped"). Reports written before this field fall back to a wording that claims no pass count.
+
+### Changed
+- A heuristic (E3) signal is no longer listed under Confirmed; it is shown, labelled heuristic, on the inspected negative-path row of the scope.
+- The execution scope appears once (the "what does green prove?" ledger) instead of also as a strip in the decision surface.
+- "Informational findings only" is now "No high- or medium-priority findings", and its reason states how many relevant areas remain not proven, in a neutral (not success) tone.
+- Report page redesign: application layout with a sidebar and top bar, a hero with provenance, a next-step panel, key-figure tiles (passed/total with bar, coverage ring), colored decision cards, numbered findings with a summary rail (priority donut, findings by area that filter the list), numbered evidence records, a provenance grid with an artifacts table, and a separately designed light and dark theme. Still one self-contained offline file, bilingual, responsive from 1920 to 390 px, printable.
+
 ## [0.5.7] — 2026-10-07 — Self-test context fix and documentation truth-sync
 
 Patch release; M2 stays closed, M3 has not started. The runtime, the report and its provenance are unchanged.

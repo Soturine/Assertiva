@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import difflib
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -80,6 +81,8 @@ def state_summary(state: StateEvidence | None) -> dict | None:
             {
                 "adapter": run.adapter_id, "mode": run.mode, "status": run.status.value, "command": run.command,
                 "exit_code": run.exit_code, "invocations": len(run.invocations), "collection_errors": run.collection_errors,
+                # per-outcome counts: a run's invocations include skipped and not-run cases, which never count as passed
+                "outcomes": dict(Counter(inv.outcome.value for inv in run.invocations if inv.outcome is not None)),
                 "limitations": run.limitations,
                 # Adapter-defined execution dimensions (e.g. projects or targets) and attachment references.
                 "matrix": dict(run.metadata.get("matrix") or {}),

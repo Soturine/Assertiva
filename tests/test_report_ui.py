@@ -206,7 +206,7 @@ def test_improve_answers_readiness_and_blockers_first():
 
 def test_audit_scope_separates_executed_measured_inspected_declared_not_proven(report):
     page = parse(render_html(report))
-    rows = {a["id"]: a["class"] for a in page.with_class("lrow")}
+    rows = {a["id"]: a["class"] for a in page.with_class("lrow") if a.get("id")}  # the column header row has none
     level = lambda area: re.search(r"lvl-(\w+)", rows[f"scope-{area}"]).group(1)
     assert level("tests") == "inspected"  # static audit: inventory only, nothing executed
     assert level("ci") == "declared"  # configuration is never run evidence
@@ -219,17 +219,20 @@ def test_audit_scope_shows_execution_only_when_tests_ran(calc_project):
     import sys
 
     page = parse(render_html(run_audit(calc_project, execute=True, python=sys.executable)))
-    rows = {a["id"]: a["class"] for a in page.with_class("lrow")}
+    rows = {a["id"]: a["class"] for a in page.with_class("lrow") if a.get("id")}  # the column header row has none
     assert "lvl-executed" in rows["scope-tests"] and "lvl-measured" in rows["scope-coverage"]
 
 
 def test_heuristic_signals_are_never_counted_as_confirmed(calc_project):
     data = run_audit(calc_project)
     data["states"]["current"]["metrics"]["negative_paths_with_state_after_rejection"] = _metric(12, "HIGHER_IS_BETTER", tier="E3")
+    data["states"]["current"]["metrics"]["negative_path_tests"] = _metric(20, "CONTEXTUAL", tier="E2")
     page_html = render_html(data)
-    confirmed = section(page_html, 'class="fact d-conf"')
-    assert 'data-i18n="conf.none"' in confirmed  # nothing executed: nothing confirmed
-    assert 'class="signal"' in confirmed and "E3" in confirmed  # the E3 signal is shown apart, labelled as heuristic
+    confirmed = section(page_html, 'class="fact d-conf"', "</section>")
+    assert 'data-i18n="conf.none.why"' in confirmed  # nothing executed: nothing confirmed
+    assert "after a rejection" not in confirmed and "E3" not in confirmed  # a heuristic is never a confirmed fact
+    negative = re.search(r'<li class="lrow (lvl-\w+)[^"]*" id="scope-negative">(.*?)</li>', page_html, re.S)
+    assert negative.group(1) == "lvl-inspected" and "12 seem to check state after a rejection (heuristic)" in negative.group(2)
 
 
 def test_absence_of_findings_is_not_presented_as_success(calc_project):
@@ -584,9 +587,9 @@ def test_evidence_strength_uses_distinct_glyphs_not_a_scale(report):
     page_html = render_html(report)
     assert 'class="meter"' not in page_html
     ledger = section(page_html, '<ol class="ledger"', "</ol>")
-    glyphs = dict(re.findall(r'class="lrow lvl-(\w+)[^"]*".*?<use href="#i-(\w+)"', ledger))
+    glyphs = dict(re.findall(r'class="lrow lvl-(\w+)[^"]*".*?class="l-level"><svg[^>]*><use href="#i-(\w+)"', ledger))
     assert glyphs["declared"] != glyphs["not_evidenced"] != glyphs["inspected"]
-    assert all('data-i18n="lvl.' in row for row in re.findall(r'<li class="lrow.*?</li>', ledger))  # always a label, never colour alone
+    assert all('data-i18n="lvl.' in row for row in re.findall(r'<li class="lrow lvl-.*?</li>', ledger))  # always a label, never colour alone
 
 
 def test_portuguese_numbers_and_dates_are_localized_but_canonical_values_kept():
@@ -612,7 +615,7 @@ def test_technical_claim_boundary_is_grouped_and_counted(report):
     for name in ("observed", "not_evidenced", "limitations"):
         values = report["claim_boundary"][name]
         if values:
-            assert f'<details class="claim-g cg-{name}"' in claim
+            assert f'<details class="claim-g cg-{name} ' in claim
             listed = re.findall(rf'<div class="cd" id="claim-{name}-\w+">.*?<span class="count">(\d+)</span>', claim)
             assert sum(map(int, listed)) == len(values)  # grouped, nothing dropped
 

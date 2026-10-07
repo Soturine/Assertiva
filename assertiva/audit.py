@@ -34,13 +34,17 @@ def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]
     if failing:
         findings.append(Finding("NATIVE_TESTS_FAILING", "Some tests fail or error in the current state.", {"count": len(failing), "tests": failing[:20]}))
     executed = [inv for run in current.runs if run.mode == "execute" for inv in run.invocations]
-    if executed and static_total and len(executed) != static_total:
+    # The static inventory counts runnable nodes (definitions + inherited/composed materializations) and never expands
+    # parameters; the comparable native unit is the materialization, not the invocation (one per parameter case).
+    materializations = {inv.materialization_id for inv in executed}
+    if executed and static_total and len(materializations) != static_total:
         findings.append(
             Finding(
                 "STATIC_INVENTORY_DIVERGES_FROM_NATIVE",
                 "Native collection differs from static inventory; native collection is authoritative for what runs.",
                 {
                     "static_definitions_and_materializations": static_total,
+                    "native_materializations": len(materializations),
                     "native_invocations": len(executed),
                     "native_declarations": len({inv.declaration_id for inv in executed}),
                     "inherited_materializations": sum(inv.inherited for inv in executed),

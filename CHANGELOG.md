@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.6.0] — 2026-10-07 — Agent-led, evidence-grounded architecture
+
+Minor release; M2 stays closed, M3 has not started. Found by dogfooding on functional-test-designer: the Skill stopped at static evidence, sampled weak-oracle candidates and generalized, recommended evidence it could acquire itself, and the HTML kept a link it judged irrelevant as the high-priority next step.
+
+### Changed
+- SKILL.md is rewritten around the auditing agent: start from the user's question, choose evidence by what it can settle (no instrument is mandatory or first), correlate, resolve material engine findings instead of generalizing a sample, report gaps no tool raised, and stop when the evidence answers the question or more evidence is not safe, authorized or proportionate. Claims separate provenance (OBSERVED, DECLARED, INFERRED, UNKNOWN) from importance. Agent Skills frontmatter; 287 → ~95 lines, with three references loaded on demand (`references/ENGINE.md`, `TEST_QUALITY.md`, `DELIVERY.md`) replacing `FRAMEWORK_ADAPTERS.md`, `MUTATION_TESTING.md` and `TEST_SMELLS.md`.
+- Candidate qualification: the EXECUTION pillar is one check (`CANDIDATE_TESTS`); `STATIC_AND_DISCOVERY` reported the same missing runner, blocked run or collection error a second time. A table test shows the pillar keeps every outcome of the two former checks.
+
+### Added
+- `assertiva audit --assessment FILE` attaches the auditing agent's assessment to the latest audit run and re-renders the same page. Dispositions (CONFIRMED, PARTIAL, CONTEXTUAL, FALSE_POSITIVE, UNRESOLVED) sit beside engine findings without rewriting their severity, summary or evidence; agent findings are first-class with basis and cited evidence. Refused for another run, a changed project, entries without evidence, or a whole-finding verdict without every item reviewed.
+- `assertiva audit --run-check CHECK_ID` reproduces a discovered check (what CI declares) in a disposable copy, as `improve --run-check` already did. Found by dogfooding: an agent that needed CI-equivalent evidence for a unittest suite ran the runner inside the project tree because audit offered no safe instrument.
+- Audit reports carry `run_id`, the project digest, and per finding an `id`, `origin` and effective `priority`; recommendations carry `finding_id`.
+- The Assurance Report leads with the auditor's conclusion, ranks and chooses the next step by effective priority, and shows engine observation, engine default priority, disposition, rationale, reviewed scope and cited evidence on each card (English and Brazilian Portuguese).
+- Eight hidden-rubric eval cases for agent-led behavior, two on executable fixture projects; the harness hides case titles from the evaluated agent and includes the Skill's references.
+
+### Evaluation and dogfood
+- Eight agent-led cases, claude-haiku-4-5 on both sides, blind Haiku judge, n = 1 per case: SKILL.md 0.5.8 4 PASS / 1 REVIEW / 3 FAIL; this release 6 PASS / 2 REVIEW / 0 FAIL (`evals/results/2026-10-07-agent-led-*`).
+- functional-test-designer, same short prompt: the agent executed the suite through the engine (599 passed, coverage measured), set the local skill link aside as contextual, reviewed all 19 weak-oracle candidates and attached its assessment; the project was unchanged. Dogfood also produced the fixes below and the completion example in SKILL.md.
+- Self-audit with `--execute`: 619 passed, 8 skipped, wheel qualification PASS, project unchanged.
+
+### Fixed
+- `coverage run -m pytest` in CI was classified as a coverage command, so the suite looked absent from CI (`CI_PYTEST_NOT_OBSERVED`).
+- Static audits recorded the skipped execution as "not requested: fast static feedback"; they now say what stays UNKNOWN and what `audit --execute` measures.
+
 ## [0.5.8] — 2026-10-07 — Identity of the native-divergence check, passed counts, report redesign
 
 Patch release; M2 stays closed, M3 has not started.

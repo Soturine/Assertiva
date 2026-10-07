@@ -151,6 +151,8 @@ python -m pip install -e .
 assertiva audit .
 assertiva audit . --execute --coverage-report coverage.xml --mutation-report mutation.json --junit-xml results.xml
 assertiva audit . --changed-since main --execute   # impact-based selection, widened when impact is not proven
+assertiva audit . --run-check <CHECK_ID>           # reproduce a declared check (e.g. the CI test step) in a disposable copy
+assertiva audit . --assessment assessment.json    # attach the auditing agent's assessment to the last run's report
 
 # Improve: one command, called again at each step.
 assertiva improve .                      # measure baseline, create the candidate workspace

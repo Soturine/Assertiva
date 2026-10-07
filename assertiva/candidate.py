@@ -39,7 +39,6 @@ class QualificationStage(str, Enum):
 class QualificationCheck(str, Enum):
     """Checks inside a pillar; each keeps its own status and evidence."""
 
-    STATIC_AND_DISCOVERY = "STATIC_AND_DISCOVERY"
     CANDIDATE_TESTS = "CANDIDATE_TESTS"
     ORIGINAL_REGRESSION = "ORIGINAL_REGRESSION"
     COVERAGE_AND_ORACLES = "COVERAGE_AND_ORACLES"
@@ -51,7 +50,7 @@ class QualificationCheck(str, Enum):
 
 
 PILLARS: dict[QualificationStage, tuple[QualificationCheck, ...]] = {
-    QualificationStage.EXECUTION: (QualificationCheck.STATIC_AND_DISCOVERY, QualificationCheck.CANDIDATE_TESTS),
+    QualificationStage.EXECUTION: (QualificationCheck.CANDIDATE_TESTS,),
     QualificationStage.BEHAVIORAL_ASSURANCE: (
         QualificationCheck.ORIGINAL_REGRESSION, QualificationCheck.COVERAGE_AND_ORACLES, QualificationCheck.NEGATIVE_PATHS,
     ),

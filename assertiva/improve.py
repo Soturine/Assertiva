@@ -152,32 +152,28 @@ def _invocations(state: StateEvidence):
     return [inv for run in state.runs for inv in run.invocations]
 
 
-def _discovery_stage(candidate: StateEvidence) -> CheckResult:
-    stage = QualificationCheck.STATIC_AND_DISCOVERY
+def _execution_stage(changes: list[CandidateTestChange], candidate: StateEvidence) -> CheckResult:
+    """EXECUTION: the candidate's tests are collected natively and the added/modified ones run without failure.
+
+    One check for one claim: a missing runner, a blocked run or a collection error is reported once."""
+    stage = QualificationCheck.CANDIDATE_TESTS
     if not candidate.runs:
         return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could discover candidate tests", *candidate.limitations)
-    errors = [error for run in candidate.runs for error in run.collection_errors]
+    changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
+    errors = [e for run in candidate.runs for e in run.collection_errors]
+    in_changed = [e for run in candidate.runs for e in run.collection_errors if run.metadata.get("error_sources", {}).get(e) in changed]
+    if in_changed:
+        return _stage(stage, StageStatus.FAIL, "candidate test files failed to collect: " + ", ".join(in_changed))
     if errors:
         return _stage(stage, StageStatus.FAIL, "collection errors: " + ", ".join(errors[:10]))
     if any(run.status is StageStatus.BLOCKED for run in candidate.runs):
         return _stage(stage, StageStatus.BLOCKED, "runner could not execute", *[l for r in candidate.runs for l in r.limitations])
-    count = len(_invocations(candidate))
-    if not count:
+    invocations = _invocations(candidate)
+    if not invocations:
         return _stage(stage, StageStatus.UNKNOWN, "no candidate invocations were collected")
-    return _stage(stage, StageStatus.PASS, f"{count} invocations collected natively without errors")
-
-
-def _candidate_tests_stage(changes: list[CandidateTestChange], candidate: StateEvidence) -> CheckResult:
-    stage = QualificationCheck.CANDIDATE_TESTS
-    if not candidate.runs:
-        return _stage(stage, StageStatus.UNKNOWN, "no runner adapter could execute candidate tests", *candidate.limitations)
-    changed = {c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE}
-    touched = [inv for inv in _invocations(candidate) if changed & set(inv.source_paths)]
-    errors = [e for run in candidate.runs for e in run.collection_errors if run.metadata.get("error_sources", {}).get(e) in changed]
-    if errors:
-        return _stage(stage, StageStatus.FAIL, "candidate test files failed to collect: " + ", ".join(errors))
-    if not touched:
-        return _stage(stage, StageStatus.NOT_RUN, "the candidate does not add or modify executable tests")
+    touched = [inv for inv in invocations if changed & set(inv.source_paths)]
+    if not touched:  # nothing to execute beyond discovery, which succeeded
+        return _stage(stage, StageStatus.PASS, f"{len(invocations)} invocations collected natively without errors")
     bad = sorted(inv.invocation_id for inv in touched if inv.outcome in (Outcome.FAILED, Outcome.ERROR))
     if bad:
         return _stage(stage, StageStatus.FAIL, "failing candidate invocations: " + ", ".join(bad[:10]))
@@ -487,8 +483,7 @@ def _stability_stage(stability: StabilityEvidence, deltas) -> CheckResult:
 
 def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed, budget: list) -> list[QualificationStageResult]:
     plan = {
-        QualificationCheck.STATIC_AND_DISCOVERY: lambda: _discovery_stage(candidate),
-        QualificationCheck.CANDIDATE_TESTS: lambda: _candidate_tests_stage(changes, candidate),
+        QualificationCheck.CANDIDATE_TESTS: lambda: _execution_stage(changes, candidate),
         QualificationCheck.ORIGINAL_REGRESSION: lambda: _regression_stage(session, changes, candidate),
         QualificationCheck.COVERAGE_AND_ORACLES: lambda: _coverage_stage(deltas),
         QualificationCheck.NEGATIVE_PATHS: lambda: _negative_path_stage(changes, candidate, deltas),

@@ -730,7 +730,7 @@ UI: dict[str, tuple[str, str]] = {
     "q.FAULT_SENSITIVITY": ("Fault sensitivity", "Sensibilidade a falhas"),
     "q.DELIVERY_FIDELITY": ("Delivery fidelity", "Fidelidade de entrega"),
     "q.STABILITY_AND_COST": ("Stability and cost", "Estabilidade e custo"),
-    "q.STATIC_AND_DISCOVERY": ("Discovery and collection", "Descoberta e coleta"),
+    "q.STATIC_AND_DISCOVERY": ("Discovery and collection", "Descoberta e coleta"),  # reports written before 0.6.0
     "q.CANDIDATE_TESTS": ("Candidate tests", "Testes do candidato"),
     "q.ORIGINAL_REGRESSION": ("Original regression suite", "Suíte de regressão original"),
     "q.COVERAGE_AND_ORACLES": ("Coverage and oracles", "Cobertura e oráculos"),

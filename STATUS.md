@@ -22,7 +22,7 @@ Python/pytest, packaging, GitHub Actions and pre-commit are the first reference 
 - Candidate workspace: detached Git worktree for a clean repository root, otherwise a copy; verified against the baseline fingerprint, including uncommitted work.
 - Change set ADD / MODIFY / RETIRE_CANDIDATE with fingerprints and diffs; originals are never commented out or deleted without approval; apply refuses atomically when the project file or the candidate changed since qualification.
 - Qualification: five pillars — EXECUTION, BEHAVIORAL_ASSURANCE, FAULT_SENSITIVITY, DELIVERY_FIDELITY, STABILITY_AND_COST — each aggregating its checks (FAIL > BLOCKED > UNKNOWN > PASS; a check that did not run never passes a pillar on its own and stays listed under remaining unknowns). Checks (PASS / FAIL / BLOCKED / NOT_RUN / UNKNOWN; unavailable is never PASS):
-  - EXECUTION: STATIC_AND_DISCOVERY, CANDIDATE_TESTS from native collection/execution;
+  - EXECUTION: CANDIDATE_TESTS — native collection of the whole candidate (any collection error fails) and execution of the added/modified tests (one check since 0.6.0; it replaced STATIC_AND_DISCOVERY + CANDIDATE_TESTS, which reported the same missing runner or blocked run twice);
   - BEHAVIORAL_ASSURANCE:
     ORIGINAL_REGRESSION: unchanged original tests rerun against the candidate;
     COVERAGE_AND_ORACLES: line/branch coverage (measured, or ingested with `--coverage-report baseline=…|candidate=…`) and weak-oracle deltas; covered and total are compared as counts, and a percentage over a changed denominator is UNKNOWN with the note shown in the report (80/100 → 90/120: covered up, total changed, percent down), never a pass or a fail by percentage alone;

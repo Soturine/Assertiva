@@ -202,7 +202,8 @@ def _result_from(data: dict):
                 QualificationStageResult(
                     QualificationStage(s["stage"]), StageStatus(s["status"]), s["summary"],
                     tuple(CheckResult(QualificationCheck(c["check"]), StageStatus(c["status"]), c["summary"],
-                                      tuple(c["evidence_refs"]), tuple(c["limitations"])) for c in s["checks"]),
+                                      tuple(c["evidence_refs"]), tuple(c["limitations"]))
+                          for c in s["checks"] if c["check"] in QualificationCheck.__members__),  # checks merged since older sessions
                 )
                 for s in q["stages"]
             ],

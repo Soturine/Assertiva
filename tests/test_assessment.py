@@ -203,3 +203,103 @@ def test_cli_refuses_without_a_prior_audit_and_with_measurement_options(two_weak
     assert "run `assertiva audit` first" in capsys.readouterr().err
     assert cli.main(["audit", str(two_weak), "--assessment", path, "--execute"]) == 2
     assert "--assessment" in capsys.readouterr().err
+
+
+# --- the rendered page tells one story --------------------------------------------------------------
+
+import html as html_lib  # noqa: E402
+import re  # noqa: E402
+
+from assertiva.report import render_html  # noqa: E402
+
+
+def _rail(page: str) -> str:
+    start = page.index('<aside class="rail"')
+    return page[start:page.index("</aside>", start)]
+
+
+def _card(page: str, finding_id: str) -> str:
+    start = page.index(f'data-finding-id="{finding_id}"')
+    start = page.rindex('<details class="finding', 0, start)
+    end = page.find('<details class="finding', start + 10)
+    return page[start:end if end > 0 else page.index("</section>", start)]
+
+
+_BOUNDARY = {"id": "boundary-mocked", "title": "The adapter is mocked in every test", "claim": "No test crosses the adapter.",
+             "why": "A broken adapter stays green.", "priority": "high", "basis": "INFERRED",
+             "evidence": ["tests/test_calc.py:1"], "recommendation": "Add one test through the real adapter."}
+
+
+def test_next_step_follows_the_assessment_not_the_engine_default(two_weak, capsys):
+    report = _audit(two_weak, capsys)
+    assert "WEAK_ORACLE_SIGNAL" in _rail(render_html(report)) or 'href="#finding-' in _rail(render_html(report))
+    out = apply_assessment(report, _assess(report, findings=[_BOUNDARY], dispositions=[{
+        "finding": "WEAK_ORACLE_SIGNAL", "disposition": "FALSE_POSITIVE", "rationale": "Both delegate to a strict helper.",
+        "evidence": ["tests/helpers.py:3"], "scope": {"reviewed": 2, "of": 2}}]))
+    page = render_html(out)
+    rail = html_lib.unescape(_rail(page))
+    assert "Add one test through the real adapter." in rail and "The adapter is mocked in every test" in rail
+    improvements = page[page.index('id="improvements"'):page.index('<section id="evidence"')]
+    assert "Add one test through the real adapter." in html_lib.unescape(improvements)
+    assert 'id="rec-WEAK_ORACLE_SIGNAL"' not in improvements  # withdrawn: no longer an action
+
+
+def test_a_dispositioned_card_shows_observation_assessment_and_raw_evidence(two_weak, capsys):
+    report = _audit(two_weak, capsys)
+    out = apply_assessment(report, _assess(report, dispositions=[{
+        "finding": "WEAK_ORACLE_SIGNAL", "disposition": "CONTEXTUAL", "priority": "info",
+        "rationale": "Smoke checks of a one-line wrapper; behavior is asserted elsewhere.",
+        "evidence": ["tests/test_calc.py:6"], "scope": {"reviewed": 2, "of": 2}}]))
+    card = _card(render_html(out), "WEAK_ORACLE_SIGNAL")
+    text = html_lib.unescape(card)
+    assert 'data-i18n="disp.CONTEXTUAL"' in card and 'data-i18n="severity.info"' in card
+    assert 'data-i18n="assess.engine_said"' in card and 'data-i18n="severity.medium"' in card  # the engine default stays visible
+    assert "Smoke checks of a one-line wrapper" in text and "tests/test_calc.py:6" in text
+    assert "Reviewed 2 of 2 items" in text
+    raw = re.search(r'<details class="tech">.*?<pre class="code">(.*?)</pre>', card, re.S).group(1)
+    assert json.loads(html_lib.unescape(raw)) == _weak(report)["evidence"]
+
+
+def test_agent_findings_render_as_findings_with_their_basis(two_weak, capsys):
+    report = _audit(two_weak, capsys)
+    page = render_html(apply_assessment(report, _assess(report, findings=[_BOUNDARY], lang="en")))
+    card = _card(page, "agent:boundary-mocked")
+    text = html_lib.unescape(card)
+    assert "The adapter is mocked in every test" in text and "A broken adapter stays green." in text
+    assert 'data-i18n="basis.INFERRED"' in card and 'data-i18n="assess.by_agent"' in card
+    assert "tests/test_calc.py:1" in text and 'data-severity="high"' in card
+
+
+def test_the_auditors_conclusion_leads_and_unknowns_are_listed(two_weak, capsys):
+    report = _audit(two_weak, capsys)
+    out = apply_assessment(report, _assess(report, summary="A suíte cobre o caminho feliz; nada prova a integração.",
+                                           lang="pt-BR", unknowns=["Se o CI rodou nesta revisão."]))
+    page = render_html(out)
+    decision = page[page.index('class="decision'):page.index('id="green"')]
+    assert 'lang="pt-BR"' in decision and "nada prova a integração" in html_lib.unescape(decision)
+    assert "Se o CI rodou nesta revisão." in html_lib.unescape(page[page.index('class="fact d-unk"'):])
+    assert render_html(out, lang="pt-BR")  # both languages render
+
+
+def test_counts_and_verdict_use_effective_priority(two_weak, capsys):
+    report = _audit(two_weak, capsys)
+    out = apply_assessment(report, _assess(report, dispositions=[{
+        "finding": "WEAK_ORACLE_SIGNAL", "disposition": "FALSE_POSITIVE", "rationale": "x", "evidence": ["e"],
+        "scope": {"reviewed": 2, "of": 2}}]))
+    page = render_html(out)
+    attention = page[page.index('class="fact d-att"'):page.index('class="fact d-unk"')]
+    assert "Weak behavioral oracles" not in html_lib.unescape(attention)
+    assert "1 engine finding was reviewed and set aside" in html_lib.unescape(page)
+
+
+def test_reports_written_before_assessments_still_render(calc_project):
+    from assertiva.audit import run_audit
+
+    old = run_audit(calc_project)
+    old.pop("run_id")
+    for f in old["findings"]:
+        for key in ("id", "origin", "priority"):
+            f.pop(key)
+    for rec in old["recommendations"]:
+        rec.pop("finding_id")
+    assert 'href="#finding-' in _rail(render_html(old))

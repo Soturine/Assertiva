@@ -28,7 +28,7 @@ from .report_narrative import strip_kinds, template as _narrative_template
 
 Pair = tuple[str, str]
 
-_SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2, "info": 3}
+_SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2, "info": 3, "none": 4}
 _STATE_ORDER = ("current", "baseline", "candidate", "applied")
 _FIRST = ("NATIVE_COLLECTION_ERRORS", "NATIVE_TESTS_FAILING")  # their own recommendation says they come first
 _LIST_LIMIT = 6
@@ -246,6 +246,15 @@ class _R:
         original = f' data-en="{_e(pair[0])}"' if self.lang != "en" else ""
         return f' data-i18n="{k}"{original}'
 
+    def agent_text(self, text: str, tag: str = "span", cls: str | None = None) -> str:
+        """Text written by the auditing agent: shown as written, in the language it declared, never machine-translated."""
+        lang = (self.report.get("assessment") or {}).get("lang")
+        klass = f"agent-text {cls}" if cls else "agent-text"
+        return f'<{tag} class="{klass}"' + (f' lang="{_e(lang)}"' if lang else "") + f">{_e(text)}</{tag}>"
+
+    def refs(self, values: list[str]) -> str:
+        return self.items(values, kind="code", limit=8)
+
     def narr(self, text: str, tag: str = "span", cls: str | None = None) -> str:
         """Engine sentence: localized on a template match, otherwise as written (lang=en)."""
         pair = narrate(text)
@@ -306,31 +315,61 @@ def _finding_meta(code: str) -> dict:
     return FINDINGS.get(code) or {}
 
 
+def _prio(f: dict) -> str:
+    """Effective priority: the engine severity unless the auditor's assessment restated it ('none': set aside)."""
+    return f.get("priority") or f["severity"]
+
+
+def _fid(f: dict) -> str:
+    return f.get("id") or f["code"]  # reports written before finding ids: the code
+
+
+def _agent(f: dict) -> bool:
+    return f.get("origin") == "agent"
+
+
+def _active(findings: list[dict]) -> list[dict]:
+    return [f for f in findings if _prio(f) != "none"]
+
+
 def _sorted_findings(findings: list[dict]) -> list[tuple[int, dict]]:
-    return sorted(enumerate(findings), key=lambda item: (_SEVERITY_ORDER.get(item[1]["severity"], 9), item[0]))
+    return sorted(enumerate(findings), key=lambda item: (_SEVERITY_ORDER.get(_prio(item[1]), 9), item[0]))
 
 
 def _category(code: str) -> str:
-    return _finding_meta(code).get("category") or "other"
+    return "assessment" if code == "AGENT_FINDING" else (_finding_meta(code).get("category") or "other")
 
 
-def _recommendation_for(report: dict, code: str) -> str | None:
-    return next((rec["recommendation"] for rec in report.get("recommendations") or [] if rec["finding"] == code), None)
+def _recommendation_for(report: dict, f: dict) -> str | None:
+    """The finding's open recommendation; a withdrawn one (the auditor set the finding aside) is no longer an action."""
+    fid = _fid(f)
+    return next((rec["recommendation"] for rec in report.get("recommendations") or []
+                 if rec.get("finding_id", rec["finding"]) == fid and rec.get("status") != "WITHDRAWN"), None)
 
 
 def _severity_counts(findings: list[dict]) -> dict[str, int]:
     counts = {"high": 0, "medium": 0, "info": 0}
-    for f in findings:
-        counts[f["severity"] if f["severity"] in ("high", "medium") else "info"] += 1
+    for f in _active(findings):
+        counts[_prio(f) if _prio(f) in ("high", "medium") else "info"] += 1
     return counts
 
 
 def _finding_title(f: dict) -> Pair:
+    if _agent(f):
+        return (f["title"], f["title"])
     meta = _finding_meta(f["code"])
     return meta["title"] if meta.get("title") else (_humanize(f["code"]), _humanize(f["code"]))
 
 
+def _finding_why(f: dict) -> Pair | None:
+    if _agent(f):
+        return (f["why"], f["why"]) if f.get("why") else None
+    return _finding_meta(f["code"]).get("why")
+
+
 def _finding_summary(f: dict) -> Pair | None:
+    if _agent(f):
+        return (f["summary"], f["summary"])
     summary = _finding_meta(f["code"]).get("summary")
     if summary and summary[0] == f["summary"]:
         return summary
@@ -348,18 +387,26 @@ def _action(code: str, text: str) -> Pair | None:
     return ACTIONS.get(code) or _rec_pair(code, text)
 
 
+def _act(report: dict, f: dict) -> Pair | None:
+    text = _recommendation_for(report, f)
+    if text is None:
+        return None
+    return (text, text) if _agent(f) else _action(f["code"], text)
+
+
 def _next_step(report: dict) -> dict:
-    """The next action only when the evidence ranks one; a tie is reported as a tie, never broken by guessing."""
-    with_rec = [(i, f) for i, f in enumerate(report["findings"]) if _recommendation_for(report, f["code"])]
+    """The next action only when the evidence ranks one; a tie is reported as a tie, never broken by guessing.
+    Ranked by effective priority: an auditor's disposition can lower, raise or withdraw an engine default."""
+    with_rec = [(i, f) for i, f in enumerate(report["findings"]) if _prio(f) != "none" and _recommendation_for(report, f)]
     for code in _FIRST:
-        first = [(i, f) for i, f in with_rec if f["code"] == code]
+        first = [(i, f) for i, f in with_rec if f["code"] == code and _prio(f) == "high"]
         if first:
             return {"kind": "one", "items": first[:1]}
     if not with_rec:
         return {"kind": "none", "items": []}
-    top = min(_SEVERITY_ORDER.get(f["severity"], 9) for _, f in with_rec)
-    at_top = [(i, f) for i, f in with_rec if _SEVERITY_ORDER.get(f["severity"], 9) == top]
-    if at_top[0][1]["severity"] not in ("high", "medium"):
+    top = min(_SEVERITY_ORDER.get(_prio(f), 9) for _, f in with_rec)
+    at_top = [(i, f) for i, f in with_rec if _SEVERITY_ORDER.get(_prio(f), 9) == top]
+    if _prio(at_top[0][1]) not in ("high", "medium"):
         return {"kind": "optional", "items": at_top}
     return {"kind": "one" if len(at_top) == 1 else "tie", "items": at_top}
 
@@ -628,18 +675,19 @@ def _rail(r: _R) -> str:
     step = _next_step(report)
     if step["kind"] == "one":
         index, f = step["items"][0]
-        meta = _finding_meta(f["code"])
-        act = _action(f["code"], _recommendation_for(report, f["code"]))
-        rows = [("next.why", r.p(meta["why"]) if meta.get("why") else ""),
-                ("next.origin", f'<a href="#finding-{index}">{r.p(_finding_title(f))}</a>{r.pill(f["severity"], prefix="severity.")}'),
+        meta = {} if _agent(f) else _finding_meta(f["code"])
+        act = _act(report, f)
+        why = _finding_why(f)
+        rows = [("next.why", r.p(why) if why else ""),
+                ("next.origin", f'<a href="#finding-{index}">{r.p(_finding_title(f))}</a>{r.pill(_prio(f), prefix="severity.")}'),
                 ("next.done", r.p(meta["close"]) if meta.get("close") else "")]
         dl = "".join(f"<div><dt>{r.t(k)}</dt><dd>{v}</dd></div>" for k, v in rows if v)
         body = ((r.p(act, tag="p", cls="rail-act") if act else "") + f'<dl class="rail-dl">{dl}</dl>'
                 + f'<a class="btn" href="#finding-{index}-fix">{r.t("next.how")}{r.icon("arrow")}</a>')
     elif step["kind"] == "tie":
-        severity = step["items"][0][1]["severity"]
+        severity = _prio(step["items"][0][1])
         items = "".join(
-            f'<li><a href="#finding-{i}">{r.p(_action(f["code"], _recommendation_for(report, f["code"])) or _finding_title(f))}</a></li>'
+            f'<li><a href="#finding-{i}">{r.p(_act(report, f) or _finding_title(f))}</a></li>'
             for i, f in step["items"][:4]
         )
         more = r.t("decision.more", tag="li", cls="muted", n=len(step["items"]) - 4) if len(step["items"]) > 4 else ""
@@ -703,10 +751,14 @@ def _conclusion(r: _R) -> str:
         applied = bool(report["states"].get("applied"))
         lines.append(f'<p class="c-scope">{r.icon("checkc" if applied else "ring", "ic")}{r.t("story.applied" if applied else "story.not_applied")}</p>')
     else:
-        findings = report["findings"]
+        findings = _active(report["findings"])
+        assessment = report.get("assessment") or {}
+        if assessment.get("summary"):
+            lines.append(f'<div class="c-auditor"><p class="mini-label">{r.icon("users", "ic")}{r.t("assess.conclusion")}</p>'
+                         f'{r.agent_text(assessment["summary"], "p", "c-auditor-text")}</div>')
         if findings:
             lines.append(f'<p class="c-chips"><span class="c-total">{r.t("att.count", n=len(findings))}</span>{_sev_chips(r, _severity_counts(findings))}</p>')
-        if report["status"] in ("UNKNOWN", "NO_FINDINGS_IN_SCOPE") or not findings or not any(f["severity"] in ("high", "medium") for f in findings):
+        if report["status"] in ("UNKNOWN", "NO_FINDINGS_IN_SCOPE") or not findings or not any(_prio(f) in ("high", "medium") for f in findings):
             lines.append(r.p(reason, tag="p", cls="c-reason"))
         shape, evmode = _evidence_mode(r)
         glyph = {"solid": "checkc", "half": "half", "hollow": "diamond"}[shape]
@@ -761,8 +813,9 @@ def _kpis(r: _R) -> str:
         surface = report.get("verification_surface") or []
         tiles.append(_kpi(r, "doc", "kpi.checks", _e(len(surface)), r.t("kpi.checks.sub"), tone="muted"))
         counts = _severity_counts(report["findings"])
-        tiles.append(_kpi(r, "alert", "kpi.findings", _e(len(report["findings"])), r.t("kpi.findings.sub"),
-                          f'<p class="kpi-note chips">{_sev_chips(r, counts)}</p>' if report["findings"] else "",
+        active = _active(report["findings"])
+        tiles.append(_kpi(r, "alert", "kpi.findings", _e(len(active)), r.t("kpi.findings.sub"),
+                          f'<p class="kpi-note chips">{_sev_chips(r, counts)}</p>' if active else "",
                           "warn" if counts["high"] or counts["medium"] else "muted"))
     return f'<section class="kpis" aria-labelledby="h-kpis"><h2 class="sr-only" id="h-kpis">{r.t("cards.title")}</h2>{"".join(tiles)}</section>'
 
@@ -793,7 +846,7 @@ def _facts_audit(r: _R) -> str:
     confirmed = _confirmed(state)
     conf_body = _bullets(r, [p for p, _ in confirmed]) if confirmed else r.t("conf.none.why", tag="p", cls="fnote")
     counts = _severity_counts(report["findings"])
-    serious = [(i, f) for i, f in _sorted_findings(report["findings"]) if f["severity"] in ("high", "medium")]
+    serious = [(i, f) for i, f in _sorted_findings(report["findings"]) if _prio(f) in ("high", "medium")]
     if serious:
         att_body = ('<ul class="flist links">' + "".join(f'<li><a href="#finding-{i}">{r.p(_finding_title(f))}</a></li>' for i, f in serious[:3])
                     + (r.t("decision.more", tag="li", cls="more-n", n=len(serious) - 3) if len(serious) > 3 else "") + "</ul>")
@@ -801,7 +854,11 @@ def _facts_audit(r: _R) -> str:
         att_body = r.t("att.none", tag="p", cls="fnote")
     if counts["info"]:
         att_body += r.t("att.info", tag="p", cls="fnote", n=counts["info"])
+    dismissed = len(report["findings"]) - len(_active(report["findings"]))
+    if dismissed:
+        att_body += r.t("assess.dismissed", tag="p", cls="fnote", n=dismissed)
     shorts = [_short_unknown(item, report) for item in report["claim_boundary"].get("not_evidenced") or []]
+    shorts += [(u, u) for u in (report.get("assessment") or {}).get("unknowns") or []]
     return (
         f'<div class="facts"><h2 class="sr-only" id="h-facts">{r.t("strip.title")}</h2>'
         + _fact(r, "d-conf", "check", "conf.title", len(confirmed), conf_body, r.link("#green", "conf.go"))
@@ -924,50 +981,89 @@ def _overview(r: _R) -> str:
 
 # --- findings ----------------------------------------------------------------------------
 
+def _assessment_block(r: _R, f: dict) -> str:
+    """The auditor's disposition beside the engine observation; the engine default stays visible."""
+    a = f["assessment"]
+    rows = [f'<p class="a-head">{r.pill(a["disposition"], prefix="disp.", tone=_DISP_TONE[a["disposition"]])}'
+            f'<span class="a-engine">{r.t("assess.engine_said")} {r.pill(f["severity"], prefix="severity.")}</span></p>',
+            r.agent_text(a["rationale"], "p", "a-rationale")]
+    if a.get("scope"):
+        rows.append(r.t("assess.reviewed", tag="p", cls="a-scope", n=a["scope"]["reviewed"], of=a["scope"]["of"]))
+    if a.get("subjects"):
+        items = "".join(f'<li><code>{_e(s_["subject"])}</code> {r.pill(s_["disposition"], prefix="disp.", tone=_DISP_TONE[s_["disposition"]])}'
+                        + (f" {r.agent_text(s_['note'])}" if s_.get("note") else "") + "</li>" for s_ in a["subjects"])
+        rows.append(f'<p class="tech-label">{r.t("assess.subjects")}</p><ul class="list">{items}</ul>')
+    rows.append(f'<p class="tech-label">{r.t("assess.evidence")}</p>{r.refs(a["evidence"])}')
+    return (f'<div class="f-block f-assess">{r.icon("users", "ic fb-ic")}<div><h4>{r.t("assess.title")}</h4>{"".join(rows)}</div></div>')
+
+
+_DISP_TONE = {"CONFIRMED": "warn", "PARTIAL": "warn", "CONTEXTUAL": "neutral", "FALSE_POSITIVE": "pass", "UNRESOLVED": "unknown"}
+
+
 def _finding(r: _R, index: int, f: dict, number: int) -> str:
     code, report = f["code"], r.report
-    meta = _finding_meta(code)
+    agent = _agent(f)
+    meta = {} if agent else _finding_meta(code)
     evidence = f.get("evidence") or {}
-    affected, listed = _affected(evidence)
-    rec = _recommendation_for(report, code)
+    affected, listed = _affected(evidence) if not agent else (None, [])
+    rec = _recommendation_for(report, f)
     category = _category(code)
     fid = f"finding-{index}"
-    why = meta.get("why")
-    severity = f["severity"]
-    compact = severity not in ("high", "medium")
+    why = _finding_why(f)
+    priority = _prio(f)
+    compact = priority not in ("high", "medium")
     summary = _finding_summary(f)
     meta_bits = [f'<span class="tag-area">{r.t("cat." + category)}</span>']
     if affected:
         meta_bits.append(r.p(affected))
-    meta_bits.append(_basis(r, meta.get("tier")))
-    observed = r.p(summary, tag="p") if summary else (r.t("finding.observed.original", tag="p") + f'<p class="original" lang="en">{_e(f["summary"])}</p>')
-    other = {k: v for k, v in evidence.items() if not isinstance(v, (list, dict)) and k not in _COUNT_KEYS}
-    kv = "".join(f"<dt><code>{_e(k)}</code></dt><dd><code>{_e(v)}</code></dd>" for k, v in other.items())
-    evidence_html = ((f'<p class="affected">{r.p(affected)}</p>' if affected else "")
-                     + (r.items(listed, kind="code", limit=8) if listed else "") + (f'<dl class="kv">{kv}</dl>' if kv else ""))
-    left = [f'<div class="f-block">{r.icon("info", "ic fb-ic")}<div><h4>{r.t("finding.observed")}</h4>{observed}</div></div>']
+    if agent:
+        meta_bits += [r.t("assess.by_agent"), r.t("basis." + f["basis"], cls="tier")]
+    else:
+        meta_bits.append(_basis(r, meta.get("tier")))
+        if f.get("assessment"):
+            meta_bits.append(r.t("disp." + f["assessment"]["disposition"], cls="tier"))
+    if agent:
+        observed = r.agent_text(f["summary"], "p")
+    else:
+        observed = r.p(summary, tag="p") if summary else (r.t("finding.observed.original", tag="p") + f'<p class="original" lang="en">{_e(f["summary"])}</p>')
+    left = [f'<div class="f-block">{r.icon("info", "ic fb-ic")}<div><h4>{r.t("assess.claim" if agent else "finding.observed")}</h4>{observed}</div></div>']
     if why:
-        left.append(f'<div class="f-block">{r.icon("alert", "ic fb-ic")}<div><h4>{r.t("finding.why")}</h4>{r.p(why, tag="p")}</div></div>')
+        why_html = r.agent_text(why[0], "p") if agent else r.p(why, tag="p")
+        left.append(f'<div class="f-block">{r.icon("alert", "ic fb-ic")}<div><h4>{r.t("finding.why")}</h4>{why_html}</div></div>')
+    if agent:
+        evidence_html = r.refs(evidence.get("refs") or [])
+    else:
+        other = {k: v for k, v in evidence.items() if not isinstance(v, (list, dict)) and k not in _COUNT_KEYS}
+        kv = "".join(f"<dt><code>{_e(k)}</code></dt><dd><code>{_e(v)}</code></dd>" for k, v in other.items())
+        evidence_html = ((f'<p class="affected">{r.p(affected)}</p>' if affected else "")
+                         + (r.items(listed, kind="code", limit=8) if listed else "") + (f'<dl class="kv">{kv}</dl>' if kv else ""))
     left.append(f'<div class="f-block" id="{fid}-evidence">{r.icon("doc", "ic fb-ic")}<div><h4>{r.t("finding.evidence")}</h4>'
                 f'{evidence_html or r.t("finding.no_items", tag="p", cls="empty")}</div></div>')
-    right = []
+    right = [_assessment_block(r, f)] if f.get("assessment") else []
     if rec:
-        rec_pair = _rec_pair(code, rec)
-        rec_html = r.p(rec_pair, tag="p") if rec_pair else f'<p lang="en" class="raw-text">{_e(rec)}</p>'
+        if agent:
+            rec_html = r.agent_text(rec, "p")
+        else:
+            rec_pair = _rec_pair(code, rec)
+            rec_html = r.p(rec_pair, tag="p") if rec_pair else f'<p lang="en" class="raw-text">{_e(rec)}</p>'
         right.append(f'<div class="f-block f-fix" id="{fid}-fix">{r.icon("wrench", "ic fb-ic")}<div><h4>{r.t("finding.recommendation")}'
                      f'<span class="pill tone-accent">{r.t("proposed.short")}</span></h4>{rec_html}</div></div>')
     if meta.get("close"):
         right.append(f'<div class="f-block f-close">{r.icon("checkc", "ic fb-ic")}<div><h4>{r.t("finding.close")}</h4>{r.p(meta["close"], tag="p")}</div></div>')
+    basis = r.t("basis." + f["basis"]) if agent else r.tier(meta.get("tier"))
     tech = (f'<details class="tech"><summary>{r.t("finding.technical")}</summary><dl class="kv">'
-            f'<dt>{r.t("finding.code")}</dt><dd><code>{_e(code)}</code></dd><dt>{r.t("finding.basis")}</dt><dd>{r.tier(meta.get("tier"))}</dd>'
+            f'<dt>{r.t("finding.code")}</dt><dd><code>{_e(code)}</code></dd><dt>{r.t("finding.basis")}</dt><dd>{basis}</dd>'
             f'<dt>{r.t("original")}</dt><dd lang="en">{_e(f["summary"])}</dd></dl>'
             f'<p class="tech-label">{r.t("finding.raw")}</p><pre class="code">{_e(json.dumps(evidence, indent=2, ensure_ascii=False))}</pre></details>')
+    title = r.agent_text(f["title"], "h3", "f-title") if agent else r.p(_finding_title(f), tag="h3", cls="f-title")
+    title = title.replace("<h3 ", f'<h3 id="{fid}-t" ', 1)
     return (
-        f'<details class="finding sev-{_e(severity)}{" compact" if compact else ""}" id="{fid}" data-severity="{_e(severity)}" data-category="{_e(category)}">'
+        f'<details class="finding sev-{_e(priority)}{" compact" if compact else ""}" data-finding-id="{_e(_fid(f))}" id="{fid}" '
+        f'data-severity="{_e(priority)}" data-category="{_e(category)}">'
         f'<summary class="f-row" data-layer="decision"><span class="f-num" aria-hidden="true">{number}</span>'
-        f'<span class="f-sev">{r.pill(severity, prefix="severity.")}</span>'
-        f'<h3 class="f-title" id="{fid}-t">{r.p(_finding_title(f))}</h3>'
-        + (r.p(why, cls="f-why") if why and not compact else "")
+        f'<span class="f-sev">{r.pill(priority, prefix="severity.")}</span>'
+        f'{title}'
+        + ((r.agent_text(why[0], cls="f-why") if agent else r.p(why, cls="f-why")) if why and not compact else "")
         + f'<span class="f-meta">{_DOT_SEP.join(meta_bits)}</span>{r.icon("chev", "ic chev")}</summary>'
         f'<div class="f-body"><div class="f-col">{"".join(left)}</div><div class="f-col">{"".join(right)}</div>{tech}</div></details>'
     )
@@ -1037,19 +1133,22 @@ def _findings_area(r: _R) -> str:
 
 def _improvements_area(r: _R) -> str:
     report = r.report
-    recs = report.get("recommendations") or []
+    recs = [rec for rec in report.get("recommendations") or [] if rec.get("status") != "WITHDRAWN"]
     head = (f'<div class="area-head"><p class="eyebrow">{r.icon("bulb", "ic")}{r.t("improve.eyebrow")}</p><h2 id="h-improvements">{r.t("improve.title")}</h2>'
             f'{r.t("improve.lead", tag="p", cls="lead")}</div>')
     if not recs:
         return f'<section id="improvements" class="area" aria-labelledby="h-improvements">{head}{r.t("improve.none", tag="p", cls="empty")}</section>'
-    index_of = {f["code"]: i for i, f in enumerate(report["findings"])}
+    index_of: dict[str, int] = {}
+    for i, f in enumerate(report["findings"]):
+        index_of.setdefault(_fid(f), i)
     step = _next_step(report)
-    first = {f["code"] for _, f in step["items"]} if step["kind"] == "one" else set()
+    first = {_fid(f) for _, f in step["items"]} if step["kind"] == "one" else set()
     groups: dict[str, list[dict]] = {"first": [], "high": [], "medium": [], "info": []}
     for rec in recs:
-        index = index_of.get(rec["finding"])
+        key = rec.get("finding_id", rec["finding"])
+        index = index_of.get(key)
         f = report["findings"][index] if index is not None else {"code": rec["finding"], "severity": "medium", "summary": ""}
-        group = "first" if rec["finding"] in first else ("info" if f["severity"] in ("info", "low") else f["severity"])
+        group = "first" if key in first else ("info" if _prio(f) in ("info", "low") else _prio(f))
         groups[group].append({"rec": rec, "finding": f, "index": index})
     out, number = [], 0
     group_icon = {"first": "arrow-up", "high": "alert", "medium": "bars", "info": "ring"}
@@ -1062,15 +1161,18 @@ def _improvements_area(r: _R) -> str:
             number += 1
             rec, f, index = item["rec"], item["finding"], item["index"]
             code = rec["finding"]
-            meta = _finding_meta(code)
-            act = _action(code, rec["recommendation"]) or (rec["recommendation"], rec["recommendation"])
-            text = _rec_pair(code, rec["recommendation"])
+            agent = _agent(f)
+            meta = {} if agent else _finding_meta(code)
+            raw = (rec["recommendation"], rec["recommendation"])
+            act = raw if agent else (_action(code, rec["recommendation"]) or raw)
+            text = raw if agent else _rec_pair(code, rec["recommendation"])
+            why = _finding_why(f)
             link = f'<a href="#finding-{index}">{r.p(_finding_title(f))}</a>' if index is not None else f"<code>{_e(code)}</code>"
             rows.append(
-                f'<li class="rec" id="rec-{_e(code)}"><details{" open" if group == "first" else ""}><summary>'
+                f'<li class="rec" id="rec-{_e(rec.get("finding_id", code))}"><details{" open" if group == "first" else ""}><summary>'
                 f'<span class="rec-n" aria-hidden="true">{number:02d}</span><span class="rec-main">{r.p(act, cls="rec-act")}'
-                + (r.p(meta["why"], cls="rec-why") if meta.get("why") else "")
-                + f'</span><span class="rec-side">{r.pill(f["severity"], prefix="severity.")}<span class="pill tone-accent">{r.t("proposed.short")}</span></span>'
+                + (r.p(why, cls="rec-why") if why else "")
+                + f'</span><span class="rec-side">{r.pill(_prio(f), prefix="severity.")}<span class="pill tone-accent">{r.t("proposed.short")}</span></span>'
                 f'{r.icon("chev", "ic chev")}</summary><div class="rec-body">'
                 + (r.p(text, tag="p", cls="rec-text") if text else f'<p class="rec-text raw-text" lang="en">{_e(rec["recommendation"])}</p>')
                 + '<dl class="rec-meta">'
@@ -1081,7 +1183,7 @@ def _improvements_area(r: _R) -> str:
                 f'<li>{r.t("rec.applied")}</li><li>{r.t("rec.verified")}</li></ol></dd></div>'
                 + "</dl></div></details></li>"
             )
-        note = r.t("improve.tie", tag="p", cls="group-note", n=len(step["items"])) if step["kind"] == "tie" and group == step["items"][0][1]["severity"] else ""
+        note = r.t("improve.tie", tag="p", cls="group-note", n=len(step["items"])) if step["kind"] == "tie" and group == _prio(step["items"][0][1]) else ""
         out.append(f'<section class="rec-group g-{group}" aria-labelledby="h-rec-{group}"><h3 id="h-rec-{group}">{r.icon(group_icon[group], "ic")}{r.t("improve.group." + group)}'
                    f'<span class="count">{len(items)}</span></h3>{note}<ol class="rec-list">{"".join(rows)}</ol></section>')
     return f'<section id="improvements" class="area" data-layer="decision" aria-labelledby="h-improvements">{head}{"".join(out)}</section>'
@@ -1412,6 +1514,8 @@ def _verdict(r: _R) -> tuple[str, str, Pair, Pair]:
             return "warn", "alert", pair_of("verdict.not_ready"), pair_of("verdict.blockers", n=len(blockers), list=_join(items))
         return "warn", "alert", pair_of("verdict.not_ready"), pair_of("verdict.not_ready.generic")
     counts = _severity_counts(report["findings"])
+    if status != "UNKNOWN":  # the auditor's findings and dispositions decide whether anything remains to act on
+        status = "FINDINGS" if _active(report["findings"]) else "NO_FINDINGS_IN_SCOPE"
     if status == "UNKNOWN":
         return "unknown", "question", pair_of("verdict.unknown"), pair_of("verdict.unknown.reason")
     if status == "NO_FINDINGS_IN_SCOPE":
@@ -2012,6 +2116,13 @@ abbr[title]{text-decoration:none;cursor:help}
 .skip:focus{top:10px}
 .quiet,.muted{color:var(--muted)}
 .empty{color:var(--muted);margin:6px 0}
+.c-auditor{margin:10px 0 6px;padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 var(--r-sm) var(--r-sm) 0}
+.c-auditor .mini-label{display:flex;gap:6px;align-items:center;margin:0 0 4px}
+.c-auditor-text{margin:0;color:var(--ink)}
+.f-assess{border:1px solid var(--rule-strong);border-radius:var(--r-sm);padding:10px;background:var(--surface-2)}
+.a-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 6px}
+.a-engine{color:var(--muted);font-size:.85rem;display:inline-flex;gap:6px;align-items:center}
+.a-rationale,.a-scope{margin:4px 0}
 .tone-pass{--tone:var(--pass)}.tone-fail{--tone:var(--fail)}.tone-warn{--tone:var(--warn)}.tone-blocked{--tone:var(--warn)}
 .tone-unknown{--tone:var(--unknown)}.tone-not_run{--tone:var(--faint)}.tone-neutral{--tone:var(--muted)}.tone-accent{--tone:var(--accent)}
 .tone-info{--tone:var(--info)}.tone-muted{--tone:var(--faint)}

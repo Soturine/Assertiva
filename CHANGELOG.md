@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.7] — 2026-10-07 — Self-test context fix and documentation truth-sync
+
+Patch release; M2 stays closed, M3 has not started. The runtime, the report and its provenance are unchanged.
+
+### Fixed
+- Self-tests that incorrectly assumed a source checkout. A real `assertiva audit . --execute` of 0.5.6 reported one failing test natively and four against the installed wheel. Artifact qualification runs the tests from a copy without `.git` and without the source package, and these tests relied on both; the wheel itself was correct.
+  - `test_agent_workspace_has_no_rubric` shelled out to `git ls-files` in a copy without `.git`. `workspace_copy` now takes a root and an explicit file manifest and, without a Git checkout or a manifest, raises an error naming the missing prerequisite. The exclusion rule is tested on a synthetic repository in any context; the check on this checkout's tracked files is skipped with a reason when there is no checkout.
+  - The report catalog and engine-sentence tests scanned `ROOT/"assertiva"`, which does not exist under wheel qualification; they scan the imported package.
+  - The provenance test pinned `install == "source-checkout"`; it now checks the version, the install kind, the absence of a revision for an installed package and the git HEAD for a checkout, each against an independent source.
+
+### Added
+- `tests/test_installed_artifact_context.py`: builds this repository's wheel with the adapter's own steps, runs the tests that read repository files in a copy without `.git` and without the source package, and fails on the 0.5.6 tests with exactly the four failures above.
+- A contract test that `assertiva audit` exiting 0 is not the audited suite passing: a failing suite exits 0 and the report says FAIL.
+
+### Documentation
+- README and owner docs now separate what the model is designed to accommodate from what is implemented (pytest, Jest, Playwright, Maven and portable reports today; Vitest, .NET, Go, Rust and Gradle not yet), describe preview deployment as specified and not executable (reported as not evidenced), describe the decision-first report, one canonical HTML per run, English and Brazilian Portuguese, state that the audit exit code is not the verdict, and say that an MCP server is not implemented.
+
 ## [0.5.6] — 2026-10-07 — Report provenance fix and decision surface v3
 
 Patch release; M2 stays closed, M3 has not started. Evidence semantics are unchanged.

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.4] — 2026-10-07 — Assurance Report redesign (presentation only)
+
+Patch release; M2 stays closed, M3 has not started. The report model, adapters, evidence and qualification logic are unchanged.
+
+### Changed
+- The HTML Assurance Report is reorganized into Overview, Evidence, Verification and Details. The Overview answers what is working (evidence-backed strengths from structured data only), what needs attention, what is not evidenced and what to improve next (an existing recommendation only when the evidence ranks one), next to "What does green prove?". The overall status is never shown as success.
+- Findings show a human title, severity, category, evidence basis, why it matters, the proposed improvement, what would close it, and technical details with the code and raw evidence.
+- Metrics use display names (ids kept), the delta column appears only when states are compared, the verification surface is grouped by origin with full commands and a table view, and provenance is shown as pairs with the raw JSON available.
+- New visual system with light and dark themes, accessible status cues and no horizontal scroll down to phone width; still one offline, self-contained file.
+
+### Added
+- English and Brazilian Portuguese in the same report, selected in the header (remembered when storage is available, browser language otherwise). Translation is by stable key; codes, commands, paths, hashes and raw evidence are never translated.
+
 ## [0.5.3] — 2026-10-06 — unittest.TestCase static discovery
 
 Patch release; M2 stays closed, M3 has not started. Closes the inventory limitation recorded in 0.5.2.

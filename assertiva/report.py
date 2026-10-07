@@ -28,7 +28,7 @@ _SEVERITY = {
     "SUITE_SMOKE_DOMINANT": "high", "MUTATION_SURVIVORS": "high", "MUTATION_REPORT_UNREADABLE": "medium",
     "MUTATION_REPORT_SOURCE_MISMATCH": "medium",
     "ARTIFACT_QUALIFICATION_FAILED": "high", "PROJECT_LINK_ESCAPES_ROOT": "high", "BROKEN_PROJECT_LINK": "medium",
-    "NESTED_REPOSITORY": "info", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
+    "NESTED_REPOSITORY": "info", "DECLARED_CHECK_FAILED": "high", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
     "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
@@ -62,6 +62,7 @@ _RECOMMENDATION = {
     "PUBLISHED_ARTIFACT_NOT_QUALIFIED": "Test the built artifact (install it and run tests) in the job that publishes it, before publishing.",
     "ARTIFACT_LINEAGE_UNKNOWN": "Record the tested artifact's hash and publish exactly those bytes, or verify the hash before deploying.",
     "TESTED_ARTIFACT_DIFFERS_FROM_DELIVERED": "Rebuild and requalify, or publish the artifact that was actually tested.",
+    "DECLARED_CHECK_FAILED": "Reproduce the failing check locally and fix the cause before trusting a green from the pipeline that runs it.",
     "ARTIFACT_OMITS_SOURCE_FILES": "Confirm the listed files are intentionally excluded from the artifact, or add them as package data.",
 }
 

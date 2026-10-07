@@ -7,21 +7,23 @@ tests is opt-in and always happens in a disposable copy of the project.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from .adapters import artifact_adapters, runner_adapters
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
-from .evidence import StateEvidence, attach_mutation, measure, mutant_label
+from .adapters.commands import reproduction_plan
+from .evidence import StateEvidence, attach_mutation, measure, mutant_label, run_declared, runnable_copy
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
 from .process import scoped
 from .history import record_state
 from .report import audit_model, execution_budget, selection_summary
 from .selection import select_changes
-from .verification import artifact_lineage, delivery_matrix, discover_surface, matrix_findings, surface_findings
-from .workspace import boundary_report, capture_baseline, read_only_guard
+from .verification import GateMode, VerificationKind, artifact_lineage, delivery_matrix, discover_surface, matrix_findings, surface_findings
+from .workspace import boundary_report, capture_baseline, read_only_guard, remove_tree
 
 
 def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]:
@@ -116,6 +118,44 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
     return findings
 
 
+def _declared_checks(root: Path, surface, requested, adapters, python: str | None, budget: list) -> tuple[list[dict], list[Finding]]:
+    """Reproduce the discovered checks the caller named, in one disposable copy (never in the project).
+
+    Naming a check authorizes it; deploy/publish checks, compound shell steps and steps without a command are
+    never run, as in improve's delivery qualification."""
+    by_id = {c.check_id: c for c in surface.checks}
+    unknown = [c for c in requested if c not in by_id]
+    if unknown:
+        raise ValueError(f"no discovered check {', '.join(unknown)}; discovered check ids are listed in verification_surface")
+    results, findings, copy = [], [], None
+    try:
+        for check_id in dict.fromkeys(requested):
+            check = by_id[check_id]
+            plan = reproduction_plan(check, python or sys.executable)
+            record = {"check_id": check_id, "kind": check.kind.value, "origin": check.origin.value, "command": check.command,
+                      "gate": check.gate.value}
+            if plan.argv is None:
+                record |= {"status": StageStatus.NOT_RUN.value, "detail": plan.reason}
+                budget.append(BudgetDecision(f"check:{check_id}", "NOT_RUN", plan.reason))
+            else:
+                copy = copy or runnable_copy(root, adapters, root)
+                status, detail = run_declared(plan.argv, copy, python)
+                record |= {"status": status.value, "detail": detail}
+                if check.metadata.get("matrix"):
+                    record["limitation"] = f"only the local environment was reproduced, not matrix {check.metadata['matrix']}"
+                budget.append(BudgetDecision(f"check:{check_id}", "EXECUTED", "requested: audit --run-check (disposable copy)"))
+                if status is StageStatus.FAIL:
+                    allowed = check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY)
+                    findings.append(Finding("DECLARED_CHECK_FAILED", "A declared verification check failed when reproduced in an isolated copy.",
+                                            {"check_id": check_id, "command": check.command, "detail": detail, "gate": check.gate.value},
+                                            severity="info" if allowed else "high"))
+            results.append(record)
+    finally:
+        if copy is not None:
+            remove_tree(copy)
+    return results, findings
+
+
 @scoped
 def run_audit(
     root: str | Path,
@@ -126,6 +166,7 @@ def run_audit(
     junit_reports: list[str | Path] | tuple = (),
     coverage_reports: list[str | Path] | tuple = (),
     changed_since: str | None = None,
+    run_checks: list[str] | tuple = (),
 ) -> dict:
     root = Path(root).resolve()
     selection = None
@@ -167,6 +208,8 @@ def run_audit(
                 current.static.update(adapter.static_signals(root))
             if adapters:
                 limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
+        reproduced, declared_findings = _declared_checks(root, surface, list(run_checks), adapters, python, current.budget) if run_checks else ([], [])
+        findings.extend(declared_findings)
         current.runs.extend(load_junit(report) for report in junit_reports)
         if current.runs:
             findings.extend(_native_findings(current, static_total))
@@ -206,6 +249,16 @@ def run_audit(
     report["test_selection"] = selection_summary(selection)
     report["delivery"] = {"matrix": {"declared": declared, "ci": covered}, "artifact_lineage": lineage}
     report["review_candidates"] = review
+    report["declared_checks"] = reproduced
+    boundary = report["claim_boundary"]
+    for check in reproduced:
+        if check["status"] != StageStatus.NOT_RUN.value:
+            boundary["observed"].append(f"declared check {check['check_id']} reproduced in an isolated copy: {check['status']} ({check['detail']})")
+    if any(c["kind"] == VerificationKind.TEST.value and c["status"] != StageStatus.NOT_RUN.value for c in reproduced) and not current.runs:
+        swap = "no tests were executed; test outcomes are UNKNOWN"
+        boundary["not_evidenced"] = ["per-test outcomes are UNKNOWN: declared test checks ran as whole commands" if x == swap else x
+                                     for x in boundary["not_evidenced"]]
+        report["remaining_unknowns"] = list(boundary["not_evidenced"])
     report["history"] = None
     if execute and current.runs:
         reasons = {test: why[0].reason for test, why in (selection.selected.items() if selection else ())}

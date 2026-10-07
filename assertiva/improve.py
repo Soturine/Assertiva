@@ -8,7 +8,6 @@ verification. The original project is read-only (and verified as such) until app
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import sys
 import time
@@ -32,6 +31,7 @@ from .candidate import (
     pillar,
 )
 from .evidence import (
+    run_declared,
     ControlOutcome,
     NegativeControl,
     NegativeControlResult,
@@ -47,7 +47,7 @@ from .evidence import (
 )
 from .history import Stability, classify_attempts, record_state
 from .models import BudgetDecision, MutantStatus, Outcome, StabilityEvidence, StabilityRecord
-from .process import run_command, scoped, traced_stage
+from .process import scoped, traced_stage
 from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
     Approval,
@@ -343,15 +343,6 @@ def _artifact_stage(candidate: StateEvidence) -> CheckResult:
     return _stage(stage, StageStatus.PASS, "; ".join(parts), *limitations)
 
 
-def _run_declared(argv: tuple[str, ...], copy: Path, python: str | None) -> tuple[StageStatus, str]:
-    env = dict(os.environ)
-    env["PATH"] = str(Path(python or sys.executable).parent) + os.pathsep + env.get("PATH", "")
-    result = run_command(list(argv), copy, env=env)
-    if result.error or result.timed_out:
-        return StageStatus.BLOCKED, result.summary()
-    return (StageStatus.PASS if result.ok else StageStatus.FAIL), result.summary()
-
-
 def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: StateEvidence, budget: list) -> CheckResult:
     """Reproduce the candidate's own delivery checks: DISCOVERED -> AUTHORIZED -> EXECUTED."""
     stage = QualificationCheck.PIPELINE_EQUIVALENT
@@ -383,7 +374,7 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
                 if plan.needs_authorization and check.check_id not in authorized:
                     notes.append(f"not reproduced: {label}: discovered, not authorized (assertiva improve --run-check {check.check_id})")
                     continue
-                status, detail = _run_declared(plan.argv, copy, session.python)
+                status, detail = run_declared(plan.argv, copy, session.python)
             reproduced += 1
             if check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY) and status is not StageStatus.PASS:
                 notes.append(f"{label}: {status.value} but allowed to fail ({check.gate.value}): {detail}")

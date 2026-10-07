@@ -521,6 +521,11 @@ def _scope(report: dict) -> list[dict]:
         if executed and ingested:
             detail = _join([detail, pair_of("scope.tests.also_ingested", n=sum(r["invocations"] for r in ingested))], (" · ", " · "))
         rows.append({"area": "tests", "level": level, "detail": detail, "href": "#runs"})
+    elif any(c["kind"] == "TEST" and c["status"] not in ("NOT_RUN",) for c in report.get("declared_checks") or []):
+        tested = [c for c in report["declared_checks"] if c["kind"] == "TEST" and c["status"] != "NOT_RUN"]
+        failing = [c for c in tested if c["status"] in _BAD]
+        rows.append({"area": "tests", "level": "FAILED" if failing else "EXECUTED", "href": "#claim",
+                     "detail": pair_of("scope.tests.declared", n=len(tested), status=_lower(_label("st.", "FAIL" if failing else tested[0]["status"])))})
     elif _metric(state, "test_declarations") is not None:
         rows.append({"area": "tests", "level": "INSPECTED", "detail": pair_of("scope.tests.static", n=_metric(state, "test_declarations")), "href": "#metrics"})
     elif _metric(state, "weak_oracle_tests") is not None:
@@ -1546,6 +1551,8 @@ def _evidence_mode(r: _R) -> tuple[str, Pair]:
     executed = [run for run in runs if run["mode"] != "report"]
     if executed:
         return "solid", pair_of("evmode.executed", n=sum(run["invocations"] for run in executed))
+    if any(c["status"] != "NOT_RUN" for c in report.get("declared_checks") or []):
+        return "half", pair_of("evmode.declared_checks")
     if runs:
         return "half", pair_of("evmode.ingested")
     return "hollow", pair_of("evmode.static")

@@ -750,6 +750,10 @@ UI: dict[str, tuple[str, str]] = {
     "cat.project": ("Project boundary", "Limites do projeto"),
     "cat.other": ("Other", "Outros"),
     "cat.assessment": ("Auditor findings", "Achados do auditor"),
+    "scope.tests.declared.one": ("Declared test check reproduced as a whole command: {status}", "Verificação de teste declarada reproduzida como comando inteiro: {status}"),
+    "scope.tests.declared.other": ("{n} declared test checks reproduced as whole commands: {status}", "{n} verificações de teste declaradas reproduzidas como comandos inteiros: {status}"),
+    "evmode.declared_checks": ("Declared checks reproduced in an isolated copy; per-test outcomes were not collected",
+                               "Verificações declaradas reproduzidas em cópia isolada; resultados por teste não foram coletados"),
     # the auditing agent's assessment, attached to the run
     "severity.none": ("Not an issue here", "Não é problema aqui"),
     "disp.CONFIRMED": ("Confirmed by the auditor", "Confirmado pelo auditor"),
@@ -1163,6 +1167,16 @@ FINDINGS: dict[str, dict] = {
                  "Um relatório de cobertura não pôde ser lido; ele não fornece evidência."),
         why=("Coverage stays not evidenced.", "A cobertura continua não evidenciada."),
         close=("A readable coverage report is ingested.", "Um relatório de cobertura legível é ingerido.")),
+    "DECLARED_CHECK_FAILED": F(
+        category="delivery", tier="E1",
+        title=("A declared check fails when reproduced", "Uma verificação declarada falha quando reproduzida"),
+        summary=("A declared verification check failed when reproduced in an isolated copy.",
+                 "Uma verificação declarada falhou quando reproduzida em uma cópia isolada."),
+        why=("The pipeline that declares this check would not be green at this revision in this environment.",
+             "O pipeline que declara esta verificação não estaria verde nesta revisão neste ambiente."),
+        close=("The reproduced check passes in the next audit.", "A verificação reproduzida passa na próxima auditoria."),
+        rec=("Reproduce the failing check locally and fix the cause before trusting a green from the pipeline that runs it.",
+             "Reproduza a verificação localmente e corrija a causa antes de confiar em um verde do pipeline que a executa.")),
     "PROJECT_LINK_ESCAPES_ROOT": F(
         category="project", tier="E1",
         title=("Project links leave the project", "Links do projeto saem do projeto"),
@@ -1218,5 +1232,6 @@ ACTIONS: dict[str, tuple[str, str]] = {
     "ARTIFACT_OMITS_SOURCE_FILES": ("Confirm or include the omitted files", "Confirmar ou incluir os arquivos omitidos"),
     "MUTATION_SURVIVORS": ("Kill the surviving mutants", "Eliminar os mutantes sobreviventes"),
     "MUTATION_REPORT_SOURCE_MISMATCH": ("Regenerate the mutation report", "Gerar novamente o relatório de mutação"),
+    "DECLARED_CHECK_FAILED": ("Fix the failing declared check", "Corrigir a verificação declarada que falha"),
     "PROJECT_LINK_ESCAPES_ROOT": ("Replace links that leave the project", "Substituir links que saem do projeto"),
 }

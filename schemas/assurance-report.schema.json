@@ -452,6 +452,51 @@
           "type": "integer"
         }
       }
+    },
+    "declared_checks": {
+      "type": "array",
+      "description": "Discovered checks reproduced on request (`audit --run-check`) in a disposable copy.",
+      "items": {
+        "type": "object",
+        "required": [
+          "check_id",
+          "status"
+        ],
+        "properties": {
+          "check_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "origin": {
+            "type": "string"
+          },
+          "command": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gate": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "BLOCKED",
+              "NOT_RUN"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "limitation": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "additionalProperties": false

@@ -53,7 +53,7 @@ def _emit(payload: dict, output: str, lines: list[str]) -> None:
         print("\n".join(lines))
 
 
-_MEASUREMENT = ("execute", "changed_since", "coverage_report", "mutation_report", "junit_xml")
+_MEASUREMENT = ("execute", "changed_since", "coverage_report", "mutation_report", "junit_xml", "run_check")
 
 
 def _attach(root: Path, directory: Path, args: argparse.Namespace) -> int:
@@ -87,7 +87,8 @@ def _audit(args: argparse.Namespace) -> int:
     if args.assessment:
         return _attach(root, directory, args)
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
-                       junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since)
+                       junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since,
+                       run_checks=args.run_check or [])
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -244,6 +245,9 @@ def _parser() -> argparse.ArgumentParser:
                                                               "with --execute, only the selected set runs")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
+    audit.add_argument("--run-check", action="append", metavar="CHECK_ID",
+                       help="reproduce a discovered verification check (see verification_surface) in a disposable copy; "
+                            "deploy/publish checks never run")
     audit.add_argument("--assessment", metavar="FILE", help="attach the auditing agent's assessment (JSON) to the last audit run "
                                                             "and re-render its report; executes nothing")
     audit.set_defaults(handler=_audit)

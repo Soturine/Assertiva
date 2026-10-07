@@ -31,6 +31,10 @@ NARRATIVE: list[tuple[str, str]] = [
     ("build, package and installed-artifact behavior", "comportamento do build, do pacote e do artefato instalado"),
     ("startup, health and deployment behavior", "comportamento de inicialização, saúde e implantação"),
     ("{adapter} {dimension}: {value}, not executed", "{adapter} {dimension}: {value}, não executado"),
+    ("declared check {check} reproduced in an isolated copy: {status:st} ({detail})",
+     "verificação declarada {check} reproduzida em cópia isolada: {status:st} ({detail})"),
+    ("per-test outcomes are UNKNOWN: declared test checks ran as whole commands",
+     "os resultados por teste são DESCONHECIDOS: as verificações de teste declaradas rodaram como comandos inteiros"),
     ("full-suite outcome: {n} mapped test files were not run",
      "resultado da suíte completa: {n} arquivos de teste mapeados não foram executados"),
     # claim boundary: improve

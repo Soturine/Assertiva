@@ -110,30 +110,34 @@ Never describe candidate results as already present in the project.
 
 ## Visual contract
 
-The HTML report is one self-contained, offline page (inline CSS and a small progressive-enhancement script; no CDN, web font, framework or network request). It works without JavaScript; the script adds language and theme switching, filters, copy buttons and opening a finding from a link. Rendering lives in `assertiva/report_html.py`, the presentation catalog in `assertiva/report_i18n.py`; neither changes the report model.
+The HTML report is one self-contained, offline page (inline CSS and a small progressive-enhancement script; no CDN, web font, framework or network request). It works without JavaScript; the script adds language and theme switching, filters, copy buttons, the active-section indicator and opening collapsed detail from a link. Rendering lives in `assertiva/report_html.py`; presentation text lives in `assertiva/report_i18n.py` (by stable key) and `assertiva/report_narrative.py` (the engine's own sentence templates). None of them changes the report model.
 
-The page reads in four areas:
+The page has two layers that show the same truth.
 
-1. **Overview** — project, revision, workspace state, workflow and states shown (Current, or Baseline vs Candidate, + Applied); the report status in words with its raw value; the decision surface; key evidence cards; **What does green prove?** (Observed / Not evidenced / Limitations); highest-priority findings; recommended improvements grouped by domain.
-2. **Evidence** — candidate qualification and change set (improve), metrics by state, evidence delta, negative paths, mutation, built artifact, delivery, selection, history.
-3. **Verification** — the verification surface grouped by origin (local, hooks, CI, build, …) with the full command, gate and tier behind each row plus a table view; runs and provenance; execution budget.
-4. **Details** — all findings with severity/category/search filters, remaining unknowns, provenance pairs, the raw report JSON.
+**Layer 1, decision** (`data-layer="decision"`), read in about 30 seconds:
 
-Decision surface rules (presentation only; no new semantics):
+- **Identity and conclusion** — project, revision, workspace state, which states are shown; the conclusion in words with its reason (for example "Needs review: 1 high-priority finding and 6 medium", or "Candidate not ready yet: what blocks review: pipeline-equivalent checks (failed)"); whether there is execution evidence or only static inspection. The raw status enum is a technical detail, and the overall status is never painted as success.
+- **Next step** — an existing recommendation, only when the evidence ranks one: a finding whose own recommendation says it comes first (collection errors, failing tests) or a single finding at the highest priority. A tie is reported as a tie with the tied actions listed; it is never broken by guessing. In improve: review the change set when the candidate is ready, otherwise the checks that block review.
+- **Confirmed / Needs attention / Not proven** — Confirmed lists only execution or deterministic facts (a run that passed, a verified artifact, no surviving mutant, detected negative controls, passed qualification checks). Heuristic (E3) positives are shown apart as a *positive signal*, never counted as confirmed. The absence of a finding is never a strength. Not proven is the claim boundary's not-evidenced list as short labels.
+- **What does green prove?** — in audit, the audit scope: each area (tests, coverage, test quality, negative paths, fault sensitivity, artifact, CI, local hooks, deploy) with its evidence strength — executed / verified, measured / ingested, inspected, declared, not proven — and what was observed, from the model only. In improve, each qualification check from proven to not proven. Limitations are counted and disclosed.
+- **Improve story** — whether the candidate is ready, how many metrics improved, regressed, changed contextually, stayed unchanged or are not comparable, and that nothing was applied.
+- **Findings** (collapsed rows) — priority in words, human title, why it matters, area, affected count, and links to the evidence and to the fix.
+- **Recommendations** — grouped as Do first (the ranked next step), High priority, Important, Optional; each with the action, the full recommendation, why, the finding, the area and what closes it, always marked *Proposed · not applied*.
+- **Candidate pillars and evidence delta** (improve) — regressions first, then improvements, contextual changes and not comparable, each as before → after; unchanged metrics collapsed.
 
-- **What is working** lists evidence-backed strengths drawn from structured data only (a run that passed, a qualified artifact, no surviving mutant, detected negative controls, passed qualification checks), each with its tier. The absence of a finding is never shown as a strength.
-- **What needs attention** lists high and medium findings and failed or blocked qualification checks.
-- **What is not evidenced** is the claim boundary's not-evidenced list.
-- **What to improve next** is an existing recommendation, and only when the evidence ranks one: a finding whose own recommendation says it comes first (collection errors, failing tests), or a single finding at the highest severity. Otherwise the page says no single next action can be selected.
-- The overall status is never painted as success; green belongs to specific evidence.
+**Layer 2, auditability**, behind disclosure: each finding's observation, affected evidence, recommendation, closing condition and technical details (identifier, evidence basis, original text, raw evidence JSON); a summary by domain, then every metric with id, direction, basis and delta; declared checks grouped by origin with full commands; runs; negative paths, mutation, artifact, delivery, selection and history panels; compact provenance with all fields disclosed; the complete claim boundary; remaining unknowns; the execution budget; the canonical JSON.
 
-Each finding shows a human title, severity, category, evidence basis (tier), what was observed, why it matters, the evidence (affected items, progressively disclosed), the recommended improvement marked **Proposed** (proposed ≠ applied ≠ verified), what would close it, and technical details (finding code, original text, raw evidence). Title, category, basis, "why it matters" and "what would close it" come from a catalog keyed by finding code; "why" restates the consequence the engine's own text states and "close" negates the detection condition.
-
-Metrics use display names with the metric id beneath; the delta column appears only when states are compared. Charts are drawn only for compared states and sit next to tables with the same numbers. Status is never conveyed by color alone (icon and text), and the page supports keyboard navigation, light and dark themes and reduced motion, with no horizontal scroll down to phone width.
+Charts are not drawn for their own sake: comparisons are before → after rows with the change marked. Status is never conveyed by color alone (icon and text), and the page supports keyboard navigation, light and dark themes and reduced motion, with no horizontal scroll from 1920 px down to phone width.
 
 ### Languages
 
-English (canonical) and Brazilian Portuguese. The choice is remembered when browser storage is available; otherwise the browser language decides, falling back to English. Text is looked up by stable key; engine sentences are translated only when they match a fixed English template exactly, and otherwise appear as written, marked `lang="en"`. Finding codes, metric ids, enums, commands, paths, hashes, revisions, adapter names and raw evidence are never translated. Only the strings a page uses are embedded.
+English (canonical) and Brazilian Portuguese, selected in the header, remembered when browser storage is available, otherwise taken from the browser language. Three kinds of text are kept apart:
+
+- **Presentation text** is always localized, by stable key.
+- **Assertiva's own narrative** (claim boundary, limitations, qualification summaries, change reasons, dynamic finding summaries) is localized when it matches one of the engine's exact sentence templates; the values inside it (paths, ids, counts, tool output) are kept as written. A contract test scans the engine for every sentence it writes into a report and requires a template, so new sentences cannot leak untranslated.
+- **Raw external or technical evidence** (commands, paths, hashes, artifact names, tool and runner messages, sentences with no fixed template) stays as written, marked `lang="en"`, and only in technical detail, never in the decision layer.
+
+Finding codes, metric ids, enums, commands, paths, hashes, revisions and adapter names are never translated. Only the strings a page uses are embedded.
 
 ## Metric discipline
 

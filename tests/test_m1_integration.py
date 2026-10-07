@@ -161,8 +161,10 @@ def test_report_has_no_aggregate_score_and_keeps_unknowns(improved):
 def test_html_distinguishes_statuses_and_shows_provenance(improved):
     _, _, report = improved
     html = render_html(report)
-    css = dict(re.findall(r"\.(pass|fail|blocked|unknown|not_run)\{([^}]*)\}", html))
-    assert len({css[s] for s in ("pass", "fail", "blocked", "unknown", "not_run")}) == 5
+    css: dict[str, str] = {}
+    for status, rule in re.findall(r"\.(?:pill\.)?tone-(pass|fail|blocked|unknown|not_run)\{([^}]*)\}", html):
+        css[status] = css.get(status, "") + rule
+    assert len({css[s] for s in ("pass", "fail", "blocked", "unknown", "not_run")}) == 5  # every status has its own style
     assert 'id="unknowns"' in html and 'id="runs"' in html
     assert "isolated-candidate-copy" in html and "pytest-native" in html
 

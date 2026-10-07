@@ -104,14 +104,14 @@ def test_improve_page_separates_proposed_candidate_from_applied(improve_states):
     session, result = improve_states
     report = improve_report(session, result)
     html = render_html(report)
-    assert 'data-i18n="not_applied.banner"' in html and 'data-i18n="mode.improve"' in html
+    assert 'data-i18n="story.not_applied"' in html and 'data-i18n="mode.improve"' in html
     assert 'data-i18n="mode.improve_applied"' not in html
-    assert html.count('class="panel stage"') == len(report["candidate_qualification"]["stages"])
-    assert '<details class="change">' in html and "+    assert add(2, 3) == 5" in html
-    assert 'id="delta"' in html
-    action = html[html.index('class="decision d-next"'):]
-    action = action[:action.index("</article>")]
-    assert ('data-i18n="decision.next.review"' in action) == (report["status"] == "READY_FOR_REVIEW")  # review, never "apply"
+    assert html.count('<section class="pillar"') == len(report["candidate_qualification"]["stages"])
+    assert '<li class="change"><details>' in html and "+    assert add(2, 3) == 5" in html
+    assert '<section id="delta"' in html
+    action = html[html.index('<aside class="next"'):]
+    action = action[:action.index("</aside>")]
+    assert ('data-i18n="next.review"' in action) == (report["status"] == "READY_FOR_REVIEW")  # review, never "apply"
 
 
 @pytest.mark.integration

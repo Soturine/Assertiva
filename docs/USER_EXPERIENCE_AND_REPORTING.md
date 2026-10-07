@@ -108,26 +108,43 @@ APPLIED
 
 Never describe candidate results as already present in the project.
 
+## Report artifact contract
+
+One run produces one canonical page.
+
+| Command | Written to the report directory |
+|---|---|
+| `assertiva audit <project>` | `audit.html` and `audit.json` |
+| `assertiva improve <project>` (qualification) | `improve.html` and `improve.json` |
+| `assertiva improve <project> --approve ...` | `improve.html` and `improve.json`, now including the applied state |
+
+- Baseline, candidate and applied are states inside the same `improve.html`; they are never separate pages.
+- The default report directory is `<ASSERTIVA_HOME>/reports/<project>-<hash>/`, outside the project; `--report-dir` chooses another directory outside the project. A new run replaces the page of the same workflow there; it never adds a second page for the same run.
+- The execution trace is written separately and referenced from the report's provenance.
+- Each HTML is self-contained and offline: CSS and the progressive-enhancement script are embedded; there is no CDN, font, framework or network request, and the page is useful with JavaScript disabled.
+- A future history or bundle can lay runs out as `reports/<project>/<run-id>/audit.html` and add an optional `index.html`; nothing in a single run depends on more than one page.
+- Several pages appear only when several independent runs are rendered (for example the dogfood scenarios: static audit, executed audit, improve, edge cases).
+
+Provenance identifies the producer: `assertiva_version` is the version of the code that ran (read from the source checkout when running from one, so a stale editable install cannot misreport it), and `runtime` records the install kind and, for a checkout, its git revision and whether it had local changes. The page also states which Assertiva rendered it; when evidence produced by one version is rendered by another, the page says so.
+
 ## Visual contract
 
-The HTML report is one self-contained, offline page (inline CSS and a small progressive-enhancement script; no CDN, web font, framework or network request). It works without JavaScript; the script adds language and theme switching, filters, copy buttons, the active-section indicator and opening collapsed detail from a link. Rendering lives in `assertiva/report_html.py`; presentation text lives in `assertiva/report_i18n.py` (by stable key) and `assertiva/report_narrative.py` (the engine's own sentence templates). None of them changes the report model.
+Rendering lives in `assertiva/report_html.py`; presentation text lives in `assertiva/report_i18n.py` (by stable key) and `assertiva/report_narrative.py` (the engine's own sentence templates). None of them changes the report model. The page answers one question: *can this green be trusted, why, where can it not, and what should be done now?*
 
-The page has two layers that show the same truth.
+**Layer 1, decision** (`data-layer="decision"`):
 
-**Layer 1, decision** (`data-layer="decision"`), read in about 30 seconds:
+- **Identity** — project, revision, workspace state, when it was generated (shown in the browser's local time; the UTC timestamp stays in technical details), and for improve which states are shown.
+- **Decision surface** — one panel with the conclusion and its reason as counts (for example *Needs review · 8 findings: 1 high, 6 medium, 1 informational*, or *Candidate not ready yet · what blocks review: pipeline-equivalent checks (blocked)*), whether tests were executed or only inspected, and an integrated **next step** rail: what to do, why, which finding it comes from and what would prove it resolved. The next step exists only when the evidence ranks one; a tie is listed as a tie. Nothing is changed automatically.
+- **What was examined** (audit) — every area with its kind of evidence; **candidate lifecycle** (improve) — baseline, candidate, review, approval, applied, post-apply check, each shown done only with its evidence, so a candidate never reads as applied.
+- **Confirmed / Needs attention / Not proven** — Confirmed holds execution or deterministic facts only; heuristic positives are shown apart as signals; the absence of a finding is never a strength.
+- **What does green prove?** — the audit scope as a ledger, or each qualification check from failed to proven. Evidence strength is a *kind*, not a scale: ✓ executed / verified, ◐ measured / ingested, ◇ inspected, ○ declared, ? not proven, ✕ failed — always icon and label, never colour alone.
+- **Findings** — compact rows (priority, title, why it matters, area, affected count, evidence basis in words with the E-tier as metadata); informational findings are more compact. Expanding shows what was observed, the affected evidence, the proposed fix, how to prove it resolved and technical details.
+- **Recommendations** — an action plan: Do first, High priority, Important, Optional; each row shows the action, the reason and the priority, and expands to the full recommendation, the finding, the area, the closing criterion and its state (proposed → applied → verified).
+- **Improve** — pillars ordered with failures first and open; the delta with regressions first, then improvements, contextual changes, not comparable, and unchanged metrics collapsed.
 
-- **Identity and conclusion** — project, revision, workspace state, which states are shown; the conclusion in words with its reason (for example "Needs review: 1 high-priority finding and 6 medium", or "Candidate not ready yet: what blocks review: pipeline-equivalent checks (failed)"); whether there is execution evidence or only static inspection. The raw status enum is a technical detail, and the overall status is never painted as success.
-- **Next step** — an existing recommendation, only when the evidence ranks one: a finding whose own recommendation says it comes first (collection errors, failing tests) or a single finding at the highest priority. A tie is reported as a tie with the tied actions listed; it is never broken by guessing. In improve: review the change set when the candidate is ready, otherwise the checks that block review.
-- **Confirmed / Needs attention / Not proven** — Confirmed lists only execution or deterministic facts (a run that passed, a verified artifact, no surviving mutant, detected negative controls, passed qualification checks). Heuristic (E3) positives are shown apart as a *positive signal*, never counted as confirmed. The absence of a finding is never a strength. Not proven is the claim boundary's not-evidenced list as short labels.
-- **What does green prove?** — in audit, the audit scope: each area (tests, coverage, test quality, negative paths, fault sensitivity, artifact, CI, local hooks, deploy) with its evidence strength — executed / verified, measured / ingested, inspected, declared, not proven — and what was observed, from the model only. In improve, each qualification check from proven to not proven. Limitations are counted and disclosed.
-- **Improve story** — whether the candidate is ready, how many metrics improved, regressed, changed contextually, stayed unchanged or are not comparable, and that nothing was applied.
-- **Findings** (collapsed rows) — priority in words, human title, why it matters, area, affected count, and links to the evidence and to the fix.
-- **Recommendations** — grouped as Do first (the ranked next step), High priority, Important, Optional; each with the action, the full recommendation, why, the finding, the area and what closes it, always marked *Proposed · not applied*.
-- **Candidate pillars and evidence delta** (improve) — regressions first, then improvements, contextual changes and not comparable, each as before → after; unchanged metrics collapsed.
+**Layer 2, auditability** (denser): an evidence snapshot by domain, then every metric, declared check, run, negative path, mutation report, artifact, delivery, selection and history panel behind disclosure; compact provenance with all fields disclosed; the complete claim boundary grouped by domain with counts; remaining unknowns; the execution budget; the canonical JSON. Long raw blocks are bounded with *show complete*; commands and the JSON have copy buttons.
 
-**Layer 2, auditability**, behind disclosure: each finding's observation, affected evidence, recommendation, closing condition and technical details (identifier, evidence basis, original text, raw evidence JSON); a summary by domain, then every metric with id, direction, basis and delta; declared checks grouped by origin with full commands; runs; negative paths, mutation, artifact, delivery, selection and history panels; compact provenance with all fields disclosed; the complete claim boundary; remaining unknowns; the execution budget; the canonical JSON.
-
-Charts are not drawn for their own sake: comparisons are before → after rows with the change marked. Status is never conveyed by color alone (icon and text), and the page supports keyboard navigation, light and dark themes and reduced motion, with no horizontal scroll from 1920 px down to phone width.
+A changed coverage denominator is shown next to the percentage it qualifies. Filters on findings are visible, clearable and kept in the URL. The page supports keyboard navigation, focus-visible, skip link, light and dark themes, reduced motion and print (interactive controls hidden, every collapsed detail opened), and is checked from 1920 px down to 390 px.
 
 ### Languages
 

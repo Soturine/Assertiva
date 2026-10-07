@@ -137,6 +137,8 @@ def _kind_value(value: str, kind: str | None) -> Pair:
         return (", ".join(_lower(m)[0] for m in names), ", ".join(_lower(m)[1] for m in names))
     if kind == "check":
         return _label("q.", value)
+    if kind == "num":
+        return (value, value.replace(".", ","))
     return (value, value)
 
 
@@ -510,9 +512,21 @@ _LEVEL_TONE = {"FAILED": "fail", "VERIFIED": "pass", "EXECUTED": "pass", "MEASUR
 
 # --- shared pieces ---------------------------------------------------------------------
 
-def _meter(strength: int) -> str:
-    bars = "".join(f'<span class="{"on" if i < strength else "off"}"></span>' for i in range(4))
-    return f'<span class="meter" aria-hidden="true">{bars}</span>'
+# Evidence strength is a kind of evidence, not a scale: each level has its own glyph and label.
+_LEVEL_GLYPH = {"VERIFIED": "checkc", "EXECUTED": "checkc", "FAILED": "crossc", "MEASURED": "half", "INGESTED": "half",
+                "PARTIAL": "half", "INSPECTED": "diamond", "DECLARED": "ring", "NOT_EVIDENCED": "question"}
+_LEVEL_TONE = {"FAILED": "fail", "VERIFIED": "pass", "EXECUTED": "pass", "MEASURED": "info", "INGESTED": "info", "PARTIAL": "warn",
+               "INSPECTED": "info", "DECLARED": "muted", "NOT_EVIDENCED": "unknown"}
+
+
+def _glyph(r: _R, level: str) -> str:
+    return r.icon(_LEVEL_GLYPH[level], "ic lv")
+
+
+def _legend(r: _R) -> str:
+    items = "".join(f'<li class="tone-{_LEVEL_TONE[level]}">{_glyph(r, level)}{r.t("lvl." + level)}</li>'
+                    for level in ("EXECUTED", "MEASURED", "INSPECTED", "DECLARED", "NOT_EVIDENCED"))
+    return f'<ul class="legend" {r.attr("aria-label", "legend.label")}>{items}</ul>'
 
 
 def _ledger_row(r: _R, area: Pair, level: str, detail: str, href: str | None = None, row_id: str = "") -> str:
@@ -520,9 +534,654 @@ def _ledger_row(r: _R, area: Pair, level: str, detail: str, href: str | None = N
     rid = f' id="{row_id}"' if row_id else ""
     more = f'<a class="l-go" href="{href}" {r.attr("aria-label", "ledger.open")}>{r.icon("arrow")}</a>' if href else ""
     return (f'<li class="lrow lvl-{level.lower()} tone-{tone}"{rid}><span class="l-area">{r.p(area)}</span>'
-            f'<span class="l-level">{_meter(_STRENGTH[level])}{r.t("lvl." + level)}</span>'
+            f'<span class="l-level">{_glyph(r, level)}{r.t("lvl." + level)}</span>'
             f'<span class="l-detail">{detail}</span>{more}</li>')
 
+
+def _basis(r: _R, tier: str | None) -> str:
+    """Human evidence basis; the E-tier code stays visible as metadata."""
+    if not tier:
+        return r.t("tier.none", cls="basis")
+    return f'<span class="basis">{r.t("basis." + tier)} <abbr class="tier-code" title="{_e(r.s("tier." + tier))}">{_e(tier)}</abbr></span>'
+
+
+def _chip(r: _R, key: str, n: int, cls: str = "") -> str:
+    return f'<span class="chip {cls}"><b>{n}</b>{r.t(key, n=n)}</span>'
+
+
+def _sev_chips(r: _R, counts: dict[str, int]) -> str:
+    chips = [_chip(r, "cnt." + sev, counts[sev], "sev-" + sev) for sev in ("high", "medium", "info") if counts[sev]]
+    return "".join(chips)
+
+
+# --- decision surface ---------------------------------------------------------------------
+
+def _conclusion(r: _R) -> str:
+    report = r.report
+    tone, icon, headline, reason = _verdict(r)
+    lines = []
+    if report["workflow"] == "improve":
+        lines.append(r.p(reason, tag="p", cls="c-reason"))
+        delta = report.get("evidence_delta") or {}
+        if delta:
+            improved, regressed = len(delta.get("improved") or []), len(delta.get("regressed") or [])
+            lines.append(f'<p class="c-chips">{_chip(r, "dc.improved", improved, "sev-pass" if improved else "zero")}'
+                         f'{_chip(r, "dc.regressed", regressed, "sev-high" if regressed else "zero")}'
+                         f'<a class="c-more" href="#delta">{r.t("conc.delta")}</a></p>')
+        applied = bool(report["states"].get("applied"))
+        lines.append(f'<p class="c-scope">{r.icon("checkc" if applied else "ring", "ic")}{r.t("story.applied" if applied else "story.not_applied")}</p>')
+    if report["workflow"] != "improve":
+        findings = report["findings"]
+        if findings:
+            lines.append(f'<p class="c-chips"><span class="c-total">{r.t("att.count", n=len(findings))}</span>{_sev_chips(r, _severity_counts(findings))}</p>')
+        if report["status"] in ("UNKNOWN", "NO_FINDINGS_IN_SCOPE") or not findings:
+            lines.append(r.p(reason, tag="p", cls="c-reason"))
+        shape, evmode = _evidence_mode(r)
+        glyph = {"solid": "checkc", "half": "half", "hollow": "diamond"}[shape]
+        lines.append(f'<p class="c-scope mode-{shape}">{r.icon(glyph, "ic")}{r.p(evmode)}</p>')
+    return (f'<div class="d-main"><p class="c-label" id="h-conclusion">{r.t("verdict.label")}</p>'
+            f'<p class="c-headline">{r.icon(icon, "ic c-ic")}{r.p(headline)}</p>{"".join(lines)}</div>')
+
+
+def _rail(r: _R) -> str:
+    report = r.report
+    head = f'<h2 id="h-next" class="rail-label">{r.icon("arrow")}{r.t("next.title")}</h2>'
+    foot = r.t("next.no_auto", tag="p", cls="rail-foot")
+    if report["workflow"] == "improve":
+        status = report["status"]
+        if status == "APPLIED":
+            body, foot = r.t("next.applied", tag="p", cls="rail-act quiet"), ""
+        elif status == "READY_FOR_REVIEW":
+            body = (r.t("next.review", tag="p", cls="rail-act")
+                    + f'<dl class="rail-dl"><div><dt>{r.t("next.why")}</dt><dd>{r.t("next.review.why")}</dd></div>'
+                    f'<div><dt>{r.t("next.command")}</dt><dd><code>assertiva improve --approve &lt;change_id&gt;</code></dd></div></dl>'
+                    + f'<a class="btn" href="#changes">{r.t("next.review.go")}{r.icon("arrow")}</a>')
+        else:
+            blockers = [c for c in _checks(report) if c["status"] in _BAD]
+            if blockers:
+                items = "".join(f'<li><a href="#check-{_e(c["check"])}">{r.p(_label("q.", c["check"]))}</a>{r.pill(c["status"])}</li>' for c in blockers)
+                body = (r.t("next.unblock", tag="p", cls="rail-act")
+                        + f'<dl class="rail-dl"><div><dt>{r.t("next.why")}</dt><dd>{r.t("next.unblock.why")}</dd></div>'
+                        f'<div><dt>{r.t("next.blockers")}</dt><dd><ul class="rail-list">{items}</ul></dd></div></dl>'
+                        + f'<a class="btn" href="#candidate">{r.t("next.unblock.go")}{r.icon("arrow")}</a>')
+            else:
+                body, foot = r.t("next.none", tag="p", cls="rail-act quiet"), ""
+        return f'<aside class="rail" aria-labelledby="h-next">{head}{body}{foot}</aside>'
+    step = _next_step(report)
+    if step["kind"] == "one":
+        index, f = step["items"][0]
+        meta = _finding_meta(f["code"])
+        act = _action(f["code"], _recommendation_for(report, f["code"]))
+        rows = [("next.why", r.p(meta["why"]) if meta.get("why") else ""),
+                ("next.origin", f'<a href="#finding-{index}">{r.p(_finding_title(f))}</a>{r.pill(f["severity"], prefix="severity.")}'),
+                ("next.done", r.p(meta["close"]) if meta.get("close") else "")]
+        dl = "".join(f"<div><dt>{r.t(k)}</dt><dd>{v}</dd></div>" for k, v in rows if v)
+        body = ((r.p(act, tag="p", cls="rail-act") if act else "") + f'<dl class="rail-dl">{dl}</dl>'
+                + f'<a class="btn" href="#finding-{index}-fix">{r.t("next.how")}{r.icon("arrow")}</a>')
+    elif step["kind"] == "tie":
+        severity = step["items"][0][1]["severity"]
+        items = "".join(
+            f'<li><a href="#finding-{i}">{r.p(_action(f["code"], _recommendation_for(report, f["code"])) or _finding_title(f))}</a></li>'
+            for i, f in step["items"][:4]
+        )
+        more = r.t("decision.more", tag="li", cls="muted", n=len(step["items"]) - 4) if len(step["items"]) > 4 else ""
+        body = (r.t("next.tie", tag="p", cls="rail-act", n=len(step["items"]), severity=_lower(pair_of("severity." + severity)))
+                + f'<ul class="rail-list">{items}{more}</ul>' + r.t("next.tie.why", tag="p", cls="rail-note")
+                + f'<a class="btn" href="#improvements">{r.t("next.plan")}{r.icon("arrow")}</a>')
+    elif step["kind"] == "optional":
+        body = r.t("next.optional", tag="p", cls="rail-act quiet") + f'<a class="btn ghost" href="#improvements">{r.t("next.optional.go")}{r.icon("arrow")}</a>'
+    else:
+        body, foot = r.t("next.none", tag="p", cls="rail-act quiet"), ""
+    return f'<aside class="rail" aria-labelledby="h-next">{head}{body}{foot}</aside>'
+
+
+def _fact(r: _R, cls: str, icon: str, title_key: str, figure: str, body: str, link: str = "") -> str:
+    return (f'<section class="fact {cls}" aria-labelledby="h-{cls}"><h3 id="h-{cls}">{r.icon(icon)}{r.t(title_key)}</h3>'
+            f'<p class="f-fig">{figure}</p>{body}{link}</section>')
+
+
+def _bullets(r: _R, pairs: list[Pair], limit: int = 3) -> str:
+    if not pairs:
+        return ""
+    more = r.t("decision.more", tag="li", cls="more-n", n=len(pairs) - limit) if len(pairs) > limit else ""
+    return '<ul class="flist">' + "".join(f"<li>{r.p(p)}</li>" for p in pairs[:limit]) + more + "</ul>"
+
+
+def _facts_audit(r: _R) -> str:
+    report = r.report
+    state = report["states"].get("current")
+    confirmed, signals = _confirmed(state), _signals(state)
+    conf_body = _bullets(r, [p for p, _ in confirmed]) if confirmed else r.t("conf.none.why", tag="p", cls="fnote")
+    if signals:
+        conf_body += (f'<p class="signal">{r.icon("diamond")}<span>{r.t("signal.label")}</span> {r.p(signals[0][0])}'
+                      f'<abbr class="tier-code" title="{_e(r.s("tier.E3"))}">E3</abbr></p>')
+    counts = _severity_counts(report["findings"])
+    serious = [(i, f) for i, f in _sorted_findings(report["findings"]) if f["severity"] in ("high", "medium")]
+    att_body = ""
+    if serious:
+        att_body = (f'<p class="f-chips">{_sev_chips(r, {**counts, "info": 0})}</p><ul class="flist links">'
+                    + "".join(f'<li><a href="#finding-{i}">{r.p(_finding_title(f))}</a></li>' for i, f in serious[:2]) + "</ul>")
+    if counts["info"]:
+        att_body += r.t("att.info", tag="p", cls="fnote", n=counts["info"])
+    not_evidenced = report["claim_boundary"].get("not_evidenced") or []
+    shorts = [_short_unknown(item, report) for item in not_evidenced]
+    return (
+        f'<div class="facts"><h2 class="sr-only" id="h-facts">{r.t("strip.title")}</h2>'
+        + _fact(r, "d-conf", "checkc", "conf.title", r.t("conf.count", n=len(confirmed)) if confirmed else r.t("conf.none", cls="quiet"),
+                conf_body, r.link("#green", "conf.go"))
+        + _fact(r, "d-att", "alert", "att.title", r.t("att.count", n=len(serious)) if serious else r.t("att.none", cls="quiet"),
+                att_body, r.link("#findings", "att.go") if report["findings"] else "")
+        + _fact(r, "d-unk", "question", "unk.title", r.t("unk.count", n=len(shorts)) if shorts else r.t("unk.none", cls="quiet"),
+                _bullets(r, shorts), r.link("#green", "unk.go") if shorts else "")
+        + "</div>"
+    )
+
+
+def _facts_improve(r: _R) -> str:
+    report = r.report
+    checks = _checks(report)
+    passed = [c for c in checks if c["status"] == "PASS"]
+    bad = [c for c in checks if c["status"] in _BAD]
+    open_ = [c for c in checks if c["status"] in _OPEN]
+    regressed = (report.get("evidence_delta") or {}).get("regressed") or []
+    attention = [_label("q.", c["check"]) for c in bad] + [METRICS.get(d["name"], (d["name"], d["name"])) for d in regressed]
+    unknown = [_label("q.", c["check"]) for c in open_] + [pair_of("short.preview")]
+    return (
+        f'<div class="facts"><h2 class="sr-only" id="h-facts">{r.t("strip.title")}</h2>'
+        + _fact(r, "d-conf", "checkc", "conf.title", r.t("conf.checks", n=len(passed)) if passed else r.t("conf.none", cls="quiet"),
+                _bullets(r, [_label("q.", c["check"]) for c in passed]), r.link("#candidate", "conf.go.checks"))
+        + _fact(r, "d-att", "alert", "att.title", r.t("att.items", n=len(attention)) if attention else r.t("att.none.improve", cls="quiet"),
+                _bullets(r, attention), r.link("#candidate", "att.go.checks") if attention else "")
+        + _fact(r, "d-unk", "question", "unk.title", r.t("unk.count", n=len(unknown)), _bullets(r, unknown), r.link("#green", "unk.go"))
+        + "</div>"
+    )
+
+
+_LIFE_GLYPH = {"done": ("checkc", "pass"), "partial": ("half", "warn"), "fail": ("crossc", "fail"), "pending": ("ring", "accent"), "todo": ("dash", "muted")}
+
+
+def _lifecycle(r: _R) -> str:
+    """Candidate lifecycle from the states the report holds; no step is shown as done without its evidence."""
+    report = r.report
+    checks = _checks(report)
+    ready = bool((report.get("candidate_qualification") or {}).get("ready_for_review"))
+    applied = bool(report["states"].get("applied"))
+    blockers = [c for c in checks if c["status"] in _BAD]
+    candidate = "done" if ready else ("partial" if any(c["status"] == "PASS" for c in checks) else "fail")
+    steps = [
+        ("baseline", "done" if report["states"].get("baseline") else "todo", "life.baseline." + ("done" if report["states"].get("baseline") else "todo"), {}),
+        ("candidate", candidate, "life.candidate." + candidate, {}),
+        ("review", "done" if ready else "fail", "life.review.ready" if ready else "life.review.blocked", {} if ready else {"n": len(blockers)}),
+        ("approval", "done" if applied else ("pending" if ready else "todo"),
+         "life.approval." + ("done" if applied else ("pending" if ready else "todo")), {}),
+        ("applied", "done" if applied else "todo", "life.applied." + ("done" if applied else "todo"), {}),
+        ("verify", "done" if applied else "todo", "life.verify." + ("done" if applied else "todo"), {}),
+    ]
+    items = "".join(
+        f'<li class="step st-{state} tone-{_LIFE_GLYPH[state][1]}">{r.icon(_LIFE_GLYPH[state][0], "ic lv")}'
+        f'<span class="step-name">{r.t("life." + name)}</span>{r.t(key, cls="step-state", **args)}</li>'
+        for name, state, key, args in steps
+    )
+    return (f'<div class="life"><p class="mini-label" id="h-life">{r.t("life.title")}</p>'
+            f'<ol class="steps" aria-labelledby="h-life">{items}</ol></div>')
+
+
+def _scope_strip(r: _R) -> str:
+    """The audit scope at a glance: every area with its kind of evidence (detail in "What does green prove?")."""
+    items = "".join(
+        f'<li class="tone-{_LEVEL_TONE[row["level"]]}"><a href="#scope-{row["area"]}">{_glyph(r, row["level"])}'
+        f'<span class="ss-area">{r.t("area." + row["area"])}</span><span class="ss-level">{r.t("lvl." + row["level"])}</span></a></li>'
+        for row in _scope(r.report)
+    )
+    return (f'<div class="scope-strip"><p class="mini-label" id="h-scope-strip">{r.t("scope.title")}</p>'
+            f'<ul aria-labelledby="h-scope-strip">{items}</ul></div>')
+
+
+def _identity(r: _R) -> str:
+    report = r.report
+    project = report["project"]
+    if report["workflow"] == "audit":
+        mode = "mode.audit"
+    else:
+        mode = "mode.improve_applied" if report["states"].get("applied") else "mode.improve"
+    revision = project.get("revision")
+    revision_html = f'<code title="{_e(revision)}">{_e(revision[:12])}</code>' if revision else r.t("header.no_revision")
+    dirty = bool(project.get("dirty"))
+    when = r.p(_when(report["generated_at"]), tag="time", attrs=f' datetime="{_e(report["generated_at"])}" data-local')
+    states = _ARROW_SEP.join(r.state(k) for k, _ in _states(report)) if report["workflow"] == "improve" else ""
+    return (
+        f'<div class="ident"><p class="eyebrow">{r.t(mode)}</p><h1 id="h-project">{_e(project.get("name") or "project")}</h1>'
+        f'<dl class="idline"><div><dt>{r.t("header.revision")}</dt><dd>{revision_html}</dd></div>'
+        f'<div><dt>{r.t("prov.state")}</dt><dd class="ws {"dirty" if dirty else "clean"}">{r.t("header.dirty" if dirty else "header.clean")}</dd></div>'
+        f'<div><dt>{r.t("prov.generated")}</dt><dd>{when}</dd></div>'
+        + (f'<div><dt>{r.t("states.shown")}</dt><dd>{states}</dd></div>' if states else "")
+        + "</dl></div>"
+    )
+
+
+def _decision(r: _R) -> str:
+    tone = _verdict(r)[0]
+    improve = r.report["workflow"] == "improve"
+    facts = _facts_improve(r) if improve else _facts_audit(r)
+    return (f'{_identity(r)}<section class="decision tone-{tone}" aria-labelledby="h-conclusion">'
+            f'{_conclusion(r)}{_rail(r)}<div class="d-extra">{_lifecycle(r) if improve else _scope_strip(r)}</div>{facts}</section>')
+
+
+# --- "What does green prove?" ------------------------------------------------------------
+
+def _green_audit(r: _R) -> str:
+    report = r.report
+    rows = "".join(
+        _ledger_row(r, pair_of("area." + row["area"]), row["level"], r.p(row["detail"]), row.get("href"), f"scope-{row['area']}")
+        for row in _scope(report)
+    )
+    return (
+        f'<section id="green" class="sub green" aria-labelledby="h-green">'
+        f'<div class="sub-head"><h2 id="h-green">{r.t("green.title")}</h2>{r.t("green.lead.audit", tag="p", cls="lead")}</div>'
+        f'<ol class="ledger" {r.attr("aria-label", "scope.title")}>{rows}</ol>'
+        f'<div class="ledger-foot">{_legend(r)}{_limitations(r, report["claim_boundary"].get("limitations") or [])}'
+        f'{r.link("#claim", "green.full")}</div></section>'
+    )
+
+
+def _check_summary(report: dict, c: dict) -> Pair | None:
+    return (narrate(c["summary"]) or (_artifact_summary(report) if c["check"] == "BUILD_AND_ARTIFACT" else None)
+            or (pair_of("qsum." + c["status"]) if "qsum." + c["status"] in UI else None))
+
+
+def _green_improve(r: _R) -> str:
+    report = r.report
+    rows = []
+    for c in sorted(_checks(report), key=lambda c: {"FAIL": 0, "BLOCKED": 0, "UNKNOWN": 1, "NOT_RUN": 1}.get(c["status"], 2)):
+        level = {"PASS": "VERIFIED", "FAIL": "FAILED", "BLOCKED": "FAILED"}.get(c["status"], "NOT_EVIDENCED")
+        summary = _check_summary(report, c)
+        rows.append(_ledger_row(r, _label("q.", c["check"]), level, r.p(summary, cls="l-sum") if summary else "", f"#check-{c['check']}"))
+    rows.append(_ledger_row(r, pair_of("area.deploy"), "NOT_EVIDENCED", r.t("scope.preview"), "#claim"))
+    return (
+        f'<section id="green" class="sub green" aria-labelledby="h-green">'
+        f'<div class="sub-head"><h2 id="h-green">{r.t("green.title")}</h2>{r.t("green.lead.improve", tag="p", cls="lead")}</div>'
+        f'<ol class="ledger" {r.attr("aria-label", "qual.title")}>{"".join(rows)}</ol>'
+        f'<div class="ledger-foot">{_limitations(r, report["claim_boundary"].get("limitations") or [])}{r.link("#claim", "green.full")}</div></section>'
+    )
+
+
+def _overview(r: _R) -> str:
+    improve = r.report["workflow"] == "improve"
+    green = _green_improve(r) if improve else _green_audit(r)
+    return (f'<section id="overview" class="area area-overview" data-layer="decision" aria-labelledby="h-project">'
+            f"{_decision(r)}{green}</section>")
+
+
+# --- findings ----------------------------------------------------------------------------
+
+def _finding(r: _R, index: int, f: dict) -> str:
+    code, report = f["code"], r.report
+    meta = _finding_meta(code)
+    evidence = f.get("evidence") or {}
+    affected, listed = _affected(evidence)
+    rec = _recommendation_for(report, code)
+    category = _category(code)
+    fid = f"finding-{index}"
+    why = meta.get("why")
+    severity = f["severity"]
+    compact = severity not in ("high", "medium")
+    summary = _finding_summary(f)
+    meta_bits = [r.t("cat." + category)]
+    if affected:
+        meta_bits.append(r.p(affected))
+    meta_bits.append(_basis(r, meta.get("tier")))
+    observed = r.p(summary, tag="p") if summary else (r.t("finding.observed.original", tag="p") + f'<p class="original" lang="en">{_e(f["summary"])}</p>')
+    other = {k: v for k, v in evidence.items() if not isinstance(v, (list, dict)) and k not in _COUNT_KEYS}
+    kv = "".join(f"<dt><code>{_e(k)}</code></dt><dd><code>{_e(v)}</code></dd>" for k, v in other.items())
+    evidence_html = ((f'<p class="affected">{r.p(affected)}</p>' if affected else "")
+                     + (r.items(listed, kind="code", limit=8) if listed else "") + (f'<dl class="kv">{kv}</dl>' if kv else ""))
+    blocks = [f'<div class="f-block"><h4>{r.t("finding.observed")}</h4>{observed}</div>']
+    if why and compact:
+        blocks.append(f'<div class="f-block"><h4>{r.t("finding.why")}</h4>{r.p(why, tag="p")}</div>')
+    blocks.append(f'<div class="f-block" id="{fid}-evidence"><h4>{r.t("finding.evidence")}</h4>{evidence_html or r.t("finding.no_items", tag="p", cls="empty")}</div>')
+    if rec:
+        rec_pair = _rec_pair(code, rec)
+        rec_html = r.p(rec_pair, tag="p") if rec_pair else f'<p lang="en" class="raw-text">{_e(rec)}</p>'
+        blocks.append(f'<div class="f-block f-fix" id="{fid}-fix"><h4>{r.t("finding.recommendation")}<span class="pill tone-accent">{r.t("proposed.short")}</span></h4>'
+                      f"{rec_html}</div>")
+    if meta.get("close"):
+        blocks.append(f'<div class="f-block"><h4>{r.t("finding.close")}</h4>{r.p(meta["close"], tag="p")}</div>')
+    blocks.append(
+        f'<details class="tech"><summary>{r.t("finding.technical")}</summary><dl class="kv">'
+        f'<dt>{r.t("finding.code")}</dt><dd><code>{_e(code)}</code></dd><dt>{r.t("finding.basis")}</dt><dd>{r.tier(meta.get("tier"))}</dd>'
+        f'<dt>{r.t("original")}</dt><dd lang="en">{_e(f["summary"])}</dd></dl>'
+        f'<p class="tech-label">{r.t("finding.raw")}</p><pre class="code">{_e(json.dumps(evidence, indent=2, ensure_ascii=False))}</pre></details>'
+    )
+    return (
+        f'<details class="finding sev-{_e(severity)}{" compact" if compact else ""}" id="{fid}" data-severity="{_e(severity)}" data-category="{_e(category)}">'
+        f'<summary class="f-row" data-layer="decision"><span class="f-sev">{r.pill(severity, prefix="severity.")}</span>'
+        f'<h3 class="f-title" id="{fid}-t">{r.p(_finding_title(f))}</h3>'
+        + (r.p(why, cls="f-why") if why and not compact else "")
+        + f'<span class="f-meta">{_DOT_SEP.join(meta_bits)}</span>{r.icon("chev", "ic chev")}</summary>'
+        f'<div class="f-body">{"".join(blocks)}</div></details>'
+    )
+
+
+def _findings_area(r: _R) -> str:
+    report = r.report
+    findings = report["findings"]
+    counts = _severity_counts(findings)
+    head = (f'<div class="area-head"><h2 id="h-findings">{r.t("findings.title")}</h2>'
+            + (f'<p class="lead"><span class="chips">{_sev_chips(r, counts)}</span> {r.t("findings.lead")}</p>'
+               if findings else r.t("findings.none", tag="p", cls="lead")) + "</div>")
+    if not findings:
+        return f'<section id="findings" class="area" aria-labelledby="h-findings">{head}</section>'
+    categories = sorted({_category(f["code"]) for f in findings})
+    sev_options = "".join(f'<option value="{s}"{r.attr_text("severity." + s)}>{_e(r.s("severity." + s))}</option>' for s in ("high", "medium", "info") if counts[s])
+    cat_options = "".join(f'<option value="{c}"{r.attr_text("cat." + c)}>{_e(r.s("cat." + c))}</option>' for c in categories)
+    empty_attrs = ' id="findings-empty" hidden'
+    filters = (
+        f'<div class="filters" role="search"><label for="sev">{r.t("findings.filter.severity")}</label>'
+        f'<select id="sev" class="select"><option value=""{r.attr_text("findings.filter.all")}>{_e(r.s("findings.filter.all"))}</option>{sev_options}</select>'
+        f'<label for="cat">{r.t("findings.filter.category")}</label>'
+        f'<select id="cat" class="select"><option value=""{r.attr_text("findings.filter.all")}>{_e(r.s("findings.filter.all"))}</option>{cat_options}</select>'
+        f'<label for="q" class="sr-only">{r.t("findings.filter.search")}</label>'
+        f'<input id="q" class="search" type="search" {r.attr("placeholder", "findings.filter.search")}>'
+        f'<button type="button" id="clear-filters" class="btn ghost small" hidden>{r.t("findings.filter.clear")}</button>'
+        f'<span id="findings-count" class="muted" aria-live="polite"></span></div>'
+        f'{r.t("findings.filter.empty", tag="p", cls="empty", attrs=empty_attrs)}'
+    ) if len(findings) > 3 else ""
+    cards = "".join(_finding(r, i, f) for i, f in _sorted_findings(findings))
+    return f'<section id="findings" class="area" aria-labelledby="h-findings">{head}{filters}<div class="finding-list">{cards}</div></section>'
+
+
+# --- improvements: a prioritized plan --------------------------------------------------------
+
+def _improvements_area(r: _R) -> str:
+    report = r.report
+    recs = report.get("recommendations") or []
+    head = f'<div class="area-head"><h2 id="h-improvements">{r.t("improve.title")}</h2>{r.t("improve.lead", tag="p", cls="lead")}</div>'
+    if not recs:
+        return f'<section id="improvements" class="area" aria-labelledby="h-improvements">{head}{r.t("improve.none", tag="p", cls="empty")}</section>'
+    index_of = {f["code"]: i for i, f in enumerate(report["findings"])}
+    step = _next_step(report)
+    first = {f["code"] for _, f in step["items"]} if step["kind"] == "one" else set()
+    groups: dict[str, list[dict]] = {"first": [], "high": [], "medium": [], "info": []}
+    for rec in recs:
+        index = index_of.get(rec["finding"])
+        f = report["findings"][index] if index is not None else {"code": rec["finding"], "severity": "medium", "summary": ""}
+        group = "first" if rec["finding"] in first else ("info" if f["severity"] in ("info", "low") else f["severity"])
+        groups[group].append({"rec": rec, "finding": f, "index": index})
+    out = []
+    number = 0
+    for group in ("first", "high", "medium", "info"):
+        items = groups[group]
+        if not items:
+            continue
+        rows = []
+        for item in items:
+            number += 1
+            rec, f, index = item["rec"], item["finding"], item["index"]
+            code = rec["finding"]
+            meta = _finding_meta(code)
+            act = _action(code, rec["recommendation"]) or (rec["recommendation"], rec["recommendation"])
+            text = _rec_pair(code, rec["recommendation"])
+            link = f'<a href="#finding-{index}">{r.p(_finding_title(f))}</a>' if index is not None else f"<code>{_e(code)}</code>"
+            rows.append(
+                f'<li class="rec" id="rec-{_e(code)}"><details{" open" if group == "first" else ""}><summary>'
+                f'<span class="rec-n" aria-hidden="true">{number:02d}</span><span class="rec-main">{r.p(act, cls="rec-act")}'
+                + (r.p(meta["why"], cls="rec-why") if meta.get("why") else "")
+                + f'</span><span class="rec-side">{r.pill(f["severity"], prefix="severity.")}<span class="pill tone-accent">{r.t("proposed.short")}</span></span>'
+                f'{r.icon("chev", "ic chev")}</summary><div class="rec-body">'
+                + (r.p(text, tag="p", cls="rec-text") if text else f'<p class="rec-text raw-text" lang="en">{_e(rec["recommendation"])}</p>')
+                + '<dl class="rec-meta">'
+                + f'<div><dt>{r.t("improve.related")}</dt><dd>{link}</dd></div>'
+                + f'<div><dt>{r.t("improve.area")}</dt><dd>{r.t("cat." + _category(code))}</dd></div>'
+                + (f'<div><dt>{r.t("improve.closes")}</dt><dd>{r.p(meta["close"])}</dd></div>' if meta.get("close") else "")
+                + f'<div><dt>{r.t("improve.state")}</dt><dd><ol class="rec-states"><li class="on">{r.t("rec.proposed")}</li>'
+                f'<li>{r.t("rec.applied")}</li><li>{r.t("rec.verified")}</li></ol></dd></div>'
+                + "</dl></div></details></li>"
+            )
+        note = r.t("improve.tie", tag="p", cls="group-note", n=len(step["items"])) if step["kind"] == "tie" and group == step["items"][0][1]["severity"] else ""
+        out.append(f'<section class="rec-group g-{group}" aria-labelledby="h-rec-{group}"><h3 id="h-rec-{group}">{r.t("improve.group." + group)}'
+                   f'<span class="count">{len(items)}</span></h3>{note}<ol class="rec-list">{"".join(rows)}</ol></section>')
+    return f'<section id="improvements" class="area" data-layer="decision" aria-labelledby="h-improvements">{head}{"".join(out)}</section>'
+
+
+# --- evidence snapshot -----------------------------------------------------------------------
+
+def _tile(r: _R, domain: str, level: str, value: str, label: str, sub: str = "", change: str = "", tone: str | None = None) -> str:
+    tone = tone or _LEVEL_TONE[level]
+    return (f'<div class="tile tone-{tone}"><p class="t-domain">{_glyph(r, level)}{r.t("metrics.group." + domain)}</p>'
+            f'<p class="t-value">{value}</p><p class="t-label">{label}</p>{sub}{change}</div>')
+
+
+def _snapshot(r: _R) -> str:
+    report = r.report
+    states = _states(report)
+    if not states:
+        return ""
+    key, main = states[-1]
+    base = states[0][1] if len(states) > 1 else None
+
+    def num(state, name, digits=1):
+        metric = ((state or {}).get("metrics") or {}).get(name)
+        return r.p(_num(metric["value"], metric.get("unit"), digits)) if metric and metric.get("value") is not None else "—"
+
+    def change(name):
+        if not base:
+            return ""
+        bucket = _delta_state(report, name)
+        if not bucket or bucket == "unchanged":
+            return f'<p class="t-change same">{r.t("snap.unchanged")}</p>'
+        note = next((d.get("note") for items in (report.get("evidence_delta") or {}).values() for d in items if d["name"] == name and d.get("note")), None)
+        return (f'<p class="t-change dm-{bucket}">{r.state(states[0][0])} {num(base, name)}{_ARROW_SEP}{num(main, name)}'
+                f' <span class="dmark dm-{bucket}">{r.t("st." + bucket)}</span></p>' + (r.narr(note, tag="p", cls="t-note") if note else ""))
+
+    tiles = []
+    invocations, passed = _metric(main, "test_invocations"), _metric(main, "passed")
+    if invocations is not None and passed is not None:
+        failing = (_metric(main, "failed") or 0) + (_metric(main, "errors") or 0) + (_metric(main, "collection_errors") or 0)
+        sub = r.t("snap.failing", tag="p", cls="t-sub bad", n=failing) if failing else ""
+        tiles.append(_tile(r, "execution", "FAILED" if failing else "EXECUTED", f'{num(main, "passed")}<span class="of">/</span>{num(main, "test_invocations")}',
+                           r.t("snap.passed"), sub, change("passed")))
+    line = _metric(main, "line_coverage")
+    if line is not None:
+        branch = _metric(main, "branch_coverage")
+        sub = f'<p class="t-sub">{r.t("snap.branches", value=_num(branch, "%", 1))}</p>' if branch is not None else ""
+        tiles.append(_tile(r, "coverage", "MEASURED", num(main, "line_coverage"), r.t("snap.lines"), sub, change("line_coverage")))
+    weak = _metric(main, "weak_oracle_tests")
+    if weak is not None:
+        broad = _metric(main, "broad_error_expectations") or 0
+        sub = r.t("snap.broad", tag="p", cls="t-sub", n=broad) if broad else ""
+        tiles.append(_tile(r, "static", "INSPECTED", num(main, "weak_oracle_tests"), r.t("snap.weak", n=weak), sub, change("weak_oracle_tests"),
+                           tone="warn" if weak else "info"))
+    negative = _metric(main, "negative_path_tests")
+    if negative:
+        missing = _metric(main, "negative_paths_without_contract_detail") or 0
+        sub = r.t("snap.incomplete", tag="p", cls="t-sub", n=missing) if missing else ""
+        tiles.append(_tile(r, "negative", "INSPECTED", num(main, "negative_path_tests"), r.t("snap.negative", n=negative), sub, change("negative_path_tests")))
+    killed, survived = _metric(main, "negative_controls_killed"), _metric(main, "negative_controls_survived")
+    evaluated = _metric(main, "mutation_evaluated")
+    if killed is not None or survived is not None:
+        total = (killed or 0) + (survived or 0)
+        tiles.append(_tile(r, "fault", "FAILED" if survived else "EXECUTED", f'{_e(killed or 0)}<span class="of">/</span>{_e(total)}',
+                           r.t("snap.controls"), "", change("negative_controls_killed")))
+    elif evaluated:
+        mutants = _metric(main, "mutation_survived") or 0
+        tiles.append(_tile(r, "fault", "FAILED" if mutants else "INGESTED", num(main, "mutation_survived"), r.t("snap.survivors", n=mutants),
+                           r.t("snap.evaluated", tag="p", cls="t-sub", n=evaluated)))
+    qualified = _metric(main, "artifact_qualified")
+    if qualified is not None:
+        tiles.append(_tile(r, "artifact", "VERIFIED" if qualified else "FAILED", r.t("yes.qualified" if qualified else "no.qualified"),
+                           r.t("dom.artifact"), "", change("artifact_qualified")))
+    if not tiles:
+        return ""
+    note = r.t("snap.state", tag="p", cls="lead", state=pair_of("state." + key)) if base else ""
+    return (f'<section id="domains" class="sub" aria-labelledby="h-domains">{_section_head(r, "domains", "dom.title", "dom.lead")}{note}'
+            f'<div class="tiles">{"".join(tiles)}</div></section>')
+
+
+def _evidence_area(r: _R) -> str:
+    panels = (_metrics_panel(r) + _surface(r) + _runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
+              + _delivery(r) + _selection(r) + _history(r))
+    return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><h2 id="h-evidence">{r.t("evidence.title")}</h2>'
+            f'{r.t("evidence.lead", tag="p", cls="lead")}</div>{_snapshot(r)}<div class="panels-d">{panels}</div></section>')
+
+
+# --- improve: candidate pillars ---------------------------------------------------------------
+
+def _check_row(r: _R, c: dict) -> str:
+    pair = _check_summary(r.report, c)
+    summary = r.p(pair, tag="p", cls="q-sum") if pair else ""
+    lims = list(c.get("limitations") or [])
+    tech = (f'<details class="tech"><summary>{r.t("finding.technical")}</summary><dl class="kv"><dt>{r.t("original")}</dt>'
+            f'<dd lang="en">{_e(c["summary"])}</dd><dt>{r.t("finding.code")}</dt><dd><code>{_e(c["check"])}</code> <code>{_e(c["status"])}</code></dd></dl>'
+            + (f'<p class="tech-label">{r.t("surface.limitations")}</p>{r.items(lims, limit=50)}' if lims else "") + "</details>")
+    return (f'<li class="qrow st-{_e(c["status"].lower())}" id="check-{_e(c["check"])}">{r.pill(c["status"])}'
+            f'<div class="q-main"><p class="q-name">{r.p(_label("q.", c["check"]))}</p>{summary}{tech}</div></li>')
+
+
+def _pillar(r: _R, s: dict) -> str:
+    checks = s["checks"]
+    passed = sum(c["status"] == "PASS" for c in checks)
+    first = next((c for c in checks if c["status"] != "PASS"), None)
+    if first:
+        summary = _check_summary(r.report, first)
+        reason = r.p(_label("q.", first["check"]), cls="p-check") + (": " + r.p(summary) if summary else "")
+    else:
+        reason = r.t("pillar.all", n=len(checks))
+    status = s["status"]
+    return (
+        f'<details class="pillar st-{_e(status.lower())}" id="pillar-{_e(s["stage"])}"{" open" if status in _BAD else ""}>'
+        f'<summary>{r.pill(status)}<span class="p-main"><h3 class="p-name" id="h-p-{_e(s["stage"])}">{r.p(_label("q.", s["stage"]))}</h3>'
+        f'<span class="p-reason">{reason}</span></span><span class="p-count">{passed}/{len(checks)}</span>{r.icon("chev", "ic chev")}</summary>'
+        f'<ol class="qlist">{"".join(_check_row(r, c) for c in checks)}</ol></details>'
+    )
+
+
+def _candidate_area(r: _R) -> str:
+    report = r.report
+    q = report.get("candidate_qualification")
+    head = f'<div class="area-head"><h2 id="h-candidate">{r.t("cand.title")}</h2>{r.t("cand.lead", tag="p", cls="lead")}</div>'
+    if not q:
+        return f'<section id="candidate" class="area" aria-labelledby="h-candidate">{head}</section>'
+    order = {"FAIL": 0, "BLOCKED": 0, "UNKNOWN": 1, "NOT_RUN": 1}
+    pillars = "".join(_pillar(r, s) for s in sorted(q["stages"], key=lambda s: order.get(s["status"], 2)))
+    records = (q.get("stability") or {}).get("records") or []
+    reruns = ""
+    if records:
+        rows = "".join(
+            f'<tr><th scope="row"><code>{_e(rec["invocation_id"])}</code></th><td {r.label_attr("qual.outcomes")}><code>{_e(" / ".join(o or "?" for o in rec["outcomes"]))}</code></td>'
+            f'<td {r.label_attr("qual.durations")} class="num-col"><code>{_e(" / ".join(f"{d:.3f}s" if d is not None else "?" for d in rec["durations_s"]))}</code></td>'
+            f'<td {r.label_attr("qual.verdict")}>{r.pill(rec["verdict"])}</td></tr>' for rec in records
+        )
+        reruns = _panel(r, "reruns", "qual.reruns", r.t("qual.reruns.summary", n=len(records)),
+                        f'<div class="table-wrap"><table class="responsive"><caption>{r.t("qual.reruns")}</caption><thead><tr><th scope="col">{r.t("hist.invocation")}</th>'
+                        f'<th scope="col">{r.t("qual.outcomes")}</th><th scope="col">{r.t("qual.durations")}</th><th scope="col">{r.t("qual.verdict")}</th></tr></thead>'
+                        f"<tbody>{rows}</tbody></table></div>", "qual.reruns.lead")
+    return (f'<section id="candidate" class="area" data-layer="decision" aria-labelledby="h-candidate">{head}'
+            f'<div class="pillars">{pillars}</div>{_changes(r)}<div class="panels-d">{reruns}</div></section>')
+
+
+# --- technical details -------------------------------------------------------------------------
+
+_CLAIM_DOMAINS = (
+    ("deploy", ("deploy", "preview", "health", "startup")),
+    ("artifact", ("artifact", "wheel", "sdist", "build", "package", "install", "bundle")),
+    ("ci", ("ci ", " ci", "pipeline", "delivery", "gating", "gate ", "reproduced", "hook", "declared verification", "verification check")),
+    ("fault", ("mutation", "mutant", "negative control", "negative-control")),
+    ("coverage", ("coverage", "denominator")),
+    ("static", ("static", "inventory", "ast ", "oracle", "heuristic")),
+    ("tests", ("invocation", "executed", "collected", "test", "run ", "runner", "suite")),
+)
+
+
+def _claim_domain(text: str) -> str:
+    lowered = f" {text.lower()} "
+    return next((name for name, words in _CLAIM_DOMAINS if any(w in lowered for w in words)), "other")
+
+
+def _claim(r: _R) -> str:
+    boundary = r.report["claim_boundary"]
+    groups = []
+    for name, key in (("not_evidenced", "claim.not"), ("limitations", "claim.limits"), ("observed", "claim.observed")):
+        values = boundary.get(name) or []
+        by: dict[str, list[str]] = {}
+        for value in values:
+            by.setdefault(_claim_domain(value), []).append(value)
+        index = "".join(f'<li><a href="#claim-{name}-{d}">{r.t("area." + d)}</a><span class="count">{len(v)}</span></li>' for d, v in by.items())
+        body = "".join(
+            f'<div class="cd" id="claim-{name}-{d}"><p class="cd-head">{r.t("area." + d)}<span class="count">{len(v)}</span></p>'
+            f'{r.items(v, limit=50)}</div>' for d, v in by.items()
+        )
+        groups.append(
+            f'<details class="claim-g cg-{name}"{" open" if len(values) <= 6 else ""}><summary><span class="cg-title">{r.t(key)}<span class="count">{len(values)}</span></span>'
+            f'<ul class="cd-index">{index}</ul>{r.icon("chev", "ic chev")}</summary><div class="cg-body">{body or r.t("none", tag="p", cls="empty")}</div></details>'
+        )
+    return (f'<section id="claim" class="sub" aria-labelledby="h-claim">{_section_head(r, "claim", "claim.title", "claim.lead")}'
+            f'<div class="claim-groups">{"".join(groups)}</div></section>')
+
+
+def _provenance(r: _R) -> str:
+    from . import __version__ as rendered_by
+
+    report = r.report
+    project, prov = report["project"], report.get("provenance") or {}
+    runtime = prov.get("runtime") or {}
+    runs = [run for _, s in _states(report) for run in s.get("runs", [])]
+    executed = any(run["mode"] != "report" for run in runs)
+    mode = f'<code>{_e(report["workflow"])}</code> · ' + r.t("prov.executed" if executed else ("prov.ingested" if runs else "prov.static"))
+    runners = sorted({run["adapter"] for run in runs} | set(prov.get("adapters") or []))
+    produced = prov.get("assertiva_version")
+    identity = f'<code>{_e(produced)}</code>'
+    if runtime.get("install"):
+        identity += " " + r.t("prov.install." + runtime["install"], cls="muted")
+    if runtime.get("revision"):
+        identity += f' <code title="{_e(runtime["revision"])}">{_e(runtime["revision"][:10])}</code>' + (r.t("prov.dirty_runtime", cls="ws dirty") if runtime.get("dirty") else "")
+    compact = [
+        ("prov.version", identity),
+        ("prov.revision", f'<code title="{_e(project.get("revision") or "")}">{_e((project.get("revision") or "—")[:12])}</code>'),
+        ("prov.state", r.t("header.dirty" if project.get("dirty") else "header.clean")),
+        ("prov.mode", mode),
+        ("prov.adapters", " ".join(f"<code>{_e(a)}</code>" for a in runners) or "—"),
+        ("prov.generated", r.p(_when(report["generated_at"]), tag="time", attrs=f' datetime="{_e(report["generated_at"])}" data-local')),
+    ]
+    warning = (r.t("prov.mismatch", tag="p", cls="prov-warn", a=str(produced), b=rendered_by)
+               if produced and produced != rendered_by else "")
+    full = [
+        ("prov.revision", f'<code class="wrap">{_e(project.get("revision") or "—")}</code>'),
+        ("prov.generated_utc", f'<code>{_e(report["generated_at"])}</code>'),
+        ("prov.root", f'<code class="wrap">{_e(project.get("root"))}</code>'),
+        ("prov.produced", f"<code>{_e(produced)}</code>"),
+        ("prov.rendered", f"<code>{_e(rendered_by)}</code>"),
+    ]
+    if runtime:
+        full.append(("prov.runtime", f'<code class="wrap">{_e(json.dumps(runtime, ensure_ascii=False))}</code>'))
+    if prov.get("interpreter"):
+        full.append(("prov.interpreter", f'<code class="wrap">{_e(prov["interpreter"])}</code>'))
+    if "read_only_verified" in prov:
+        full.append(("prov.readonly", r.t("yes" if prov["read_only_verified"] else "no")))
+    if "read_only_until_approval" in prov:
+        full.append(("prov.until", r.t("yes" if prov["read_only_until_approval"] else "no")))
+    if project.get("baseline_digest"):
+        full.append(("prov.digest", f'<code class="wrap">{_e(project["baseline_digest"])}</code>'))
+    full.append(("prov.trace", f'<code class="wrap">{_e(prov["trace"])}</code>' if prov.get("trace") else r.t("prov.unavailable")))
+    full.append(("prov.status", f'<code>{_e(report["status"])}</code>'))
+    full.append(("prov.report_version", f'<code>{_e(report.get("report_version"))}</code>'))
+    pairs = "".join(f"<div><dt>{r.t(k)}</dt><dd>{v}</dd></div>" for k, v in compact)
+    more = "".join(f"<dt>{r.t(k)}</dt><dd>{v}</dd>" for k, v in full)
+    return (f'<section id="provenance" class="sub" aria-labelledby="h-provenance">{_section_head(r, "provenance", "prov.title")}'
+            f'{warning}<dl class="prov">{pairs}</dl><details class="more"><summary>{r.t("prov.more")}</summary><dl class="kv">{more}</dl></details></section>')
+
+
+def _raw(r: _R) -> str:
+    data = json.dumps(r.report, indent=2, ensure_ascii=False, default=str)
+    body = f'<div class="cmd"><div class="cmd-head">{r.t("raw.summary")}{_copy(r)}</div><pre class="code raw-json">{_e(data)}</pre></div>'
+    return _panel(r, "raw", "raw.title", r.t("raw.summary"), body, "raw.lead")
+
+
+def _details_area(r: _R) -> str:
+    return (f'<section id="details" class="area area-tech" aria-labelledby="h-details"><div class="area-head"><h2 id="h-details">{r.t("details.title")}</h2>'
+            f'{r.t("details.lead", tag="p", cls="lead")}</div>{_provenance(r)}{_claim(r)}{_unknowns(r)}<div class="panels-d">{_budget(r)}{_raw(r)}</div></section>')
+
+
+# --- retained evidence panels and helpers ------------------------------------------------
 
 def _limitations(r: _R, values: list[str], title_key: str = "limits.count") -> str:
     if not values:
@@ -548,8 +1207,6 @@ def _panel(r: _R, sid: str, title_key: str, summary: str, body: str, lead_key: s
             f'<h3 id="h-{sid}">{r.t(title_key)}</h3><span class="pd-sum">{summary}</span></span>{r.icon("chev", "ic chev")}</summary>'
             f'<div class="pd-body">{lead}{body}</div></details>')
 
-
-# --- hero: identity, verdict, next step ------------------------------------------------
 
 def _verdict(r: _R) -> tuple[str, str, Pair, Pair]:
     """(tone, icon, headline, reason) for the report status, explained from the model."""
@@ -592,129 +1249,12 @@ def _evidence_mode(r: _R) -> tuple[str, Pair]:
     if report["workflow"] == "improve":
         return "solid", pair_of("evmode.improve")
     runs = (report["states"].get("current") or {}).get("runs", [])
-    if any(run["mode"] != "report" for run in runs):
-        return "solid", pair_of("evmode.executed")
+    executed = [run for run in runs if run["mode"] != "report"]
+    if executed:
+        return "solid", pair_of("evmode.executed", n=sum(run["invocations"] for run in executed))
     if runs:
         return "half", pair_of("evmode.ingested")
     return "hollow", pair_of("evmode.static")
-
-
-def _next_panel(r: _R) -> str:
-    report = r.report
-    head = f'<h2 id="h-next" class="next-label">{r.icon("arrow")}{r.t("next.title")}</h2>'
-    if report["workflow"] == "improve":
-        status = report["status"]
-        if status == "APPLIED":
-            body = r.t("next.applied", tag="p", cls="next-act")
-        elif status == "READY_FOR_REVIEW":
-            body = (r.t("next.review", tag="p", cls="next-act") + r.t("next.review.why", tag="p", cls="next-why")
-                    + '<p class="next-cmd"><code>assertiva improve --approve &lt;change_id&gt;</code></p>' + r.link("#changes", "next.review.go"))
-        else:
-            blockers = [c for c in _checks(report) if c["status"] in _BAD]
-            if blockers:
-                items = "".join(f'<li><a href="#check-{_e(c["check"])}">{r.p(_label("q.", c["check"]))}</a> {r.pill(c["status"])}</li>' for c in blockers)
-                body = (r.t("next.unblock", tag="p", cls="next-act") + r.t("next.unblock.why", tag="p", cls="next-why")
-                        + f'<ul class="next-list">{items}</ul>')
-            else:
-                body = r.t("next.none", tag="p", cls="next-act quiet")
-        return f'<aside class="next" aria-labelledby="h-next">{head}{body}</aside>'
-    step = _next_step(report)
-    if step["kind"] == "one":
-        index, f = step["items"][0]
-        act = _action(f["code"], _recommendation_for(report, f["code"]))
-        body = ((r.p(act, tag="p", cls="next-act") if act else "")
-                + f'<p class="next-why">{r.t("next.because")} <a href="#finding-{index}">{r.p(_finding_title(f))}</a></p>'
-                + r.link(f"#finding-{index}-fix", "next.how"))
-    elif step["kind"] == "tie":
-        severity = step["items"][0][1]["severity"]
-        items = "".join(
-            f'<li><a href="#finding-{i}">{r.p(_action(f["code"], _recommendation_for(report, f["code"])) or _finding_title(f))}</a></li>'
-            for i, f in step["items"][:4]
-        )
-        more = r.t("decision.more", tag="li", cls="muted", n=len(step["items"]) - 4) if len(step["items"]) > 4 else ""
-        body = (r.t("next.tie", tag="p", cls="next-act", n=len(step["items"]), severity=_lower(pair_of("severity." + severity)))
-                + f'<ul class="next-list">{items}{more}</ul>' + r.t("next.tie.why", tag="p", cls="next-why"))
-    elif step["kind"] == "optional":
-        body = r.t("next.optional", tag="p", cls="next-act quiet") + r.link("#improvements", "next.optional.go")
-    else:
-        body = r.t("next.none", tag="p", cls="next-act quiet")
-    return f'<aside class="next" aria-labelledby="h-next">{head}{body}</aside>'
-
-
-def _hero(r: _R) -> str:
-    report = r.report
-    project = report["project"]
-    if report["workflow"] == "audit":
-        mode = "mode.audit"
-    else:
-        mode = "mode.improve_applied" if report["states"].get("applied") else "mode.improve"
-    revision = project.get("revision")
-    revision_html = f'<code title="{_e(revision)}">{_e(revision[:12])}</code>' if revision else r.t("header.no_revision")
-    dirty = bool(project.get("dirty"))
-    tone, icon, headline, reason = _verdict(r)
-    shape, evmode = _evidence_mode(r)
-    when = r.p(_when(report["generated_at"]), tag="time", attrs=f' datetime="{_e(report["generated_at"])}"')
-    states = '<span class="sep" aria-hidden="true">/</span>'.join(r.state(k) for k, _ in _states(report))
-    return (
-        '<div class="hero">'
-        f'<div class="hero-id"><p class="eyebrow">{r.t(mode)}</p><h1 id="h-project">{_e(project.get("name") or "project")}</h1>'
-        f'<p class="idline"><span>{r.t("header.revision")} {revision_html}</span>'
-        f'<span class="ws {"dirty" if dirty else "clean"}">{r.t("header.dirty" if dirty else "header.clean")}</span>'
-        f'<span>{when}</span><span>{r.t("states.shown")} {states}</span></p></div>'
-        f'<div class="verdict tone-{tone}"><p class="verdict-label">{r.t("verdict.label")}</p>'
-        f'<p class="verdict-headline">{r.icon(icon, "ic v-ic")}{r.p(headline)}</p>'
-        f'<p class="verdict-reason">{r.p(reason)}</p>'
-        f'<p class="verdict-mode mode-{shape}"><span class="dot" aria-hidden="true"></span>{r.p(evmode)}</p></div>'
-        f"{_next_panel(r)}</div>"
-    )
-
-
-# --- decision strip ----------------------------------------------------------------------
-
-def _strip_col(r: _R, cls: str, icon: str, title_key: str, figure: str, body: str, link: str = "") -> str:
-    return (f'<section class="dcol {cls}" aria-labelledby="h-{cls}"><h3 id="h-{cls}">{r.icon(icon)}{r.t(title_key)}</h3>'
-            f'<p class="dfig">{figure}</p>{body}{link}</section>')
-
-
-def _bullets(r: _R, pairs: list[Pair], limit: int = 3) -> str:
-    if not pairs:
-        return ""
-    more = r.t("decision.more", tag="li", cls="more-n", n=len(pairs) - limit) if len(pairs) > limit else ""
-    return '<ul class="dlist">' + "".join(f"<li>{r.p(p)}</li>" for p in pairs[:limit]) + more + "</ul>"
-
-
-def _strip_audit(r: _R) -> str:
-    report = r.report
-    state = report["states"].get("current")
-    confirmed, signals = _confirmed(state), _signals(state)
-    conf_figure = r.t("conf.count", n=len(confirmed)) if confirmed else r.t("conf.none", cls="quiet")
-    conf_body = _bullets(r, [p for p, _ in confirmed])
-    if not confirmed:
-        conf_body = r.t("conf.none.why", tag="p", cls="dnote")
-    if signals:
-        conf_body += (f'<p class="signal">{r.icon("diamond")}<span>{r.t("signal.label")}</span> {r.p(signals[0][0])} '
-                      f'<span class="tier-mini">E3</span></p>')
-    counts = _severity_counts(report["findings"])
-    serious = counts["high"] + counts["medium"]
-    split = []
-    if counts["high"]:
-        split.append(r.t("att.high", n=counts["high"], cls="s-high"))
-    if counts["medium"]:
-        split.append(r.t("att.medium", n=counts["medium"], cls="s-medium"))
-    att_body = (f'<p class="dsplit">{_DOT_SEP.join(split)}</p>' if split else "")
-    if counts["info"]:
-        att_body += r.t("att.info", tag="p", cls="dnote", n=counts["info"])
-    att_figure = r.t("att.count", n=serious) if serious else r.t("att.none", cls="quiet")
-    not_evidenced = report["claim_boundary"].get("not_evidenced") or []
-    shorts = [_short_unknown(item, report) for item in not_evidenced]
-    return (
-        f'<section class="strip" aria-labelledby="h-strip"><h2 id="h-strip" class="sr-only">{r.t("strip.title")}</h2>'
-        + _strip_col(r, "d-conf", "check", "conf.title", conf_figure, conf_body, r.link("#green", "conf.go"))
-        + _strip_col(r, "d-att", "alert", "att.title", att_figure, att_body, r.link("#findings", "att.go") if report["findings"] else "")
-        + _strip_col(r, "d-unk", "question", "unk.title", r.t("unk.count", n=len(shorts)) if shorts else r.t("unk.none", cls="quiet"),
-                     _bullets(r, shorts), r.link("#green", "unk.go") if shorts else "")
-        + "</section>"
-    )
 
 
 def _delta_counts(r: _R, delta: dict | None, target: str = "#delta") -> str:
@@ -728,81 +1268,6 @@ def _delta_counts(r: _R, delta: dict | None, target: str = "#delta") -> str:
     )
     return f'<ul class="dcounts">{items}</ul>'
 
-
-def _strip_improve(r: _R) -> str:
-    report = r.report
-    checks = _checks(report)
-    passed = [c for c in checks if c["status"] == "PASS"]
-    bad = [c for c in checks if c["status"] in _BAD]
-    open_ = [c for c in checks if c["status"] in _OPEN]
-    regressed = (report.get("evidence_delta") or {}).get("regressed") or []
-    attention = [_label("q.", c["check"]) for c in bad] + [METRICS.get(d["name"], (d["name"], d["name"])) for d in regressed]
-    unknown = [_label("q.", c["check"]) for c in open_] + [pair_of("short.preview")]
-    story = (f'<section class="story" aria-labelledby="h-story"><h2 id="h-story" class="story-title">{r.t("story.title")}</h2>'
-             f'{_delta_counts(r, report.get("evidence_delta"))}'
-             + ("" if report["states"].get("applied") else f'<p class="story-note">{r.icon("dash")}{r.t("story.not_applied")}</p>')
-             + "</section>")
-    return (
-        story
-        + f'<section class="strip" aria-labelledby="h-strip"><h2 id="h-strip" class="sr-only">{r.t("strip.title")}</h2>'
-        + _strip_col(r, "d-conf", "check", "conf.title",
-                     r.t("conf.checks", n=len(passed)) if passed else r.t("conf.none", cls="quiet"),
-                     _bullets(r, [_label("q.", c["check"]) for c in passed]), r.link("#candidate", "conf.go.checks"))
-        + _strip_col(r, "d-att", "alert", "att.title",
-                     r.t("att.items", n=len(attention)) if attention else r.t("att.none.improve", cls="quiet"),
-                     _bullets(r, attention), r.link("#candidate", "att.go.checks") if attention else "")
-        + _strip_col(r, "d-unk", "question", "unk.title", r.t("unk.count", n=len(unknown)), _bullets(r, unknown), r.link("#green", "unk.go"))
-        + "</section>"
-    )
-
-
-# --- "What does green prove?" ------------------------------------------------------------
-
-def _green_audit(r: _R) -> str:
-    report = r.report
-    rows = "".join(
-        _ledger_row(r, pair_of("area." + row["area"]), row["level"], r.p(row["detail"]), row.get("href"), f"scope-{row['area']}")
-        for row in _scope(report)
-    )
-    legend = "".join(f'<li>{_meter(_STRENGTH[lvl])}{r.t("lvl." + lvl)}</li>' for lvl in ("EXECUTED", "MEASURED", "INSPECTED", "DECLARED", "NOT_EVIDENCED"))
-    return (
-        f'<section id="green" class="sub green" aria-labelledby="h-green">'
-        f'<div class="sub-head"><h2 id="h-green">{r.t("green.title")}</h2>{r.t("green.lead.audit", tag="p", cls="lead")}</div>'
-        f'<ol class="ledger" {r.attr("aria-label", "scope.title")}>{rows}</ol>'
-        f'<div class="ledger-foot"><ul class="legend" {r.attr("aria-label", "legend.label")}>{legend}</ul>'
-        f'{_limitations(r, report["claim_boundary"].get("limitations") or [])}'
-        f'{r.link("#claim", "green.full")}</div></section>'
-    )
-
-
-def _green_improve(r: _R) -> str:
-    report = r.report
-    checks = _checks(report)
-    rows = []
-    for c in checks:
-        level = {"PASS": "VERIFIED", "FAIL": "FAILED", "BLOCKED": "FAILED"}.get(c["status"], "NOT_EVIDENCED")
-        summary = (narrate(c["summary"]) or (_artifact_summary(report) if c["check"] == "BUILD_AND_ARTIFACT" else None)
-                   or (pair_of("qsum." + c["status"]) if "qsum." + c["status"] in UI else None))
-        detail = r.pill(c["status"]) + (r.p(summary, cls="l-sum") if summary else "")
-        rows.append(_ledger_row(r, _label("q.", c["check"]), level, detail, f"#check-{c['check']}"))
-    rows.append(_ledger_row(r, pair_of("area.deploy"), "NOT_EVIDENCED", r.t("scope.preview"), "#claim"))
-    return (
-        f'<section id="green" class="sub green" aria-labelledby="h-green">'
-        f'<div class="sub-head"><h2 id="h-green">{r.t("green.title")}</h2>{r.t("green.lead.improve", tag="p", cls="lead")}</div>'
-        f'<ol class="ledger ledger-q" {r.attr("aria-label", "qual.title")}>{"".join(rows)}</ol>'
-        f'<div class="ledger-foot">{_limitations(r, report["claim_boundary"].get("limitations") or [])}{r.link("#claim", "green.full")}</div></section>'
-    )
-
-
-def _overview(r: _R) -> str:
-    improve = r.report["workflow"] == "improve"
-    strip = _strip_improve(r) if improve else _strip_audit(r)
-    green = _green_improve(r) if improve else _green_audit(r)
-    return (f'<section id="overview" class="area area-overview" data-layer="decision" aria-labelledby="h-project">'
-            f"{_hero(r)}{strip}{green}</section>")
-
-
-# --- findings ----------------------------------------------------------------------------
 
 _COUNT_KEYS = ("count", "smoke_like", "total")
 
@@ -822,136 +1287,6 @@ def _affected(evidence: dict) -> tuple[Pair | None, list[str]]:
     return None, listed
 
 
-def _finding(r: _R, index: int, f: dict) -> str:
-    code, report = f["code"], r.report
-    meta = _finding_meta(code)
-    evidence = f.get("evidence") or {}
-    affected, listed = _affected(evidence)
-    rec = _recommendation_for(report, code)
-    category = _category(code)
-    fid = f"finding-{index}"
-    why = meta.get("why")
-    summary = _finding_summary(f)
-    meta_bits = [r.t("cat." + category)]
-    if affected:
-        meta_bits.append(r.p(affected))
-    meta_bits.append(r.tier(meta.get("tier")))
-    actions = (f'<a class="act" href="#{fid}-evidence">{r.icon("eye")}{r.t("finding.see_evidence")}</a>'
-               + (f'<a class="act" href="#{fid}-fix">{r.icon("wrench")}{r.t("finding.how_fix")}</a>' if rec else ""))
-    observed = r.p(summary, tag="p") if summary else (r.t("finding.observed.original", tag="p") + f'<p class="original" lang="en">{_e(f["summary"])}</p>')
-    other = {k: v for k, v in evidence.items() if not isinstance(v, (list, dict)) and k not in _COUNT_KEYS}
-    kv = "".join(f"<dt><code>{_e(k)}</code></dt><dd><code>{_e(v)}</code></dd>" for k, v in other.items())
-    evidence_html = ((f'<p class="affected">{r.p(affected)}</p>' if affected else "")
-                     + (r.items(listed, kind="code", limit=8) if listed else "")
-                     + (f'<dl class="kv">{kv}</dl>' if kv else ""))
-    blocks = [f'<div class="f-block"><h4>{r.t("finding.observed")}</h4>{observed}</div>']
-    if why:
-        blocks.append(f'<div class="f-block"><h4>{r.t("finding.why")}</h4>{r.p(why, tag="p")}</div>')
-    blocks.append(f'<div class="f-block" id="{fid}-evidence"><h4>{r.t("finding.evidence")}</h4>{evidence_html or r.t("finding.no_items", tag="p", cls="empty")}</div>')
-    if rec:
-        rec_pair = _rec_pair(code, rec)
-        rec_html = r.p(rec_pair, tag="p") if rec_pair else f'<p lang="en" class="raw-text">{_e(rec)}</p>'
-        blocks.append(f'<div class="f-block f-fix" id="{fid}-fix"><h4>{r.t("finding.recommendation")}<span class="pill tone-accent">{r.t("proposed.short")}</span></h4>'
-                      f"{rec_html}</div>")
-    if meta.get("close"):
-        blocks.append(f'<div class="f-block"><h4>{r.t("finding.close")}</h4>{r.p(meta["close"], tag="p")}</div>')
-    original = f'<dt>{r.t("original")}</dt><dd lang="en">{_e(f["summary"])}</dd>'
-    blocks.append(
-        f'<details class="tech"><summary>{r.t("finding.technical")}</summary><dl class="kv">'
-        f'<dt>{r.t("finding.code")}</dt><dd><code>{_e(code)}</code></dd><dt>{r.t("finding.basis")}</dt><dd>{r.tier(meta.get("tier"))}</dd>{original}</dl>'
-        f'<p class="tech-label">{r.t("finding.raw")}</p><pre class="code">{_e(json.dumps(evidence, indent=2, ensure_ascii=False))}</pre></details>'
-    )
-    severity = f["severity"]
-    return (
-        f'<article class="finding sev-{_e(severity)}" id="{fid}" data-severity="{_e(severity)}" data-category="{_e(category)}" aria-labelledby="{fid}-t">'
-        f'<div class="f-row" data-layer="decision"><div class="f-sev">{r.pill(severity, prefix="severity.")}</div>'
-        f'<div class="f-main"><h3 class="f-title" id="{fid}-t">{r.p(_finding_title(f))}</h3>'
-        + (r.p(why, tag="p", cls="f-why") if why else "")
-        + f'<p class="f-meta">{_DOT_SEP.join(meta_bits)}</p></div>'
-        f'<div class="f-actions">{actions}</div></div>'
-        f'<details class="f-more" id="{fid}-more"><summary>{r.t("finding.details")}{r.icon("chev", "ic chev")}</summary>'
-        f'<div class="f-body">{"".join(blocks)}</div></details></article>'
-    )
-
-
-def _findings_area(r: _R) -> str:
-    report = r.report
-    findings = report["findings"]
-    counts = _severity_counts(findings)
-    head = (f'<div class="area-head"><h2 id="h-findings">{r.t("findings.title")}</h2>'
-            + (f'<p class="lead">{_DOT_SEP.join(r.t(k, n=counts[c]) for k, c in (("att.high", "high"), ("att.medium", "medium"), ("att.info_n", "info")) if counts[c])}'
-               f' {r.t("findings.lead")}</p>' if findings else r.t("findings.none", tag="p", cls="lead")) + "</div>")
-    if not findings:
-        return f'<section id="findings" class="area" aria-labelledby="h-findings">{head}</section>'
-    categories = sorted({_category(f["code"]) for f in findings})
-    sev_options = "".join(f'<option value="{s}"{r.attr_text("severity." + s)}>{_e(r.s("severity." + s))}</option>' for s in ("high", "medium", "info")
-                          if counts[s])
-    cat_options = "".join(f'<option value="{c}"{r.attr_text("cat." + c)}>{_e(r.s("cat." + c))}</option>' for c in categories)
-    filters = (
-        f'<div class="filters" role="search"><label for="sev">{r.t("findings.filter.severity")}</label>'
-        f'<select id="sev" class="select"><option value=""{r.attr_text("findings.filter.all")}>{_e(r.s("findings.filter.all"))}</option>{sev_options}</select>'
-        f'<label for="cat">{r.t("findings.filter.category")}</label>'
-        f'<select id="cat" class="select"><option value=""{r.attr_text("findings.filter.all")}>{_e(r.s("findings.filter.all"))}</option>{cat_options}</select>'
-        f'<label for="q" class="sr-only">{r.t("findings.filter.search")}</label>'
-        f'<input id="q" class="search" type="search" {r.attr("placeholder", "findings.filter.search")}>'
-        f'<span id="findings-count" class="muted" aria-live="polite"></span></div>'
-        f'{r.t("findings.filter.empty", tag="p", cls="empty", attrs=" id=" + chr(34) + "findings-empty" + chr(34) + " hidden")}'
-    ) if len(findings) > 3 else ""
-    cards = "".join(_finding(r, i, f) for i, f in _sorted_findings(findings))
-    return f'<section id="findings" class="area" aria-labelledby="h-findings">{head}{filters}<div class="finding-list">{cards}</div></section>'
-
-
-# --- improvements ------------------------------------------------------------------------
-
-def _improvements_area(r: _R) -> str:
-    report = r.report
-    recs = report.get("recommendations") or []
-    head = (f'<div class="area-head"><h2 id="h-improvements">{r.t("improve.title")}</h2>{r.t("improve.lead", tag="p", cls="lead")}</div>')
-    if not recs:
-        return f'<section id="improvements" class="area" aria-labelledby="h-improvements">{head}{r.t("improve.none", tag="p", cls="empty")}</section>'
-    index_of = {f["code"]: i for i, f in enumerate(report["findings"])}
-    step = _next_step(report)
-    first = {f["code"] for _, f in step["items"]} if step["kind"] == "one" else set()
-    groups: dict[str, list[dict]] = {"first": [], "high": [], "medium": [], "info": []}
-    for rec in recs:
-        index = index_of.get(rec["finding"])
-        f = report["findings"][index] if index is not None else {"code": rec["finding"], "severity": "medium", "summary": ""}
-        group = "first" if rec["finding"] in first else ("info" if f["severity"] in ("info", "low") else f["severity"])
-        groups.setdefault(group, []).append({"rec": rec, "finding": f, "index": index})
-    tie_note = r.t("improve.tie", tag="p", cls="group-note", n=len(step["items"])) if step["kind"] == "tie" else ""
-    out = []
-    for group in ("first", "high", "medium", "info"):
-        items = groups.get(group) or []
-        if not items:
-            continue
-        rows = []
-        for item in items:
-            rec, f, index = item["rec"], item["finding"], item["index"]
-            code = rec["finding"]
-            meta = _finding_meta(code)
-            act = _action(code, rec["recommendation"])
-            text = _rec_pair(code, rec["recommendation"])
-            link = (f'<a href="#finding-{index}">{r.p(_finding_title(f))}</a>' if index is not None else f"<code>{_e(code)}</code>")
-            rows.append(
-                f'<li class="rec" id="rec-{_e(code)}"><div class="rec-head">'
-                + (r.p(act, tag="p", cls="rec-act") if act else "")
-                + f'<span class="pill tone-accent">{r.t("proposed.short")}</span></div>'
-                + (r.p(text, tag="p", cls="rec-text") if text and act != text else ("" if text else f'<p class="rec-text raw-text" lang="en">{_e(rec["recommendation"])}</p>'))
-                + '<dl class="rec-meta">'
-                + (f'<div><dt>{r.t("improve.why")}</dt><dd>{r.p(meta["why"])}</dd></div>' if meta.get("why") else "")
-                + f'<div><dt>{r.t("improve.related")}</dt><dd>{link} {r.pill(f["severity"], prefix="severity.")}</dd></div>'
-                + f'<div><dt>{r.t("improve.area")}</dt><dd>{r.t("cat." + _category(code))}</dd></div>'
-                + (f'<div><dt>{r.t("improve.closes")}</dt><dd>{r.p(meta["close"])}</dd></div>' if meta.get("close") else "")
-                + "</dl></li>"
-            )
-        note = tie_note if group == "high" or (group == "medium" and not groups.get("high")) else ""
-        out.append(f'<section class="rec-group g-{group}" aria-labelledby="h-rec-{group}"><h3 id="h-rec-{group}">{r.t("improve.group." + group)}'
-                   f'<span class="count">{len(items)}</span></h3>{note}<ul class="rec-list">{"".join(rows)}</ul></section>')
-    return f'<section id="improvements" class="area" data-layer="decision" aria-labelledby="h-improvements">{head}{"".join(out)}</section>'
-
-
-# --- evidence ----------------------------------------------------------------------------
-
 def _metric_name(r: _R, name: str) -> str:
     entry = METRICS.get(name)
     return r.p(entry, cls="m-name") if entry else f'<span class="m-name">{_e(_humanize(name))}</span>'
@@ -964,65 +1299,11 @@ def _value(r: _R, state: dict | None, name: str) -> str:
     return r.p(_num(metric["value"], metric.get("unit"), 1 if metric.get("unit") == "%" else 2))
 
 
-_DOMAINS = (
-    ("execution", (("passed", "test_invocations"), "failed", "errors", "collection_errors", "skipped")),
-    ("coverage", ("line_coverage", "branch_coverage")),
-    ("static", ("weak_oracle_tests", "broad_error_expectations", "error_status_only_tests")),
-    ("negative", ("negative_path_tests", "negative_paths_without_contract_detail", "negative_paths_with_state_after_rejection")),
-    ("fault", ("negative_controls_killed", "negative_controls_survived", "mutation_evaluated", "mutation_survived")),
-    ("artifact", ("artifact_qualified",)),
-)
-
-
 def _delta_state(report: dict, name: str) -> str | None:
     for bucket, items in (report.get("evidence_delta") or {}).items():
         if any(d["name"] == name for d in items):
             return bucket
     return None
-
-
-def _domains(r: _R) -> str:
-    report = r.report
-    states = _states(report)
-    if not states:
-        return ""
-    compare = len(states) > 1
-    blocks = []
-    for domain, names in _DOMAINS:
-        rows = []
-        for item in names:
-            if isinstance(item, tuple):
-                numerator, denominator = item
-                if not any(_metric(s, denominator) is not None for _, s in states):
-                    continue
-                values = [f'{_value(r, s, numerator)}<span class="of">/</span>{_value(r, s, denominator)}' for _, s in states]
-                label = r.t("dom.passed_of")
-                name = numerator
-            else:
-                if not any(_metric(s, item) is not None for _, s in states):
-                    continue
-                if item in ("failed", "errors", "collection_errors", "skipped") and not any(_metric(s, item) for _, s in states):
-                    continue
-                if item == "artifact_qualified":
-                    values = [r.t("yes.qualified" if _metric(s, item) else "no.qualified") if _metric(s, item) is not None else "—" for _, s in states]
-                else:
-                    values = [_value(r, s, item) for _, s in states]
-                label = r.t("dom.artifact") if item == "artifact_qualified" else _metric_name(r, item)
-                name = item
-            bucket = _delta_state(report, name) if compare else None
-            arrow = '<span class="arrow" aria-hidden="true">→</span>'
-            mark = f'<span class="dmark dm-{bucket}">{r.t("st." + bucket)}</span>' if bucket and bucket != "unchanged" else ""
-            rows.append(f'<div class="fig{" moved" if bucket and bucket != "unchanged" else ""}"><dt>{label}</dt>'
-                        f'<dd><span class="fig-v">{arrow.join(values)}</span>{mark}</dd></div>')
-        if rows:
-            blocks.append(f'<section class="domain" aria-labelledby="h-dom-{domain}"><h4 id="h-dom-{domain}">{r.t("metrics.group." + domain)}</h4>'
-                          f'<dl class="figs">{"".join(rows)}</dl></section>')
-    if not blocks:
-        return ""
-    states_note = (f'<p class="dom-states">{_ARROW_SEP.join(r.state(k) for k, _ in states)}</p>'
-                   if compare else "")
-    return (f'<section id="domains" class="sub" aria-labelledby="h-domains">{_section_head(r, "domains", "dom.title", "dom.lead")}{states_note}'
-            f'<div class="domains">{"".join(blocks)}</div></section>')
 
 
 def _metrics_tables(r: _R) -> str:
@@ -1274,58 +1555,10 @@ def _history(r: _R) -> str:
     return _panel(r, "history", "hist.title", r.t("hist.states", n=history["states_recorded"]), body)
 
 
-def _evidence_area(r: _R) -> str:
-    panels =(_metrics_panel(r) + _surface(r) + _runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
-              + _delivery(r) + _selection(r) + _history(r))
-    return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><h2 id="h-evidence">{r.t("evidence.title")}</h2>'
-            f'{r.t("evidence.lead", tag="p", cls="lead")}</div>{_domains(r)}<div class="panels-d">{panels}</div></section>')
-
-
-# --- improve: candidate and delta ----------------------------------------------------------
-
 def _artifact_summary(report: dict) -> Pair | None:
     artifacts = (report["states"].get("candidate") or {}).get("artifacts") or []
     parts = [pair_of("conf.artifact" if a["status"] == "PASS" else "short.artifact_kind", kind=a["kind"]) for a in artifacts]
     return _join(parts) if parts else None
-
-
-def _check_row(r: _R, c: dict) -> str:
-    pair = narrate(c["summary"]) or (_artifact_summary(r.report) if c["check"] == "BUILD_AND_ARTIFACT" else None)
-    summary = r.p(pair, tag="p", cls="q-sum") if pair else r.t("qsum." + c["status"], tag="p", cls="q-sum quiet") if "qsum." + c["status"] in UI else ""
-    lims = list(c.get("limitations") or [])
-    tech = (f'<details class="tech"><summary>{r.t("finding.technical")}</summary><dl class="kv"><dt>{r.t("original")}</dt>'
-            f'<dd lang="en">{_e(c["summary"])}</dd><dt>{r.t("finding.code")}</dt><dd><code>{_e(c["check"])}</code> <code>{_e(c["status"])}</code></dd></dl>'
-            + (f'<p class="tech-label">{r.t("surface.limitations")}</p>{r.items(lims, limit=50)}' if lims else "") + "</details>")
-    return (f'<li class="qrow st-{_e(c["status"].lower())}" id="check-{_e(c["check"])}">{r.pill(c["status"])}'
-            f'<div class="q-main"><p class="q-name">{r.p(_label("q.", c["check"]))}</p>{summary}{tech}</div></li>')
-
-
-def _candidate_area(r: _R) -> str:
-    report = r.report
-    q = report.get("candidate_qualification")
-    head = f'<div class="area-head"><h2 id="h-candidate">{r.t("cand.title")}</h2>{r.t("cand.lead", tag="p", cls="lead")}</div>'
-    if not q:
-        return f'<section id="candidate" class="area" aria-labelledby="h-candidate">{head}</section>'
-    pillars = "".join(
-        f'<section class="pillar" id="pillar-{_e(s["stage"])}" aria-labelledby="h-p-{_e(s["stage"])}"><div class="pillar-head">'
-        f'<h3 id="h-p-{_e(s["stage"])}">{r.p(_label("q.", s["stage"]))}</h3>{r.pill(s["status"])}</div>'
-        f'<ol class="qlist">{"".join(_check_row(r, c) for c in s["checks"])}</ol></section>'
-        for s in q["stages"]
-    )
-    records = (q.get("stability") or {}).get("records") or []
-    reruns = ""
-    if records:
-        rows = "".join(
-            f'<tr><th scope="row"><code>{_e(rec["invocation_id"])}</code></th><td {r.label_attr("qual.outcomes")}><code>{_e(" / ".join(o or "?" for o in rec["outcomes"]))}</code></td>'
-            f'<td {r.label_attr("qual.durations")} class="num-col"><code>{_e(" / ".join(f"{d:.3f}s" if d is not None else "?" for d in rec["durations_s"]))}</code></td>'
-            f'<td {r.label_attr("qual.verdict")}>{r.pill(rec["verdict"])}</td></tr>' for rec in records
-        )
-        reruns = _panel(r, "reruns", "qual.reruns", r.t("qual.reruns.summary", n=len(records)),
-                        f'<div class="table-wrap"><table class="responsive"><caption>{r.t("qual.reruns")}</caption><thead><tr><th scope="col">{r.t("hist.invocation")}</th>'
-                        f'<th scope="col">{r.t("qual.outcomes")}</th><th scope="col">{r.t("qual.durations")}</th><th scope="col">{r.t("qual.verdict")}</th></tr></thead>'
-                        f"<tbody>{rows}</tbody></table></div>", "qual.reruns.lead")
-    return (f'<section id="candidate" class="area" data-layer="decision" aria-labelledby="h-candidate">{head}'
-            f'<div class="pillars">{pillars}</div>{_changes(r)}<div class="panels-d">{reruns}</div></section>')
 
 
 def _changes(r: _R) -> str:
@@ -1388,56 +1621,6 @@ def _delta_area(r: _R) -> str:
     return f'<section id="delta" class="area" data-layer="decision" aria-labelledby="h-delta">{head}{body}</section>'
 
 
-# --- technical details -------------------------------------------------------------------
-
-def _provenance(r: _R) -> str:
-    report = r.report
-    project, prov = report["project"], report.get("provenance") or {}
-    runs = [run for _, s in _states(report) for run in s.get("runs", [])]
-    executed = any(run["mode"] != "report" for run in runs)
-    mode = f'<code>{_e(report["workflow"])}</code> · ' + r.t("prov.executed" if executed else ("prov.ingested" if runs else "prov.static"))
-    runners = sorted({run["adapter"] for run in runs} | set(prov.get("adapters") or []))
-    compact = [
-        ("prov.version", f'<code>{_e(prov.get("assertiva_version"))}</code>'),
-        ("prov.revision", f'<code title="{_e(project.get("revision") or "")}">{_e((project.get("revision") or "—")[:12])}</code>'),
-        ("prov.state", r.t("header.dirty" if project.get("dirty") else "header.clean")),
-        ("prov.mode", mode),
-        ("prov.adapters", " ".join(f"<code>{_e(a)}</code>" for a in runners) or "—"),
-        ("prov.trace", r.t("prov.available") if prov.get("trace") else r.t("prov.unavailable")),
-    ]
-    full = [
-        ("prov.revision", f'<code class="wrap">{_e(project.get("revision") or "—")}</code>'),
-        ("prov.generated", f'<code>{_e(report["generated_at"])}</code>'),
-        ("prov.root", f'<code class="wrap">{_e(project.get("root"))}</code>'),
-    ]
-    if prov.get("interpreter"):
-        full.append(("prov.interpreter", f'<code class="wrap">{_e(prov["interpreter"])}</code>'))
-    if "read_only_verified" in prov:
-        full.append(("prov.readonly", r.t("yes" if prov["read_only_verified"] else "no")))
-    if "read_only_until_approval" in prov:
-        full.append(("prov.until", r.t("yes" if prov["read_only_until_approval"] else "no")))
-    if project.get("baseline_digest"):
-        full.append(("prov.digest", f'<code class="wrap">{_e(project["baseline_digest"])}</code>'))
-    if prov.get("trace"):
-        full.append(("prov.trace", f'<code class="wrap">{_e(prov["trace"])}</code>'))
-    full.append(("prov.status", f'<code>{_e(report["status"])}</code>'))
-    full.append(("prov.report_version", f'<code>{_e(report.get("report_version"))}</code>'))
-    pairs = "".join(f"<div><dt>{r.t(k)}</dt><dd>{v}</dd></div>" for k, v in compact)
-    more = "".join(f"<dt>{r.t(k)}</dt><dd>{v}</dd>" for k, v in full)
-    return (f'<section id="provenance" class="sub" aria-labelledby="h-provenance">{_section_head(r, "provenance", "prov.title")}'
-            f'<dl class="prov">{pairs}</dl><details class="more"><summary>{r.t("prov.more")}</summary><dl class="kv">{more}</dl></details></section>')
-
-
-def _claim(r: _R) -> str:
-    boundary = r.report["claim_boundary"]
-    cols = "".join(
-        f'<div class="claim-col"><h4>{r.t(key)}</h4>{r.items(boundary.get(name) or [], "none", limit=50)}</div>'
-        for name, key in (("observed", "claim.observed"), ("not_evidenced", "claim.not"), ("limitations", "claim.limits"))
-    )
-    return (f'<section id="claim" class="sub" aria-labelledby="h-claim">{_section_head(r, "claim", "claim.title", "claim.lead")}'
-            f'<div class="claim-cols">{cols}</div></section>')
-
-
 def _unknowns(r: _R) -> str:
     report = r.report
     unknowns = report.get("remaining_unknowns") or []
@@ -1459,18 +1642,6 @@ def _budget(r: _R) -> str:
     body = (f'<p class="meta-row">{r.t("budget.level", l=budget["level"], d=budget["depth"], m=budget["max_depth"])}</p><ul class="budget">{rows}</ul>')
     return _panel(r, "budget", "budget.title", r.t("budget.summary", n=len(budget["decisions"])), body, "budget.lead")
 
-
-def _raw(r: _R) -> str:
-    data = json.dumps(r.report, indent=2, ensure_ascii=False, default=str)
-    return _panel(r, "raw", "raw.title", r.t("raw.summary"), f'<pre class="code raw-json">{_e(data)}</pre>', "raw.lead")
-
-
-def _details_area(r: _R) -> str:
-    return (f'<section id="details" class="area area-tech" aria-labelledby="h-details"><div class="area-head"><h2 id="h-details">{r.t("details.title")}</h2>'
-            f'{r.t("details.lead", tag="p", cls="lead")}</div>{_provenance(r)}{_claim(r)}{_unknowns(r)}<div class="panels-d">{_budget(r)}{_raw(r)}</div></section>')
-
-
-# --- navigation and page -------------------------------------------------------------------
 
 def _nav(r: _R) -> str:
     report = r.report
@@ -1496,26 +1667,6 @@ def _nav(r: _R) -> str:
     return f'<nav class="sidenav" {r.attr("aria-label", "nav.label")}><ul>{items}</ul></nav>'
 
 
-_ICONS = {
-    "check": '<path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
-    "cross": '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
-    "alert": '<path d="M8 2.5l6 11H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5v3.2M8 11.6v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
-    "question": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 1.8"/><path d="M6.4 6.3a1.7 1.7 0 113 1.1c-.6.4-1.4.8-1.4 1.6M8 11.3v.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-    "block": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.5"/>',
-    "dash": '<path d="M4 8h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
-    "dot": '<circle cx="8" cy="8" r="3" fill="currentColor"/>',
-    "diamond": '<path d="M8 2.5L13.5 8 8 13.5 2.5 8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>',
-    "info": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.3v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
-    "arrow": '<path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
-    "chev": '<path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
-    "eye": '<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/>',
-    "wrench": '<path d="M10.5 2.5a3 3 0 00-3.2 4L2.8 11a1.4 1.4 0 002 2l4.5-4.5a3 3 0 004-3.2l-1.8 1.8-1.7-.4-.4-1.7z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>',
-    "copy": '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 10.5v-7a1 1 0 011-1h7" fill="none" stroke="currentColor" stroke-width="1.4"/>',
-    "moon": '<path d="M13 9.5A5.5 5.5 0 016.5 3a5.5 5.5 0 106.5 6.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-    "globe": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14C6.2 12.3 5.4 10.3 5.4 8S6.2 3.7 8 2z" fill="none" stroke="currentColor" stroke-width="1.2"/>',
-}
-
-
 def _sprite() -> str:
     symbols = "".join(f'<symbol id="i-{name}" viewBox="0 0 16 16">{body}</symbol>' for name, body in _ICONS.items())
     return f'<svg class="sprite" aria-hidden="true" focusable="false">{symbols}</svg>'
@@ -1525,7 +1676,35 @@ _LOGO = ('<svg class="logo" viewBox="0 0 24 24" aria-hidden="true" focusable="fa
          '<path d="M7 16.5L12 6l5 10.5M9.2 12.4h5.6" fill="none" stroke="var(--bg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
 
+_ICONS = {
+    "check": '<path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    "checkc": '<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M4.8 8.3l2.2 2.2 4.2-4.8" fill="none" stroke="var(--on-tone)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    "cross": '<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    "crossc": '<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" fill="none" stroke="var(--on-tone)" stroke-width="1.7" stroke-linecap="round"/>',
+    "half": '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.8a6.2 6.2 0 010 12.4z" fill="currentColor"/>',
+    "ring": '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+    "alert": '<path d="M8 2.5l6 11H2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5v3.2M8 11.6v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+    "question": '<circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 1.8"/><path d="M6.4 6.3a1.7 1.7 0 113 1.1c-.6.4-1.4.8-1.4 1.6M8 11.3v.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+    "block": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 12L12 4" stroke="currentColor" stroke-width="1.5"/>',
+    "dash": '<path d="M4 8h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    "dot": '<circle cx="8" cy="8" r="3" fill="currentColor"/>',
+    "diamond": '<path d="M8 1.8L14.2 8 8 14.2 1.8 8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
+    "info": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7.3v4M8 4.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+    "arrow": '<path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    "chev": '<path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    "copy": '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M3.5 10.5v-7a1 1 0 011-1h7" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    "moon": '<path d="M13 9.5A5.5 5.5 0 016.5 3a5.5 5.5 0 106.5 6.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
+    "globe": '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14C6.2 12.3 5.4 10.3 5.4 8S6.2 3.7 8 2z" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+}
+
+_JS_STRINGS = {
+    "en": {"copied": "Copied", "show_full": "Show complete", "collapse": "Collapse", "count": "{a} of {b} findings", "local": "local time"},
+    "pt-BR": {"copied": "Copiado", "show_full": "Mostrar completo", "collapse": "Recolher", "count": "{a} de {b} achados", "local": "horário local"},
+}
+
+
 def render_html(report: dict, lang: str = "en") -> str:
+    from . import __version__ as rendered_by
     from .report import REPORT_VERSION  # the model module owns the report format version
 
     lang = lang if lang in ("en", "pt-BR") else "en"
@@ -1539,6 +1718,8 @@ def render_html(report: dict, lang: str = "en") -> str:
     header = (
         f'<header class="topbar"><div class="topbar-inner"><a class="brand" href="#overview">{_LOGO}'
         f'<span class="brand-name">Assertiva</span><span class="brand-product">{r.t("brand.product")}</span></a>'
+        f'<span class="topbar-context" aria-hidden="true"><code>{_e(project.get("name") or "")}</code>'
+        f'<span class="tc-status">{r.p(_verdict(r)[2])}</span></span>'
         f'<div class="controls"><label class="lang">{r.icon("globe")}<span class="sr-only">{r.t("lang.label")}</span>'
         f'<select id="lang" class="select" {r.attr("aria-label", "lang.label")}><option value="en" lang="en"{selected[1]}>English</option>'
         f'<option value="pt-BR" lang="pt-BR"{selected[0]}>Português (Brasil)</option></select></label>'
@@ -1547,191 +1728,212 @@ def render_html(report: dict, lang: str = "en") -> str:
     )
     nav = _nav(r)
     skip = r.t("skip", tag="a", cls="skip", attrs=' href="#main"')
-    copied = _ui("copied")[1]
-    live = f'<div id="live" class="sr-only" aria-live="polite" data-copied-en="{_e(copied[0])}" data-copied-pt="{_e(copied[1])}"></div>'
-    footer = f'<footer class="footer">{r.t("footer", tag="p", v=REPORT_VERSION)}</footer>'
-    dictionary = json.dumps({"pt-BR": dict(sorted(r.used.items()))}, ensure_ascii=False).replace("</", "<\\/")
+    footer = f'<footer class="footer">{r.t("footer", tag="p", v=REPORT_VERSION, a=rendered_by)}</footer>'
+    data = json.dumps({"pt-BR": dict(sorted(r.used.items())), "js": _JS_STRINGS}, ensure_ascii=False).replace("</", "<\\/")
     return (
         f'<!doctype html>\n<html lang="{lang}" data-rendered="{lang}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark">'
+        f'<meta name="generator" content="Assertiva {_e(rendered_by)}">'
         f"{title}<style>{_CSS}</style></head>\n<body>\n{skip}\n{_sprite()}\n{header}\n"
-        f'<div class="shell">{nav}<main id="main" tabindex="-1">{main}</main></div>\n{footer}\n{live}\n'
-        f'<script type="application/json" id="i18n">{dictionary}</script>\n<script>{_JS}</script>\n</body></html>\n'
+        f'<div class="shell">{nav}<main id="main" tabindex="-1">{main}</main></div>\n{footer}\n'
+        '<div id="live" class="sr-only" aria-live="polite"></div>\n'
+        f'<script type="application/json" id="i18n">{data}</script>\n<script>{_JS}</script>\n</body></html>\n'
     )
 
 
 _CSS = """
 :root{color-scheme:light;
---bg:#f5f4f0;--paper:#fbfaf7;--surface:#ffffff;--sunk:#efeee9;--rule:#e2e0d9;--rule-strong:#cbc8bf;
---ink:#141519;--ink-2:#3b3d44;--muted:#62646c;--faint:#8b8d94;
---accent:#2f43c4;--accent-ink:#ffffff;--accent-soft:#e9ebfb;
---pass:#1b7340;--fail:#bb2a2a;--warn:#955a00;--unknown:#6a6d75;--info:#2b62a1;
---pass-soft:#e6f2ea;--fail-soft:#f9e8e7;--warn-soft:#f8eedd;--unknown-soft:#ececea;--info-soft:#e7eef7;
---shadow:0 1px 0 rgba(20,21,25,.04);--lift:0 10px 30px -18px rgba(20,21,25,.35);
---r-sm:6px;--r:10px;--r-lg:16px;
+--bg:#f4f4f2;--surface:#ffffff;--raised:#ffffff;--sunk:#eeeeeb;--rule:#e3e3df;--rule-strong:#cdcdc7;
+--ink:#121417;--ink-2:#363940;--muted:#5d6068;--faint:#878a91;
+--accent:#2b46c8;--accent-soft:#e8ebfb;--on-tone:#ffffff;
+--pass:#17713b;--fail:#b8292b;--warn:#8d5600;--unknown:#646872;--info:#245e9e;
+--pass-soft:#e5f1e9;--fail-soft:#fbeceb;--warn-soft:#f8efdf;--info-soft:#e7eef8;
+--shadow:0 1px 2px rgba(18,20,23,.05);--lift:0 12px 32px -20px rgba(18,20,23,.4);
+--r-sm:6px;--r:10px;--r-lg:14px;
 --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
---display:ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
 --mono:ui-monospace,SFMono-Regular,"SF Mono","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;
---bg:#0e0f11;--paper:#121316;--surface:#17181c;--sunk:#1c1d22;--rule:#26272d;--rule-strong:#373840;
---ink:#efeff1;--ink-2:#c9cad0;--muted:#a2a4ac;--faint:#7b7d85;
---accent:#9aa8ff;--accent-ink:#0e0f11;--accent-soft:#1e2240;
---pass:#5ccb84;--fail:#ff8a85;--warn:#e6b65a;--unknown:#a7aab2;--info:#7fb6ff;
---pass-soft:#14281c;--fail-soft:#2d1716;--warn-soft:#2b2312;--unknown-soft:#202126;--info-soft:#16212f;
---shadow:0 1px 0 rgba(0,0,0,.3);--lift:0 14px 34px -18px rgba(0,0,0,.8)}}
+--bg:#0d0e10;--surface:#15161a;--raised:#1a1b20;--sunk:#1d1e23;--rule:#26272d;--rule-strong:#393a42;
+--ink:#eeeff1;--ink-2:#c8c9cf;--muted:#a1a3ab;--faint:#787b83;
+--accent:#9eacff;--accent-soft:#1d2140;--on-tone:#0d0e10;
+--pass:#5fcb86;--fail:#ff8b86;--warn:#e8b65c;--unknown:#a6a9b1;--info:#82b7ff;
+--pass-soft:#132619;--fail-soft:#2c1615;--warn-soft:#2a2111;--info-soft:#15202d;
+--shadow:0 1px 2px rgba(0,0,0,.4);--lift:0 16px 36px -20px rgba(0,0,0,.85)}}
 :root[data-theme="dark"]{color-scheme:dark;
---bg:#0e0f11;--paper:#121316;--surface:#17181c;--sunk:#1c1d22;--rule:#26272d;--rule-strong:#373840;
---ink:#efeff1;--ink-2:#c9cad0;--muted:#a2a4ac;--faint:#7b7d85;
---accent:#9aa8ff;--accent-ink:#0e0f11;--accent-soft:#1e2240;
---pass:#5ccb84;--fail:#ff8a85;--warn:#e6b65a;--unknown:#a7aab2;--info:#7fb6ff;
---pass-soft:#14281c;--fail-soft:#2d1716;--warn-soft:#2b2312;--unknown-soft:#202126;--info-soft:#16212f;
---shadow:0 1px 0 rgba(0,0,0,.3);--lift:0 14px 34px -18px rgba(0,0,0,.8)}
+--bg:#0d0e10;--surface:#15161a;--raised:#1a1b20;--sunk:#1d1e23;--rule:#26272d;--rule-strong:#393a42;
+--ink:#eeeff1;--ink-2:#c8c9cf;--muted:#a1a3ab;--faint:#787b83;
+--accent:#9eacff;--accent-soft:#1d2140;--on-tone:#0d0e10;
+--pass:#5fcb86;--fail:#ff8b86;--warn:#e8b65c;--unknown:#a6a9b1;--info:#82b7ff;
+--pass-soft:#132619;--fail-soft:#2c1615;--warn-soft:#2a2111;--info-soft:#15202d;
+--shadow:0 1px 2px rgba(0,0,0,.4);--lift:0 16px 36px -20px rgba(0,0,0,.85)}
 *,*::before,*::after{box-sizing:border-box}
-html{scroll-padding-top:80px;-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html{scroll-padding-top:84px;-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion: no-preference){html{scroll-behavior:smooth}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.55 var(--sans);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 0}
 a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
 code,pre{font-family:var(--mono);font-size:.84em}
 code{overflow-wrap:anywhere;word-break:break-word}
 p{margin:0}
+abbr[title]{text-decoration:none;cursor:help}
+[hidden]{display:none!important}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .sprite{display:none}
 .ic{width:16px;height:16px;flex:none;vertical-align:-3px}
+.lv{color:var(--tone,var(--muted))}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 .skip{position:absolute;left:16px;top:-60px;background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:var(--r-sm);z-index:30;box-shadow:var(--lift)}
 .skip:focus{top:10px}
-.quiet{color:var(--muted)}
-.muted{color:var(--muted)}
-.empty{color:var(--muted);margin:8px 0}
+.quiet,.muted{color:var(--muted)}
+.empty{color:var(--muted);margin:6px 0}
+.tone-pass{--tone:var(--pass)}.tone-fail{--tone:var(--fail)}.tone-warn{--tone:var(--warn)}.tone-blocked{--tone:var(--warn)}
+.tone-unknown{--tone:var(--unknown)}.tone-not_run{--tone:var(--faint)}.tone-neutral{--tone:var(--muted)}.tone-accent{--tone:var(--accent)}
+.tone-info{--tone:var(--info)}.tone-muted{--tone:var(--faint)}
 /* top bar */
-.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:saturate(1.2) blur(10px);border-bottom:1px solid var(--rule)}
-.topbar-inner{max-width:1480px;margin:0 auto;padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.brand{display:flex;align-items:center;gap:12px;color:var(--ink);text-decoration:none;min-width:0}
-.logo{width:24px;height:24px;flex:none}
-.brand-name{font-weight:650;letter-spacing:-.01em;font-size:1rem}
-.brand-product{color:var(--muted);font-size:.9rem;padding-left:12px;border-left:1px solid var(--rule-strong);white-space:nowrap}
-.controls{display:flex;align-items:center;gap:8px}
+.topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.2) blur(10px);border-bottom:1px solid var(--rule)}
+.topbar-inner{max-width:1440px;margin:0 auto;padding:0 28px;height:56px;display:flex;align-items:center;gap:18px}
+.brand{display:flex;align-items:center;gap:11px;color:var(--ink);text-decoration:none;flex:none}
+.logo{width:22px;height:22px;flex:none}
+.brand-name{font-weight:680;letter-spacing:-.015em}
+.brand-product{color:var(--muted);font-size:.875rem;padding-left:11px;border-left:1px solid var(--rule-strong);white-space:nowrap}
+.topbar-context{display:flex;align-items:center;gap:10px;min-width:0;color:var(--muted);font-size:.875rem;opacity:0;transform:translateY(4px);transition:opacity .2s ease,transform .2s ease;overflow:hidden;white-space:nowrap}
+.topbar-context.show{opacity:1;transform:none}
+.tc-status{color:var(--ink-2);font-weight:550;overflow:hidden;text-overflow:ellipsis}
+.controls{display:flex;align-items:center;gap:8px;margin-left:auto}
 .lang{display:flex;align-items:center;gap:6px;color:var(--muted)}
-.select,.search{font:inherit;font-size:.875rem;color:var(--ink);background:var(--surface);border:1px solid var(--rule-strong);border-radius:var(--r-sm);padding:6px 10px;min-height:36px}
+.select,.search{font:inherit;font-size:.875rem;color:var(--ink);background:var(--surface);border:1px solid var(--rule-strong);border-radius:var(--r-sm);padding:6px 10px;min-height:34px}
 .select{appearance:none;padding-right:30px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat}
 .select:hover,.search:hover,.toggle:hover{border-color:var(--faint)}
-.toggle{font:inherit;font-size:.875rem;display:inline-flex;align-items:center;gap:8px;color:var(--ink);background:var(--surface);border:1px solid var(--rule-strong);border-radius:999px;padding:6px 14px;min-height:36px;cursor:pointer}
+.toggle{font:inherit;font-size:.875rem;display:inline-flex;align-items:center;gap:8px;color:var(--ink);background:var(--surface);border:1px solid var(--rule-strong);border-radius:999px;padding:5px 13px;min-height:34px;cursor:pointer}
 .toggle[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-/* shell + nav */
-.shell{max-width:1480px;margin:0 auto;padding:0 32px;display:grid;grid-template-columns:196px minmax(0,1fr);gap:56px}
-.sidenav{position:sticky;top:60px;align-self:start;max-height:calc(100vh - 60px);overflow:auto;padding:40px 0 24px}
+/* shell and navigation */
+.shell{max-width:1440px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:184px minmax(0,1fr);gap:48px}
+.sidenav{position:sticky;top:56px;align-self:start;max-height:calc(100vh - 56px);overflow:auto;padding:28px 0 24px}
 .sidenav ul{list-style:none;margin:0;padding:0}
 .sidenav>ul>li{margin:0 0 2px}
-.nav-area{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);text-decoration:none;padding:8px 12px;border-radius:var(--r-sm);font-size:.9375rem;font-weight:500;border-left:2px solid transparent}
+.nav-area{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);text-decoration:none;padding:7px 10px 7px 12px;border-radius:var(--r-sm);font-size:.9rem;font-weight:550;position:relative;transition:color .15s ease,background .15s ease}
+.nav-area::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:transparent;transition:background .15s ease}
 .nav-area:hover{color:var(--ink);background:var(--sunk)}
-li.active>.nav-area{color:var(--ink);background:var(--surface);border-left-color:var(--accent);box-shadow:var(--shadow)}
-.badge{font-size:.75rem;font-weight:600;color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 8px;font-variant-numeric:tabular-nums}
+li.active>.nav-area{color:var(--ink);background:var(--surface);box-shadow:var(--shadow)}
+li.active>.nav-area::before{background:var(--accent)}
+.badge{font-size:.75rem;font-weight:650;color:var(--muted);background:var(--sunk);border-radius:999px;padding:0 7px;line-height:1.6;font-variant-numeric:tabular-nums}
 li.active .badge{background:var(--accent-soft);color:var(--accent)}
-.nav-sub{display:none;margin:2px 0 8px 14px!important;border-left:1px solid var(--rule)}
+.nav-sub{display:none;margin:2px 0 8px 12px!important;border-left:1px solid var(--rule)}
 li.active>.nav-sub{display:block}
-.nav-sub a{display:block;color:var(--muted);text-decoration:none;font-size:.85rem;padding:4px 12px}
+.nav-sub a{display:block;color:var(--muted);text-decoration:none;font-size:.84rem;padding:3px 10px}
 .nav-sub a:hover{color:var(--ink)}
 main{min-width:0;padding:0 0 96px}
 main:focus{outline:none}
-/* hero */
-.hero{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);grid-template-areas:"id next" "verdict next";gap:28px 56px;align-items:start}
-.hero-id{grid-area:id}
-.eyebrow{font-size:.8125rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
-h1{font-size:clamp(2rem,3.4vw,2.75rem);line-height:1.05;letter-spacing:-.03em;margin:0 0 14px;font-weight:700;overflow-wrap:anywhere}
-.idline{display:flex;flex-wrap:wrap;gap:6px 22px;color:var(--muted);font-size:.875rem}
-.idline code{color:var(--ink-2)}
-.sep{margin:0 6px;color:var(--faint)}
+/* identity */
+.area.area-overview{padding-top:28px;margin-top:0}
+.ident{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 32px;margin-bottom:18px}
+.eyebrow{flex-basis:100%;font-size:.8125rem;font-weight:600;color:var(--accent);margin-bottom:-4px}
+h1{font-size:clamp(1.75rem,2.6vw,2.25rem);line-height:1.1;letter-spacing:-.025em;margin:0;font-weight:700;overflow-wrap:anywhere}
+.idline{display:flex;flex-wrap:wrap;gap:4px 24px;margin:0;font-size:.875rem}
+.idline div{display:flex;gap:6px;align-items:baseline}
+.idline dt{color:var(--faint)}
+.idline dd{margin:0;color:var(--ink-2)}
 .ws.dirty{color:var(--warn)}
-.verdict{grid-area:verdict;border-top:1px solid var(--rule-strong);padding-top:24px}
-.verdict-label{font-size:.875rem;color:var(--muted);margin-bottom:6px}
-.verdict-headline{font-family:var(--display);font-size:clamp(2rem,3.6vw,3.1rem);line-height:1.08;letter-spacing:-.015em;font-weight:500;display:flex;align-items:baseline;gap:14px;color:var(--ink)}
-.v-ic{width:.62em;height:.62em;flex:none;transform:translateY(-.06em);color:var(--tone)}
-.verdict-reason{font-size:1.1875rem;line-height:1.45;color:var(--ink-2);margin-top:12px;max-width:44ch}
-.verdict-mode{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:.9375rem;color:var(--ink-2)}
-.verdict-mode .dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--ink-2);flex:none}
-.mode-solid .dot{background:var(--ink-2)}
-.mode-half .dot{background:linear-gradient(90deg,var(--ink-2) 50%,transparent 50%)}
-.tone-warn{--tone:var(--warn)}.tone-fail{--tone:var(--fail)}.tone-pass{--tone:var(--pass)}.tone-unknown{--tone:var(--unknown)}
-.tone-neutral{--tone:var(--muted)}.tone-accent{--tone:var(--accent)}.tone-blocked{--tone:var(--warn)}.tone-not_run{--tone:var(--unknown)}
-.tone-info{--tone:var(--info)}.tone-muted{--tone:var(--faint)}
-.next{grid-area:next;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r-lg);padding:26px 28px 24px;box-shadow:var(--lift);position:relative;margin-top:6px}
-.next::before{content:"";position:absolute;left:28px;right:28px;top:0;height:3px;background:var(--accent);border-radius:0 0 3px 3px}
-.next-label{display:flex;align-items:center;gap:8px;font-size:.875rem;font-weight:600;color:var(--accent);margin:0 0 14px}
-.next-act{font-size:1.3125rem;line-height:1.35;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
-.next-act.quiet{font-size:1.0625rem;font-weight:500;color:var(--ink-2)}
-.next-why{color:var(--muted);font-size:.9375rem;margin-top:12px}
-.next-why a{color:var(--ink);font-weight:500}
-.next-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
-.next-list li{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.9375rem}
-.next-list a{color:var(--ink);font-weight:500}
-.next-cmd{margin-top:12px}
-.next-cmd code{background:var(--sunk);padding:4px 8px;border-radius:var(--r-sm)}
-.next .link{margin-top:18px}
-.link{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;font-weight:550;text-decoration:none}
-.link:hover{text-decoration:underline}
-.link .ic{width:14px;height:14px;transition:transform .15s ease}
-.link:hover .ic{transform:translateX(2px)}
-/* decision strip */
-.strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:44px;border-top:1px solid var(--rule-strong);border-bottom:1px solid var(--rule)}
-.dcol{padding:22px 28px 24px 0;min-width:0}
-.dcol+.dcol{padding-left:28px;border-left:1px solid var(--rule)}
-.dcol h3{display:flex;align-items:center;gap:8px;font-size:.9375rem;font-weight:600;margin:0 0 12px;color:var(--ink-2)}
-.dcol h3 .ic{color:var(--tone)}
+.arrow{color:var(--faint);margin:0 6px;font-weight:400}
+/* decision surface */
+.decision{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);grid-template-rows:auto 1fr auto;grid-template-areas:"main rail" "extra rail" "facts facts";background:var(--surface);border:1px solid var(--rule);border-radius:var(--r-lg);box-shadow:var(--lift);overflow:hidden;position:relative}
+.decision::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tone,var(--muted))}
+.d-main{grid-area:main;padding:26px 30px 0 34px;min-width:0}
+.d-extra{grid-area:extra;padding:0 30px 24px 34px;min-width:0}
+.c-label{font-size:.8125rem;color:var(--muted);font-weight:550;margin-bottom:6px}
+.c-headline{display:flex;align-items:center;gap:12px;font-size:clamp(1.6rem,2.4vw,2.05rem);line-height:1.15;font-weight:680;letter-spacing:-.022em}
+.c-ic{width:.8em;height:.8em;color:var(--tone)}
+.c-reason{font-size:1.0625rem;color:var(--ink-2);margin-top:10px;max-width:60ch}
+.c-chips{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.c-total{font-size:1.0625rem;font-weight:650;margin-right:4px}
+.c-more{font-size:.875rem;font-weight:550;margin-left:4px}
+.chip{display:inline-flex;align-items:baseline;gap:5px;font-size:.875rem;padding:3px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-2);border:1px solid var(--rule)}
+.chip b{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
+.chip.sev-high{background:var(--fail-soft);border-color:color-mix(in srgb,var(--fail) 30%,transparent)}.chip.sev-high b{color:var(--fail)}
+.chip.sev-medium{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}.chip.sev-medium b{color:var(--warn)}
+.chip.sev-pass{background:var(--pass-soft);border-color:color-mix(in srgb,var(--pass) 30%,transparent)}.chip.sev-pass b{color:var(--pass)}
+.chip.zero b{color:var(--faint)}
+.c-scope{display:flex;align-items:center;gap:8px;margin-top:16px;font-size:.9375rem;color:var(--ink-2)}
+.c-scope .ic{color:var(--ink-2)}
+.rail{grid-area:rail;padding:24px 26px;border-left:1px solid var(--rule);background:color-mix(in srgb,var(--accent-soft) 45%,var(--surface));min-width:0;display:flex;flex-direction:column;align-items:flex-start}
+.rail-label{display:flex;align-items:center;gap:7px;font-size:.8125rem;font-weight:650;color:var(--accent);margin:0 0 10px;letter-spacing:.01em}
+.rail-act{font-size:1.1875rem;line-height:1.35;font-weight:650;letter-spacing:-.012em}
+.rail-act.quiet{font-size:1rem;font-weight:500;color:var(--ink-2)}
+.rail-dl{margin:14px 0 0;display:grid;gap:10px;font-size:.9rem}
+.rail-dl dt{font-size:.78rem;color:var(--muted);font-weight:600}
+.rail-dl dd{margin:2px 0 0;color:var(--ink-2)}
+.rail-dl a{color:var(--ink);font-weight:550;margin-right:6px}
+.rail-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;font-size:.9375rem}
+.rail-list li{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rail-list a{color:var(--ink);font-weight:550}
+.rail-note{font-size:.875rem;color:var(--muted);margin-top:10px}
+.rail-foot{font-size:.78rem;color:var(--muted);margin-top:auto;padding-top:14px}
+.btn{display:inline-flex;align-items:center;gap:7px;margin-top:16px;font-size:.875rem;font-weight:600;color:var(--on-tone);background:var(--accent);border-radius:var(--r-sm);padding:7px 13px;text-decoration:none;border:1px solid var(--accent);font-family:inherit;cursor:pointer}
+.btn .ic{width:14px;height:14px;transition:transform .15s ease}
+.btn:hover .ic{transform:translateX(2px)}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.small{margin-top:0;padding:4px 10px;font-size:.8125rem}
+.facts{grid-area:facts;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--rule)}
+.fact{padding:18px 24px 20px 34px;min-width:0}
+.fact+.fact{border-left:1px solid var(--rule);padding-left:24px}
+.fact h3{display:flex;align-items:center;gap:8px;font-size:.875rem;font-weight:600;margin:0 0 6px;color:var(--ink-2)}
+.fact h3 .ic{color:var(--tone)}
 .d-conf{--tone:var(--pass)}.d-att{--tone:var(--warn)}.d-unk{--tone:var(--unknown)}
-.dfig{font-size:1.5rem;font-weight:650;letter-spacing:-.02em;line-height:1.2;margin-bottom:10px;font-variant-numeric:tabular-nums}
-.dfig .quiet{font-size:1.0625rem;font-weight:500}
-.dsplit{font-size:.9375rem;color:var(--ink-2);display:flex;gap:8px;align-items:center;margin-bottom:6px}
-.s-high{color:var(--fail);font-weight:600}.s-medium{color:var(--warn);font-weight:600}
-.dot-sep{color:var(--faint)}
-.dnote{font-size:.875rem;color:var(--muted);margin-top:6px}
-.dlist{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:5px;font-size:.9375rem;color:var(--ink-2)}
-.dlist li{padding-left:16px;position:relative;overflow-wrap:anywhere}
-.dlist li::before{content:"";position:absolute;left:2px;top:.62em;width:6px;height:6px;border-radius:2px;background:var(--tone)}
-.dlist .more-n{color:var(--muted)}.dlist .more-n::before{display:none}
-.signal{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--rule-strong);font-size:.875rem;color:var(--muted)}
-.signal .ic{width:13px;height:13px;color:var(--info);transform:translateY(2px)}
+.f-fig{font-size:1.25rem;font-weight:680;letter-spacing:-.015em;margin-bottom:8px;font-variant-numeric:tabular-nums}
+.f-fig .quiet{font-size:1rem;font-weight:500}
+.f-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.fnote{font-size:.84rem;color:var(--muted);margin-top:6px}
+.flist{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:.9rem;color:var(--ink-2)}
+.flist li{padding-left:14px;position:relative;overflow-wrap:anywhere}
+.flist li::before{content:"";position:absolute;left:1px;top:.6em;width:5px;height:5px;border-radius:50%;background:var(--tone)}
+.flist.links a{color:var(--ink-2);text-decoration-color:var(--rule-strong)}
+.flist .more-n{color:var(--muted)}.flist .more-n::before{display:none}
+.signal{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px dashed var(--rule-strong);font-size:.84rem;color:var(--muted)}
+.signal .ic{width:12px;height:12px;color:var(--info);transform:translateY(1px)}
 .signal>span:first-of-type{color:var(--info);font-weight:600}
-.tier-mini{font-family:var(--mono);font-size:.75rem;color:var(--faint);border:1px solid var(--rule-strong);border-radius:4px;padding:0 4px}
-.dcol .link{margin-top:14px}
-/* improve story */
-.story{margin-top:40px}
-.story-title{font-size:.9375rem;font-weight:600;color:var(--ink-2);margin:0 0 12px}
-.dcounts{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--rule);border-radius:var(--r);background:var(--surface);overflow:hidden}
-.dc{flex:1 1 140px;min-width:0}
-.dc+.dc{border-left:1px solid var(--rule)}
-.dc a{display:flex;flex-direction:column;gap:2px;padding:14px 18px;color:var(--ink-2);text-decoration:none;font-size:.875rem}
-.dc a:hover{background:var(--sunk)}
-.dc-n{font-size:1.75rem;font-weight:650;letter-spacing:-.02em;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
-.dc-improved .dc-n{color:var(--pass)}.dc-regressed .dc-n{color:var(--fail)}
-.dc.zero .dc-n{color:var(--faint)}
-.dc-regressed:not(.zero){background:var(--fail-soft)}
-.story-note{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:.9375rem;color:var(--ink-2)}
-/* green / ledger */
-.sub{margin-top:56px}
-.sub-head{margin-bottom:18px;max-width:72ch}
-.sub-head h2,.area-head h2{font-family:var(--display);font-weight:500;font-size:clamp(1.6rem,2.4vw,2rem);letter-spacing:-.01em;line-height:1.15;margin:0}
-.sub-head h3{font-size:1.25rem;letter-spacing:-.01em;margin:0}
-.lead{color:var(--muted);margin-top:8px;font-size:1rem;max-width:68ch}
-.ledger{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule-strong)}
-.lrow{display:grid;grid-template-columns:minmax(150px,220px) minmax(170px,210px) minmax(0,1fr) 28px;gap:20px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--rule)}
-.lrow:hover{background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.tier-code{font-family:var(--mono);font-size:.72rem;color:var(--faint);border:1px solid var(--rule-strong);border-radius:4px;padding:0 4px;margin-left:2px}
+.fact .link{margin-top:10px}
+.link{display:inline-flex;align-items:center;gap:6px;font-size:.875rem;font-weight:600;text-decoration:none}
+.link:hover{text-decoration:underline}
+.link .ic{width:13px;height:13px}
+/* in-panel scope strip and lifecycle */
+.mini-label{font-size:.78rem;font-weight:600;color:var(--muted);margin:0 0 8px}
+.scope-strip,.life{margin-top:20px;padding-top:16px;border-top:1px dashed var(--rule)}
+.scope-strip ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 18px}
+.scope-strip a{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 0;color:var(--ink-2);text-decoration:none;font-size:.875rem;border-bottom:1px solid transparent}
+.scope-strip a:hover{border-bottom-color:var(--rule-strong)}
+.scope-strip .lv{width:15px;height:15px}
+.ss-level{font-size:.78rem;color:var(--tone);font-weight:600;white-space:nowrap}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px;counter-reset:step}
+.step{display:grid;grid-template-columns:18px minmax(0,1fr);gap:1px 8px;align-items:center;counter-increment:step}
+.step .lv{width:17px;height:17px}
+.step-name{font-weight:600;font-size:.9rem}
+.step-name::before{content:counter(step) ". ";color:var(--faint);font-weight:500}
+.step-state{grid-column:2;font-size:.8125rem;color:var(--tone,var(--muted))}
+.step.st-todo .step-name{color:var(--muted)}
+/* ledger */
+.sub{margin-top:44px}
+.sub-head{margin-bottom:14px;max-width:76ch}
+.sub-head h2,.area-head h2{font-size:1.375rem;font-weight:680;letter-spacing:-.018em;line-height:1.25;margin:0}
+.sub-head h3{font-size:1.125rem;letter-spacing:-.01em;margin:0}
+.lead{color:var(--muted);margin-top:6px;font-size:.9375rem;max-width:72ch}
+.ledger{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r)}
+.lrow{display:grid;grid-template-columns:minmax(150px,210px) minmax(150px,190px) minmax(0,1fr) 24px;gap:18px;align-items:center;padding:11px 16px;border-top:1px solid var(--rule)}
+.lrow:first-child{border-top:0}
+.lrow:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
 .l-area{font-weight:600}
-.l-level{display:flex;align-items:center;gap:10px;font-size:.9rem;color:var(--tone);font-weight:600}
-.l-detail{color:var(--ink-2);font-size:.9375rem;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
-.l-sum{color:var(--ink-2)}
+.l-level{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--tone);font-weight:600}
+.l-level .lv{width:17px;height:17px}
+.l-detail{color:var(--ink-2);font-size:.9375rem;min-width:0}
 .l-go{color:var(--faint);display:flex;justify-content:center}
 .l-go:hover{color:var(--accent)}
-.meter{display:inline-flex;gap:3px;flex:none}
-.meter span{width:6px;height:14px;border-radius:2px;background:var(--rule-strong)}
-.meter span.on{background:var(--tone,var(--ink-2))}
-.lvl-not_evidenced .meter span{background:transparent;border:1px dashed var(--rule-strong)}
-.lvl-not_evidenced .l-area{color:var(--muted);font-weight:500}
-.ledger-foot{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:flex-start;justify-content:space-between;margin-top:16px}
+.lvl-not_evidenced .l-area,.lvl-declared .l-area{color:var(--ink-2);font-weight:500}
+.lvl-failed{background:var(--fail-soft)}
+.ledger-foot{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-start;justify-content:space-between;margin-top:12px}
 .legend{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.8125rem;color:var(--muted)}
-.legend li{display:flex;align-items:center;gap:6px}
-.legend .meter span{width:4px;height:10px}
-.legend .meter span.on{background:var(--muted)}
-.limits{font-size:.9rem;color:var(--ink-2);max-width:60ch}
-.limits>summary{display:inline-flex;align-items:center;gap:8px;color:var(--ink-2);font-weight:500}
+.legend li{display:flex;align-items:center;gap:5px}
+.legend .lv{width:13px;height:13px}
+.limits{font-size:.9rem;color:var(--ink-2);max-width:64ch}
+.limits>summary{display:inline-flex;align-items:center;gap:8px;color:var(--ink-2);font-weight:550}
 .limits[open]>summary{margin-bottom:8px}
 .limits-none{font-size:.875rem;color:var(--muted)}
 .original{margin-top:10px;padding:10px 12px;background:var(--sunk);border-radius:var(--r-sm)}
@@ -1740,226 +1942,305 @@ h1{font-size:clamp(2rem,3.4vw,2.75rem);line-height:1.05;letter-spacing:-.03em;ma
 .raw-text{color:var(--ink-2)}
 summary{cursor:pointer;list-style:none}
 summary::-webkit-details-marker{display:none}
-/* areas */
-.area{padding-top:72px;margin-top:24px}
-.area.area-overview{padding-top:40px;margin-top:0}
-.area-head{margin-bottom:26px;padding-top:28px;border-top:1px solid var(--rule-strong);max-width:76ch}
-/* pills */
-.pill{display:inline-flex;align-items:center;gap:5px;font-size:.8125rem;font-weight:600;line-height:1.2;padding:3px 10px 3px 8px;border-radius:999px;color:var(--tone,var(--unknown));background:color-mix(in srgb,var(--tone,var(--unknown)) 12%,transparent);border:1px solid color-mix(in srgb,var(--tone,var(--unknown)) 32%,transparent);white-space:nowrap;vertical-align:middle}
-.pill .ic{width:13px;height:13px}
-.pill.tone-blocked{border-style:double;border-width:3px;padding:1px 8px 1px 6px}
-.pill.tone-unknown{border-style:dotted}
-.pill.tone-not_run{border-style:dashed}
-.tier{display:inline-block;font-size:.8125rem;color:var(--muted);white-space:nowrap}
-.tag{display:inline-block;font-family:var(--mono);font-size:.78rem;background:var(--sunk);border-radius:5px;padding:1px 6px;margin:1px 4px 1px 0}
-/* findings */
-.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 18px}
-.filters label{font-size:.875rem;color:var(--muted)}
-.search{flex:1 1 220px;min-width:0}
-.finding-list{display:grid;gap:12px}
-.finding{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);box-shadow:var(--shadow);position:relative;overflow:hidden}
-.finding::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rule-strong)}
-.sev-high::before{background:var(--fail)}.sev-medium::before{background:var(--warn)}
-.f-row{display:grid;grid-template-columns:118px minmax(0,1fr) auto;gap:6px 18px;padding:20px 22px 16px 24px;align-items:start}
-.f-sev{padding-top:2px}
-.f-title{font-size:1.125rem;line-height:1.35;letter-spacing:-.005em;margin:0;font-weight:620}
-.f-why{color:var(--ink-2);margin-top:6px;font-size:.9875rem;max-width:72ch}
-.f-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:10px;font-size:.875rem;color:var(--muted)}
-.f-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;padding-top:2px}
-.act{display:inline-flex;align-items:center;gap:6px;font-size:.875rem;font-weight:550;text-decoration:none;color:var(--ink-2);padding:5px 10px;border-radius:var(--r-sm);border:1px solid var(--rule);white-space:nowrap}
-.act:hover{border-color:var(--rule-strong);color:var(--ink);background:var(--sunk)}
-.f-more{border-top:1px solid var(--rule)}
-.f-more>summary,.panel-d>summary,.dg-unchanged>summary,.change summary,.check summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.f-more>summary{padding:10px 22px 10px 24px;font-size:.875rem;color:var(--muted);font-weight:500}
-.f-more>summary:hover{color:var(--ink);background:var(--sunk)}
 .chev{transition:transform .18s ease;color:var(--muted)}
 details[open]>summary .chev{transform:rotate(180deg)}
-.f-body{padding:6px 24px 24px;display:grid;gap:20px;max-width:900px}
-.f-block h4{font-size:.9375rem;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+@media (prefers-reduced-motion: no-preference){details[open]>summary~*{animation:reveal .18s ease}}
+@keyframes reveal{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+:target{animation:flash 1.4s ease}
+@keyframes flash{0%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent)}100%{box-shadow:0 0 0 3px transparent}}
+@media (prefers-reduced-motion: reduce){:target{animation:none;outline:2px solid var(--accent)}}
+/* areas */
+.area{padding-top:56px;margin-top:8px}
+.area-head{margin-bottom:20px;max-width:80ch;display:flex;flex-direction:column}
+.area-head .lead{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.chips{display:inline-flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:.8rem;font-weight:600;line-height:1.2;padding:3px 9px 3px 7px;border-radius:999px;color:var(--tone,var(--unknown));background:color-mix(in srgb,var(--tone,var(--unknown)) 12%,transparent);border:1px solid color-mix(in srgb,var(--tone,var(--unknown)) 30%,transparent);white-space:nowrap;vertical-align:middle}
+.pill .ic{width:12px;height:12px}
+.pill.tone-blocked{border-style:double;border-width:3px;padding:1px 7px 1px 5px}
+.pill.tone-unknown{border-style:dotted}
+.pill.tone-not_run{border-style:dashed}
+.tier,.basis{font-size:.8125rem;color:var(--muted);white-space:nowrap}
+.tag{display:inline-block;font-family:var(--mono);font-size:.78rem;background:var(--sunk);border-radius:5px;padding:1px 6px;margin:1px 4px 1px 0}
+.dot-sep{color:var(--faint);margin:0 2px}
+/* findings */
+.filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 14px;padding:10px 12px;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r)}
+.filters label{font-size:.84rem;color:var(--muted)}
+.search{flex:1 1 220px;min-width:0}
+#findings-count{margin-left:auto;font-size:.84rem;font-variant-numeric:tabular-nums}
+.finding-list{display:grid;gap:8px}
+.finding{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);position:relative;overflow:hidden;transition:border-color .15s ease,box-shadow .15s ease}
+.finding::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rule-strong)}
+.finding.sev-high::before{background:var(--fail)}.finding.sev-medium::before{background:var(--warn)}
+.finding:hover{border-color:var(--rule-strong)}
+.finding[open]{box-shadow:var(--lift);border-color:var(--rule-strong)}
+.f-row{display:grid;grid-template-columns:100px minmax(0,1fr) 20px;grid-template-areas:"sev title chev" ". why ." ". meta .";gap:3px 16px;padding:15px 18px 14px 20px;align-items:start}
+.f-row>.f-sev{grid-area:sev}.f-row>.f-title{grid-area:title;margin:0}.f-row>.f-why{grid-area:why}.f-row>.f-meta{grid-area:meta}.f-row>.chev{grid-area:chev}
+.f-row:hover .f-title{text-decoration:underline;text-decoration-color:var(--rule-strong);text-underline-offset:4px}
+.f-sev{padding-top:1px}
+.f-title{font-size:1.04rem;line-height:1.35;font-weight:640;letter-spacing:-.005em}
+.f-why{display:block;color:var(--ink-2);font-size:.9375rem;max-width:80ch}
+.f-meta{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;font-size:.84rem;color:var(--muted)}
+.finding .chev{margin-top:4px}
+.finding.compact .f-row{padding-top:11px;padding-bottom:10px}
+.finding.compact .f-title{font-size:.96rem;font-weight:580}
+.f-body{padding:4px 22px 22px 136px;display:grid;gap:16px;max-width:1020px;border-top:1px solid var(--rule);padding-top:16px}
+.f-block h4{font-size:.875rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;color:var(--ink-2)}
 .f-fix p{font-weight:550}
-.affected{font-weight:600;margin-bottom:6px}
-.tech>summary,.more>summary{display:inline-flex;align-items:center;gap:6px;font-size:.875rem;color:var(--accent);font-weight:550}
+.affected{font-weight:600;margin-bottom:4px}
+.tech>summary,.more>summary{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;color:var(--accent);font-weight:600}
 .tech>summary::before,.more>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s ease}
 .tech[open]>summary::before,.more[open]>summary::before{transform:rotate(45deg)}
-.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 18px;margin:10px 0;font-size:.875rem}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 16px;margin:8px 0;font-size:.84rem}
 .kv dt{color:var(--muted)}
 .kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
-pre.code{margin:8px 0 0;padding:14px;background:var(--sunk);border-radius:var(--r-sm);white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-height:420px;overflow:auto;font-size:.8rem;line-height:1.55}
+pre.code{margin:6px 0 0;padding:12px 14px;background:var(--sunk);border-radius:var(--r-sm);white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-height:420px;overflow:auto;font-size:.79rem;line-height:1.55;position:relative}
+pre.code.clamped{max-height:13.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+pre.code.full{max-height:none}
+.expand{margin-top:6px;font:inherit;font-size:.8125rem;font-weight:600;color:var(--accent);background:none;border:0;padding:2px 0;cursor:pointer}
 pre.diff{white-space:pre;overflow-x:auto}
-pre.raw-json{max-height:640px}
 .list{margin:4px 0;padding-left:1.15em}
-.list li{margin:4px 0;overflow-wrap:anywhere}
+.list li{margin:3px 0;overflow-wrap:anywhere}
 .list li::marker{color:var(--faint)}
-/* recommendations */
-.rec-group{margin-top:32px}
-.rec-group>h3{display:flex;align-items:center;gap:10px;font-size:1.0625rem;margin:0 0 12px}
-.count{font-size:.8125rem;font-weight:600;color:var(--muted);background:var(--sunk);border-radius:999px;padding:1px 9px;font-variant-numeric:tabular-nums}
+/* improvements: plan */
+.rec-group{margin-top:24px}
+.rec-group>h3{display:flex;align-items:center;gap:10px;font-size:1rem;margin:0 0 10px}
+.count{font-size:.78rem;font-weight:650;color:var(--muted);background:var(--sunk);border-radius:999px;padding:0 8px;line-height:1.7;font-variant-numeric:tabular-nums}
 .g-first>h3{color:var(--accent)}
-.group-note{color:var(--muted);font-size:.9375rem;margin:-4px 0 12px}
-.rec-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.rec{padding:18px 4px 18px;border-bottom:1px solid var(--rule)}
-.g-first .rec-list{border:1px solid color-mix(in srgb,var(--accent) 35%,var(--rule));border-radius:var(--r);background:var(--surface);padding:0 22px}
-.g-first .rec{border-bottom:0}
-.rec-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
-.rec-act{font-size:1.0625rem;font-weight:620;line-height:1.4}
-.rec-text{color:var(--ink-2);margin-top:6px;max-width:80ch}
-.rec-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 28px;margin:14px 0 0;font-size:.875rem}
-.rec-meta dt{color:var(--muted);font-size:.8125rem;margin-bottom:2px}
-.rec-meta dd{margin:0;color:var(--ink-2)}
+.group-note{color:var(--muted);font-size:.9rem;margin:-4px 0 10px}
+.rec-list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.g-first .rec-list{border-color:color-mix(in srgb,var(--accent) 40%,var(--rule));box-shadow:var(--lift)}
+.rec+.rec{border-top:1px solid var(--rule)}
+.rec summary{display:grid;grid-template-columns:34px minmax(0,1fr) auto 20px;gap:6px 14px;align-items:start;padding:13px 16px}
+.rec summary:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+.rec-n{font-family:var(--mono);font-size:.8rem;color:var(--faint);padding-top:3px}
+.g-first .rec-n{color:var(--accent);font-weight:700}
+.rec-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rec-act{font-weight:640;font-size:1rem}
+.rec-why{color:var(--muted);font-size:.9rem}
+.rec-side{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.rec-body{padding:0 16px 16px 64px}
+.rec-text{color:var(--ink-2);max-width:80ch}
+.rec-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 24px;margin:12px 0 0;font-size:.875rem}
+.rec-meta dt{color:var(--muted);font-size:.78rem;font-weight:600}
+.rec-meta dd{margin:2px 0 0;color:var(--ink-2)}
 .rec-meta a{color:var(--ink)}
-/* evidence */
-.domains{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));border-top:1px solid var(--rule-strong)}
-.domain{padding:18px 24px 20px 0;border-bottom:1px solid var(--rule);min-width:0}
-.domain h4{font-size:.9375rem;color:var(--ink-2);margin:0 0 10px}
-.dom-states{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:.875rem;margin:-6px 0 12px}
-.figs{margin:0;display:grid;gap:8px}
-.fig{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.fig dt{color:var(--muted);font-size:.9rem;min-width:0}
-.fig dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap;display:flex;align-items:baseline;gap:8px}
-.fig.moved dd{color:var(--ink)}
+.rec-states{list-style:none;margin:0;padding:0;display:flex;gap:4px;flex-wrap:wrap}
+.rec-states li{font-size:.78rem;padding:1px 8px;border-radius:999px;border:1px dashed var(--rule-strong);color:var(--faint)}
+.rec-states li.on{border-style:solid;border-color:var(--accent);color:var(--accent);font-weight:600}
+/* evidence snapshot */
+.tiles{display:flex;flex-wrap:wrap;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.tile{background:var(--surface);padding:16px 18px 18px;min-width:0;flex:1 1 190px}
+.t-domain{display:flex;align-items:center;gap:7px;font-size:.8125rem;font-weight:600;color:var(--muted);margin-bottom:10px}
+.t-domain .lv{width:14px;height:14px}
+.t-value{font-size:1.75rem;font-weight:700;letter-spacing:-.025em;line-height:1.1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.tile.tone-fail .t-value{color:var(--fail)}
+.t-label{font-size:.875rem;color:var(--ink-2);margin-top:3px}
+.t-sub{font-size:.84rem;color:var(--muted);margin-top:6px}
+.t-sub.bad{color:var(--fail);font-weight:600}
+.t-note{font-size:.78rem;color:var(--warn);margin-top:4px}
+.t-change{font-size:.8rem;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule)}
 .of{color:var(--faint);margin:0 1px;font-weight:400}
-.arrow{color:var(--faint);margin:0 6px;font-weight:400}
-.dmark{font-size:.75rem;font-weight:600;padding:1px 6px;border-radius:4px}
+.dmark{font-size:.75rem;font-weight:650;padding:0 6px;border-radius:4px}
 .dm-improved{color:var(--pass);background:var(--pass-soft)}.dm-regressed{color:var(--fail);background:var(--fail-soft)}
-.dm-changed{color:var(--muted);background:var(--sunk)}.dm-unknown{color:var(--unknown);background:var(--unknown-soft)}
-.panels-d{margin-top:28px;border-top:1px solid var(--rule)}
-.panel-d{border-bottom:1px solid var(--rule)}
-.panel-d>summary{padding:16px 4px}
-.panel-d>summary:hover{background:color-mix(in srgb,var(--surface) 70%,transparent)}
-.pd-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 16px;min-width:0}
-.pd-title h3{font-size:1.0625rem;margin:0;font-weight:600}
-.pd-sum{color:var(--muted);font-size:.9rem}
-.pd-body{padding:4px 4px 28px}
-.pd-body>.lead{margin:0 0 16px}
-.table-wrap{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;margin:0 0 14px}
-table{border-collapse:collapse;width:100%;font-size:.875rem}
-caption{text-align:left;font-size:.875rem;font-weight:600;color:var(--ink-2);padding:12px 16px 8px}
-th,td{text-align:left;vertical-align:top;padding:9px 16px;border-top:1px solid var(--rule)}
-thead th{font-size:.8125rem;font-weight:600;color:var(--muted);background:var(--sunk)}
+.dm-changed{color:var(--muted);background:var(--sunk)}.dm-unknown{color:var(--unknown);background:var(--sunk)}
+.t-change.dm-improved,.t-change.dm-regressed,.t-change.dm-changed,.t-change.dm-unknown{background:none}
+/* disclosure panels (auditability, denser) */
+.panels-d{margin-top:22px;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.panel-d+.panel-d{border-top:1px solid var(--rule)}
+.panel-d>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px}
+.panel-d>summary:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+.pd-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 14px;min-width:0}
+.pd-title h3{font-size:.98rem;margin:0;font-weight:620}
+.pd-sum{color:var(--muted);font-size:.84rem}
+.pd-body{padding:2px 16px 20px;font-size:.92rem}
+.pd-body>.lead{margin:0 0 12px;font-size:.875rem}
+.table-wrap{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r-sm);overflow:hidden;margin:0 0 12px}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+caption{text-align:left;font-size:.84rem;font-weight:650;color:var(--ink-2);padding:10px 14px 6px}
+th,td{text-align:left;vertical-align:top;padding:7px 14px;border-top:1px solid var(--rule)}
+thead th{font-size:.78rem;font-weight:650;color:var(--muted);background:var(--sunk)}
 tbody th{font-weight:500}
 .num-col{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 .m-name{display:block}
-.m-id{display:block;font-size:.75rem;color:var(--faint)}
-.th-note{display:block;font-size:.8125rem;color:var(--muted);margin-top:4px;white-space:normal}
+.m-id{display:block;font-size:.72rem;color:var(--faint)}
+.th-note{display:block;font-size:.78rem;color:var(--muted);margin-top:3px;white-space:normal}
 .dir{color:var(--muted)}
-.sources{font-size:.875rem}
-.origins{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;margin-top:12px}
-.origin{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);min-width:0}
-.origin-head{display:flex;justify-content:space-between;align-items:center;margin:0;padding:12px 16px;border-bottom:1px solid var(--rule);font-size:.9375rem}
+.origins{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,400px),1fr));gap:12px;margin-top:10px}
+.origin{border:1px solid var(--rule);border-radius:var(--r-sm);min-width:0}
+.origin-head{display:flex;justify-content:space-between;align-items:center;margin:0;padding:9px 14px;border-bottom:1px solid var(--rule);font-size:.9rem;background:var(--sunk)}
 .origin-head .count{background:none;padding:0}
 .check-list{list-style:none;margin:0;padding:0}
 .check{border-top:1px solid var(--rule)}
 .check:first-child{border-top:0}
-.check summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:12px;padding:10px 16px}
-.check summary:hover{background:var(--sunk)}
-.kind{font-size:.75rem;font-weight:600;padding:2px 8px;border-radius:var(--r-sm);background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.check summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 14px}
+.check summary:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+.kind{font-size:.75rem;font-weight:650;padding:1px 7px;border-radius:var(--r-sm);background:var(--accent-soft);color:var(--accent);white-space:nowrap}
 .kind-unknown,.kind-custom{background:var(--sunk);color:var(--muted)}
 .check-title{display:flex;flex-direction:column;min-width:0}
-.check-name{font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.check-where{font-size:.8125rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gate{font-size:.8125rem;color:var(--muted);white-space:nowrap}
+.check-name{font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.check-where{font-size:.8rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gate{font-size:.8rem;color:var(--muted);white-space:nowrap}
 .gate-blocking{color:var(--ink);font-weight:600}
-.check-body{padding:4px 16px 14px}
-.cmd{margin-top:10px}
-.cmd-head{display:flex;justify-content:space-between;align-items:center;font-size:.8125rem;color:var(--muted);font-weight:600}
-.copy{font:inherit;font-size:.8125rem;display:inline-flex;gap:5px;align-items:center;color:var(--muted);background:var(--surface);border:1px solid var(--rule-strong);border-radius:var(--r-sm);padding:2px 8px;cursor:pointer}
+.check-body{padding:2px 14px 12px}
+.cmd{margin-top:8px}
+.cmd-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.8rem;color:var(--muted);font-weight:600}
+.copy{font:inherit;font-size:.78rem;display:inline-flex;gap:5px;align-items:center;color:var(--muted);background:var(--surface);border:1px solid var(--rule-strong);border-radius:var(--r-sm);padding:2px 8px;cursor:pointer;transition:color .15s ease,border-color .15s ease}
 .copy:hover{color:var(--ink)}
+.copy.done{color:var(--pass);border-color:var(--pass)}
 .copy .ic{width:13px;height:13px}
 code.wrap{white-space:pre-wrap}
-.runs{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-.run,.artifact{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);padding:14px 18px}
+.runs{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.run,.artifact{border:1px solid var(--rule);border-radius:var(--r-sm);padding:12px 14px}
 .run-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
 .run-title{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.run-how{color:var(--muted);font-size:.9rem;margin-top:6px}
+.run-how{color:var(--muted);font-size:.875rem;margin-top:4px}
 .matrix{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
-.checks-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;font-size:.875rem}
+.checks-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px;font-size:.84rem}
 .checks-list li{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:18px 28px;margin-bottom:14px}
-.cols h4{font-size:.9375rem;margin:0 0 6px}
-.meta-row{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:.9rem;margin-bottom:12px;align-items:center}
-/* candidate */
-.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:0 40px;border-top:1px solid var(--rule-strong)}
-.pillar{padding:20px 0 8px;border-bottom:1px solid var(--rule);min-width:0}
-.pillar-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
-.pillar-head h3{font-size:1.0625rem;margin:0}
-.qlist{list-style:none;margin:0;padding:0;display:grid;gap:14px}
-.qrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start}
-.qrow>.pill{margin-top:1px;min-width:92px;justify-content:flex-start}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:14px 24px;margin-bottom:12px}
+.cols h4{font-size:.875rem;margin:0 0 4px}
+.meta-row{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:.875rem;margin-bottom:10px;align-items:center}
+/* candidate pillars */
+.pillars{display:grid;gap:8px}
+.pillar{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;position:relative}
+.pillar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rule-strong)}
+.pillar.st-fail,.pillar.st-blocked{border-color:color-mix(in srgb,var(--fail) 40%,var(--rule));box-shadow:var(--lift)}
+.pillar.st-fail::before,.pillar.st-blocked::before{background:var(--fail)}
+.pillar.st-pass::before{background:var(--pass)}
+.pillar.st-unknown::before,.pillar.st-not_run::before{background:var(--unknown)}
+.pillar>summary{display:grid;grid-template-columns:118px minmax(0,1fr) auto 20px;gap:14px;align-items:center;padding:13px 18px 13px 20px}
+.pillar>summary:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+.p-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.p-name{font-size:1rem;margin:0;font-weight:640}
+.p-reason{font-size:.9rem;color:var(--ink-2)}
+.p-check{font-weight:600}
+.pillar.st-pass .p-reason{color:var(--muted)}
+.p-count{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.qlist{list-style:none;margin:0;padding:12px 20px 18px 152px;display:grid;gap:12px;border-top:1px solid var(--rule)}
+.qrow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:start;margin-left:-118px}
 .q-name{font-weight:600}
-.q-sum{color:var(--ink-2);font-size:.9375rem;margin-top:2px}
-.q-main .tech{margin-top:6px}
+.q-sum{color:var(--ink-2);font-size:.92rem;margin-top:1px}
+.q-main .tech{margin-top:4px}
 .qrow.st-fail .q-name,.qrow.st-blocked .q-name{color:var(--fail)}
-.changes{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.change{border-bottom:1px solid var(--rule)}
-.change summary{justify-content:flex-start;padding:12px 4px;flex-wrap:wrap}
+.changes{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.change+.change{border-top:1px solid var(--rule)}
+.change summary{display:flex;align-items:center;gap:8px;padding:11px 16px;flex-wrap:wrap}
 .change summary .chev{margin-left:auto}
 .path{font-weight:600}
-.change-body{padding:0 4px 18px}
+.change-body{padding:0 16px 16px}
 /* delta */
-.dgroup{margin-top:28px}
-.dgroup>h3{display:flex;align-items:center;gap:10px;font-size:1.0625rem;margin:0}
-.dg-lead{color:var(--muted);font-size:.9rem;margin:4px 0 10px}
+.dcounts{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.dc{flex:1 1 140px;min-width:0}
+.dc+.dc{border-left:1px solid var(--rule)}
+.dc a{display:flex;flex-direction:column;gap:1px;padding:12px 16px;color:var(--ink-2);text-decoration:none;font-size:.84rem}
+.dc a:hover{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
+.dc-n{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;line-height:1.1;color:var(--ink);font-variant-numeric:tabular-nums}
+.dc-improved .dc-n{color:var(--pass)}.dc-regressed .dc-n{color:var(--fail)}
+.dc.zero .dc-n{color:var(--faint)}
+.dc-regressed:not(.zero),.dc-unknown:not(.zero){background:var(--fail-soft)}
+.dc-unknown:not(.zero){background:var(--sunk)}
+.dgroup{margin-top:22px}
+.dgroup>h3{display:flex;align-items:center;gap:10px;font-size:1rem;margin:0}
+.dg-lead{color:var(--muted);font-size:.875rem;margin:2px 0 8px}
 .dg-regressed>h3{color:var(--fail)}.dg-improved>h3{color:var(--pass)}
-.drows{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.drow{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:4px 14px;align-items:baseline;padding:10px 4px;border-bottom:1px solid var(--rule)}
+.drows{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+.drow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:2px 14px;align-items:baseline;padding:9px 16px;border-top:1px solid var(--rule)}
+.drow:first-child{border-top:0}
 .d-glyph{font-family:var(--mono);font-weight:700;text-align:center;color:var(--muted)}
 .d-improved .d-glyph{color:var(--pass)}.d-regressed .d-glyph{color:var(--fail)}
-.d-name .m-name{font-weight:550}
-.d-vals{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
-.d-note{grid-column:2/-1;font-size:.875rem;color:var(--muted)}
-.dg-unchanged>summary{padding:14px 4px;color:var(--ink-2);font-weight:550;border-bottom:1px solid var(--rule)}
+.d-regressed{background:var(--fail-soft)}
+.d-name .m-name{font-weight:560}
+.d-vals{font-variant-numeric:tabular-nums;font-weight:650;white-space:nowrap}
+.d-note{grid-column:2/-1;font-size:.84rem;color:var(--muted)}
+.dg-unchanged>summary{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;color:var(--ink-2);font-weight:560;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r)}
+.dg-unchanged[open]>summary{border-radius:var(--r) var(--r) 0 0}
+.dg-unchanged .drows{border-top:0;border-radius:0 0 var(--r) var(--r)}
 .dg-unchanged .drow{color:var(--muted)}
-/* details */
-.area-tech .area-head h2{color:var(--ink-2)}
-.prov{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px 28px;margin:0 0 12px;padding:18px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+/* technical details */
+.area-tech{font-size:.94rem}
+.prov{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px 24px;margin:0 0 10px;padding:14px 16px;background:var(--surface);border:1px solid var(--rule);border-radius:var(--r)}
 .prov div{min-width:0}
-.prov dt{font-size:.8125rem;color:var(--muted)}
-.prov dd{margin:2px 0 0;font-size:.9375rem;overflow-wrap:anywhere}
-.claim-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:20px 32px}
-.claim-col h4{font-size:.9375rem;margin:0 0 6px}
-.budget{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
-.budget-row{display:grid;grid-template-columns:auto minmax(120px,240px) minmax(0,1fr);gap:12px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--rule);font-size:.875rem}
+.prov dt{font-size:.78rem;color:var(--muted);font-weight:600}
+.prov dd{margin:2px 0 0;font-size:.9rem;overflow-wrap:anywhere}
+.prov-warn{margin:0 0 10px;padding:10px 14px;border-radius:var(--r-sm);background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);font-size:.9rem}
+.claim-groups{display:grid;gap:8px}
+.claim-g{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r)}
+.claim-g>summary{display:grid;grid-template-columns:minmax(160px,auto) minmax(0,1fr) 20px;gap:12px;align-items:center;padding:11px 16px}
+.cg-title{display:flex;align-items:center;gap:8px;font-weight:620}
+.cd-index{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.84rem;color:var(--muted)}
+.cd-index li{display:flex;gap:5px;align-items:center}
+.cd-index a{color:var(--ink-2);text-decoration:none}
+.cd-index .count{background:none;padding:0}
+.cg-body{padding:4px 16px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:4px 28px;border-top:1px solid var(--rule)}
+.cd{padding-top:10px}
+.cd-head{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:650;color:var(--ink-2)}
+.cd .list{font-size:.875rem}
+.budget{list-style:none;margin:0;padding:0}
+.budget-row{display:grid;grid-template-columns:auto minmax(110px,220px) minmax(0,1fr);gap:12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--rule);font-size:.84rem}
 .budget-reason{color:var(--muted)}
-.more{margin:10px 0}
-.footer{max-width:1480px;margin:0 auto;padding:28px 32px;color:var(--muted);font-size:.8125rem;border-top:1px solid var(--rule)}
+.more{margin:8px 0}
+.footer{max-width:1440px;margin:0 auto;padding:24px 28px;color:var(--muted);font-size:.8rem;border-top:1px solid var(--rule)}
 /* responsive */
-@media (max-width:1200px){.shell{grid-template-columns:minmax(0,1fr);gap:0}
-.sidenav{position:sticky;top:60px;z-index:15;max-height:none;padding:10px 0;margin:0 -32px;padding-left:32px;padding-right:32px;background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);overflow-x:auto;scrollbar-width:none}
+@media (max-width:1180px){.shell{grid-template-columns:minmax(0,1fr);gap:0}
+.sidenav{position:sticky;top:56px;z-index:15;max-height:none;margin:0 -28px;padding:8px 28px;background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule);overflow-x:auto;scrollbar-width:none}
 .sidenav>ul{display:flex;gap:6px;width:max-content}.sidenav>ul>li{margin:0}.nav-sub,li.active>.nav-sub{display:none}
-.nav-area{border-left:0;border:1px solid var(--rule);border-radius:999px;padding:6px 14px;white-space:nowrap;font-size:.875rem}
+.nav-area{border:1px solid var(--rule);border-radius:999px;padding:5px 13px;white-space:nowrap;font-size:.875rem}
+.nav-area::before{display:none}
 li.active>.nav-area{border-color:var(--ink);background:var(--ink);color:var(--bg)}
-li.active .badge{background:color-mix(in srgb,var(--bg) 20%,transparent);color:var(--bg)}
-html{scroll-padding-top:124px}
-.area.area-overview{padding-top:28px}
-.hero{grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr);gap:24px 32px}}
-@media (max-width:900px){.hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"id" "verdict" "next"}.next{margin-top:0}}
-@media (max-width:860px){.strip{grid-template-columns:minmax(0,1fr)}.dcol,.dcol+.dcol{padding:18px 0;border-left:0}.dcol+.dcol{border-top:1px solid var(--rule)}
-.lrow{grid-template-columns:minmax(0,1fr) auto;gap:4px 12px}.l-detail{grid-column:1/-1}.l-go{display:none}.l-level{justify-self:end}
-.f-row{grid-template-columns:minmax(0,1fr)}.f-actions{flex-direction:row;align-items:center;justify-content:flex-start;flex-wrap:wrap}}
-@media (max-width:640px){body{font-size:15px}.topbar-inner,.shell{padding:0 16px}.sidenav{margin:0 -16px;padding-left:16px;padding-right:16px}
+li.active .badge{background:color-mix(in srgb,var(--bg) 22%,transparent);color:var(--bg)}
+html{scroll-padding-top:120px}
+.area.area-overview{padding-top:22px}
+.topbar-context{display:none}
+}
+@media (max-width:900px){.decision{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;grid-template-areas:"main" "rail" "extra" "facts"}
+.d-main{padding-bottom:20px}.d-extra{border-top:1px solid var(--rule)}.d-extra>div{margin-top:0;border-top:0}
+.rail{border-left:0;border-top:1px solid var(--rule)}
+.facts{grid-template-columns:minmax(0,1fr)}.fact+.fact{border-left:0;border-top:1px solid var(--rule);padding-left:34px}
+.lrow{grid-template-columns:minmax(0,1fr) auto;gap:4px 12px}.l-detail{grid-column:1/-1}.l-go{display:none}
+.f-body{padding-left:22px}
+.qlist{padding-left:20px}.qrow{margin-left:0}
+.pillar>summary{grid-template-columns:minmax(0,1fr) auto 20px}.pillar>summary>.pill{grid-column:1/-1;justify-self:start}
+.rec-body{padding-left:16px}}
+@media (max-width:640px){body{font-size:15px}.topbar-inner,.shell{padding:0 16px}.sidenav{margin:0 -16px;padding:8px 16px}
 .brand-product,.toggle-text{display:none}.lang .ic{display:none}.lang .select{max-width:140px}
-.area.area-overview{padding-top:20px}.verdict-reason{font-size:1.0625rem}.next{padding:20px}
+.ident{margin-bottom:14px}.d-main{padding:20px 18px 18px 22px}.d-extra{padding:0 18px 18px 22px}.rail{padding:18px 18px 18px 22px}.fact,.fact+.fact{padding:14px 18px 16px 22px}
+.steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+.f-row{grid-template-columns:minmax(0,1fr) 20px;grid-template-areas:"sev chev" "title title" "why why" "meta meta";padding:13px 14px 12px 18px}
+.rec summary{grid-template-columns:26px minmax(0,1fr) 20px}.rec-side{grid-column:2;justify-content:flex-start}
 .dcounts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.dc+.dc{border-left:0}.dc{border-top:1px solid var(--rule)}.dc:nth-child(-n+2){border-top:0}.dc:nth-child(even){border-left:1px solid var(--rule)}
+.claim-g>summary{grid-template-columns:minmax(0,1fr) 20px}.cd-index{grid-column:1/-1;grid-row:2}
 table.responsive thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-table.responsive tr{display:block;border-top:1px solid var(--rule);padding:8px 0}
-table.responsive th,table.responsive td{display:block;border:0;padding:3px 14px;text-align:left}
+table.responsive tr{display:block;border-top:1px solid var(--rule);padding:6px 0}
+table.responsive th,table.responsive td{display:block;border:0;padding:3px 12px;text-align:left}
 table.responsive td[data-label]::before{content:attr(data-label);display:block;font-size:.75rem;color:var(--muted)}
 .num-col{text-align:left}
-.check summary{grid-template-columns:minmax(0,1fr) auto;}.check summary .kind{grid-column:1/-1;justify-self:start}
+.check summary{grid-template-columns:minmax(0,1fr) auto}.check summary .kind{grid-column:1/-1;justify-self:start}
 .budget-row{grid-template-columns:minmax(0,1fr)}.kv{grid-template-columns:minmax(0,1fr)}.kv dt{margin-top:6px}
 .drow{grid-template-columns:20px minmax(0,1fr)}.d-vals{grid-column:2}
-.qrow{grid-template-columns:minmax(0,1fr)}.rec-head{flex-direction:column;gap:8px}}
+.qrow{grid-template-columns:minmax(0,1fr)}}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
-@media print{.topbar,.sidenav,.filters,.copy,.skip,.f-actions{display:none}.shell{display:block}details>*{display:block}body{background:#fff}}
+.no-anim *{transition:none!important}
+@media print{
+@page{margin:14mm}
+body{background:#fff;color:#000;font-size:11pt}
+.topbar,.sidenav,.filters,.copy,.skip,.expand,.l-go,.btn,.chev{display:none!important}
+.shell{display:block;padding:0}
+.decision,.ledger,.finding,.pillar,.tile,.rec,.panels-d,.claim-g,.prov{box-shadow:none;break-inside:avoid}
+.area{padding-top:18px;break-before:auto}
+pre.code,pre.code.clamped{max-height:none;-webkit-mask-image:none;mask-image:none;overflow:visible}
+a{color:inherit;text-decoration:none}
+.footer{border:0}}
 """
 
 _JS = r"""
 (function(){
-var root=document.documentElement,dict={};
-try{dict=JSON.parse(document.getElementById('i18n').textContent)||{};}catch(e){}
+var root=document.documentElement,data={};
+try{data=JSON.parse(document.getElementById('i18n').textContent)||{};}catch(e){}
+var dict={'pt-BR':data['pt-BR']||{}},S=data.js||{};
 function load(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function save(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 var lang=root.getAttribute('data-rendered')||'en';
+function str(k){return ((S[lang]||S.en||{})[k])||((S.en||{})[k])||k;}
 var ATTRS=['aria-label','placeholder','title','data-label'];
 function apply(next){lang=next;root.setAttribute('lang',lang);var d=dict[lang]||{};
  document.querySelectorAll('[data-i18n]').forEach(function(el){
@@ -1970,7 +2251,11 @@ function apply(next){lang=next;root.setAttribute('lang',lang);var d=dict[lang]||
   document.querySelectorAll('[data-i18n-'+a+']').forEach(function(el){
    if(el.dataset[store]===undefined)el.dataset[store]=el.getAttribute(a)||'';
    var key=el.getAttribute('data-i18n-'+a);el.setAttribute(a,lang==='en'?el.dataset[store]:(d[key]||el.dataset[store]));});});
- var s=document.getElementById('lang');if(s)s.value=lang;counts();}
+ var s=document.getElementById('lang');if(s)s.value=lang;localTimes();counts();expanders();}
+function localTimes(){document.querySelectorAll('time[data-local]').forEach(function(t){
+ var dt=new Date(t.getAttribute('datetime'));if(isNaN(dt))return;
+ try{t.textContent=new Intl.DateTimeFormat(lang,{dateStyle:'medium',timeStyle:'short'}).format(dt)+' ('+str('local')+')';}catch(e){return;}
+ t.title=t.getAttribute('datetime');});}
 var saved=load('assertiva.lang'),nav=(navigator.language||'').toLowerCase();
 var initial=saved==='pt-BR'||saved==='en'?saved:(nav.indexOf('pt')===0?'pt-BR':lang);
 var sel=document.getElementById('lang');
@@ -1981,32 +2266,55 @@ function sync(){if(btn)btn.setAttribute('aria-pressed',String(dark()));}
 var savedTheme=load('assertiva.theme');if(savedTheme==='dark'||savedTheme==='light')root.setAttribute('data-theme',savedTheme);
 if(btn)btn.addEventListener('click',function(){var next=dark()?'light':'dark';root.setAttribute('data-theme',next);save('assertiva.theme',next);sync();});
 sync();
-function counts(){var c=document.getElementById('findings-count');if(!c)return;var shown=document.querySelectorAll('.finding:not([hidden])').length;
- c.textContent=shown+' / '+document.querySelectorAll('.finding').length;var em=document.getElementById('findings-empty');if(em)em.hidden=shown>0;}
-function filter(){var s=(document.getElementById('sev')||{}).value||'',c=(document.getElementById('cat')||{}).value||'',q=((document.getElementById('q')||{}).value||'').toLowerCase();
- document.querySelectorAll('.finding').forEach(function(e){e.hidden=(s&&e.dataset.severity!==s)||(c&&e.dataset.category!==c)||(q&&e.textContent.toLowerCase().indexOf(q)<0);});counts();}
-['sev','cat','q'].forEach(function(i){var e=document.getElementById(i);e&&e.addEventListener('input',filter);});
+/* findings filters, mirrored in the URL */
+var F={sev:document.getElementById('sev'),cat:document.getElementById('cat'),q:document.getElementById('q')},clear=document.getElementById('clear-filters');
+function counts(){var c=document.getElementById('findings-count');if(!c)return;var shown=document.querySelectorAll('.finding:not([hidden])').length,all=document.querySelectorAll('.finding').length;
+ c.textContent=str('count').replace('{a}',shown).replace('{b}',all);var em=document.getElementById('findings-empty');if(em)em.hidden=shown>0;}
+function filter(push){var s=(F.sev||{}).value||'',c=(F.cat||{}).value||'',q=((F.q||{}).value||'').toLowerCase();
+ document.querySelectorAll('.finding').forEach(function(e){e.hidden=!!((s&&e.dataset.severity!==s)||(c&&e.dataset.category!==c)||(q&&e.textContent.toLowerCase().indexOf(q)<0));});
+ if(clear)clear.hidden=!(s||c||q);counts();
+ if(push){try{var p=new URLSearchParams();if(s)p.set('sev',s);if(c)p.set('cat',c);if(q)p.set('q',q);var qs=p.toString();history.replaceState(null,'',(qs?'?'+qs:location.pathname)+location.hash);}catch(e){}}}
+['sev','cat','q'].forEach(function(i){F[i]&&F[i].addEventListener('input',function(){filter(true);});});
+if(clear)clear.addEventListener('click',function(){['sev','cat','q'].forEach(function(i){if(F[i])F[i].value='';});filter(true);F.q&&F.q.focus();});
+try{var P=new URLSearchParams(location.search);['sev','cat','q'].forEach(function(i){if(F[i]&&P.get(i))F[i].value=P.get(i);});if(P.toString())filter(false);}catch(e){}
 var k=document.getElementById('kind');k&&k.addEventListener('input',function(){
  document.querySelectorAll('.check[data-kind]').forEach(function(t){t.hidden=!!k.value&&t.dataset.kind!==k.value;});
  document.querySelectorAll('.origin').forEach(function(o){o.hidden=!o.querySelector('.check:not([hidden])');});});
+/* deep links open the collapsed detail they point to */
 function reveal(){var id=decodeURIComponent(location.hash.slice(1));if(!id)return;var el=document.getElementById(id);if(!el)return;
  var opened=false;for(var n=el;n;n=n.parentElement){if(n.tagName==='DETAILS'&&!n.open){n.open=true;opened=true;}}
- if(el.tagName==='DETAILS'&&!el.open){el.open=true;opened=true;}
  if(opened&&el.scrollIntoView)el.scrollIntoView({block:'start'});}
 window.addEventListener('hashchange',reveal);reveal();
-var areas=[].slice.call(document.querySelectorAll('main .area')),links={};
+/* bounded raw blocks */
+function expanders(){document.querySelectorAll('pre.code').forEach(function(pre){
+ var b=pre.nextElementSibling&&pre.nextElementSibling.classList.contains('expand')?pre.nextElementSibling:null;
+ if(!b){if(pre.scrollHeight<=260||pre.classList.contains('diff'))return;b=document.createElement('button');b.type='button';b.className='expand';
+  pre.classList.add('clamped');pre.after(b);b.addEventListener('click',function(){var full=pre.classList.toggle('full');pre.classList.toggle('clamped',!full);
+   b.setAttribute('aria-expanded',String(full));b.textContent=str(full?'collapse':'show_full');});b.setAttribute('aria-expanded','false');}
+ b.textContent=str(pre.classList.contains('full')?'collapse':'show_full');});}
+document.addEventListener('toggle',function(ev){if(ev.target.open)expanders();},true);
+/* active section */
+root.classList.add('no-anim');requestAnimationFrame(function(){requestAnimationFrame(function(){root.classList.remove('no-anim');});});
+var areas=[].slice.call(document.querySelectorAll('main .area')),links={},ctx=document.querySelector('.topbar-context'),hero=document.querySelector('.decision');
 document.querySelectorAll('.sidenav [data-area]').forEach(function(li){links[li.getAttribute('data-area')]=li;});
-function mark(id){Object.keys(links).forEach(function(a){var li=links[a],on=a===id;li.classList.toggle('active',on);
- var link=li.querySelector('.nav-area');if(on){link.setAttribute('aria-current','location');if(li.scrollIntoView&&getComputedStyle(li.parentElement).display==='flex'){var bar=li.closest('.sidenav');if(bar){var r=li.getBoundingClientRect(),b=bar.getBoundingClientRect();if(r.left<b.left||r.right>b.right)bar.scrollLeft+=r.left-b.left-16;}}}else link.removeAttribute('aria-current');});}
-function current(){var best=areas[0],line=window.innerHeight*0.3;areas.forEach(function(a){if(a.getBoundingClientRect().top<=line)best=a;});if(best)mark(best.id);}
+function mark(id){Object.keys(links).forEach(function(a){var li=links[a],on=a===id;li.classList.toggle('active',on);var link=li.querySelector('.nav-area');
+ if(on){link.setAttribute('aria-current','location');var bar=li.closest('.sidenav');if(bar&&getComputedStyle(li.parentElement).display==='flex'){var r=li.getBoundingClientRect(),b=bar.getBoundingClientRect();if(r.left<b.left||r.right>b.right)bar.scrollLeft+=r.left-b.left-16;}}
+ else link.removeAttribute('aria-current');});}
+function current(){var best=areas[0],line=window.innerHeight*0.3;areas.forEach(function(a){if(a.getBoundingClientRect().top<=line)best=a;});if(best)mark(best.id);
+ if(ctx&&hero)ctx.classList.toggle('show',hero.getBoundingClientRect().bottom<0);}
 var ticking=false;window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(function(){ticking=false;current();});}},{passive:true});
 current();
+/* copy */
 var live=document.getElementById('live');
 document.addEventListener('click',function(ev){var b=ev.target.closest&&ev.target.closest('.copy');if(!b)return;
  var pre=b.closest('.cmd').querySelector('pre');var text=pre?pre.textContent:'';
- function done(){if(live)live.textContent=lang==='en'?live.dataset.copiedEn:live.dataset.copiedPt;}
+ function done(){if(live)live.textContent=str('copied');b.classList.add('done');setTimeout(function(){b.classList.remove('done');},1500);}
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,function(){});}
  else{var rg=document.createRange();rg.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(rg);try{document.execCommand('copy');done();}catch(e){}}});
-if(initial!==lang)apply(initial);else counts();
+/* print: every collapsed detail is part of the audit record */
+var reopened=[];
+window.addEventListener('beforeprint',function(){reopened=[].slice.call(document.querySelectorAll('details:not([open])'));reopened.forEach(function(d){d.open=true;});});
+window.addEventListener('afterprint',function(){reopened.forEach(function(d){d.open=false;});reopened=[];});
+if(initial!==lang)apply(initial);else{localTimes();counts();expanders();}
 })();
 """

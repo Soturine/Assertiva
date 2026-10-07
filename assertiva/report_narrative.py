@@ -188,10 +188,10 @@ NARRATIVE: list[tuple[str, str]] = [
     ("absence of observed instability is not proof of stability", "a ausência de instabilidade observada não prova estabilidade"),
     ("order dependence was not measured", "a dependência de ordem não foi medida"),
     ("only the first {a} of {b} relevant invocations were rerun", "apenas as primeiras {a} de {b} invocações relevantes foram reexecutadas"),
-    ("no instability observed in {a} executions of {b} invocations; wall clock {x}s -> {y}s ({delta:st})",
-     "nenhuma instabilidade observada em {a} execuções de {b} invocações; tempo de relógio {x}s → {y}s ({delta:st})"),
-    ("no relevant invocation was rerun; wall clock {x}s -> {y}s ({delta:st})",
-     "nenhuma invocação relevante foi reexecutada; tempo de relógio {x}s → {y}s ({delta:st})"),
+    ("no instability observed in {a} executions of {b} invocations; wall clock {x:num}s -> {y:num}s ({delta:st})",
+     "nenhuma instabilidade observada em {a} execuções de {b} invocações; tempo de relógio {x:num} s → {y:num} s ({delta:st})"),
+    ("no relevant invocation was rerun; wall clock {x:num}s -> {y:num}s ({delta:st})",
+     "nenhuma invocação relevante foi reexecutada; tempo de relógio {x:num} s → {y:num} s ({delta:st})"),
     ("no relevant invocation was rerun; wall clock unknown", "nenhuma invocação relevante foi reexecutada; tempo de relógio desconhecido"),
     # change set
     ("added in candidate", "adicionado no candidato"),
@@ -210,7 +210,7 @@ NARRATIVE: list[tuple[str, str]] = [
 _PLACEHOLDER = re.compile(r"\{(\w+)(?::(\w+))?\}")
 # What a placeholder may contain, so a generic template cannot swallow an unrelated sentence.
 _SHAPE = {"n": r"\d+", "m": r"\d+", "a": r"\d+", "b": r"\d+", "code": r"-?\d+", "x": r"[\d.]+", "y": r"[\d.]+"}
-_KIND_SHAPE = {"st": r"[A-Z][A-Z_]*", "metrics": r"[a-z_]+(?:, [a-z_]+)*"}
+_KIND_SHAPE = {"st": r"[A-Z][A-Z_]*", "metrics": r"[a-z_]+(?:, [a-z_]+)*", "num": r"\d+(?:\.\d+)?"}
 
 
 @lru_cache(maxsize=None)

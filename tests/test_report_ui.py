@@ -51,7 +51,7 @@ class Page(HTMLParser):
             if attrs.get("id"):
                 self.texts.setdefault(attrs["id"], []).append(data)
         in_decision = any(a.get("data-layer") == "decision" for _, a in self.stack)
-        technical = any(t in ("code", "pre") or {"original", "tech", "raw-json"} & set((a.get("class") or "").split()) for t, a in self.stack)
+        technical = any(t in ("code", "pre") or {"original", "tech", "raw-json", "tier-code"} & set((a.get("class") or "").split()) for t, a in self.stack)
         if in_decision and not technical and data.strip():
             self.decision_text.append(data)
             if any(a.get("lang") == "en" for _, a in self.stack):
@@ -172,18 +172,18 @@ def test_two_layers_decision_first_then_audit_detail(report, make):
     assert nav == areas  # five top-level entries, one per area
     [overview] = [a for a in page.with_class("area") if a["id"] == "overview"]
     assert overview.get("data-layer") == "decision"
-    assert page.with_class("verdict") and page.all("aside", **{"class": "next"})
-    assert [c["class"].split()[1] for c in page.with_class("dcol")] == ["d-conf", "d-att", "d-unk"]
+    assert page.with_class("decision") and page.all("aside", **{"class": "rail"})
+    assert [c["class"].split()[1] for c in page.with_class("fact")] == ["d-conf", "d-att", "d-unk"]
     assert page.all(id="green") and page.with_class("ledger")
     assert not [a for a in page.with_class("area") if a["id"] == "details" and a.get("data-layer")]  # technical layer is not decision
 
 
 def test_overall_status_is_explained_never_shown_as_raw_enum_or_success(report):
     page_html = render_html(report)
-    verdict = section(page_html, 'class="verdict', "</div>")
+    verdict = section(page_html, 'class="d-main"', "</div>")
     assert report["status"] not in re.sub(r"<[^>]+>", "", verdict)  # the enum is a technical detail
     assert "tone-pass" not in verdict
-    assert "1 high-priority finding" in html_lib.unescape(verdict)
+    assert '<span class="chip sev-high"><b>1</b>' in verdict  # the reason: how many findings of which priority
     compact = section(page_html, '<dl class="prov">', "</dl>")
     assert report["status"] not in re.sub(r"<[^>]+>", "", compact)  # compact pairs stay human
     assert f"<code>{report['status']}</code>" in page_html  # the raw status is kept in the full provenance
@@ -191,14 +191,14 @@ def test_overall_status_is_explained_never_shown_as_raw_enum_or_success(report):
 
 def test_improve_answers_readiness_and_blockers_first():
     not_ready = render_html(improve_model(pipeline="FAIL"), lang="pt-BR")
-    verdict = html_lib.unescape(section(not_ready, 'class="verdict', "</div>"))
+    verdict = html_lib.unescape(section(not_ready, 'class="d-main"', '<div class="life">'))
     assert "Candidato ainda não está pronto" in verdict and "verificações equivalentes ao pipeline (falhou)" in verdict
-    nxt = section(not_ready, '<aside class="next"', "</aside>")
+    nxt = section(not_ready, '<aside class="rail"', "</aside>")
     assert 'href="#check-PIPELINE_EQUIVALENT"' in nxt and 'data-i18n="next.unblock"' in nxt
     assert 'data-i18n="story.not_applied"' in not_ready  # candidate is never presented as applied
     ready = render_html(improve_model(pipeline="PASS"))
-    assert "Candidate ready for review" in section(ready, 'class="verdict', "</div>")
-    assert "--approve" in section(ready, '<aside class="next"', "</aside>")  # review, never automatic apply
+    assert "Candidate ready for review" in section(ready, 'class="d-main"', '<div class="life">')
+    assert "--approve" in section(ready, '<aside class="rail"', "</aside>")  # review, never automatic apply
 
 
 def test_audit_scope_separates_executed_measured_inspected_declared_not_proven(report):
@@ -224,7 +224,7 @@ def test_heuristic_signals_are_never_counted_as_confirmed(calc_project):
     data = run_audit(calc_project)
     data["states"]["current"]["metrics"]["negative_paths_with_state_after_rejection"] = _metric(12, "HIGHER_IS_BETTER", tier="E3")
     page_html = render_html(data)
-    confirmed = section(page_html, 'class="dcol d-conf"')
+    confirmed = section(page_html, 'class="fact d-conf"')
     assert 'data-i18n="conf.none"' in confirmed  # nothing executed: nothing confirmed
     assert 'class="signal"' in confirmed and "E3" in confirmed  # the E3 signal is shown apart, labelled as heuristic
 
@@ -233,21 +233,21 @@ def test_absence_of_findings_is_not_presented_as_success(calc_project):
     data = run_audit(calc_project)
     data["findings"], data["recommendations"], data["status"] = [], [], "NO_FINDINGS_IN_SCOPE"
     page_html = render_html(data)
-    assert "That is not proof of absence" in html_lib.unescape(section(page_html, 'class="verdict', "</div>"))
+    assert "That is not proof of absence" in html_lib.unescape(section(page_html, 'class="d-main"', "</div>"))
     assert 'data-i18n="findings.none"' in page_html and 'data-i18n="next.none"' in page_html
 
 
 # --- next step and recommendations ---------------------------------------------------------
 
 def test_next_step_is_ranked_by_evidence_or_reported_as_a_tie(report):
-    one = section(render_html(report), '<aside class="next"', "</aside>")
+    one = section(render_html(report), '<aside class="rail"', "</aside>")
     assert ACTIONS["CI_TEST_EXECUTION_GAP"][0] in one and 'href="#finding-' in one
 
     tied = copy.deepcopy(report)
     tied["findings"].append({"code": "LOCAL_CHECK_NOT_OBSERVED_IN_CI", "severity": "high", "evidence": {},
                              "summary": "Local/hook checks were not observed in CI; a green pipeline does not cover them."})
     tied["recommendations"].append({"finding": "LOCAL_CHECK_NOT_OBSERVED_IN_CI", "recommendation": _RECOMMENDATION["LOCAL_CHECK_NOT_OBSERVED_IN_CI"], "status": "PROPOSED"})
-    tie = section(render_html(tied), '<aside class="next"', "</aside>")
+    tie = section(render_html(tied), '<aside class="rail"', "</aside>")
     assert "2 actions share high priority" in tie  # a tie is explained, never broken by guessing
     assert ACTIONS["CI_TEST_EXECUTION_GAP"][0] in tie and ACTIONS["LOCAL_CHECK_NOT_OBSERVED_IN_CI"][0] in tie
 
@@ -255,7 +255,7 @@ def test_next_step_is_ranked_by_evidence_or_reported_as_a_tie(report):
     first["findings"].append({"code": "NATIVE_TESTS_FAILING", "severity": "high", "summary": "Some tests fail or error in the current state.",
                               "evidence": {"count": 1, "tests": ["t"]}})
     first["recommendations"].append({"finding": "NATIVE_TESTS_FAILING", "recommendation": _RECOMMENDATION["NATIVE_TESTS_FAILING"], "status": "PROPOSED"})
-    assert ACTIONS["NATIVE_TESTS_FAILING"][0] in section(render_html(first), '<aside class="next"', "</aside>")
+    assert ACTIONS["NATIVE_TESTS_FAILING"][0] in section(render_html(first), '<aside class="rail"', "</aside>")
 
 
 def test_recommendations_are_grouped_by_priority_and_always_marked_proposed(report):
@@ -275,12 +275,15 @@ def test_findings_lead_with_title_and_consequence_and_keep_raw_evidence(report):
     page_html = render_html(report)
     for index, finding in enumerate(report["findings"]):
         start = page_html.index(f'id="finding-{index}"')
-        card = page_html[start:page_html.index("</article>", start)]
-        row = card[:card.index('<details class="f-more"')]
+        nxt = page_html.find('<details class="finding', start)
+        card = page_html[start:nxt if nxt > 0 else page_html.index('</section>', start)]
+        row = card[:card.index("</summary>")]
         assert f'data-i18n="severity.{finding["severity"]}"' in row  # priority in words, not only colour
         assert finding["code"] not in re.sub(r"<[^>]+>", "", row)  # the identifier is a technical detail
         assert FINDINGS[finding["code"]]["title"][0] in html_lib.unescape(row)
-        assert f'href="#finding-{index}-evidence"' in row and f'id="finding-{index}-evidence"' in card
+        assert f'id="finding-{index}-evidence"' in card  # evidence and fix are deep-linkable inside the card
+        if finding["code"] in {rec["finding"] for rec in report["recommendations"]}:
+            assert f'id="finding-{index}-fix"' in card
         raw = re.search(r'<details class="tech">.*?<pre class="code">(.*?)</pre>', card, re.S).group(1)
         assert json.loads(html_lib.unescape(raw)) == finding["evidence"]
         assert f"<code>{finding['code']}</code>" in card
@@ -501,3 +504,102 @@ def test_every_catalog_entry_has_both_languages():
         for field in ("title", "summary", "why", "close", "rec"):
             if field in meta:
                 assert all(meta[field]), (code, field)
+
+
+# --- v3 contracts --------------------------------------------------------------------------------
+
+def test_one_canonical_html_per_audit_run(calc_project, tmp_path, capsys):
+    from assertiva import cli
+
+    out = tmp_path / "reports"
+    cli.main(["audit", str(calc_project), "--output", "json", "--report-dir", str(out)])
+    report = json.loads(capsys.readouterr().out)
+    assert sorted(p.name for p in out.iterdir()) == ["audit.html", "audit.json"]
+    assert Path(report["report_path"]) == out / "audit.html"
+    cli.main(["audit", str(calc_project), "--output", "json", "--report-dir", str(out)])
+    capsys.readouterr()
+    assert sorted(p.name for p in out.iterdir()) == ["audit.html", "audit.json"]  # a new run replaces, never adds pages
+
+
+def test_provenance_names_the_runtime_that_produced_the_evidence(calc_project):
+    import tomllib
+
+    from assertiva import __version__
+
+    declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    report = run_audit(calc_project)
+    prov = report["provenance"]
+    assert prov["assertiva_version"] == __version__ == declared  # never stale installed metadata from a checkout
+    assert prov["runtime"]["version"] == declared and prov["runtime"]["install"] == "source-checkout"
+    page_html = render_html(report)
+    assert f'<meta name="generator" content="Assertiva {declared}">' in page_html
+    assert 'class="prov-warn"' not in page_html
+
+
+def test_evidence_from_another_version_is_announced_never_masked(report):
+    from assertiva import __version__
+
+    old = copy.deepcopy(report)
+    old["provenance"]["assertiva_version"] = "0.0.1"
+    page_html = render_html(old)
+    warning = html_lib.unescape(section(page_html, 'class="prov-warn"', "</p>"))
+    assert "0.0.1" in warning and __version__ in warning
+
+
+def test_lifecycle_never_shows_a_candidate_as_applied():
+    page_html = render_html(improve_model(pipeline="FAIL"))
+    life = section(page_html, '<div class="life">', "</ol>")
+    steps = dict(re.findall(r'<li class="step st-(\w+)[^"]*">.*?data-i18n="life\.(\w+)"', life))
+    states = re.findall(r'<li class="step st-(\w+)', life)
+    assert len(states) == 6
+    assert states[0] == "done" and states[2] == "fail"  # baseline observed, review blocked
+    assert states[3:] == ["todo", "todo", "todo"]  # approval not requested, nothing applied, nothing re-measured
+    ready = section(render_html(improve_model(pipeline="PASS")), '<div class="life">', "</ol>")
+    assert re.findall(r'<li class="step st-(\w+)', ready)[3:] == ["pending", "todo", "todo"]
+    del steps
+
+
+def test_evidence_strength_uses_distinct_glyphs_not_a_scale(report):
+    page_html = render_html(report)
+    assert 'class="meter"' not in page_html
+    ledger = section(page_html, '<ol class="ledger"', "</ol>")
+    glyphs = dict(re.findall(r'class="lrow lvl-(\w+)[^"]*".*?<use href="#i-(\w+)"', ledger))
+    assert glyphs["declared"] != glyphs["not_evidenced"] != glyphs["inspected"]
+    assert all('data-i18n="lvl.' in row for row in re.findall(r'<li class="lrow.*?</li>', ledger))  # always a label, never colour alone
+
+
+def test_portuguese_numbers_and_dates_are_localized_but_canonical_values_kept():
+    data = improve_model()
+    page_html = render_html(data, lang="pt-BR")
+    snapshot = re.sub(r"<[^>]+>", " ", section(page_html, 'id="domains"'))
+    assert "89,5%" in snapshot and "89.5%" not in snapshot
+    assert re.search(r'<time [^>]*datetime="2026-10-07T12:00:00\+00:00" data-local[^>]*>7 out 2026', page_html)  # browser shows local time
+    raw = re.search(r'<pre class="code raw-json">(.*?)</pre>', page_html, re.S).group(1)
+    assert json.loads(html_lib.unescape(raw))["states"]["candidate"]["metrics"]["line_coverage"]["value"] == 89.5
+
+
+def test_terminology_is_progressive_tier_codes_only_as_metadata(report):
+    page = parse(render_html(report, lang="pt-BR"))
+    text = " ".join(page.decision_text)
+    assert not re.search(r"\bE[0-4]\b", text)  # codes live in abbr/titles and technical detail
+    assert "invocaç" not in text.lower()  # decision layer speaks of test cases
+
+
+def test_technical_claim_boundary_is_grouped_and_counted(report):
+    page_html = render_html(report)
+    claim = section(page_html, 'id="claim"', '<section id="unknowns"')
+    for name in ("observed", "not_evidenced", "limitations"):
+        values = report["claim_boundary"][name]
+        if values:
+            assert f'<details class="claim-g cg-{name}"' in claim
+            listed = re.findall(rf'<div class="cd" id="claim-{name}-\w+">.*?<span class="count">(\d+)</span>', claim)
+            assert sum(map(int, listed)) == len(values)  # grouped, nothing dropped
+
+
+def test_print_and_filters_and_raw_blocks_are_supported(report):
+    data = copy.deepcopy(report)
+    data["findings"] += [{**data["findings"][-1], "code": "NESTED_REPOSITORY", "severity": "info", "evidence": {}}] * 3
+    page_html = render_html(data)
+    assert "@media print" in page_html and "beforeprint" in page_html
+    assert re.search(r'<button type="button" id="clear-filters"[^>]*hidden', page_html)
+    assert "URLSearchParams" in page_html and "show_full" in page_html

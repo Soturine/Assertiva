@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .identity import runtime_identity
 from .candidate import DeltaState, StageStatus
 from .process import MAX_DEPTH, current_depth
 from .evidence import StateEvidence, compare_states, mutant_label, state_metrics, to_jsonable
@@ -200,7 +201,7 @@ def audit_model(
         "candidate_qualification": None,
         "claim_boundary": {"observed": observed, "not_evidenced": not_evidenced, "limitations": limitations},
         "remaining_unknowns": list(not_evidenced),
-        "provenance": {"assertiva_version": __version__, "adapters": adapters, "read_only_verified": True},
+        "provenance": {"assertiva_version": __version__, "runtime": runtime_identity(), "adapters": adapters, "read_only_verified": True},
     }
 
 
@@ -255,7 +256,7 @@ def improve_report(session, result, applied=None) -> dict:
             if s.status in (StageStatus.UNKNOWN, StageStatus.NOT_RUN, StageStatus.BLOCKED)
         ] + [f"metric {d.name}: not measured in both states" for d in q.metric_deltas if d.state is DeltaState.UNKNOWN]
         + ["preview/deployment behavior: no authorized non-production preview adapter"],
-        "provenance": {"assertiva_version": __version__, "interpreter": session.python, "read_only_until_approval": True},
+        "provenance": {"assertiva_version": __version__, "runtime": runtime_identity(), "interpreter": session.python, "read_only_until_approval": True},
         "execution_budget": execution_budget(
             "qualification", [*result.baseline_evidence.budget, *result.candidate_evidence.budget, *result.budget]
         ),

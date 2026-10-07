@@ -106,10 +106,10 @@ def test_improve_page_separates_proposed_candidate_from_applied(improve_states):
     html = render_html(report)
     assert 'data-i18n="story.not_applied"' in html and 'data-i18n="mode.improve"' in html
     assert 'data-i18n="mode.improve_applied"' not in html
-    assert html.count('<section class="pillar"') == len(report["candidate_qualification"]["stages"])
+    assert html.count('<details class="pillar') == len(report["candidate_qualification"]["stages"])
     assert '<li class="change"><details>' in html and "+    assert add(2, 3) == 5" in html
     assert '<section id="delta"' in html
-    action = html[html.index('<aside class="next"'):]
+    action = html[html.index('<aside class="rail"'):]
     action = action[:action.index("</aside>")]
     assert ('data-i18n="next.review"' in action) == (report["status"] == "READY_FOR_REVIEW")  # review, never "apply"
 

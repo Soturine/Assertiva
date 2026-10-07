@@ -90,15 +90,25 @@ def parse_verdict(text: str) -> dict:
     return verdict
 
 
-def workspace_copy(target: Path) -> Path:
-    """A copy of the repository's tracked files without evals/ (the rubric is not there to be read)."""
+def tracked_files(root: Path = ROOT) -> list[str]:
+    """The tracked files of a Git checkout. A copy without ``.git`` has no such list: say so instead of guessing."""
+    if not (root / ".git").exists():
+        raise RuntimeError(f"{root} is not a Git checkout, so its tracked files are unknown; pass an explicit file list")
+    listed = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True, check=True).stdout
+    return [rel for rel in listed.split("\0") if rel]
+
+
+def workspace_copy(target: Path, *, root: Path = ROOT, files: list[str] | None = None) -> Path:
+    """A copy of the repository's files without evals/ (the rubric is not there to be read).
+
+    ``files`` is the manifest of repository-relative paths; by default it is the tracked files of a Git checkout.
+    """
     if target.exists():
         shutil.rmtree(target)
-    files = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split("\0")
-    for rel in filter(None, files):
+    for rel in (tracked_files(root) if files is None else files):
         if rel.startswith("evals/"):
             continue
-        source, destination = ROOT / rel, target / rel
+        source, destination = root / rel, target / rel
         if source.is_file():
             if os.name == "nt":  # deep fixture paths exceed MAX_PATH under long temp directories
                 destination = Path("\\\\?\\" + str(destination.resolve()))

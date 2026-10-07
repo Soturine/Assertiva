@@ -103,6 +103,6 @@ This allows projects in different languages and stacks to participate without fo
 
 `improve` uses an isolated candidate workspace and an immutable baseline. Candidate tests are themselves tested using available mutation/negative-control, original-regression, coverage/oracle, pipeline-equivalent, artifact and stability evidence.
 
-Remote CI or preview deployment is an execution target, not a new user mode. It requires an adapter/capability plus authorization. Production deployment is never the default qualification path.
+Remote CI or preview deployment is an execution target, not a new user mode. It requires an adapter/capability plus authorization; neither is implemented today (STATUS.md lists both as specified). Production deployment is never the default qualification path.
 
 Original tests are not automatically deleted or commented out. Retirement can be simulated in the isolated candidate to measure evidence loss, but applying retirement requires explicit human approval.

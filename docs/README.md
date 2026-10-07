@@ -15,8 +15,8 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 - [Executable Assurance Core](EXECUTABLE_ASSURANCE_CORE.md) — executable modules, adapter protocol and claim boundaries.
 - [Pipeline & Delivery Assurance](PIPELINE_AND_DELIVERY_ASSURANCE.md) — local/CI/build/package/deploy evidence and false-green prevention.
 - [FTD/FTE Interoperability](FTD_FTE_INTEROPERABILITY.md) — optional Test Case authority and Azure handoffs.
-- [User Experience and Reporting](USER_EXPERIENCE_AND_REPORTING.md) — two-command UX, write boundaries, candidate approval flow and HTML Assurance Report.
-- [Candidate Qualification and Test-the-Tests](CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md) — baseline preservation, mutation/negative controls, pipeline/preview qualification and before/after evidence.
+- [User Experience and Reporting](USER_EXPERIENCE_AND_REPORTING.md) — two-command UX, write boundaries, candidate approval flow, the HTML Assurance Report and its one-page-per-run artifact contract.
+- [Candidate Qualification and Test-the-Tests](CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md) — baseline preservation, mutation/negative controls, pipeline qualification (preview deployment is specified, not implemented) and before/after evidence.
 - [Test Composition, Inheritance, and Materialization](TEST_COMPOSITION_AND_MATERIALIZATION.md) — declaration vs materialization vs invocation vs attempt.
 - [Negative-Path, Validation, and Error Assurance](NEGATIVE_PATH_AND_ERROR_ASSURANCE.md) — expected errors, rollback/state effects and failure-path depth.
 

@@ -13,6 +13,8 @@ Everything else is internal orchestration, adapter behavior, or an advanced impl
 
 `audit` inspects the project, executes only permitted verification work, measures evidence and reports gaps. It never changes project files.
 
+The command's exit code reports whether Assertiva ran, not whether the audited tests passed: 0 means it completed and reported (an audit of a failing suite exits 0), 2 a refusal or misuse, 3 a read-only violation. The verdict is in the report.
+
 It may inspect tests, coverage, hooks, CI/CD, build/package checks, validation/error paths, test composition, fixtures, mocks, browser evidence, security/static checks and other verification sources discovered through adapters.
 
 The result contains:
@@ -31,7 +33,7 @@ Recommendations are proposals, not changes already present in the project.
 
 `improve` performs the audit first, creates candidate changes in an isolated workspace, verifies the candidate, compares it with the baseline, and presents the result before touching the original project.
 
-The user sees one simple flow. Candidate qualification includes **test-the-tests**: the candidate suite is challenged with available mutation/negative-control evidence, original regression evidence, coverage/oracle analysis, pipeline-equivalent checks and, when explicitly authorized and safe, an ephemeral non-production preview deployment.
+Candidate qualification includes **test-the-tests**: the candidate suite is challenged with available mutation/negative-control evidence, original regression evidence, coverage/oracle analysis, pipeline-equivalent checks and build/artifact evidence. Preview deployment is specified but not executable today: it appears as not evidenced, and production is never used.
 
 The user sees one simple flow:
 

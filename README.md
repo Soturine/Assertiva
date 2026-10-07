@@ -87,7 +87,11 @@ suite
 → revision + environment
 ```
 
-Adapters map pytest, JUnit, Jest, Vitest, Playwright, xUnit/NUnit, Go/Rust/PHP/Ruby ecosystems, custom runners, and future frameworks into this model. Unknown frameworks must degrade conservatively and explicitly, never by silently inventing flags or assuming zero tests.
+The model is designed to accommodate ecosystems such as pytest, JUnit, Jest, Vitest, Playwright, xUnit/NUnit, Go, Rust, PHP and Ruby runners, custom runners and future frameworks.
+
+**Implemented today:** native adapters for pytest (Python), Jest, Playwright and Maven (Surefire/Failsafe, JUnit Platform); portable evidence from JUnit XML, coverage (coverage.py, istanbul, LCOV, Cobertura, JaCoCo) and mutation reports; CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins.
+
+**Not implemented yet:** Vitest, .NET (xUnit/NUnit), Go, Rust, Gradle and other ecosystems. They degrade conservatively and explicitly to CUSTOM/UNKNOWN evidence, never to "0 tests" and never by silently inventing flags. See [STATUS.md](STATUS.md).
 
 ## Test Evidence Graph
 
@@ -114,13 +118,16 @@ assertiva improve
 ```
 
 - `audit` analyzes the project and **never changes project files**. It inventories tests/checks, measures available evidence, finds gaps and produces recommendations plus an HTML Assurance Report.
-- `improve` starts from the audit, builds candidate test/verification improvements in an isolated workspace, **tests the tests**, compares baseline vs candidate, and asks for approval before any project change. Candidate qualification can include mutation/negative controls, original regression, coverage/oracle analysis, pipeline-equivalent checks, build/artifact verification and an explicitly authorized non-production preview deploy when supported.
+- `improve` starts from the audit, builds candidate test/verification improvements in an isolated workspace, **tests the tests**, compares baseline vs candidate, and asks for approval before any project change. Candidate qualification can include mutation/negative controls, original regression, coverage/oracle analysis, pipeline-equivalent checks, build/artifact verification. Preview deployment is a specified dimension, not an executable one: today qualification reports it as not evidenced (production is never used); provider support is future work (see [ROADMAP.md](ROADMAP.md)).
 
 Isolation, candidate workspaces, patch application and post-apply verification are implementation details rather than extra user-facing modes. The runtime enforces write boundaries; prompt instructions alone are not considered sufficient protection.
 
-The HTML report is a first-class product surface. It should be responsive, accessible and visually calm, with summary cards, charts, filters, expandable evidence, before/candidate/applied comparisons, Evidence Delta, Verification Surface, and a final **What does green prove?** claim boundary. Candidate metrics must never be presented as already applied. Original tests stay untouched in the project until human approval; retirement candidates are never auto-deleted or silently commented out.
+The HTML Assurance Report is the main product surface: one self-contained, offline page per run, in English and Brazilian Portuguese. It has two layers over the same evidence.
 
-See [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
+- **Decision** — the conclusion and why, what was executed, an integrated next step, *Confirmed / Needs attention / Not proven*, a **What does green prove?** audit scope (executed, measured, inspected, declared, not proven) and, for `improve`, whether the candidate is ready and where it stands: baseline → candidate → review → approval → applied.
+- **Auditability** — every metric, run and declared verification check, the evidence delta, provenance (which Assertiva produced the evidence and rendered the page) and the raw JSON, behind disclosure.
+
+There is no aggregate score. Candidate metrics are never presented as already applied. Assertiva's own presentation and generated narrative are localized; raw technical or external evidence (commands, paths, tool output) stays in its original language. Original tests stay untouched in the project until human approval; retirement candidates are never auto-deleted or silently commented out. Details: [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
 ### Skill, engine and evaluation
 
@@ -157,7 +164,9 @@ assertiva improve . --discard                            # or drop the candidate
 
 Developing Assertiva itself: `pytest -m "not integration and not artifact"` gives fast feedback (~25 s); `pytest -n auto` runs everything (every suite runs in CI on every commit; real browser and JVM runs in their own jobs).
 
-Reports (JSON + self-contained HTML) and execution traces are written under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project. `--python` selects the project's interpreter.
+**One run, one canonical page.** `assertiva audit` writes `audit.html` + `audit.json`; `assertiva improve` writes `improve.html` + `improve.json`, with baseline, candidate and applied inside the same page. Reports, execution traces and history live under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project; `--report-dir` chooses another directory outside the project. Several HTML files exist only when several independent runs do (one per project or scenario, as in dogfooding); a single run is never split across pages. `--python` selects the project's interpreter.
+
+**Exit status is not the verdict.** `assertiva audit` exits 0 when the command ran and reported, 2 when it refused or was misused and 3 when a project file changed (a read-only violation). Whether the audited tests passed is in the report: auditing a failing suite exits 0 and the report says `FAIL`.
 
 What runs today:
 - runtime-enforced read-only audit (exit code 3 if any project file changed);
@@ -166,7 +175,7 @@ What runs today:
 - impact-based test selection (`--changed-since`): a revision-scoped impact graph (Python), conservative widening, fixture-level `conftest.py` granularity and monorepo components; a green selected set is reported as a selected-set claim;
 - a local, optional history (stability across runs, duration percentiles with enough samples, deterministic failure fingerprints);
 - delivery intelligence from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins configuration: declared vs selected runtimes and browser projects, artifact lineage, review candidates;
-- one Assurance Report with baseline/candidate/applied states, Evidence Delta, remaining unknowns and "What does green prove?" — no aggregate score.
+- one canonical, decision-first Assurance Report per run (English and Brazilian Portuguese) with baseline/candidate/applied states, Evidence Delta, remaining unknowns and "What does green prove?" — no aggregate score.
 
 See [STATUS.md](STATUS.md) for the IMPLEMENTED / SPECIFIED / PLANNED split, [ROADMAP.md](ROADMAP.md), [Executable Assurance Core](docs/EXECUTABLE_ASSURANCE_CORE.md) and [Candidate Qualification and Test-the-Tests](docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md).
 

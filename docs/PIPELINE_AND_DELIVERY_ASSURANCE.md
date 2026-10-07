@@ -38,8 +38,8 @@ Implemented (M2): GitHub Actions, Azure Pipelines, GitLab CI and Jenkins share o
 
 ## Candidate pipeline and preview qualification
 
-During `improve`, Assertiva may run the candidate against pipeline-equivalent checks in the isolated workspace. If a provider adapter can safely trigger remote CI, that action requires appropriate authorization and its cost/external side effects must be explicit.
+During `improve`, Assertiva runs the candidate against pipeline-equivalent checks in the isolated workspace (implemented). Triggering remote CI is specified, not executable: if a provider adapter can ever do it safely, that action requires appropriate authorization and its cost/external side effects must be explicit.
 
-Where the project already supports ephemeral/preview environments, candidate qualification may include a non-production preview deployment to verify package, migration, startup, health and selected E2E behavior.
+Specified, not implemented: where a project supports ephemeral/preview environments, candidate qualification could include a non-production preview deployment to verify package, migration, startup, health and selected E2E behavior. Today no adapter does, and the report lists preview/deployment behavior under "not evidenced".
 
 A production deployment is not a default test mechanism. If no safe preview path exists, report deployment evidence as NOT_RUN/UNKNOWN rather than simulating confidence.

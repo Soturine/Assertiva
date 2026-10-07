@@ -54,7 +54,28 @@ def test_scores_and_malformed_verdicts_are_rejected(text):
         semantic.parse_verdict(text)
 
 
-def test_agent_workspace_has_no_rubric(tmp_path):
+def test_workspace_copy_keeps_the_skill_and_package_and_leaves_the_rubric_out(tmp_path):
+    """The exclusion rule, on a synthetic repository and an explicit manifest: it needs no Git checkout."""
+    repo = tmp_path / "repo"
+    for rel in ("SKILL.md", "assertiva/__init__.py", "evals/cases/CASE.md", "evals/semantic.py", "docs/a.md"):
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(rel, encoding="utf-8")
+    manifest = ["SKILL.md", "assertiva/__init__.py", "evals/cases/CASE.md", "evals/semantic.py", "docs/a.md", "not-a-file/"]
+    workspace = semantic.workspace_copy(tmp_path / "ws", root=repo, files=manifest)
+    assert (workspace / "SKILL.md").is_file() and (workspace / "assertiva" / "__init__.py").is_file()
+    assert (workspace / "docs" / "a.md").is_file()
+    assert not (workspace / "evals").exists()
+
+
+def test_workspace_copy_without_git_or_a_manifest_names_the_missing_prerequisite(tmp_path):
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    with pytest.raises(RuntimeError, match="not a Git checkout"):
+        semantic.workspace_copy(tmp_path / "ws", root=plain)
+
+
+@pytest.mark.skipif(not (semantic.ROOT / ".git").exists(), reason="needs a Git checkout: the tracked-file list defines this repository's workspace")
+def test_agent_workspace_of_this_checkout_has_no_rubric(tmp_path):
     workspace = semantic.workspace_copy(tmp_path / "ws")
     assert (workspace / "SKILL.md").is_file() and (workspace / "assertiva").is_dir()
     assert not (workspace / "evals").exists()

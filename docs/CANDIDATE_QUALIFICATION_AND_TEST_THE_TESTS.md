@@ -23,7 +23,7 @@ run pipeline-equivalent checks
       ↓
 build/package/startup
       ↓
-optional non-production preview deployment
+optional non-production preview deployment (specified; not executable today, reported as not evidenced)
       ↓
 compare baseline vs candidate
       ↓

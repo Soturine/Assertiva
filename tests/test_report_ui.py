@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import assertiva
 from assertiva.audit import run_audit
 from assertiva.report import _RECOMMENDATION, render_html
 from assertiva.report_html import narrate
@@ -19,7 +20,9 @@ from assertiva.report_narrative import NARRATIVE
 
 from conftest import write
 
-ROOT = Path(__file__).resolve().parents[1]
+# The package these tests exercise: the one actually imported (a source checkout or an installed wheel), never a
+# path derived from the repository layout. Under wheel qualification the source package does not exist beside the tests.
+PACKAGE = Path(assertiva.__file__).resolve().parent
 LONG_COMMAND = "pytest " + " ".join(f"--option-{i}=/a/very/long/path/segment/{i}" for i in range(60))
 VOID = {"br", "img", "input", "meta", "col", "use", "path", "rect", "circle", "link"}
 
@@ -412,8 +415,9 @@ def test_template_values_are_kept_and_kinds_localized():
 # --- catalog completeness --------------------------------------------------------------------------
 
 def _engine_findings():
+    assert any(PACKAGE.rglob("*.py")), PACKAGE  # the scan must see the imported package, never an empty or missing tree
     found = {}
-    for path in (ROOT / "assertiva").rglob("*.py"):
+    for path in PACKAGE.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "Finding" and node.args:
                 first = node.args[0]
@@ -454,7 +458,8 @@ def _shape(node):
 
 def _engine_sentences():
     """Every literal sentence the engine writes into a limitation, a claim-boundary entry or a qualification summary."""
-    for path in sorted((ROOT / "assertiva").rglob("*.py")):
+    assert any(PACKAGE.rglob("*.py")), PACKAGE
+    for path in sorted(PACKAGE.rglob("*.py")):
         if path.name.startswith("report"):
             continue
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -521,18 +526,34 @@ def test_one_canonical_html_per_audit_run(calc_project, tmp_path, capsys):
     assert sorted(p.name for p in out.iterdir()) == ["audit.html", "audit.json"]  # a new run replaces, never adds pages
 
 
+def _installed_package() -> bool:
+    """Whether the imported package sits in a site-packages directory (an installed wheel), whatever the checkout layout."""
+    return any(part in ("site-packages", "dist-packages") for part in PACKAGE.parts)
+
+
 def test_provenance_names_the_runtime_that_produced_the_evidence(calc_project):
+    """The invariants hold for an editable checkout and for an installed wheel alike; each is checked against a source
+    independent of the code under test."""
+    import importlib.metadata
+    import subprocess
     import tomllib
 
-    from assertiva import __version__
-
-    declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     report = run_audit(calc_project)
-    prov = report["provenance"]
-    assert prov["assertiva_version"] == __version__ == declared  # never stale installed metadata from a checkout
-    assert prov["runtime"]["version"] == declared and prov["runtime"]["install"] == "source-checkout"
+    prov, runtime = report["provenance"], report["provenance"]["runtime"]
+    if _installed_package():
+        expected_kind, expected_version = "installed-package", importlib.metadata.version("assertiva")
+    else:
+        expected_kind = "source-checkout"
+        expected_version = tomllib.loads((PACKAGE.parent / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    assert prov["assertiva_version"] == assertiva.__version__ == runtime["version"] == expected_version  # the code that ran
+    assert runtime["install"] == expected_kind  # an installed package is never labelled a source checkout, or the reverse
+    if expected_kind == "installed-package" or not (PACKAGE.parent / ".git").exists():
+        assert runtime["revision"] is None and runtime["dirty"] is None  # no checkout identity exists to be claimed
+    else:
+        head = subprocess.run(["git", "-C", str(PACKAGE.parent), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        assert runtime["revision"] == head and isinstance(runtime["dirty"], bool)
     page_html = render_html(report)
-    assert f'<meta name="generator" content="Assertiva {declared}">' in page_html
+    assert f'<meta name="generator" content="Assertiva {expected_version}">' in page_html
     assert 'class="prov-warn"' not in page_html
 
 

@@ -146,7 +146,7 @@ Inside IMPROVE, do not trust generated or modified tests merely because they pas
 - flake/retry/order-dependence signals;
 - runtime/resource cost;
 - pipeline-equivalent checks and build/package/startup evidence;
-- optional non-production preview deployment only when supported, safe and explicitly authorized.
+- optional non-production preview deployment only when supported, safe and explicitly authorized (no engine adapter supports it today: report it as not evidenced).
 
 Never deploy to production merely to qualify candidate tests.
 

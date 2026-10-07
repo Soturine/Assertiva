@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.6] — 2026-10-07 — Report provenance fix and decision surface v3
+
+Patch release; M2 stays closed, M3 has not started. Evidence semantics are unchanged.
+
+### Fixed
+- Report provenance could name a stale version: `assertiva_version` came from installed package metadata, which an editable install keeps at the old value after `pyproject.toml` is bumped. The version now comes from the source checkout the code runs from (installed metadata otherwise), reports record the runtime identity (install kind; for a checkout, its git revision and local changes), and the page states which Assertiva rendered it and says so when that differs from the version that produced the evidence.
+
+### Changed
+- One decision surface: the conclusion as counts, the execution scope, and an integrated next step (what, why, originating finding, what proves it resolved); "what was examined" in audit and the candidate lifecycle in improve.
+- Evidence strength is shown as distinct kinds (executed, measured, inspected, declared, not proven), each with its own glyph and label, instead of bars that read like a score.
+- Findings are compact disclosure rows; recommendations form an action plan with proposed → applied → verified; failing pillars come first; the evidence snapshot shows baseline changes and keeps a changed-denominator note beside the percentage; the technical claim boundary is grouped by domain with counts.
+- Local time in the page with UTC kept in details, localized decimals in narrative, bounded raw blocks, clearable filters kept in the URL, print styles that open every detail.
+
+### Documented
+- Report artifact contract: one run writes one `audit.html` or `improve.html` (baseline, candidate and applied inside it) plus its JSON; several pages appear only for several independent runs.
+
 ## [0.5.5] — 2026-10-07 — Assurance Report: decision-first second pass (presentation only)
 
 Patch release; M2 stays closed, M3 has not started. The report model, findings, severities, tiers, adapters and qualification logic are unchanged.

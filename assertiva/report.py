@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import uuid
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -108,15 +109,25 @@ def _mutation_summary(run) -> dict:
     }
 
 
-def _finding(finding: Any) -> dict:
-    data = to_jsonable(finding)
-    data["severity"] = data.get("severity") or _SEVERITY.get(data["code"], "medium")
-    return data
+def engine_findings(findings: list) -> list[dict]:
+    """Engine findings as report records: a stable id within the run (the code, suffixed when it repeats), the engine's
+    default severity, and a priority that starts as that severity (an attached assessment may restate it)."""
+    out, seen = [], Counter()
+    for finding in findings:
+        data = to_jsonable(finding)
+        data["severity"] = data.get("severity") or _SEVERITY.get(data["code"], "medium")
+        seen[data["code"]] += 1
+        data["id"] = data["code"] if seen[data["code"]] == 1 else f"{data['code']}-{seen[data['code']]}"
+        data["origin"] = "engine"
+        data["priority"] = data["severity"]
+        out.append(data)
+    return out
 
 
-def _recommendations(findings: list[dict]) -> list[dict]:
+def recommendations(findings: list[dict]) -> list[dict]:
     return [
-        {"finding": f["code"], "recommendation": f.get("recommendation") or _RECOMMENDATION[f["code"]], "status": "PROPOSED"}
+        {"finding": f["code"], "finding_id": f.get("id", f["code"]),
+         "recommendation": f.get("recommendation") or _RECOMMENDATION[f["code"]], "status": "PROPOSED"}
         for f in findings
         if f.get("recommendation") or f["code"] in _RECOMMENDATION
     ]
@@ -153,7 +164,7 @@ def _surface(surface) -> list[dict]:
 def audit_model(
     root: Path, baseline, findings: list, current: StateEvidence, surface, limitations: list[str], adapters: list[str], status: str,
 ) -> dict:
-    findings_data = [_finding(f) for f in findings]
+    findings_data = engine_findings(findings)
     observed, not_evidenced = [], []
     for run in current.runs:
         if run.mode == "report":
@@ -192,12 +203,13 @@ def audit_model(
     return {
         "report_version": REPORT_VERSION,
         "workflow": "audit",
+        "run_id": uuid.uuid4().hex[:16],
         "status": status,
-        "project": {"name": root.name, "root": str(root), "revision": baseline.revision, "dirty": baseline.dirty},
+        "project": {"name": root.name, "root": str(root), "revision": baseline.revision, "dirty": baseline.dirty, "digest": baseline.digest},
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "states": {"current": state_summary(current), "baseline": None, "candidate": None, "applied": None},
         "findings": findings_data,
-        "recommendations": _recommendations(findings_data),
+        "recommendations": recommendations(findings_data),
         "verification_surface": _surface(surface),
         "evidence_delta": None,
         "change_set": None,

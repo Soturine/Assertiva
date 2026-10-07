@@ -92,6 +92,12 @@ def _tokens(segment: str) -> list[str]:
 def _classify_segment(segment: str) -> tuple[K | None, str, tuple[str, ...], dict[str, Any]] | None:
     """None for setup; (None, ...) for unknown; else (kind, tool, args, metadata)."""
     tokens = _tokens(segment)
+    if tokens[:2] == ["coverage", "run"] and "-m" in tokens[2:-1]:  # coverage run [opts] -m pytest ... runs pytest, measured
+        inner = tokens[tokens.index("-m", 2) + 1:]
+        classified = _classify_segment(" ".join(shlex.quote(t) for t in ["python", "-m", *inner]))
+        if classified and classified[0] not in (None, K.UNKNOWN):
+            kind, tool, args, metadata = classified
+            return kind, tool, args, {**metadata, "measured_by": "coverage"}
     if not tokens:
         return None
     head, sub = tokens[0], (tokens[1] if len(tokens) > 1 else None)

@@ -137,6 +137,17 @@ def test_interpreter_options_before_dash_m_are_unwrapped():
     assert classify_command('python -c "import x"').kind is VerificationKind.UNKNOWN
 
 
+def test_coverage_run_of_a_module_is_that_module_measured():
+    """Found by an eval fixture: `coverage run -m pytest` in CI was a coverage command, so the suite looked absent from CI."""
+    from assertiva.adapters.commands import classify_command
+
+    tested = classify_command("coverage run --branch -m pytest -q tests")
+    assert (tested.kind, tested.tool, tested.runner_args) == (VerificationKind.TEST, "pytest", ("-q", "tests"))
+    assert tested.metadata.get("measured_by") == "coverage"
+    assert classify_command("python -m coverage run -m unittest discover").tool == "unittest"
+    assert classify_command("coverage report --fail-under=90").kind is VerificationKind.COVERAGE
+
+
 def test_unparseable_workflow_is_unknown_not_silently_empty(tmp_path):
     write(tmp_path / ".github" / "workflows" / "broken.yml", "jobs: [unclosed\n")
     surface = discover_surface(tmp_path)

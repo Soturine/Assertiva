@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import __version__, process
+from .assessment import apply_assessment, load_assessment
 from .audit import run_audit
 from .evidence import NegativeControl
 from .improve import (
@@ -26,7 +27,10 @@ from .improve import (
     start_improve,
 )
 from .report import improve_report, write_report
-from .workspace import Approval, ApplyFailedError, ApprovalRequiredError, ProjectModifiedError, StaleBaselineError, state_dir
+from .workspace import (
+    Approval, ApplyFailedError, ApprovalRequiredError, ProjectModifiedError, StaleBaselineError, capture_baseline, read_only_guard,
+    state_dir,
+)
 
 
 class UsageError(Exception):
@@ -49,9 +53,39 @@ def _emit(payload: dict, output: str, lines: list[str]) -> None:
         print("\n".join(lines))
 
 
+_MEASUREMENT = ("execute", "changed_since", "coverage_report", "mutation_report", "junit_xml")
+
+
+def _attach(root: Path, directory: Path, args: argparse.Namespace) -> int:
+    """Join the agent's assessment to the latest audit of this project and re-render that run's page."""
+    if any(getattr(args, name) for name in _MEASUREMENT):
+        raise UsageError("--assessment attaches to the last audit run; it cannot be combined with options that measure")
+    stored = directory / "audit.json"
+    if not stored.is_file():
+        raise UsageError(f"no audit report for this project in {directory}; run `assertiva audit` first")
+    report = json.loads(stored.read_text(encoding="utf-8"))
+    digest = (report.get("project") or {}).get("digest")
+    if not digest:
+        raise UsageError("the last audit report predates assessments (no project digest); run `assertiva audit` again")
+    with read_only_guard(root):
+        current = capture_baseline(root).digest
+    if current != digest:
+        raise UsageError("the project changed since the audited run; run `assertiva audit` again and assess that run")
+    report = apply_assessment(report, load_assessment(args.assessment))
+    report["report_path"] = str(write_report(report, directory, "audit"))
+    a = report["assessment"]
+    _emit(report, args.output, [
+        f"Assessment attached to audit run {report['run_id']}: {a['dispositions']} dispositions, {a['findings']} agent findings",
+        f"Report: {report['report_path']}",
+    ])
+    return 0
+
+
 def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
     directory = _report_dir(root, args.report_dir)
+    if args.assessment:
+        return _attach(root, directory, args)
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
                        junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
@@ -209,6 +243,8 @@ def _parser() -> argparse.ArgumentParser:
                                                               "with --execute, only the selected set runs")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
+    audit.add_argument("--assessment", metavar="FILE", help="attach the auditing agent's assessment (JSON) to the last audit run "
+                                                            "and re-render its report; executes nothing")
     audit.set_defaults(handler=_audit)
 
     improve = sub.add_parser("improve", help="build and qualify candidate test improvements; apply only with approval")

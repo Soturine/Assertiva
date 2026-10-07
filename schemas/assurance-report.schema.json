@@ -33,6 +33,13 @@
             "boolean",
             "null"
           ]
+        },
+        "digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Content digest of the audited project files; an assessment is refused when the project no longer matches it."
         }
       },
       "additionalProperties": true
@@ -70,7 +77,118 @@
     "findings": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "required": [
+          "code",
+          "summary",
+          "severity"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable within the run: the code, suffixed when it repeats; agent findings are 'agent:<slug>'."
+          },
+          "code": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "engine",
+              "agent"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "description": "Engine default for the code (agent findings: the agent's priority). Never rewritten by an assessment."
+          },
+          "priority": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "info",
+              "none"
+            ],
+            "description": "Effective priority: the severity unless an assessment restates it; 'none' for a false positive."
+          },
+          "evidence": {
+            "type": "object"
+          },
+          "assessment": {
+            "type": "object",
+            "description": "The auditing agent's disposition of an engine finding.",
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "CONFIRMED",
+                  "PARTIAL",
+                  "CONTEXTUAL",
+                  "FALSE_POSITIVE",
+                  "UNRESOLVED"
+                ]
+              },
+              "priority": {
+                "enum": [
+                  "high",
+                  "medium",
+                  "low",
+                  "info"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "scope": {
+                "type": "object",
+                "properties": {
+                  "reviewed": {
+                    "type": "integer"
+                  },
+                  "of": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "subjects": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "basis": {
+            "enum": [
+              "OBSERVED",
+              "DECLARED",
+              "INFERRED"
+            ]
+          },
+          "recommendation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
       }
     },
     "evidence_delta": {
@@ -294,6 +412,46 @@
         "null"
       ],
       "description": "concentrations for human review; never findings or gates"
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Identity of one audit run; an attached assessment must name it."
+    },
+    "assessment": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "The auditing agent's assessment attached with `assertiva audit --assessment`.",
+      "properties": {
+        "source": {
+          "const": "agent"
+        },
+        "attached_at": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "lang": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dispositions": {
+          "type": "integer"
+        },
+        "findings": {
+          "type": "integer"
+        }
+      }
     }
   },
   "additionalProperties": false

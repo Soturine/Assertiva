@@ -61,7 +61,7 @@ Evaluate whether a module or whole project has a strong enough behavioral safety
 
 - **Evidence over green status.**
 - **Behavior over coverage percentage.**
-- **Deterministic-first core; heuristics/LLM inference are advisory and provenance-labeled.**
+- **The agent investigates; the engine measures and verifies.** Provenance (observed, declared, inferred, unknown) is always labeled and never decides importance.
 - **Language/framework-neutral semantics; adapters translate capabilities instead of redefining policy.**
 - **Smallest sufficient evidence first; broader confidence when required.**
 - **Never weaken a test merely to make it pass.**
@@ -133,12 +133,12 @@ There is no aggregate score. Candidate metrics are never presented as already ap
 
 | Surface | What you get |
 |---|---|
-| `/assertiva` (Skill, engine not installed) | semantic reasoning over what the agent can read; mode `semantic-only`, no runtime evidence, no HTML report |
-| `/assertiva` with the engine installed | the same reasoning grounded in deterministic engine evidence, plus the engine's HTML Assurance Report; mode `engine-backed` |
+| `/assertiva` | the auditing agent: reads code, tests and CI, decides what evidence the question needs, runs the engine when it helps, reconciles engine findings with what it finds, and attaches its assessment to the engine's report |
+| `/assertiva` without the engine installed | the same investigation from what the agent can read and run safely; no engine evidence and no HTML report |
 | `assertiva audit` / `assertiva improve` | the deterministic engine directly |
 | [`evals/semantic.py`](evals/semantic.py) | evaluation/benchmark of the Skill itself; its PASS/FAIL/REVIEW verdicts are never part of a normal audit |
 
-The mode rules, the cheapest-first engine use and the claim categories live in [SKILL.md](SKILL.md).
+How the agent works, its boundaries and its claim classes live in [SKILL.md](SKILL.md) and its [references](references/).
 
 ## Current status
 

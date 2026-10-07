@@ -1,7 +1,7 @@
 # Cost-aware evidence ordering for HEAD
 
 ## Context
-A user asks, during an engine-backed audit of a Python repository, whether the current revision is green and what that proves. The working tree is clean. A previous session measured the full local suite at about 130 s. `gh` is installed and authenticated for the repository's GitHub Actions; no run has been queried yet in this session. No coverage, JUnit or mutation artifact exists locally.
+A user asks, during an audit of a Python repository with the Assertiva engine installed, whether the current revision is green and what that proves. The working tree is clean. A previous session measured the full local suite at about 130 s. `gh` is installed and authenticated for the repository's GitHub Actions; no run has been queried yet in this session. No coverage, JUnit or mutation artifact exists locally.
 
 ## Prompt / task
 Plan and justify the order in which you would gather evidence, and say what each step could and could not establish.

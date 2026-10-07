@@ -343,7 +343,7 @@ The complete `audit.json` follows.
 ```
 
 ## Prompt / task
-Finish the engine-backed answer: the mode line, the deterministic evidence it rests on, and the handoff to the Assurance Report. Say how you obtained each value you report.
+Finish the answer: what it rests on, the deterministic evidence, and the handoff to the Assurance Report. Say how you obtained each value you report.
 
 ## Expected
 - treat the `head -c 6000` view as truncated: it cannot show that a field is absent;

@@ -1,287 +1,86 @@
-# Assertiva — Adaptive Test Intelligence & Assurance
+---
+name: assertiva
+description: Audits what a project's tests and verification actually prove, and improves them with before/after evidence. Use when the user asks whether tests are good or can be trusted, whether a green suite or CI run means anything, about weak assertions, mocked-away integrations, coverage or mutation meaning, flaky tests, CI/local or built-artifact gaps, which tests a change needs, refactor safety, or to strengthen a test suite without touching the project until approval.
+---
 
-Use Assertiva when the task involves test-suite quality, verification-surface discovery, affected-test/check selection, failure diagnosis, E2E localization, regression evidence, CI/CD execution, local-vs-pipeline parity, build/package/deploy verification gaps, test-output/context cost, flaky behavior, mutation/negative controls, or refactor safety.
+# Assertiva
 
-## Goal
+**What exactly does this green prove — and what does it not?**
 
-Produce the greatest reasonable evidence of correctness at the lowest reasonable execution, investigation, and agent-context cost without weakening the claim being made.
+You are the auditor. Your job is to answer the user's assurance question with grounded claims: what the tests and checks really protect, where green would stay green while behavior breaks, and what remains unknown. The Assertiva engine (`assertiva`) is one of your instruments, next to the source, the tests, the project's own tooling, its CI configuration and run history. The engine measures and verifies; you decide what to look at, what it means and when you know enough.
 
-```text
-FAST FEEDBACK
-!= REGRESSION CONFIDENCE
-!= TEST QUALITY
-```
+## Investigate
 
-## Deterministic-first evidence policy
+Start from the user's question, not from a tool. "Audit my tests" means: how much protection does this suite give, where are the false greens, and how sure can we be. A narrower question ("is this test weak?", "does CI run the integration tests?") deserves a narrower investigation.
 
-Prefer deterministic, machine-verifiable evidence whenever possible.
+Work in a loop:
 
-- **E0 RAW** — native runner/report/source artifact.
-- **E1 DETERMINISTIC_DERIVED** — reproducible parsed/normalized result.
-- **E2 DECLARED** — project-authored mapping/policy/metadata.
-- **E3 HEURISTIC** — fallible static/ranking/similarity/smell signal.
-- **E4 INFERRED** — semantic/LLM inference requiring supporting evidence.
+1. **Orient cheaply.** Layout, test configuration, CI workflows, a few tests next to the code they protect. Form hypotheses about where assurance could be false.
+2. **Acquire the evidence that would settle them.** Choose the instrument by what it can tell you:
 
-E3/E4 may rank, flag, cluster and propose. They must not silently suppress material tests or close consequential gates. When evidence is insufficient, widen execution or report UNKNOWN.
+   | Question | Evidence that answers it |
+   | --- | --- |
+   | Do the tests pass at this revision; what runs, skips, fails? | a run: `assertiva audit --execute` (disposable copy) or the runner in your own copy |
+   | Do assertions check the behavior that matters? | the tests and the implementation, read together; engine oracle signals as leads |
+   | Do test doubles hide the boundary under test? | the doubles, the real collaborator and its contract |
+   | What does CI run, on which revision? | workflow files (declared); provider runs with their head SHA |
+   | Would a real defect be caught? | mutation reports, negative controls |
+   | Does the shipped artifact behave like the source tree? | engine artifact qualification |
+   | What does this change affect? | `assertiva audit --changed-since REV` |
 
-Label every claim with its category and never move it to another one silently:
+   No instrument is mandatory and none comes first by default. Static inspection is cheap but cannot tell whether tests pass, what they execute or what CI runs; when the question needs that and you can get it safely, get it.
+3. **Correlate.** The important findings usually join facts no single tool sees:
+   - high coverage + a state machine with four states + tests for three + the missing one is recovery = a real gap;
+   - three green unit tests + all mock the same adapter + nothing crosses it = boundary fidelity gap;
+   - green CI + the workflow excludes the integration marker + integration tests exist = green proves nothing about integration.
+4. **Resolve what matters.** Engine findings are facts and leads, not conclusions. Confirm, contextualize or reject each material one by reading what it points at. A conclusion drawn from a sample covers that sample; when a finding is material and reviewing all of it is cheap, review all of it.
+5. **Find what no tool reported.** A gap the engine never raised is as valid as one it did; report it as a first-class finding with its evidence.
 
-- **DETERMINISTIC FACT** (E0/E1) — "run 123 succeeded for SHA abc", "coverage line 83/100 from coverage.xml".
-- **DECLARED FACT** (E2) — "the GitHub Actions workflow declares Python 3.12": configuration, not execution.
-- **HEURISTIC SIGNAL** (E3) — "605 functions start with `test_`", "~1446 `assert*` call occurrences": static counts, never executed tests, meaningful assertions or oracle strength without native discovery/runtime evidence.
-- **SEMANTIC INFERENCE** (E4) — "this oracle appears weak", "the uncovered branch looks safety-critical": your reasoning, never presented as engine output.
-- **UNKNOWN** — what no available evidence settles.
+## Know when you are done
 
-Revision provenance: a green CI run proves a revision only when its identity is confirmed (for example the run's head SHA equals `git rev-parse HEAD`, or an equally explicit link). Otherwise report "CI green observed; correspondence to HEAD UNKNOWN" and never raise it to E0 or proof for the current revision. A dirty working tree is never proven by any run.
+Before answering, ask: *does the evidence I hold materially answer the question asked?* If not: *is there more evidence I can obtain now, safely, within what the user authorized, at reasonable cost?* If yes, obtain it instead of recommending that the user does.
 
-Order evidence by cost: cheap provenance check → existing fresh evidence → targeted/local execution → broader/full execution only while it still buys something. When provider evidence is reachable (for example `gh run list --json headSha,conclusion`), check for a run whose head SHA equals HEAD before rerunning a full suite merely to learn whether HEAD is green. A full suite stays allowed when it adds relevant evidence; say what that evidence is.
+You are done when the answer is settled, when more evidence would not change it, when its cost or risk is out of proportion, when it needs an authorization or environment you do not have, or when the rest is genuinely unknown. Say which applies. Running everything is not the goal; enough evidence to answer correctly is.
 
-## Execution mode and the engine
+## Boundaries
 
-Before auditing a project, check whether the deterministic engine is available (`assertiva --version`).
+Freedom to reason is not permission to act. These hold whatever the investigation suggests:
 
-- **engine-backed** — start with the cheapest call, `assertiva audit <project> --output json`, which is static and read-only. Use `--execute`, `--changed-since`, coverage, mutation, JUnit or other runs only when the new evidence would change a decision or close a material UNKNOWN: new execution must buy new evidence. Read `report_path` (the HTML Assurance Report the engine wrote) by parsing the whole JSON, never by sampling or truncating its text: `python -c "import json,sys; print(json.load(sys.stdin)['report_path'])"` or `jq -r .report_path`, then confirm the file exists. The output need not enter the context in full. If the command succeeded but `report_path` is missing or points to no file, report that as an engine defect, never as "no HTML".
-- **semantic-only** — the engine is missing or fails to start. Continue the audit with the Skill; do not abort, imply runtime evidence or promise an HTML report.
+- **Audit never modifies the project.** Run project code only where it cannot write into the working tree: through the engine (disposable copies under a read-only guard) or in a copy you make outside the project. Runners and tools write caches and artifacts, so never run them inside the tree during an audit.
+- **Improve** writes candidate changes only in the engine's candidate workspace. Applying requires the human's explicit approval of named change ids; never pass `--approve` on your own initiative. A stale baseline blocks apply.
+- Never deploy, publish, push, or change external systems; never use secrets you were not given; stay inside the project and the paths the user named.
 
-Open the answer with one line, no banner: `Assertiva mode: engine-backed` or `Assertiva mode: semantic-only — local engine unavailable; runtime evidence and Assurance HTML were not produced.` Then report deterministic evidence (engine or native artifacts), semantic findings, unknowns and recommendations as distinguishable parts. When the engine produced a report, end with `Assurance Report:` and the `report_path`. The Skill never renders HTML itself.
+## Claims
 
-Normal use is an audit, not a grade: never present PASS/FAIL/REVIEW as the Skill's verdict. Those belong to the Skill evaluation in `evals/semantic.py`.
+Keep two questions apart: **how you know** and **how much it matters**.
 
-Recommendations must follow from the project's delivery/consumption model, not from a generic checklist. Example: for a library, tool or package, prefer declared compatible dependency ranges plus constrained, reproducible CI and minimum- and latest-supported dependency runs; a lockfile fits an application or development environment and is not an automatic recommendation.
+How you know:
+- **OBSERVED** — seen directly: a run's outcomes, a report, a file's content, a command's output.
+- **DECLARED** — stated by configuration or metadata (a workflow, a POM, a requirement). Not proof that it ran.
+- **INFERRED** — reasoned from cited observations, by you or by an engine heuristic; say what supports it.
+- **UNKNOWN** — nothing available settles it; say why.
 
-## AUDIT
+How much it matters is the consequence for the user's assurance question. A well-grounded inference ("these tests mock exactly the boundary they claim to prove") can be the most important finding of an audit; a deterministic fact can be trivial. Never let the label decide the priority.
 
-Determine whether existing tests actually provide meaningful evidence.
+Fixed lines:
+- UNKNOWN is never PASS; skipped or not-run is never counted as passed.
+- Test count and coverage are diagnostics, never quality scores.
+- A CI run proves a revision only with confirmed identity (its head SHA equals `git rev-parse HEAD`); a dirty working tree is never proven by any run.
+- Never claim executed tests, pipeline equivalence or engine output you did not observe; never present candidate evidence as current-project evidence.
+- Normal use is an audit, not a grade: never present PASS/FAIL/REVIEW as the Skill's verdict (that vocabulary belongs to the Skill's own evaluation).
 
-Inspect as applicable:
-- authoritative requirement/invariant/oracle;
-- assertion strength and observable effects;
-- negative/boundary/failure/recovery/concurrency/authorization/migration cases;
-- integration fidelity and suspicious mocks;
-- flaky/retry-dependent behavior;
-- duplicate/redundant tests;
-- snapshots/goldens and update provenance;
-- UI/browser locator strategy and incidental DOM coupling;
-- semantic role/name/label/state and accessibility-tree evidence;
-- keyboard/focus behavior distinct from pointer interaction;
-- retry/timeout changes that may mask flakes or races;
-- parameterized/table/data-driven definitions and material invocations;
-- property-based/generative tests, seeds and minimized counterexamples;
-- fuzz corpora/crash reproducers;
-- structured validation/error contracts;
-- line/statement vs branch/condition/function/instruction coverage;
-- dynamic/generated tests;
-- async/concurrency/race assumptions;
-- mutation/negative-control/differential/independent evidence;
-- exact revision/environment/configuration/run provenance.
+## Report
 
-Coverage and test count are diagnostics, not proof.
+Lead with the answer to the question. Then what green proves and does not, the findings ranked by consequence (each with its evidence and how you know), what you decided about each material engine finding, what stays unknown and why, and recommendations that fit the project's delivery model (a library is not an application: no automatic lockfile, for example). Say plainly what the answer rests on — "ran the suite through the engine", "read the 14 refund tests", "the engine is not installed: no runtime evidence".
 
-Also inspect the complete verification surface that turns repository state into delivery evidence:
-- tests, linters, type/static checks, schema/generated-code checks, migrations, localization/i18n checks, security scans, build/package/container/startup/health/deploy checks, hooks and project-specific commands;
-- which checks exist versus which checks local workflows, hooks and CI/CD actually execute;
-- path/marker/filter/project exclusions, skips, retries and allowed-failure/advisory semantics;
-- runtime/OS/browser/database/service matrix differences;
-- source-tree validation versus built/installed/deployed artifact behavior.
+When the engine wrote an Assurance Report for this run, the report must not contradict your answer. Write your assessment (conclusion, dispositions of engine findings, your own findings, unknowns) and attach it with `assertiva audit <project> --assessment <file>`; the engine validates it against that run and re-renders the same page, raw engine evidence intact. Never edit or render the HTML yourself. End with `Assurance Report: <report_path>`.
 
-Do not hardcode project names, one framework, one test runner or one CI provider into core policy. Tool-specific knowledge belongs in adapters. Unknown commands/checks remain explicit UNKNOWN/CUSTOM evidence until an adapter or declared project contract can classify them.
+## Improve
 
-A repository containing a check does not prove the delivery path executed it. A green pipeline proves only the checks and environments that actually ran.
+Audit first. Then drive `assertiva improve`: it measures the baseline in isolation, gives you a candidate workspace, qualifies what you write there (original regression, coverage and oracles, negative paths, mutation or negative controls, delivery checks, artifact, stability) and reports baseline versus candidate. Do not trust a generated or changed test because it passes; challenge it. Show the report; the human approves.
 
-## User intent and write boundaries
+## References
 
-Keep the user-facing interaction simple.
-
-- **AUDIT** means inspect, measure, execute permitted verification, find gaps and recommend improvements. It must not modify project files.
-- **IMPROVE** means audit first, then build candidate changes outside the original project, verify the candidate, present baseline-vs-candidate evidence, and request approval before applying anything.
-
-Do not expose internal implementation details such as temporary workspaces, worktrees, patch staging or post-apply checks as separate everyday modes unless troubleshooting requires it.
-
-Runtime enforcement is required:
-- audit keeps the project read-only;
-- improve writes only to isolated candidate state until approval;
-- application is limited to the approved change set;
-- stale source changes must block unsafe blind overwrite.
-
-Reports/artifacts should default to Assertiva-owned storage outside the audited repository so read-only use does not dirty the working tree.
-
-### Driving `assertiva improve`
-
-1. `assertiva improve` measures the baseline and prints a candidate workspace. Write candidate changes **only there**.
-2. `assertiva improve` again qualifies the candidate. Optionally pass:
-   - `--negative-controls <file.json>`: a list of `{"control_id", "path", "find", "replace", "claim", "tests"?}` deliberate behavior-breaking edits that the tests claiming `claim` must detect (run only in disposable copies);
-   - `--mutation-report baseline=<path>` / `candidate=<path>`: existing mutation-tool reports for each state (run the tool in the corresponding workspace; Assertiva ingests, it does not mutate);
-   - `--run-check <CHECK_ID>`: only when the human authorizes running a specific discovered delivery check (migration, container, custom command). Never authorize deploy/publish checks; Assertiva will not run them anyway.
-3. Show the report to the human. Never pass `--approve` on your own initiative: approval names specific change ids and belongs to the human.
-4. `--discard` drops the candidate without touching the project.
-
-## Reporting contract
-
-Produce one Assurance Report model for both workflows.
-
-For AUDIT, report CURRENT + FINDINGS + RECOMMENDATIONS + UNKNOWNS.
-
-For IMPROVE, report BASELINE vs CANDIDATE, then APPLIED only after approval and post-apply verification.
-
-Prefer evidence delta over a synthetic quality score:
-- improved;
-- unchanged;
-- regressed;
-- unknown.
-
-The HTML surface should include accessible charts and textual/table equivalents, filters, expandable findings, provenance/limitations, verification-surface views, coverage/test-quality statistics, change-set summaries and a final "What does green prove?" section.
-
-Candidate metrics are candidate evidence, not current-project evidence.
-
-## Candidate qualification / test-the-tests
-
-Inside IMPROVE, do not trust generated or modified tests merely because they pass. Qualify the candidate safety net using the strongest available evidence:
-- candidate tests and the unchanged original regression suite;
-- line/branch/condition/function coverage as available;
-- assertion/oracle strength;
-- negative-path/error/rollback/state-effect evidence;
-- parameterized/boundary-case materialization;
-- integration/E2E fidelity and matrix coverage;
-- mutation testing or deliberate negative controls where proportionate;
-- flake/retry/order-dependence signals;
-- runtime/resource cost;
-- pipeline-equivalent checks and build/package/startup evidence;
-- optional non-production preview deployment only when supported, safe and explicitly authorized (no engine adapter supports it today: report it as not evidenced).
-
-Never deploy to production merely to qualify candidate tests.
-
-Original tests are immutable baseline evidence during IMPROVE. ADD/MODIFY/RETIRE proposals happen only in isolated candidate state until approval. A retirement candidate must keep the project original active until explicit human approval. Do not comment out originals in active files as a default preservation mechanism; preserve revision/fingerprint and show side-by-side diffs instead.
-
-A higher test count is not automatically an improvement. Compare evidence deltas with explicit metric direction and report mixed/regressed/unknown dimensions without collapsing them into a single quality score.
-
-Read docs/CANDIDATE_QUALIFICATION_AND_TEST_THE_TESTS.md when proposing or evaluating test changes.
-
-## Optional integrations
-
-Functional Test Designer is an optional source of authority-rich Test Cases. Preserve its oracle/provenance when present, but Assertiva must work normally on projects that only have pytest/Jest/Playwright/JUnit/etc. Functional Test Executor is also optional and applies when Azure Test Plans fetch/publication is part of the workflow. See docs/FTD_FTE_INTEROPERABILITY.md.
-
-## SELECT
-
-Choose candidate tests using the strongest available evidence from changed symbols, dependency graphs, runtime test-to-code maps, contracts, critical journeys, Git history, known regressions and project-declared mappings.
-
-Always expose limitations. Exact/deterministic mappings can exclude tests only within their proven scope. Heuristic/inferred impact should prioritize, not prove unaffectedness.
-
-## RUN
-
-Run the smallest sufficient high-signal evidence first when policy permits. Do not report a selected subset as full-suite/release proof.
-
-## DIAGNOSE
-
-1. identify failing check and first divergent stage;
-2. cluster likely shared failures;
-3. find the smallest useful reproducer;
-4. descend from E2E only when lower layers reproduce/isolate the same failure;
-5. escalate diagnostics D0→D4 only as needed;
-6. classify product defect, test/oracle defect, environment/infra defect, data problem, flake, or unresolved.
-
-## VERIFY
-
-After a fix/refactor:
-1. rerun minimal reproducer;
-2. rerun affected dependents;
-3. run affected regression;
-4. run relevant contract/integration/E2E;
-5. run broader/full gates when risk, milestone/release policy, selector uncertainty, or project rules require them.
-
-## Progressive diagnostics
-
-- D0 Summary
-- D1 Failure
-- D2 Context
-- D3 Trace
-- D4 Forensic
-
-Never assume `-v/-vv/-vvv` semantics are portable.
-
-## Test identity
-
-Do not collapse a parameterized/dynamic test definition into one boolean result when individual invocations are observable.
-
-```text
-suite → definition → invocation/data case → attempt/retry → result
-```
-
-Preserve stable IDs, sanitized parameter identity, matrix dimensions, attempt number and dynamic/partial-discovery status.
-
-## Structured errors
-
-Invalid-input behavior is part of the contract. Prefer stable structured fields such as category/type/code/path/location/context/status and sanitized input over brittle message-only assertions, unless exact wording is itself required.
-
-Pydantic ValidationError is one adapter-specific form, not a core dependency.
-
-## Coverage semantics
-
-Never reduce coverage to one percentage. Preserve metric kind, denominator, scope, exclusions, tool/version and aggregate-vs-test-specific context. Line coverage does not imply branch/condition coverage, and none of them proves oracle adequacy.
-
-## Property/fuzz/metamorphic evidence
-
-Preserve seed/replay token, run budget, counterexample, minimized/shrunk counterexample and corpus where available. Randomized success without replay data is weaker diagnostic evidence.
-
-## Failure-guided E2E decomposition
-
-Do not repeatedly rerun an expensive E2E when a smaller safe reproducer can isolate the same stage. After repair, return to the original composition-level evidence when the claim depends on it.
-
-## Refactor safety
-
-Before consequential refactoring, establish authoritative behavior and build a safety matrix mapping important behaviors/contracts to unit/property/characterization, integration/contract, E2E/composition and non-functional evidence as applicable.
-
-Classify readiness:
-- READY
-- READY_WITH_GAPS
-- NOT_READY
-- UNKNOWN
-
-A green suite or 100% line coverage does not make a refactor safe by itself. The question is whether meaningful unintended behavioral changes in the refactored scope would be detected.
-
-For whole-project refactors, inventory behavior slices as protected, weakly protected, characterization-only, integration-only, E2E-only, unprotected, or unknown before restructuring them.
-
-Never weaken test expectations merely to make a refactor pass.
-
-## Test-the-safety-net
-
-Where proportionate, challenge the suite with mutation testing, deliberate negative controls, known historical regressions, boundary perturbations, contract violations, property/metamorphic tests, or intentionally broken candidate implementations in a sandbox.
-
-## Harness, fidelity, observations, data and doubles
-
-Never infer test strength from a framework class, file suffix, or label alone. When integration/UI/API/database fidelity matters, read docs/TEST_HARNESS_AND_FIDELITY.md and record the actual process, transport, persistence, transaction, dependency, UI runtime, matrix and isolation boundaries.
-
-When auditing assertions, map them to behavior claims and observation surfaces using docs/ASSERTIONS_ORACLES_AND_OBSERVATION_SURFACES.md. Status/content/template/context/persistence/call/visual/accessibility observations prove different things.
-
-When fixtures, factories, Faker/generated data, shared setup, database seeds or order-dependence matter, use docs/TEST_DATA_FIXTURES_FACTORIES.md.
-
-When mocks, spies, fakes, patch/monkeypatch, virtual services or containers are involved, use docs/TEST_DOUBLES_PATCHING_AND_VIRTUALIZATION.md. Verify the seam actually used by the SUT and do not mock away the boundary a test claims to integrate.
-
-For HTTP/API/browser/component/mobile/web flows, use docs/WEB_API_UI_TESTING.md and preserve request, auth, state, rendering, accessibility, visual and platform-matrix claims independently.
-
-For implementation/productization of Assertiva itself, use docs/AGENT_SKILL_MCP_ARCHITECTURE.md: Skill owns policy, deterministic core owns reproducible processing, CLI is the default token-efficient agent surface, and MCP is optional for persistent state/graph/artifact/job workflows.
-
-## Semantic UI / browser assurance
-
-For browser/component UI tests, prefer assertions and locators tied to the intended user/product contract when such a contract exists. Native semantics come first; ARIA supplements semantics where needed and must not be added merely for test convenience.
-
-Treat role/name/state, keyboard/focus, interaction, visual output, browser storage/network state and backend effects as separate observation surfaces. Use explicit test IDs when user-facing semantics are insufficient or ambiguous rather than forcing fake semantics into the product.
-
-Flag positional DOM selectors, deep CSS chains and absolute XPath as potential implementation coupling when a stable product contract exists, but do not ban them when DOM/styling structure is itself the contract.
-
-A semantic/accessibility snapshot can detect regressions that visual snapshots miss; a visual snapshot can detect regressions semantic snapshots miss. Neither replaces the other.
-
-Automated accessibility scanners are partial evidence. Zero detected violations is not complete accessibility proof.
-
-Snapshot baseline updates require intent/provenance. Retries preserve first-failure evidence, and timeout inflation is not root-cause repair unless the authoritative latency contract changed.
-
-## Token-aware evidence
-
-Prefer compact structured summaries with retrievable raw artifacts. Never save tokens by hiding failures, skips/not-run, retries, limitations, environment/configuration, revision, fidelity, contradictions or unknowns.
-
-## Provider neutrality
-
-Core policy is framework/language/provider neutral. Adapters expose capabilities such as discovery, invocation enumeration, stable IDs, filtering, structured results, retries, coverage, traces, seeds and mutation evidence.
-
-## Current maturity
-
-`assertiva audit` and `assertiva improve` are the executable surface. They read pytest, Jest, Playwright and Maven runs, portable JUnit XML, mutation and coverage reports, and CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins; `audit --changed-since` selects tests from a revision-scoped impact graph (Python) and widens whenever impact is not proven; a local history adds stability and failure-fingerprint evidence. MCP is not implemented. Use the CLI for deterministic evidence and this Skill for reasoning about it (see Execution mode and the engine); STATUS.md holds the exact claim boundaries.
+- [references/ENGINE.md](references/ENGINE.md) — engine calls, what each costs and buys, reading its output, the assessment format, driving `improve`.
+- [references/TEST_QUALITY.md](references/TEST_QUALITY.md) — oracles and observation surfaces, test doubles, harness fidelity, data and fixtures, negative paths and error contracts, coverage, mutation, parameterized/property tests, UI and browser tests.
+- [references/DELIVERY.md](references/DELIVERY.md) — verification surface, CI and revision provenance, artifacts, test selection, flaky tests, failure diagnosis, refactor safety.

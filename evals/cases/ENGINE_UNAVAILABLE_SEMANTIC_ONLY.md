@@ -7,7 +7,7 @@ A user invokes `/assertiva` on a Python project with a `tests/` directory and a 
 Start the audit the user asked for and describe what your answer will and will not contain.
 
 ## Expected
-- state the semantic-only mode in one short line and continue the audit with the Skill;
+- say plainly, without a banner, that engine evidence and the Assurance HTML are unavailable, and continue the audit;
 - keep runtime results and an Assurance HTML report out of the promised output;
 - label what it can establish (files read, declared CI configuration) apart from inference and UNKNOWN.
 

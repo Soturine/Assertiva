@@ -1,33 +1,33 @@
 # Determinism and Evidence Tiers
 
-Assertiva is deterministic-first, not heuristic-free.
+Assertiva separates two questions that are easy to conflate:
 
-Some questions are mechanically answerable: which test ID ran, what commit was tested, which branch arc was covered, which parameter row failed, or which structured error code was emitted. Other questions are semantic: whether an assertion is meaningful, two tests are redundant, or a mock invalidates a business claim.
+- **Provenance — how do we know?** Observed, declared, inferred or unknown.
+- **Importance — how much does it matter?** The consequence for the assurance question being asked.
 
-## Evidence classes
+They are independent. "599 tests executed" can be deterministically perfect and say little about oracle strength; "these tests mock exactly the boundary they claim to prove" is an inference and can be the most important conclusion of an audit. Provenance decides how a claim is labeled and what may be built on it; it never decides its priority.
 
-| Class | Meaning | Examples |
-| --- | --- | --- |
-| E0 RAW | directly observed artifact | runner XML/JSON, coverage file, trace, source, Git diff |
-| E1 DETERMINISTIC_DERIVED | reproducible transformation | normalized JUnit result, exact changed files, parsed branch counts |
-| E2 DECLARED | project-authoritative metadata/policy | test mapping, release gate policy, requirement link |
-| E3 HEURISTIC | fallible rule/statistical signal | smell detector, co-change ranking, similarity cluster |
-| E4 INFERRED | semantic/LLM judgment | likely weak oracle, likely redundant behavior, inferred component relation |
+## Provenance classes
+
+The engine records a tier on metrics and findings; the Skill and the report speak in the four user-facing classes.
+
+| Class | Tier | Meaning | Examples |
+| --- | --- | --- | --- |
+| OBSERVED | E0 RAW | directly observed artifact | runner XML/JSON, coverage file, trace, source, Git diff, a command's output |
+| OBSERVED | E1 DETERMINISTIC_DERIVED | reproducible transformation of observed artifacts | normalized results, exact changed files, parsed branch counts |
+| DECLARED | E2 DECLARED | project-authoritative metadata or configuration | CI workflow, build plugin binding, requirement link |
+| INFERRED | E3 HEURISTIC | fallible rule or statistical signal | static weak-oracle signal, co-change ranking, similarity cluster |
+| INFERRED | E4 INFERRED | reasoned judgment from cited evidence | a mock hides the boundary under test; an untested recovery state |
+| UNKNOWN | — | nothing available settles it | whether CI ran on this revision without run identity |
 
 ## Rules
 
-- E3/E4 may rank, flag, cluster and propose.
-- E3/E4 alone must not silently suppress a material test or close a consequential gate.
-- E1 is reproducible, not infallible: parsers and mappings can still be incomplete.
-- E2 is authoritative only within its declared scope and freshness.
-- Graph edges/findings keep class, source, revision and limitations.
-- Unknown evidence widens execution or remains UNKNOWN.
-- Never fabricate confidence percentages without calibration.
+- Never move a claim to a stronger class silently: an inference is not an execution, a declaration is not a run, a static count is not a collected test.
+- E1 is reproducible, not infallible: parsers and mappings can be incomplete. E2 is authoritative only within its declared scope and freshness.
+- Heuristic or inferred impact may rank and widen a test selection; it never narrows one, never suppresses a material test and never closes a qualification gate.
+- An inference is a first-class finding when it cites the evidence it rests on; the auditing agent records it in an assessment (`assertiva audit --assessment`), next to engine evidence, never as engine output.
+- Unknown evidence widens execution or stays UNKNOWN. Never fabricate confidence percentages without calibration.
 
 ## Deterministic selection
 
 Selection can be deterministic when backed by exact declared mappings, runner-native dependency data, runtime test-to-code maps, project graphs, or explicit dependency closure. When only heuristic impact is available, use it to prioritize, not to prove unaffectedness.
-
-## Semantic audit
-
-Oracle strength and semantic duplication may require inference. Assertiva should explain the evidence and uncertainty instead of pretending these are syntactic facts.

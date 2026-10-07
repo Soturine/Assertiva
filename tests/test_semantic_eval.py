@@ -45,6 +45,17 @@ def test_agent_context_carries_the_skill_and_every_reference_it_can_load():
         assert f'<skill-file path="{rel}">' in context and path.read_text(encoding="utf-8") in context
 
 
+def test_skill_links_only_to_files_it_ships():
+    import re
+
+    skill = (semantic.ROOT / "SKILL.md").read_text(encoding="utf-8")
+    links = set(re.findall(r"\]\(([^)#]+)\)", skill))
+    assert links, "SKILL.md routes to its references"
+    for link in links:
+        assert (semantic.ROOT / link).is_file(), link
+        assert link.startswith("references/"), f"{link}: references stay one level deep inside the Skill"
+
+
 @pytest.mark.parametrize("case", sorted(p.name for p in semantic.FIXTURES.iterdir() if p.is_dir()))
 def test_a_case_with_a_fixture_works_on_that_project_not_on_this_repository(case, tmp_path):
     assert case in CASES, "every fixture belongs to a case"

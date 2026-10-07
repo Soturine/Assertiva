@@ -1,7 +1,7 @@
-"""The contract the Skill relies on when it runs engine-backed: a cheap availability probe and a static,
-read-only audit that returns the path of the HTML Assurance Report it wrote.
+"""The contract the Skill relies on when it uses the engine: a cheap availability probe, a read-only audit that returns
+the path of the HTML Assurance Report it wrote, and the invariants SKILL.md states.
 
-How the Skill reasons in semantic-only mode, about CI revision provenance, static counts and dependency
+How the agent investigates, when it stops and how it reasons about CI provenance, static counts and dependency
 recommendations is judged by the semantic evals (evals/cases), not graded here by string."""
 
 import json
@@ -35,11 +35,18 @@ def test_engine_backed_first_call_is_static_and_returns_the_html_report_path(cal
     assert tree_fingerprint(calc_project) == before
 
 
-def test_skill_declares_both_modes_and_keeps_eval_verdicts_out_of_normal_use():
+def test_skill_states_the_invariants_it_relies_on_and_leaves_method_to_the_agent():
+    """String checks only for contracts the engine and the report depend on; how the agent investigates is graded by
+    the semantic evals, never by keywords here."""
     skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-    assert "Assertiva mode: engine-backed" in skill
-    assert "Assertiva mode: semantic-only" in skill
-    assert "Assurance Report:" in skill and "report_path" in skill
-    for category in ("DETERMINISTIC FACT", "DECLARED FACT", "HEURISTIC SIGNAL", "SEMANTIC INFERENCE", "UNKNOWN"):
-        assert category in skill, category
+    assert skill.splitlines()[:3] == ["---", "name: assertiva", skill.splitlines()[2]]  # Agent Skills frontmatter
+    assert skill.splitlines()[2].startswith("description: ")
+    assert len(skill.splitlines()) < 150, "SKILL.md stays an entrypoint; detail lives in references/"
+    assert "Assurance Report:" in skill and "report_path" in skill and "--assessment" in skill
+    for category in ("OBSERVED", "DECLARED", "INFERRED", "UNKNOWN"):
+        assert f"**{category}**" in skill, category
     assert "never present PASS/FAIL/REVIEW as the Skill's verdict" in skill
+    assert "Audit never modifies the project" in skill and "never pass `--approve`" in skill
+    engine = (ROOT / "references" / "ENGINE.md").read_text(encoding="utf-8")
+    for disposition in ("CONFIRMED", "PARTIAL", "CONTEXTUAL", "FALSE_POSITIVE", "UNRESOLVED"):
+        assert f"`{disposition}`" in engine

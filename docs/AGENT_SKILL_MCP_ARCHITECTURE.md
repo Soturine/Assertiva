@@ -1,30 +1,34 @@
 # Agent Skill, CLI, and MCP Architecture
 
-Assertiva should separate policy, deterministic execution, persistent intelligence and raw evidence.
+The auditing agent leads the investigation; the deterministic core is its instrument, not its workflow.
 
 ## Recommended layers
 
 ~~~text
-Agent / CI / human
-      |
-   SKILL.md
-      |
-workflow routing + claim policy
-      |
-deterministic Assertiva core
-      |
-CLI -------- optional MCP server
- |                |
-runner adapters   persistent graph/history/artifacts/jobs
-      \           /
-       evidence store
+                 user goal
+                     |
+          agent + SKILL.md (+ references/)
+     decides what to read, run and conclude
+       |              |               |
+  source, tests,   Assertiva       CI provider,
+  docs, config     CLI / engine    existing artifacts
+       |              |               |
+       +--------------+---------------+
+                      |
+      evidence: observed / declared / inferred / unknown
+                      |
+       assessment (dispositions + agent findings)
+                      |
+   engine renders one canonical Assurance Report per run
 ~~~
 
-Implemented today: `SKILL.md`, the deterministic core, the CLI and the runner adapters. An MCP server is not implemented; it is optional and planned for M3 (ROADMAP.md), and the Skill + CLI path is complete without it.
+The engine owns what must be reproducible and safe: native execution in disposable copies, runner discovery and parsing, test identity, coverage/JUnit/mutation ingestion, CI declarations, artifact qualification, revision and provenance, the read-only guard, path boundaries, transactional apply, history and the report. The agent owns the question, the choice of evidence, semantic reasoning, false-positive judgment, findings the engine cannot see, and when the answer is complete. The assessment (`assertiva audit --assessment`) is the contract between them.
+
+Implemented today: `SKILL.md` with its references, the deterministic core, the CLI and the runner adapters. An MCP server is not implemented; it is optional and planned for M3 (ROADMAP.md), and the Skill + CLI path is complete without it.
 
 ## Skill layer
 
-SKILL.md should stay compact and route to references only when relevant. Stable assurance policy belongs in the skill/core; framework lookup tables and fast-moving version facts belong in adapters/references/research.
+SKILL.md stays a compact entrypoint (goal, investigation method, completion, boundaries, claims, reporting) and routes to three references (`references/ENGINE.md`, `TEST_QUALITY.md`, `DELIVERY.md`) one level deep. It states invariants as rules and method as principles and questions; it does not prescribe a fixed sequence of tools. Fast-moving tool facts belong in adapters and dated research.
 
 Advantages:
 - low setup and portable across coding agents;
@@ -160,13 +164,13 @@ Do not invent a composite quality score merely to make the dashboard look comple
 ## Reasoning layer, evidence core, bounded claims
 
 ```text
-Skill (semantic reasoning, may infer)
-        ↓ asks for
-deterministic evidence core (CLI/engine/adapters)
-        ↓ produces
-bounded claims (what green proves, what stays UNKNOWN)
+agent reasoning (leads, may infer, may find what no tool reports)
+        ↔ acquires
+reproducible evidence (engine, runners, CI, artifacts)
+        ↓
+bounded claims (what green proves, what stays UNKNOWN), one report
 ```
 
-The Skill may reason freely, but facts come from evidence: "this oracle looks weak" is an inference to present as such; "419 tests executed" is deterministic evidence. A language model never replaces the deterministic core. Without an installed engine the Skill runs semantic-only; with it, engine-backed (rules in [SKILL.md](../SKILL.md#execution-mode-and-the-engine)). The HTML report is always rendered by the engine.
+Facts come from evidence: "this oracle looks weak" is an inference to present as such; "419 tests executed" is observed. An inference grounded in cited code can still be the most important finding; provenance and importance are separate (see [Determinism and Evidence Tiers](DETERMINISM_AND_EVIDENCE_TIERS.md)). Without an installed engine the agent keeps auditing with what it can read and run safely, and says that engine evidence and the HTML report were not produced. The HTML report is always rendered by the engine; the agent's assessment joins it for the same run.
 
 Each layer is evaluated by its own means: the runtime by deterministic tests, CI and the on-demand runtime self-qualification; the Skill by semantic evaluation with a hidden rubric and a separate judge ([`evals/README.md`](../evals/README.md)). Neither substitutes for the other.

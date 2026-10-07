@@ -79,6 +79,13 @@ Delivery
 Dogfood
 - [x] matched full-suite vs selected+widening experiments with known injected defects (miss rate first): `tests/test_selection_experiment.py`, 0 misses in 12 controlled defects
 
+## Agent-led architecture (0.6.0, between M2 and M3)
+Found by dogfooding: a static-first Skill stopped at static evidence, sampled candidates and generalized, and handed back evidence it could acquire, while the report contradicted its own conclusions.
+- [x] Skill rewritten around the auditor: question-first investigation, free tool choice, completion adequacy, provenance separate from importance; three references by progressive disclosure
+- [x] auditing agent's assessment attached to the run (`audit --assessment`): dispositions of engine findings, agent findings, conclusion; the report renders them beside raw engine evidence
+- [x] EXECUTION pillar as one check (former discovery and candidate-test checks merged with equivalent protection)
+- [x] eight hidden-rubric eval cases for agent-led behavior, two on executable fixtures
+
 ## M3 — Productization & Empirical Validation
 - [ ] stable CLI contract and project policy/config
 - [ ] optional MCP server and revision-aware local evidence store

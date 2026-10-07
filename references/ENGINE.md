@@ -79,7 +79,8 @@ Severities are the engine's defaults for the code, not a judgment of this projec
 }
 ```
 
-- `disposition`: `CONFIRMED` (holds as stated), `PARTIAL` (holds for some items: give `subjects`), `CONTEXTUAL` (the fact is true but its impact here differs: `priority` required), `FALSE_POSITIVE` (does not hold here), `UNRESOLVED` (reviewed, evidence insufficient).
+- `disposition` is about the engine's claim, not about the code: `CONFIRMED` (the claim holds as stated), `PARTIAL` (holds for some items: give `subjects`), `CONTEXTUAL` (the fact is true but its impact here differs: `priority` required), `FALSE_POSITIVE` (the claim does not hold here), `UNRESOLVED` (reviewed, evidence insufficient).
+- `subjects` name individual items of the finding, one entry per item, with the same meaning: for a weak-oracle finding, a test that really is weak is `CONFIRMED`, a test the heuristic misread is `FALSE_POSITIVE`.
 - `priority`: `high`, `medium`, `low` or `info`; optional except for `CONTEXTUAL` and agent findings; not allowed on `FALSE_POSITIVE` (it leaves the action plan).
 - A whole-finding `CONFIRMED` or `FALSE_POSITIVE` on a finding with several items needs `"scope": {"reviewed": n, "of": n}` covering every item; with fewer reviewed, use `PARTIAL` or `UNRESOLVED` and say what was reviewed.
 - `basis` for your own findings: `OBSERVED` (you saw it run or read it directly), `DECLARED` or `INFERRED`. Every disposition and finding needs at least one evidence reference.

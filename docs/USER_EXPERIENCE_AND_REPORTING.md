@@ -119,6 +119,9 @@ One run produces one canonical page.
 | `assertiva audit <project>` | `audit.html` and `audit.json` |
 | `assertiva improve <project>` (qualification) | `improve.html` and `improve.json` |
 | `assertiva improve <project> --approve ...` | `improve.html` and `improve.json`, now including the applied state |
+| `assertiva audit <project> --assessment FILE` | the same `audit.html` and `audit.json`, re-rendered with the auditing agent's assessment |
+
+The auditing agent's assessment belongs to the run it assessed: the engine checks the run id and that the project is unchanged, keeps every engine finding with its raw evidence and default severity, and adds the agent's conclusion, its disposition of each reviewed finding and its own findings. The page ranks and recommends by the effective priority, so the delivered report and the agent's answer agree; nothing an engine observed is hidden.
 
 - Baseline, candidate and applied are states inside the same `improve.html`; they are never separate pages.
 - The default report directory is `<ASSERTIVA_HOME>/reports/<project>-<hash>/`, outside the project; `--report-dir` chooses another directory outside the project. A new run replaces the page of the same workflow there; it never adds a second page for the same run.

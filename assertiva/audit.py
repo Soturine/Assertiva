@@ -160,7 +160,8 @@ def run_audit(
                               reason="requested: audit --execute" + (" (selected set)" if subset else ""), selected=subset)
         else:
             current = StateEvidence("current", "static-analysis")
-            not_requested = "not requested: fast static feedback; audit --execute runs tests and artifact checks"
+            not_requested = ("not executed by this call: test outcomes, coverage and artifact behavior stay UNKNOWN; "
+                             "audit --execute measures them in a disposable copy")
             current.budget += [BudgetDecision("tests", "NOT_RUN", not_requested), BudgetDecision("artifact", "NOT_RUN", not_requested)]
             for adapter in adapters:
                 current.static.update(adapter.static_signals(root))

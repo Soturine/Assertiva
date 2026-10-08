@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.1] — 2026-10-08 — Consent outside the project, connection targets withheld
+
+Patch release (security). M3 stays in progress.
+
+### Fixed
+- A repository could authorize its own commands and unlock the user's credentials: 0.7.0 read `[execution] authorize` and `env` from the audited project's `.assertiva.toml` / `[tool.assertiva]`. Consent now lives only in `<ASSERTIVA_HOME>/consent.toml` (`[[project]]` with `root`, `authorize`, `env`), written by the user outside every project; a project's `[execution]` is reported as a limitation and ignored. The project file keeps only declarative settings (`[tests] runners`, `timeout_s`).
+- Consent names the exact command, no longer a check id: an id is a step's position, and a later commit could put another command behind it.
+- Connection targets and settings (`DATABASE_URL`, `*_DATABASE_URL`, `PG*`, `MYSQL_*`, `REDIS_URL`, `MONGO_URI`, broker/cache hosts, `DJANGO_SETTINGS_MODULE`) are withheld from project code even without a password in the value, so a shell pointed at staging or production cannot steer a test run there. A consented connection reaches only a local host; one naming another host stays withheld.
+- `ASSERTIVA_*` variables were exempt from withholding as a prefix; only names that are not credential-like pass now (the engine's own variables are unaffected).
+- STATUS.md said M3 had not started and Vitest was not implemented.
+- references/ENGINE.md: consent location, disposable local databases, connections stay local.
+
+### Added
+- License: Apache-2.0 (`LICENSE`, package metadata, SKILL.md frontmatter).
+
+### Not done
+- The behavioral corrections of 0.7.0 and 0.7.1 (references/ENGINE.md, references/DELIVERY.md) have not been re-evaluated with agents. A disposable copy is still not a sandbox: network and the user's permissions remain, and files such as `~/.pgpass` stay readable by project code.
+
 ## [0.7.0] — 2026-10-08 — Evidence integrity, Python and Vitest runners, project configuration
 
 Minor release; M3 is in progress (partial, see ROADMAP.md). Found by dogfooding 0.6.0 on functional-test-designer.

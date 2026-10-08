@@ -1,6 +1,7 @@
 ---
 name: assertiva
 description: Audits what a project's tests and verification actually prove, and improves them with before/after evidence. Use when the user asks whether tests are good or can be trusted, whether a green suite or CI run means anything, about weak assertions, mocked-away integrations, coverage or mutation meaning, flaky tests, CI/local or built-artifact gaps, which tests a change needs, refactor safety, or to strengthen a test suite without touching the project until approval.
+license: Apache-2.0
 ---
 
 # Assertiva

@@ -245,3 +245,99 @@ def test_high_line_coverage_does_not_hide_weak_oracles(tmp_path):
     report = audit_pytest_project(tmp_path, cov)
     assert report.has_finding("HIGH_COVERAGE_WEAK_ORACLE")
     assert report.has_finding("LINE_BRANCH_COVERAGE_DIVERGENCE")
+
+
+# --- static inventory follows the runner's own discovery configuration -------------------------------
+# Found by dogfooding: with `testpaths = ["tests"]`, eval fixture projects under evals/ were inventoried as
+# this project's tests. A file found is not a definition the runner would collect.
+
+def _paths(root):
+    from assertiva.pytest_audit import discover_pytest_definitions
+
+    return sorted({t.path for t in discover_pytest_definitions(root)})
+
+
+def test_inventory_respects_configured_testpaths(tmp_path):
+    write(tmp_path / "pyproject.toml", '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
+    write(tmp_path / "tests" / "test_a.py", "def test_a():\n    assert 1 == 1\n")
+    write(tmp_path / "evals" / "fixtures" / "case" / "tests" / "test_b.py", "def test_b():\n    assert 1 == 1\n")
+    assert _paths(tmp_path) == ["tests/test_a.py"]
+
+
+def test_inventory_respects_python_files_and_ini_files(tmp_path):
+    write(tmp_path / "pytest.ini", "[pytest]\npython_files = check_*.py\ntestpaths = suite\n")
+    write(tmp_path / "suite" / "check_a.py", "def test_a():\n    assert 1 == 1\n")
+    write(tmp_path / "suite" / "test_b.py", "def test_b():\n    assert 1 == 1\n")
+    assert _paths(tmp_path) == ["suite/check_a.py"]
+
+
+def test_inventory_skips_directories_the_runner_never_recurses_into(tmp_path):
+    for folder in ("node_modules/pkg", "build", "dist", "venv", ".tox/py", "env"):
+        write(tmp_path / folder / "test_x.py", "def test_x():\n    assert 1 == 1\n")
+    write(tmp_path / "env" / "pyvenv.cfg", "home = /usr/bin\n")  # a virtual environment under any name
+    write(tmp_path / "tests" / "test_a.py", "def test_a():\n    assert 1 == 1\n")
+    assert _paths(tmp_path) == ["tests/test_a.py"]
+
+
+def test_without_configuration_the_whole_tree_is_the_default_scope(tmp_path):
+    write(tmp_path / "tests" / "test_a.py", "def test_a():\n    assert 1 == 1\n")
+    write(tmp_path / "pkg" / "sub" / "b_test.py", "def test_b():\n    assert 1 == 1\n")
+    assert _paths(tmp_path) == ["pkg/sub/b_test.py", "tests/test_a.py"]
+
+
+# --- oracle signals: indirect oracles are oracles; a count of asserts is not quality ------------------
+# Found by dogfooding: 13 of 19 weak-oracle candidates were false positives — exact `is None` checks, call guards
+# (`side_effect=AssertionError`), class helper methods that assert, mock interaction assertions.
+
+def _weak(tmp_path, source: str) -> dict[str, tuple]:
+    from assertiva.pytest_audit import discover_pytest_definitions
+
+    write(tmp_path / "tests" / "test_x.py", source)
+    return {t.name: t.assertion_kinds for t in discover_pytest_definitions(tmp_path) if t.smoke_like}
+
+
+def test_an_exact_none_result_is_a_value_oracle_not_existence(tmp_path):
+    weak = _weak(tmp_path, "import unittest\n\nclass T(unittest.TestCase):\n"
+                           "    def test_absent(self):\n        self.assertIsNone(parse(''))\n"
+                           "    def test_bare(self):\n        assert parse('') is None\n"
+                           "    def test_exists(self):\n        self.assertIsNotNone(parse('x'))\n")
+    assert weak == {"test_exists": ("EXISTENCE_ONLY",)}
+
+
+def test_a_guard_that_fails_on_a_forbidden_call_is_an_oracle(tmp_path):
+    weak = _weak(tmp_path, "from unittest import mock\n\n"
+                           "def test_lazy():\n    with mock.patch('m.connect', side_effect=AssertionError('connected too early')):\n"
+                           "        build_client()\n\n"
+                           "def test_guard_assigned():\n    fake = mock.Mock()\n    fake.send.side_effect = AssertionError('sent')\n    run(fake)\n\n"
+                           "def test_simulated_failure_is_setup_not_oracle():\n"
+                           "    with mock.patch('m.connect', side_effect=ValueError('down')):\n        build_client()\n")
+    assert weak == {"test_simulated_failure_is_setup_not_oracle": ("NO_ASSERTION",)}
+
+
+def test_helpers_that_assert_are_followed(tmp_path):
+    weak = _weak(tmp_path, "import unittest\n\n"
+                           "def check_total(order):\n    assert order.total == 10\n\n"
+                           "def build(order):\n    return order\n\n"
+                           "class Base(unittest.TestCase):\n    def verify(self, name):\n        self.assertEqual(run(name), 'ok')\n\n"
+                           "class T(Base):\n"
+                           "    def test_method_helper(self):\n        self.verify('a')\n"
+                           "    def test_module_helper(self):\n        check_total(make())\n"
+                           "    def test_named_assertion_call(self):\n        helpers.assert_problem(call(), code='E1')\n"
+                           "    def test_mock_interaction(self):\n        m = make()\n        m.notify.assert_called_once_with('a')\n"
+                           "    def test_explicit_fail(self):\n        if broken():\n            self.fail('broken')\n"
+                           "    def test_helper_without_assertion(self):\n        build(make())\n")
+    assert weak == {"test_helper_without_assertion": ("NO_ASSERTION",)}
+
+
+def test_many_assertions_can_still_be_weak(tmp_path):
+    weak = _weak(tmp_path, "def test_many():\n    r = call()\n    assert r is not None\n    assert r.body is not None\n"
+                           "    assert r.headers is not None\n")
+    assert weak == {"test_many": ("EXISTENCE_ONLY",)}
+
+
+def test_the_weak_oracle_finding_names_each_candidates_signal(tmp_path):
+    from assertiva.pytest_audit import audit_pytest_project
+
+    write(tmp_path / "tests" / "test_x.py", "def test_a():\n    call()\n\n\ndef test_b():\n    assert call() is not None\n")
+    finding = next(f for f in audit_pytest_project(tmp_path).findings if f.code == "WEAK_ORACLE_SIGNAL")
+    assert finding.evidence["signals"] == {"tests/test_x.py::test_a": ["NO_ASSERTION"], "tests/test_x.py::test_b": ["EXISTENCE_ONLY"]}

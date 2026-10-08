@@ -49,6 +49,7 @@ You are done when the answer is settled, when more evidence would not change it,
 Freedom to reason is not permission to act. These hold whatever the investigation suggests:
 
 - **Audit never modifies the project.** Run project code only where it cannot write into the working tree: through the engine (disposable copies under a read-only guard: `--execute`, or `--run-check <check id>` for what CI declares) or in a copy you make outside the project. Runners and tools write caches and artifacts, so never run them inside the tree during an audit — not even `pytest`, `npm test` or `manage.py test`; copy the project to a temporary directory first.
+- A run is evidence only with its own exit status. When you run a command yourself, never judge it through a pipe (`| tail`, `| tee`, `| head` report their own status) or by words in its output; keep the command, the exit code and what it ran on. A local run of what CI declares is not proof that CI ran it.
 - **Improve** writes candidate changes only in the engine's candidate workspace. Applying requires the human's explicit approval of named change ids; never pass `--approve` on your own initiative. A stale baseline blocks apply.
 - Never deploy, publish, push, or change external systems; never use secrets you were not given; stay inside the project and the paths the user named.
 

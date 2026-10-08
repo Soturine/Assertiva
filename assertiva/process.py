@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import functools
+import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import time
 from contextlib import contextmanager
@@ -65,6 +67,8 @@ class CommandResult:
     error: str | None = None  # could not start (missing interpreter/tool)
     stdout: str = ""
     stderr: str = ""
+    signal: str | None = None  # POSIX: the signal that ended the process
+    output_sha256: str | None = None  # of the complete stdout + stderr, before truncation
 
     @property
     def ok(self) -> bool:
@@ -75,6 +79,8 @@ class CommandResult:
             return f"could not start: {self.error}"
         if self.timed_out:
             return f"timed out after {self.timeout_s}s"
+        if self.signal:
+            return f"ended by {self.signal} in {self.duration_s}s"
         tail = (self.stderr or self.stdout).strip().splitlines()[-3:]
         return f"exit {self.returncode} in {self.duration_s}s" + (": " + " | ".join(tail) if tail and self.returncode else "")
 
@@ -123,6 +129,54 @@ def active_target(kind: str, identity: str):
             os.environ.pop(TARGETS_ENV, None)
         else:
             os.environ[TARGETS_ENV] = previous
+
+
+# --- the environment project code sees ----------------------------------------------------
+# A disposable copy protects the project tree, not the machine: project code still runs as the user,
+# with network access. What Assertiva can withhold is the credentials its own environment carries.
+# Credential-looking variables are removed from every child environment (names are recorded, values
+# never); a project lists what its tests legitimately need in `.assertiva.toml` ([execution] env).
+_CREDENTIAL_NAME = re.compile(
+    r"(?i)(token|secret|passw(or)?d|passphrase|credential|api[-_]?key|private[-_]?key|access[-_]?key|auth|session|cookie)"
+)
+_CREDENTIAL_PREFIXES = (
+    "AWS_", "AZURE_", "ARM_", "GOOGLE_", "GCLOUD", "CLOUDSDK_", "GCP_", "DIGITALOCEAN_", "HEROKU_", "VAULT_", "TWINE_",
+    "PYPI_", "DOCKER_", "KUBECONFIG", "SSH_AUTH_SOCK", "SSH_AGENT_PID", "GPG_", "GH_", "CI_JOB_",
+    "SYSTEM_ACCESSTOKEN", "ACTIONS_RUNTIME", "ACTIONS_ID_TOKEN", "ACTIONS_CACHE",
+)
+_URL_WITH_PASSWORD = re.compile(r"://[^/\s:@]+:[^@\s]+@")
+PASSTHROUGH: frozenset[str] = frozenset()  # set by the command from the project's configuration
+
+
+def is_credential(name: str, value: str) -> bool:
+    if name.startswith("ASSERTIVA_"):
+        return False
+    return (name.upper().startswith(_CREDENTIAL_PREFIXES) or bool(_CREDENTIAL_NAME.search(name))
+            or bool(_URL_WITH_PASSWORD.search(value)))
+
+
+def child_environment(env: dict) -> dict:
+    """``env`` without credential-looking variables (except those the project passes through)."""
+    withheld = {name for name, value in env.items() if name not in PASSTHROUGH and is_credential(name, value)}
+    if withheld and _SCOPES:
+        _SCOPES[-1].setdefault("__withheld__", set()).update(withheld)
+    return {name: value for name, value in env.items() if name not in withheld}
+
+
+@contextmanager
+def passthrough(names):
+    """Let the project's declared variables (``[execution] env``) reach its code during this block."""
+    global PASSTHROUGH
+    previous, PASSTHROUGH = PASSTHROUGH, frozenset(names)
+    try:
+        yield
+    finally:
+        PASSTHROUGH = previous
+
+
+def withheld_variables() -> list[str]:
+    """Names of the variables withheld from child processes in the current run."""
+    return sorted(_SCOPES[-1].get("__withheld__", ())) if _SCOPES else []
 
 
 # --- run-scoped capability evidence ----------------------------------------------------
@@ -183,29 +237,66 @@ def redact(text: str) -> str:
     return _URL_CREDENTIALS.sub(r"\1***\3", _SECRET_ARG.sub(r"\1***", text))
 
 
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """End the process and everything it started (its own session / process group)."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, timeout=30)
+        else:
+            os.killpg(proc.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        proc.kill()
+    except OSError:
+        pass
+
+
 def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0) -> CommandResult:
+    """Run ``command`` non-interactively in its own process group, bounded by ``timeout_s``.
+
+    The result is the command's own exit status (or the signal that ended it, a timeout or a start
+    failure); a timeout ends the whole process tree, not just the direct child."""
     started = time.perf_counter()
     result = CommandResult(
         command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
     )
     trace("command_start", command=[redact(c) for c in result.command], cwd=result.cwd, timeout_s=timeout_s)
-    env = dict(os.environ if env is None else env)
+    env = child_environment(dict(os.environ if env is None else env))
     env[DEPTH_ENV] = str(current_depth() + 1)
     if os.environ.get(TARGETS_ENV):
         env[TARGETS_ENV] = os.environ[TARGETS_ENV]
+    group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
     try:
-        completed = subprocess.run(
-            result.command, cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
-            stdin=subprocess.DEVNULL, timeout=timeout_s,
-        )
-        result.returncode, result.stdout, result.stderr = completed.returncode, _tail(completed.stdout), _tail(completed.stderr)
-    except subprocess.TimeoutExpired as exc:
-        result.timed_out, result.stdout, result.stderr = True, _tail(exc.stdout), _tail(exc.stderr)
+        proc = subprocess.Popen(result.command, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, **group)
     except OSError as exc:
         result.error = str(exc)
+    else:
+        try:
+            out, err = proc.communicate(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            result.timed_out = True
+            _kill_tree(proc)
+            try:
+                out, err = proc.communicate(timeout=30)
+            except subprocess.TimeoutExpired:  # a descendant that left the group still holds the pipes
+                out, err = b"", b""
+                for stream in (proc.stdout, proc.stderr):
+                    stream.close()
+                proc.wait()
+        result.output_sha256 = hashlib.sha256((out or b"") + b"|" + (err or b"")).hexdigest()
+        result.stdout, result.stderr = _tail(out), _tail(err)
+        if not result.timed_out:
+            result.returncode = proc.returncode
+            if proc.returncode < 0 and os.name != "nt":
+                try:
+                    result.signal = signal.Signals(-proc.returncode).name
+                except ValueError:
+                    result.signal = f"signal {-proc.returncode}"
     result.duration_s = round(time.perf_counter() - started, 3)
     trace(
         "command_end", command=[redact(c) for c in result.command[:3]], returncode=result.returncode, timed_out=result.timed_out,
-        error=result.error, duration_s=result.duration_s,
+        error=result.error, signal=result.signal, duration_s=result.duration_s,
     )
     return result

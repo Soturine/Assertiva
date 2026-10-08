@@ -6,8 +6,6 @@ measured directory. Metrics carry an explicit direction; there is no aggregate s
 
 from __future__ import annotations
 
-import os
-import sys
 from dataclasses import dataclass, field, fields, is_dataclass, replace
 from enum import Enum
 from pathlib import Path
@@ -28,7 +26,7 @@ from .models import (
     RunEvidence,
     TestInvocation,
 )
-from .process import execution_refusal, run_command, scoped, traced_stage
+from .process import execution_refusal, scoped, traced_stage
 from .workspace import boundary_report, link_installed, remove_tree, snapshot
 
 
@@ -390,13 +388,3 @@ def state_from_dict(data: dict) -> StateEvidence:
             for a in data.get("artifacts", [])
         ],
     )
-
-
-def run_declared(argv: tuple[str, ...], copy: Path, python: str | None) -> tuple[StageStatus, str]:
-    """Run one declared check's command in a disposable copy; the project's interpreter comes first on PATH."""
-    env = dict(os.environ)
-    env["PATH"] = str(Path(python or sys.executable).parent) + os.pathsep + env.get("PATH", "")
-    result = run_command(list(argv), copy, env=env)
-    if result.error or result.timed_out:
-        return StageStatus.BLOCKED, result.summary()
-    return (StageStatus.PASS if result.ok else StageStatus.FAIL), result.summary()

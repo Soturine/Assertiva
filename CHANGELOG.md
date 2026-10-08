@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+M3 has started (partial). Found by dogfooding 0.6.0 on functional-test-designer.
+
+### Evidence integrity and execution safety
+- A run is evidence only with its own exit status. Processes run in their own process group and a timeout ends the whole tree (POSIX process group, Windows `taskkill /T`), not only the direct child; a process ended by a signal records it and is never a pass; every command keeps a digest of its complete output.
+- `--run-check` records what actually ran: executed argv, exit code / signal / timeout / start failure, duration, output digest and tail (redacted), environment, scope (per-test through a native adapter, otherwise whole command with per-test outcomes UNKNOWN) and `parity` with the declared step per dimension (command, selection, revision, environment, services, result). A local reproduction is LOCAL evidence, never proof that CI ran it. The Verification Surface panel shows it (English and Brazilian Portuguese).
+- One reproduction path for audit and improve (`assertiva/reproduction.py`); audit now reproduces a test check through the runner's adapter when one supports its arguments (per-test outcomes), reusing an equivalent measured run, as improve already did.
+- Credential-looking environment variables (tokens, secrets, passwords, keys, cloud and registry credentials, URLs with passwords) are withheld from every child process; their names (never values) are a report limitation. The project owner passes a needed variable through with `.assertiva.toml` (`[execution] env`). A disposable copy protects the project tree, not the machine: network and the user's permissions remain, and the documentation says so.
+- **Behavior change:** in audit, naming a check selects it but authorizes only test runners and side-effect-free checks. Migrations, containers, custom and unknown commands run only when `.assertiva.toml` (`[execution] authorize`, check ids or exact commands) authorizes them, a file the audit can never write; improve keeps `--run-check` as the human's authorization and also honors the file. Test checks no longer need `--run-check` in improve's delivery qualification.
+- `mvn`/`gradle` invocations with publishing goals (`deploy`, `publish*`, `release:*`, `jib:build`, …) are DEPLOY checks and never run; before, any Maven/Gradle command was a TEST check.
+- SKILL.md: one rule for the agent's own runs (no pipes into `tail`/`tee`/`head`, no success by output words, keep command and exit code).
+
+### Static inventory and oracle signals
+- The Python static inventory follows the runner's discovery configuration: `testpaths`, `python_files` and `norecursedirs` (pytest.ini, pyproject `[tool.pytest.ini_options]`/`[tool.pytest]`, tox.ini, setup.cfg) and never enters virtual environments. Before, eval fixture projects under `evals/` were inventoried as Assertiva's own tests despite `testpaths = ["tests"]`.
+- Weak-oracle signals recognize indirect oracles: same-module helper functions and methods (including same-module bases) that assert, `assert*`-named calls, test-double interaction assertions, explicit `fail`, and call guards (`side_effect=AssertionError`); `assertIsNone` / `is None` pin an exact value and are no longer existence-only. `WEAK_ORACLE_SIGNAL` lists each candidate's signal. On functional-test-designer the candidates went from 19 to 8 (the remaining ones are "must not raise" contracts the agent must judge), with no project-specific rule.
+
 ## [0.6.0] — 2026-10-07 — Agent-led, evidence-grounded architecture
 
 Minor release; M2 stays closed, M3 has not started. Found by dogfooding on functional-test-designer: the Skill stopped at static evidence, sampled weak-oracle candidates and generalized, recommended evidence it could acquire itself, and the HTML kept a link it judged irrelevant as the high-priority next step.

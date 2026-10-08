@@ -63,7 +63,11 @@ class GitHubActionsAdapter:
             if dim and isinstance(step.get("with"), dict) and step["with"].get(dim[1]) is not None:
                 setup = merge_values(setup, {dim[0]: [str(step["with"][dim[1]])]})
         environment = job.get("environment")
+        services = sorted(str(name) for name in job["services"]) if isinstance(job.get("services"), dict) else []
+        if job.get("container"):
+            services.append("container: " + str(job["container"].get("image") if isinstance(job["container"], dict) else job["container"]))
         job_meta = {
+            "services": services,
             "job": job_id, "matrix": strategy.get("matrix"), "environment": environment.get("name") if isinstance(environment, dict) else environment,
             "matrix_values": merge_values(matrix_values(strategy.get("matrix")), {"os": [str(job["runs-on"])]} if isinstance(job.get("runs-on"), str) else {}, setup),
         }

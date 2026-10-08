@@ -44,6 +44,12 @@ _TOOLS: dict[tuple[str, str | None], K] = {
 }
 # Kinds whose recognized tools only read the (disposable) copy: reproducible without asking.
 SAFE_KINDS = frozenset({K.LINT, K.FORMAT, K.TYPECHECK, K.STATIC_ANALYSIS, K.PACKAGE, K.BUILD})
+# Kinds that run when named: the safe kinds and test runners (running the tests is what an audit asks for;
+# they run project code in the copy with credentials withheld). Everything else needs an authorization.
+RUN_WHEN_NAMED = SAFE_KINDS | {K.TEST}
+# Build-tool goals/tasks that publish or deploy: such an invocation is a DEPLOY, whatever else it runs.
+_BUILD_TOOLS = {"mvn", "./mvnw", "mvnw", "gradle", "./gradlew", "gradlew"}
+_PUBLISHING_GOALS = re.compile(r"^(deploy|publish\w*|release:\w+|jib:build|dockerPush|uploadArchives|bintrayUpload)$", re.I)
 _SHELL = re.compile(r"\$\{\{|&&|\|\||[;|<>`$*?]")
 _MANAGE_PY = {"test": K.TEST, "check": K.STATIC_ANALYSIS, "migrate": K.MIGRATION, "makemigrations": K.MIGRATION, "compilemessages": K.LOCALIZATION}
 _SETUP = {
@@ -113,6 +119,8 @@ def _classify_segment(segment: str) -> tuple[K | None, str, tuple[str, ...], dic
             hook_ids = [t for t in tokens[2:] if not t.startswith("-")]
             return kind, "pre-commit", args, {"runs_hooks": hook_ids or ["*"]}
         return kind, tool, args, {}
+    if head in _BUILD_TOOLS and any(_PUBLISHING_GOALS.match(t.rsplit(":", 1)[-1] if t.startswith(":") else t) for t in tokens[1:]):
+        return K.DEPLOY, head, tuple(tokens[1:]), {}
     if (head, None) in _TOOLS:
         return _TOOLS[(head, None)], head, tuple(tokens[1:]), {}
     return K.UNKNOWN, " ".join(tokens), (), {}
@@ -147,7 +155,7 @@ def reproduction_plan(check, python: str) -> ReproductionPlan:
         return ReproductionPlan(None, False, "command could not be parsed")
     if argv and PurePosixPath(argv[0].replace("\\", "/")).name in {"python", "python3", "py", "python.exe"}:
         argv[0] = python
-    return ReproductionPlan(tuple(argv), kind not in SAFE_KINDS, f"{kind.value} check")
+    return ReproductionPlan(tuple(argv), kind not in RUN_WHEN_NAMED, f"{kind.value} check")
 
 
 def classify_command(command: str) -> CommandClass:

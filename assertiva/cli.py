@@ -16,6 +16,7 @@ from pathlib import Path
 from . import __version__, process
 from .assessment import apply_assessment, load_assessment
 from .audit import run_audit
+from .config import load_config
 from .evidence import NegativeControl
 from .improve import (
     SessionExistsError,
@@ -120,6 +121,11 @@ def _state_reports(values: list[str] | None) -> dict[str, str]:
 
 def _improve(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
+    with process.passthrough(load_config(root).env):
+        return _improve_in(args, root)
+
+
+def _improve_in(args: argparse.Namespace, root: Path) -> int:
     session = load_session(root)
 
     if args.discard:

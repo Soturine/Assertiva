@@ -7,18 +7,18 @@ tests is opt-in and always happens in a disposable copy of the project.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from .adapters import artifact_adapters, runner_adapters
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
-from .adapters.commands import reproduction_plan
-from .evidence import StateEvidence, attach_mutation, measure, mutant_label, run_declared, runnable_copy
+from .config import ProjectConfig, load_config
+from .evidence import StateEvidence, attach_mutation, measure, mutant_label, runnable_copy
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
-from .process import scoped
+from .process import passthrough, scoped, withheld_variables
+from .reproduction import reproduce_check
 from .history import record_state
 from .report import audit_model, execution_budget, selection_summary
 from .selection import select_changes
@@ -118,42 +118,42 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
     return findings
 
 
-def _declared_checks(root: Path, surface, requested, adapters, python: str | None, budget: list) -> tuple[list[dict], list[Finding]]:
+def _declared_checks(root: Path, surface, requested, adapters, python: str | None, budget: list, revision: dict,
+                     config: ProjectConfig, reusable: list) -> tuple[list[dict], list[Finding], list]:
     """Reproduce the discovered checks the caller named, in one disposable copy (never in the project).
 
-    Naming a check authorizes it; deploy/publish checks, compound shell steps and steps without a command are
-    never run, as in improve's delivery qualification."""
+    Naming a check selects it; test runners and side-effect-free checks run, other kinds need the project
+    owner's authorization (`.assertiva.toml`), deploy/publish and compound shell steps never run."""
     by_id = {c.check_id: c for c in surface.checks}
     unknown = [c for c in requested if c not in by_id]
     if unknown:
         raise ValueError(f"no discovered check {', '.join(unknown)}; discovered check ids are listed in verification_surface")
-    results, findings, copy = [], [], None
+    results, findings, runs, copies = [], [], [], []
+
+    def copy() -> Path:
+        if not copies:
+            copies.append(runnable_copy(root, adapters, root))
+        return copies[0]
+
     try:
         for check_id in dict.fromkeys(requested):
             check = by_id[check_id]
-            plan = reproduction_plan(check, python or sys.executable)
-            record = {"check_id": check_id, "kind": check.kind.value, "origin": check.origin.value, "command": check.command,
-                      "gate": check.gate.value}
-            if plan.argv is None:
-                record |= {"status": StageStatus.NOT_RUN.value, "detail": plan.reason}
-                budget.append(BudgetDecision(f"check:{check_id}", "NOT_RUN", plan.reason))
-            else:
-                copy = copy or runnable_copy(root, adapters, root)
-                status, detail = run_declared(plan.argv, copy, python)
-                record |= {"status": status.value, "detail": detail}
-                if check.metadata.get("matrix"):
-                    record["limitation"] = f"only the local environment was reproduced, not matrix {check.metadata['matrix']}"
-                budget.append(BudgetDecision(f"check:{check_id}", "EXECUTED", "requested: audit --run-check (disposable copy)"))
-                if status is StageStatus.FAIL:
-                    allowed = check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY)
-                    findings.append(Finding("DECLARED_CHECK_FAILED", "A declared verification check failed when reproduced in an isolated copy.",
-                                            {"check_id": check_id, "command": check.command, "detail": detail, "gate": check.gate.value},
-                                            severity="info" if allowed else "high"))
-            results.append(record)
+            done = reproduce_check(check, copy, adapters, python, revision, config.authorizes, reusable,
+                                   authorize_hint=" (`[execution] authorize` in .assertiva.toml)")
+            results.append(done.record)
+            budget.extend(done.budget)
+            if done.run is not None and done.run not in reusable:
+                done.run.metadata["reproduces_check"] = check_id
+                runs.append(done.run)
+            if done.status is StageStatus.FAIL:
+                allowed = check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY)
+                findings.append(Finding("DECLARED_CHECK_FAILED", "A declared verification check failed when reproduced in an isolated copy.",
+                                        {"check_id": check_id, "command": check.command, "detail": done.record["detail"], "gate": check.gate.value},
+                                        severity="info" if allowed else "high"))
     finally:
-        if copy is not None:
-            remove_tree(copy)
-    return results, findings
+        for path in copies:
+            remove_tree(path)
+    return results, findings, runs
 
 
 @scoped
@@ -172,7 +172,9 @@ def run_audit(
     selection = None
     findings: list[Finding] = []
     limitations: list[str] = []
-    with read_only_guard(root):
+    config = load_config(root)
+    limitations += [f"configuration ({config.source}): {problem}" for problem in config.problems]
+    with read_only_guard(root), passthrough(config.env):
         baseline = capture_baseline(root)
         surface = discover_surface(root)
         adapters = runner_adapters(root, python)
@@ -208,8 +210,14 @@ def run_audit(
                 current.static.update(adapter.static_signals(root))
             if adapters:
                 limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
-        reproduced, declared_findings = _declared_checks(root, surface, list(run_checks), adapters, python, current.budget) if run_checks else ([], [])
+        reproduced, declared_findings, reproduced_runs = [], [], []
+        if run_checks:
+            revision = {"digest": baseline.digest, "vcs_revision": baseline.revision, "dirty": baseline.dirty}
+            reproduced, declared_findings, reproduced_runs = _declared_checks(
+                root, surface, list(run_checks), adapters, python, current.budget, revision, config, list(current.runs))
         findings.extend(declared_findings)
+        if not current.runs:
+            current.runs.extend(reproduced_runs)
         current.runs.extend(load_junit(report) for report in junit_reports)
         if current.runs:
             findings.extend(_native_findings(current, static_total))
@@ -239,6 +247,9 @@ def run_audit(
         findings.extend(lineage_findings)
         review = [c for adapter in adapters if hasattr(adapter, "review_candidates") for c in adapter.review_candidates(root)]
         findings.extend(_boundary_findings(boundary_report(root)))
+    withheld = withheld_variables()
+    if withheld:
+        limitations.append("credential-like environment variables were withheld from executed project code: " + ", ".join(withheld))
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)

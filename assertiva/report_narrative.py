@@ -64,6 +64,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "nenhum adaptador executável reconheceu este projeto; a evidência de testes é DESCONHECIDA"),
     ("installed dependencies are linked from the project, not isolated ({deps}); runs can read and write them, and dependency changes made by a candidate are not installed",
      "dependências instaladas são vinculadas a partir do projeto, não isoladas ({deps}); execuções podem lê-las e alterá-las, e mudanças de dependência feitas por um candidato não são instaladas"),
+    ("credential-like environment variables were withheld from executed project code: {names}",
+     "variáveis de ambiente com aparência de credencial foram retidas do código do projeto executado: {names}"),
     ("{adapter} cannot run a selected subset; it ran its full suite",
      "{adapter} não consegue executar um subconjunto selecionado; executou a suíte completa"),
     ("{adapter}: none of the selected tests belong to it; it was not run",

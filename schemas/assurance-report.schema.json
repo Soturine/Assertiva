@@ -486,7 +486,8 @@
               "PASS",
               "FAIL",
               "BLOCKED",
-              "NOT_RUN"
+              "NOT_RUN",
+              "UNKNOWN"
             ]
           },
           "detail": {
@@ -494,6 +495,62 @@
           },
           "limitation": {
             "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "description": "per-test outcomes (native runner adapter) or whole command (per-test outcomes UNKNOWN)"
+          },
+          "authorization": {
+            "enum": [
+              "REQUIRED",
+              "AUTHORIZED"
+            ],
+            "description": "for kinds that can change state outside the copy"
+          },
+          "execution": {
+            "type": "object",
+            "description": "what actually ran: via (adapter id or command), argv, exit_code, signal, timed_out, start_error, duration_s, output_sha256, output_tail"
+          },
+          "environment": {
+            "type": "object",
+            "description": "platform, machine and interpreter of the local reproduction"
+          },
+          "parity": {
+            "type": "array",
+            "description": "equivalence with the declared step per dimension; a local run never proves what CI ran",
+            "items": {
+              "type": "object",
+              "required": [
+                "dimension",
+                "status",
+                "detail"
+              ],
+              "properties": {
+                "dimension": {
+                  "enum": [
+                    "command",
+                    "selection",
+                    "revision",
+                    "environment",
+                    "services",
+                    "result"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "SAME",
+                    "ADAPTED",
+                    "PARTIAL",
+                    "DIFFERENT",
+                    "LOCAL",
+                    "UNKNOWN"
+                  ]
+                },
+                "detail": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

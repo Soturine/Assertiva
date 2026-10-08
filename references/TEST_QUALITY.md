@@ -20,6 +20,7 @@ A test is as strong as what it observes. Ask, for each important behavior: what 
 
 - Map assertions to behavior claims. Status, returned value, persisted state, emitted event, call on a collaborator, rendered output, accessibility tree and visual output are different surfaces; one does not prove another.
 - Truthiness, `is not None`, "no exception", a 200 status or "called once" usually let wrong values pass. A helper or custom matcher may be strong even when the test body looks empty — read it before judging.
+- Judge the contract, not the count of asserts. "Must not raise" or "must not touch X" can be the whole contract, and a double whose side effect fails the test on a forbidden call is a real oracle; a test with ten `is not None` checks can still prove nothing. A negative test that checks the error but not the state afterwards misses partial writes. When the contract cannot be read from the test, its name and the code under test, the item is unresolved, not weak.
 - An oracle derived from the code under test (same formula, same fixture generator, a snapshot accepted without review) shares its bugs.
 - Authority: where does the expected value come from — a requirement, a contract, a hand-computed example, or the current output?
 

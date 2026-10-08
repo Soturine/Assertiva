@@ -1667,6 +1667,7 @@ def _surface(r: _R) -> str:
     origins: dict[str, list[dict]] = {}
     for c in checks:
         origins.setdefault(c["origin"], []).append(c)
+    reproduced = {d["check_id"]: d for d in r.report.get("declared_checks") or []}
     order = ["LOCAL", "HOOK", "CI", "BUILD", "PACKAGE", "DEPLOY", "DECLARED", "UNKNOWN"]
     groups = []
     for origin in sorted(origins, key=lambda o: order.index(o) if o in order else len(order)):
@@ -1685,6 +1686,8 @@ def _surface(r: _R) -> str:
                           + f'<dt>{r.t("surface.gate")}</dt><dd><code>{_e(c["gate"])}</code></dd><dt>{r.t("surface.tier")}</dt><dd>{r.tier(c.get("evidence_tier"))}</dd></dl>')
             if c.get("limitations"):
                 detail.append(f'<p class="tech-label">{r.t("surface.limitations")}</p>{r.items(list(c["limitations"]))}')
+            if c["check_id"] in reproduced:
+                detail.append(_reproduction(r, reproduced[c["check_id"]]))
             rows.append(
                 f'<li class="check" data-kind="{_e(c["kind"])}"><details><summary><span class="kind kind-{_e(c["kind"].lower())}">{kind}</span>'
                 f'<span class="check-title"><span class="check-name">{_e(name)}</span>' + (f'<span class="check-where">{_e(where)}</span>' if where else "")
@@ -1700,6 +1703,22 @@ def _surface(r: _R) -> str:
             f'<option value=""{r.attr_text("surface.filter.all")}>{_e(r.s("surface.filter.all"))}</option>{options}</select></div>'
             f'<div class="origins">{"".join(groups)}</div>')
     return _panel(r, "surface-section", "surface.title", r.t("surface.summary", n=len(checks), m=len(origins)), body, "surface.lead")
+
+
+def _reproduction(r: _R, d: dict) -> str:
+    """One reproduced check: what ran, its own exit status, and its equivalence with the declared step."""
+    run = d.get("execution") or {}
+    exit_status = ("signal " + run["signal"]) if run.get("signal") else ("timeout" if run.get("timed_out") else run.get("exit_code"))
+    rows = [("surface.repro.status", f'<code>{_e(d["status"])}</code> {_e(d.get("detail", ""))}')]
+    rows += [(key, f"<code>{_e(value)}</code>") for key, value in (
+        ("surface.repro.scope", d.get("scope")), ("surface.repro.via", run.get("via")),
+        ("surface.repro.exit", exit_status), ("surface.repro.duration", f'{run["duration_s"]} s' if run.get("duration_s") is not None else None),
+    ) if value is not None]
+    kv = "".join(f"<dt>{r.t(key)}</dt><dd>{value}</dd>" for key, value in rows)
+    parity = "".join(f'<dt>{r.t("parity." + p["dimension"]) if "parity." + p["dimension"] in UI else _e(p["dimension"])}</dt>'
+                     f'<dd><code>{_e(p["status"])}</code> {_e(p["detail"])}</dd>' for p in d.get("parity") or [])
+    return (f'<p class="tech-label">{r.t("surface.reproduced")}</p><dl class="kv">{kv}</dl>'
+            + (f'<p class="tech-label">{r.t("surface.repro.parity")}</p><dl class="kv">{parity}</dl>' if parity else ""))
 
 
 def _copy(r: _R) -> str:

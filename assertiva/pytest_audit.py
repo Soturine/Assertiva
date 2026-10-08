@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, path_selected_by_ci
 from .adapters.coverage_reports import load_coverage_report
+from .adapters.python_discovery import test_files
 from .adapters.python_test_classes import TESTCASE_METHOD_PREFIX, ClassKind, classify_classes
 from .models import CoverageSummary, Finding, TestCompositionRelation, TestDefinition
 
@@ -88,7 +89,7 @@ def _assertion_kind(node: ast.Assert) -> str:
                 return "HTTP_STATUS_ONLY"
             if any(status >= 400 for status in statuses):
                 return "ERROR_STATUS_ONLY"
-        if any(isinstance(op, (ast.Is, ast.IsNot)) for op in test.ops) and any(
+        if any(isinstance(op, ast.IsNot) for op in test.ops) and any(
             isinstance(comparator, ast.Constant) and comparator.value is None
             for comparator in test.comparators
         ):
@@ -204,7 +205,7 @@ def _unittest_assertion_kind(call: ast.Call) -> str | None:
     if not (isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id == "self"
             and func.attr.startswith("assert")) or func.attr in _RAISES | {"assertWarns", "assertWarnsRegex"}:
         return None
-    if func.attr in {"assertIsNone", "assertIsNotNone"}:
+    if func.attr == "assertIsNotNone":  # assertIsNone pins an exact value
         return "EXISTENCE_ONLY"
     if func.attr == "assertEqual" and len(call.args) == 2:
         left, right = call.args
@@ -213,26 +214,84 @@ def _unittest_assertion_kind(call: ast.Call) -> str | None:
     return "BEHAVIORAL_ASSERTION"
 
 
-def _function_assertions(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, ...]:
+_MOCK_ASSERTIONS = ("assert_called", "assert_not_called", "assert_any_call", "assert_has_calls", "assert_awaited", "assert_not_awaited")
+
+
+def _guard_value(value: ast.AST) -> bool:
+    """`AssertionError(...)` / `AssertionError` as a double's side effect: any call to it fails the test."""
+    target = value.func if isinstance(value, ast.Call) else value
+    return (_expr_name(target) or "").split(".")[-1] == "AssertionError"
+
+
+def _call_oracle(call: ast.Call, helpers: frozenset[str]) -> str | None:
+    """Oracles that are calls: assertion helpers, test-double interaction checks, explicit failures, call guards."""
+    name = _expr_name(call.func) or ""
+    leaf = name.split(".")[-1]
+    if any(k.arg == "side_effect" and _guard_value(k.value) for k in call.keywords):
+        return "FORBIDDEN_CALL_GUARD"
+    if leaf.startswith(_MOCK_ASSERTIONS):
+        return "INTERACTION_ASSERTION"
+    if leaf == "fail" and name in {"self.fail", "pytest.fail", "fail"}:
+        return "EXPLICIT_FAIL"
+    if name.startswith("self.") and leaf.startswith("assert"):
+        return None  # unittest assertions are read by _unittest_assertion_kind
+    if leaf.startswith("assert") or (name in helpers or (name.startswith("self.") and leaf in helpers)):
+        return "HELPER_ASSERTION"
+    return None
+
+
+def _function_assertions(node: ast.FunctionDef | ast.AsyncFunctionDef, helpers: frozenset[str] = frozenset()) -> tuple[str, ...]:
     kinds = [_assertion_kind(item) for item in ast.walk(node) if isinstance(item, ast.Assert)]
     for item in ast.walk(node):
         if isinstance(item, ast.Call):
-            kind = _expected_failure_kind(item) or _unittest_assertion_kind(item)
+            kind = _expected_failure_kind(item) or _unittest_assertion_kind(item) or _call_oracle(item, helpers)
             if kind:
                 kinds.append(kind)
+        elif isinstance(item, ast.Assign) and _guard_value(item.value) and any(
+                isinstance(t, ast.Attribute) and t.attr == "side_effect" for t in item.targets):
+            kinds.append("FORBIDDEN_CALL_GUARD")
     normalized = tuple(dict.fromkeys(kinds))
     return normalized or ("NO_ASSERTION",)
 
 
+def assertion_helpers(tree: ast.Module) -> dict[str | None, frozenset[str]]:
+    """Non-test functions and methods of this module that assert (transitively), by scope.
+
+    ``None`` holds module-level functions; each class name holds its methods plus those of its same-module bases.
+    Imported helpers are not followed (an `assert*`-named call still counts by its name)."""
+    module = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith("test")}
+    classes = {n.name: n for n in tree.body if isinstance(n, ast.ClassDef)}
+
+    def asserting(functions: dict, known: frozenset[str]) -> frozenset[str]:
+        found = set()
+        while True:
+            scope = frozenset(found | known)
+            new = {name for name, fn in functions.items()
+                   if name not in found and _function_assertions(fn, scope) != ("NO_ASSERTION",)}
+            if not new:
+                return frozenset(found)
+            found |= new
+
+    top = asserting(module, frozenset())
+    scopes: dict[str | None, frozenset[str]] = {None: top}
+
+    def methods(name: str, seen: frozenset[str] = frozenset()) -> dict:
+        node = classes.get(name)
+        if node is None or name in seen:
+            return {}
+        own = {n.name: n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith("test")}
+        inherited = {}
+        for base in _base_names(node):
+            inherited.update(methods(base, seen | {name}))
+        return {**inherited, **own}
+
+    for name in classes:
+        scopes[name] = top | asserting(methods(name), top)
+    return scopes
+
+
 def _test_files(root: Path) -> list[Path]:
-    files: set[Path] = set()
-    for pattern in ("test_*.py", "*_test.py"):
-        files.update(root.rglob(pattern))
-    return sorted(
-        path
-        for path in files
-        if not any(part.startswith(".") for part in path.relative_to(root).parts)
-    )
+    return test_files(root)
 
 
 def has_pytest_surface(root: str | Path) -> bool:
@@ -305,6 +364,7 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
         rel = str(path.relative_to(root)).replace("\\", "/")
         class_map = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
         kinds = classify_classes(tree)
+        helpers = assertion_helpers(tree)
         for class_name, class_node in class_map.items():
             prefix = _method_prefix(kinds[class_name])
             if prefix is None:
@@ -322,7 +382,7 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
                         source_path=rel,
                         declaration_class=declaration_class,
                         materialization_class=class_name,
-                        assertion_kinds=_function_assertions(declaration_node),
+                        assertion_kinds=_function_assertions(declaration_node, helpers.get(declaration_class, helpers[None])),
                         limitations=(
                             "bounded same-file static inheritance analysis",
                             "native runner collection is authoritative",
@@ -332,8 +392,9 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
     return relations
 
 
-def _definition(node_id: str, rel: str, node: ast.FunctionDef | ast.AsyncFunctionDef) -> TestDefinition:
-    kinds = _function_assertions(node)
+def _definition(node_id: str, rel: str, node: ast.FunctionDef | ast.AsyncFunctionDef,
+                helpers: frozenset[str] = frozenset()) -> TestDefinition:
+    kinds = _function_assertions(node, helpers)
     dims, error_types, unobserved = negative_path_evidence(node)
     return TestDefinition(node_id, rel, node.name, kinds, all(kind in _WEAK for kind in kinds), dims, error_types, unobserved)
 
@@ -348,12 +409,13 @@ def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
             continue
         rel = str(path.relative_to(root)).replace("\\", "/")
         kinds = classify_classes(tree)
+        helpers = assertion_helpers(tree)
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
-                out.append(_definition(f"{rel}::{node.name}", rel, node))
+                out.append(_definition(f"{rel}::{node.name}", rel, node, helpers[None]))
             elif isinstance(node, ast.ClassDef) and (prefix := _method_prefix(kinds[node.name])):
                 for name, child in _direct_test_methods(node, prefix).items():
-                    out.append(_definition(f"{rel}::{node.name}::{name}", rel, child))
+                    out.append(_definition(f"{rel}::{node.name}::{name}", rel, child, helpers[node.name]))
     return out
 
 
@@ -496,11 +558,12 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
             )
         )
     if weak:
+        signals = {test.node_id: list(test.assertion_kinds) for test in tests if test.smoke_like}
         findings.append(
             Finding(
                 "WEAK_ORACLE_SIGNAL",
                 "Some direct test definitions expose weak deterministic oracle signals.",
-                {"count": len(weak), "tests": weak[:20]},
+                {"count": len(weak), "tests": weak[:20], "signals": dict(list(signals.items())[:50])},
             )
         )
 

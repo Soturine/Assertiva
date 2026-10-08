@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .adapters import runner_adapters
-from .adapters.commands import reproduction_plan
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.mutation import load_mutation_report
 from .candidate import (
@@ -30,8 +28,8 @@ from .candidate import (
     StageStatus,
     pillar,
 )
+from .config import load_config
 from .evidence import (
-    run_declared,
     ControlOutcome,
     NegativeControl,
     NegativeControlResult,
@@ -48,6 +46,7 @@ from .evidence import (
 from .history import Stability, classify_attempts, record_state
 from .models import BudgetDecision, MutantStatus, Outcome, StabilityEvidence, StabilityRecord
 from .process import scoped, traced_stage
+from .reproduction import reproduce_check
 from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
     Approval,
@@ -350,31 +349,31 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
     if not delivery:
         return _stage(stage, StageStatus.NOT_RUN, "no delivery pipeline was discovered", "delivery-path verification is UNKNOWN")
     adapters = runner_adapters(session.workspace, session.python)
+    config = load_config(session.root)
+    baseline = session.baseline
+    revision = {"label": "candidate workspace from", "digest": baseline.digest, "vcs_revision": baseline.revision, "dirty": True}
     gating: list[StageStatus] = []
     reproduced, partial = 0, False
     notes: list[str] = []
-    copy = runnable_copy(session.workspace, adapters, session.root)
+    copies: list[Path] = []
+
+    def copy() -> Path:
+        if not copies:
+            copies.append(runnable_copy(session.workspace, adapters, session.root))
+        return copies[0]
+
     try:
         for check in delivery:
             label = f"{check.command or check.tool or check.check_id} [{check.kind.value}]"
-            runner = next(((a, args) for a in adapters if (args := a.reproduction_args(check)) is not None), None)
-            measured = next((r for r in candidate.runs if runner and r.adapter_id == runner[0].adapter_id), None)
-            if runner and measured and runner[0].equivalent_to_default(runner[1]):
-                status, detail = measured.status, f"reused equivalent candidate run ({len(measured.invocations)} invocations, coverage-instrumented)"
-                budget.append(BudgetDecision(QualificationCheck.PIPELINE_EQUIVALENT.value, "REUSED", f"{label}: equivalent to the candidate run"))
-            elif runner:
-                run = runner[0].run(copy, args=runner[1])
-                status, detail = run.status, f"{len(run.invocations)} invocations"
-                budget.append(BudgetDecision(QualificationCheck.PIPELINE_EQUIVALENT.value, "EXECUTED", f"{label}: selects differently from the candidate run"))
-            else:
-                plan = reproduction_plan(check, session.python or sys.executable)
-                if plan.argv is None:
-                    notes.append(f"not reproduced: {label}: {plan.reason}")
-                    continue
-                if plan.needs_authorization and check.check_id not in authorized:
-                    notes.append(f"not reproduced: {label}: discovered, not authorized (assertiva improve --run-check {check.check_id})")
-                    continue
-                status, detail = run_declared(plan.argv, copy, session.python)
+            done = reproduce_check(check, copy, adapters, session.python, revision,
+                                   lambda c: c.check_id in authorized or config.authorizes(c), candidate.runs,
+                                   authorize_hint=f" (assertiva improve --run-check {check.check_id})")
+            budget.extend(BudgetDecision(QualificationCheck.PIPELINE_EQUIVALENT.value, d.decision, f"{label}: {d.reason}")
+                          for d in done.budget)
+            if not done.executed:
+                notes.append(f"not reproduced: {label}: {done.record['detail']}")
+                continue
+            status, detail = done.status, done.record["detail"]
             reproduced += 1
             if check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY) and status is not StageStatus.PASS:
                 notes.append(f"{label}: {status.value} but allowed to fail ({check.gate.value}): {detail}")
@@ -387,7 +386,8 @@ def _pipeline_stage(session: ImproveSession, authorized: set[str], candidate: St
             if check.metadata.get("condition"):
                 notes.append(f"{label}: condition `{check.metadata['condition']}` was not evaluated")
     finally:
-        remove_tree(copy)
+        for path in copies:
+            remove_tree(path)
     summary = f"reproduced {reproduced}/{len(delivery)} delivery checks locally"
     if StageStatus.FAIL in gating:
         return _stage(stage, StageStatus.FAIL, summary + "; a reproduced gating check failed", *notes)

@@ -53,6 +53,11 @@ def _ini(path: Path, section: str) -> dict | None:
 
 def discovery_config(root: str | Path) -> DiscoveryConfig:
     root = Path(root)
+    return pytest_config(root) or _unittest_discovery(root) or DiscoveryConfig()
+
+
+def pytest_config(root: Path) -> DiscoveryConfig | None:
+    """pytest's own configuration, from the first file that has a pytest section (None without one)."""
     for name, section in (("pytest.ini", "pytest"), (".pytest.ini", "pytest")):
         if (root / name).is_file():
             return _from_mapping(_ini(root / name, section) or {}, name)
@@ -67,7 +72,24 @@ def discovery_config(root: str | Path) -> DiscoveryConfig:
     for name, section in (("tox.ini", "pytest"), ("setup.cfg", "tool:pytest")):
         if (root / name).is_file() and (options := _ini(root / name, section)) is not None:
             return _from_mapping(options, name)
-    return DiscoveryConfig()
+    return None
+
+
+def _unittest_discovery(root: Path) -> DiscoveryConfig | None:
+    """Without pytest configuration, a project whose only declared runners are unittest or Django finds test files
+    by unittest's pattern (`test*.py`, or the declared `-p`). The whole tree stays in scope: a CI start directory
+    (`-s tests`) is a CI scope, and tests outside it are a CI gap, not files to ignore."""
+    declared = declared_runners(root)
+    if not declared or set(declared) - {"unittest", "django"}:
+        return None
+    from .commands import classify_command
+
+    patterns = []
+    for command in declared.get("unittest", []):
+        args = list(classify_command(command).runner_args)
+        patterns += [args[i + 1] for i, a in enumerate(args[:-1]) if a in ("-p", "--pattern")]
+    return DiscoveryConfig(python_files=tuple(dict.fromkeys(patterns)) or ("test*.py",),
+                           source="declared " + "/".join(sorted(declared)) + " discovery")
 
 
 def _is_venv(path: Path) -> bool:
@@ -89,3 +111,48 @@ def test_files(root: str | Path, config: DiscoveryConfig | None = None) -> list[
             dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, p) for p in config.norecursedirs) and not _is_venv(here / d)]
             found.update(here / f for f in files if f.endswith(".py") and any(fnmatch.fnmatch(f, p) for p in config.python_files))
     return sorted(p for p in found if root in p.parents or p.parent == root)
+
+
+# --- which Python runner the project declares ----------------------------------------------
+# One runner per declaration: the project's own CI/scripts decide (a unittest CI is reproduced with unittest,
+# never assumed equivalent to pytest); pytest configuration also declares pytest; without any declaration a
+# Django project (manage.py) uses its test command and anything else keeps pytest, which also runs TestCases.
+_PYTEST_CONFIG = ("pytest.ini", ".pytest.ini", "conftest.py")
+
+
+def django_manage(root: str | Path) -> Path | None:
+    path = Path(root) / "manage.py"
+    try:
+        return path if path.is_file() and "django" in path.read_text(encoding="utf-8", errors="replace").lower() else None
+    except OSError:
+        return None
+
+
+def pytest_configured(root: str | Path) -> bool:
+    root = Path(root)
+    if any((root / name).is_file() for name in _PYTEST_CONFIG) or (root / "tests" / "conftest.py").is_file():
+        return True
+    return pytest_config(root) is not None
+
+
+def declared_runners(root: str | Path) -> dict[str, list[str]]:
+    """Runner -> the declared commands (CI, hooks, scripts) that invoke it."""
+    from assertiva.verification import discover_surface
+
+    found: dict[str, list[str]] = {}
+    for check in discover_surface(Path(root)).checks:
+        tool = check.tool or ""
+        runner = {"pytest": "pytest", "unittest": "unittest", "manage.py test": "django"}.get(tool)
+        if runner and check.command:
+            found.setdefault(runner, []).append(check.command)
+    return found
+
+
+def python_runners(root: str | Path) -> set[str]:
+    root = Path(root)
+    runners = set(declared_runners(root))
+    if pytest_configured(root):
+        runners.add("pytest")
+    if runners:
+        return runners
+    return {"django"} if django_manage(root) else {"pytest"}

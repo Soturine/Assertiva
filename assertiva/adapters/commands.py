@@ -133,6 +133,12 @@ class ReproductionPlan:
     reason: str
 
 
+def is_compound(command: str) -> bool:
+    """More than one plain command line: pipes, chains, redirections, substitutions or several lines."""
+    lines = [line for line in command.splitlines() if line.strip()]
+    return len(lines) != 1 or bool(_SHELL.search(lines[0]))
+
+
 def reproduction_plan(check, python: str) -> ReproductionPlan:
     """How (and whether) a discovered check may be reproduced locally in a disposable copy.
 
@@ -144,9 +150,9 @@ def reproduction_plan(check, python: str) -> ReproductionPlan:
         return ReproductionPlan(None, False, "no command to reproduce (action or reusable workflow)")
     if kind is K.DEPLOY:
         return ReproductionPlan(None, False, "deploy/publish checks are never executed by Assertiva")
-    lines = [line for line in check.command.splitlines() if line.strip()]
-    if len(lines) != 1 or _SHELL.search(lines[0]):
+    if is_compound(check.command):
         return ReproductionPlan(None, False, "compound shell step is not reproduced")
+    lines = [line for line in check.command.splitlines() if line.strip()]
     if check.metadata.get("working_directory"):
         return ReproductionPlan(None, False, "working-directory is not reproduced")
     try:

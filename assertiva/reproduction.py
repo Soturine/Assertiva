@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .adapters.commands import reproduction_plan
+from .adapters.commands import is_compound, reproduction_plan
 from .candidate import StageStatus
 from .models import BudgetDecision, RunEvidence
 from .process import redact, run_command
@@ -108,7 +108,9 @@ def reproduce_check(
     stage = f"check:{check.check_id}"
     if check.metadata.get("matrix"):
         record["limitation"] = f"only the local environment was reproduced, not matrix {check.metadata['matrix']}"
-    runner = next(((a, args) for a in adapters if hasattr(a, "reproduction_args") and (args := a.reproduction_args(check)) is not None), None)
+    # a compound step (`runner | tail`, `a && b`) is never reproduced: its status is not the runner's
+    runner = None if is_compound(check.command or "") else next(
+        ((a, args) for a in adapters if hasattr(a, "reproduction_args") and (args := a.reproduction_args(check)) is not None), None)
     if runner:
         adapter, args = runner
         reused = next((r for r in reusable if r.adapter_id == adapter.adapter_id), None)

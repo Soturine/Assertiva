@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .adapters import artifact_adapters, runner_adapters
+from .adapters import artifact_adapters, runner_adapters, static_providers
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.junit import load_junit
 from .adapters.mutation import load_mutation_report
@@ -189,7 +189,7 @@ def run_audit(
             )
             limitations.append("test evidence is UNKNOWN for this toolchain until an adapter or portable report is available")
         static_total = 0
-        for adapter in adapters:
+        for adapter in static_providers(adapters):
             static_audit = getattr(adapter, "static_audit", None)
             if static_audit is None:
                 continue
@@ -206,7 +206,7 @@ def run_audit(
             not_requested = ("not executed by this call: test outcomes, coverage and artifact behavior stay UNKNOWN; "
                              "audit --execute measures them in a disposable copy")
             current.budget += [BudgetDecision("tests", "NOT_RUN", not_requested), BudgetDecision("artifact", "NOT_RUN", not_requested)]
-            for adapter in adapters:
+            for adapter in static_providers(adapters):
                 current.static.update(adapter.static_signals(root))
             if adapters:
                 limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
@@ -245,7 +245,7 @@ def run_audit(
                     delivered.setdefault(evidence.artifact or "", []).extend(adapter.delivered_candidates(root, evidence))
         lineage, lineage_findings = artifact_lineage(surface, current.artifacts, delivered, baseline.revision)
         findings.extend(lineage_findings)
-        review = [c for adapter in adapters if hasattr(adapter, "review_candidates") for c in adapter.review_candidates(root)]
+        review = [c for adapter in static_providers(adapters) if hasattr(adapter, "review_candidates") for c in adapter.review_candidates(root)]
         findings.extend(_boundary_findings(boundary_report(root)))
     withheld = withheld_variables()
     if withheld:

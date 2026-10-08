@@ -24,6 +24,8 @@ from assertiva.process import execution_refusal, module_available, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
+from .python_discovery import python_runners
+from .python_static import PythonStatic
 
 _PLUGIN_MODULE = "assertiva_pytest_evidence"
 _PLUGIN_SOURCE = Path(__file__).with_name("_pytest_evidence_plugin.py")
@@ -62,7 +64,7 @@ def _outcome(reports: dict[str, dict]) -> Outcome:
     return Outcome.XPASSED if call["wasxfail"] else Outcome.PASSED
 
 
-class PytestNativeAdapter:
+class PytestNativeAdapter(PythonStatic):
     adapter_id = "pytest-native"
 
     def __init__(self, python: str | None = None, timeout_s: float = 900.0):
@@ -73,6 +75,8 @@ class PytestNativeAdapter:
         from assertiva.pytest_audit import has_pytest_surface
 
         root = Path(root)
+        if "pytest" not in python_runners(root):
+            return SupportLevel.UNSUPPORTED  # the project declares another Python runner
         if any((root / name).is_file() for name in _CONFIG_MARKERS) or has_pytest_surface(root):
             return SupportLevel.SUPPORTED
         for name, marker in _SECTION_MARKERS.items():
@@ -92,52 +96,6 @@ class PytestNativeAdapter:
             AdapterCapability("marker_keyword_path_filters", supported),
             AdapterCapability("coverage", SupportLevel.UNKNOWN, "requires pytest-cov/coverage.py in the target environment"),
         )
-
-    def static_audit(self, root: str | Path, coverage_json: str | Path | None = None):
-        """Bounded static (AST) audit: never imports or runs project code."""
-        from assertiva.pytest_audit import audit_pytest_project
-
-        return audit_pytest_project(root, coverage_json)
-
-    def declared_matrix(self, root: str | Path) -> dict[str, dict]:
-        """Lowest Python version the project declares it supports (``requires-python``)."""
-        import re
-        import tomllib
-
-        try:
-            spec = tomllib.loads((Path(root) / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("requires-python")
-        except (OSError, ValueError):
-            return {}
-        match = re.search(r">=\s*(\d+\.\d+)", spec or "")
-        return {"python": {"values": [match.group(1)], "source": f"pyproject.toml requires-python {spec}"}} if match else {}
-
-    def review_candidates(self, root: str | Path) -> list[dict]:
-        from assertiva.pytest_audit import review_candidates
-
-        return review_candidates(root)
-
-    def static_signals(self, root: str | Path) -> dict[str, int]:
-        """Static (E3) oracle / negative-path signals from the bounded AST analysis."""
-        from assertiva.pytest_audit import audit_pytest_project
-
-        from assertiva.pytest_audit import is_negative_path, lacks_contract_detail
-
-        tests = audit_pytest_project(root).tests
-        return {
-            "weak_oracle_tests": sum(test.smoke_like for test in tests),
-            "broad_error_expectations": sum("BROAD_ERROR_EXPECTATION" in t.assertion_kinds for t in tests),
-            "error_status_only_tests": sum(t.negative_dims == ("PROTOCOL_STATUS",) for t in tests),
-            "expected_error_contracts": sum("EXPECTED_ERROR_CONTRACT" in t.assertion_kinds for t in tests),
-            "negative_path_tests": sum(is_negative_path(t) for t in tests),
-            "negative_paths_without_contract_detail": sum(lacks_contract_detail(t) for t in tests),
-            "negative_paths_with_state_after_rejection": sum("STATE_AFTER_REJECTION" in t.negative_dims for t in tests),
-        }
-
-    def static_negative_paths(self, root: str | Path) -> dict[str, list[str]]:
-        """Negative-path test id -> observable failure-contract dimensions (static, E3)."""
-        from assertiva.pytest_audit import audit_pytest_project, is_negative_path
-
-        return {t.node_id: list(t.negative_dims) for t in audit_pytest_project(root).tests if is_negative_path(t)}
 
     def reproduction_args(self, check) -> list[str] | None:
         """pytest arguments that reproduce a delivery check, or None if this adapter cannot."""

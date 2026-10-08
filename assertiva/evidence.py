@@ -11,7 +11,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from .adapters import artifact_adapters, runner_adapters
+from .adapters import artifact_adapters, runner_adapters, static_providers
 from .candidate import MetricDelta, MetricDirection, MetricObservation, StageStatus, compare_metric_sets
 from .models import (
     DETECTED,
@@ -194,6 +194,7 @@ def measure(
                     continue
             with traced_stage(f"{label}:{adapter.adapter_id}"):
                 state.runs.append(adapter.run(copy, args=args, coverage=True))
+        for adapter in static_providers(adapters):
             for name, value in adapter.static_signals(copy).items():
                 state.static[name] = state.static.get(name, 0) + value
             state.negative_paths.update(adapter.static_negative_paths(copy))

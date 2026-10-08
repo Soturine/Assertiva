@@ -39,6 +39,19 @@ Typical families include:
 - container/startup/health/deployment verification;
 - portable report formats and custom project commands.
 
-Executable reference adapters today: pytest (native + static), Jest, Playwright, Maven (Surefire/Failsafe, JaCoCo, build surface), Python packaging, GitHub Actions, Azure Pipelines, GitLab CI, Jenkins (through one shared CI normalization in `ci_common.py`), pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
+## Runner capabilities (as implemented)
+
+| Adapter | Discovery | Collection | Execution | Per-test outcomes | Coverage | CI parity | Impact selection | Artifact |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| pytest | static (testpaths, python_files) + native | native, collection errors | yes | yes: parameters, markers, skip/xfail/xpass | coverage.py if installed | reproduces CI pytest arguments | file subset | Python wheel |
+| unittest | static (`test*.py` / `-p`) | native discovery, load errors | yes | yes: subTest, expectedFailure, unexpected success, fixture errors | coverage.py if installed | declared CI arguments are the default run | no (full suite, stated) | Python wheel |
+| Django | static (`test*.py`) | the project's TEST_RUNNER | yes | yes through the runner's result class; none for runners without one | coverage.py if installed | `manage.py test` arguments | no (full suite, stated) | none |
+| Jest | config/dependency | Jest `--json` | yes | yes: skips/todo, retries, table cases | istanbul json-summary | `jest`/`npm test` arguments | no | none |
+| Playwright | config | JSON reporter | yes | yes: projects, retries, attachments | no | declared/selected/executed projects | no | none |
+| Maven | `pom.xml` | Surefire/Failsafe reports | offline only | yes: reruns, parameterized methods | JaCoCo | goal-level (`test` vs `verify`) | by method | none |
+
+Absent support is a limitation of Assertiva, not a failure of the audited project: it is reported as UNKNOWN or NOT_RUN.
+
+Executable reference adapters today: pytest (native + static), unittest, Django, Jest, Playwright, Maven (Surefire/Failsafe, JaCoCo, build surface), Python packaging, GitHub Actions, Azure Pipelines, GitLab CI, Jenkins (through one shared CI normalization in `ci_common.py`), pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
 
 First-party support is incremental. The absence of a dedicated adapter does not make a project unsupported: preserve observed commands and declared checks generically, mark unknown capabilities honestly, and avoid guessing semantics.

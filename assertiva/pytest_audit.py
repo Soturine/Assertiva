@@ -419,6 +419,25 @@ def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
     return out
 
 
+def unittest_uncollected(root: str | Path) -> list[str]:
+    """Test definitions unittest would never run: module-level functions and methods of classes that are not TestCases."""
+    root = Path(root)
+    out: list[str] = []
+    for path in _test_files(root):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        rel = path.relative_to(root).as_posix()
+        kinds = classify_classes(tree)
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
+                out.append(f"{rel}::{node.name}")
+            elif isinstance(node, ast.ClassDef) and kinds[node.name] is ClassKind.PYTEST_CLASS:
+                out += [f"{rel}::{node.name}::{name}" for name in _direct_test_methods(node)]
+    return out
+
+
 def unresolved_test_classes(root: str | Path) -> list[str]:
     """Classes with test-like methods whose collection cannot be decided statically (bases not resolvable)."""
     root = Path(root)
@@ -509,22 +528,17 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
                 severity="info",
             )
         )
-    if (tests or materializations) and not ci and unittest_ci:
+    uncollected = unittest_uncollected(root) if unittest_ci and not ci else []
+    if uncollected:
         findings.append(
             Finding(
                 "CI_RUNS_PYTHON_UNITTEST",
-                "CI runs the Python tests with unittest (declared configuration). Assertiva has no native unittest "
-                "adapter: it can execute these tests only through pytest, so equivalence with the CI run is UNKNOWN.",
-                {
-                    "ci_commands": [inv.command for inv in unittest_ci],
-                    "ci_runner": "DECLARED",
-                    "native_unittest_execution": "UNSUPPORTED",
-                    "limitations": [
-                        "unittest collects only unittest.TestCase tests matching its discovery pattern; "
-                        "plain pytest-style functions in the same files are not run by it",
-                    ],
-                },
-                severity="info",
+                "CI runs the Python tests with unittest, which never runs plain test functions or non-TestCase classes; "
+                "these tests exist but the declared CI run does not execute them.",
+                {"ci_commands": [inv.command for inv in unittest_ci], "ci_runner": "DECLARED",
+                 "not_collected_by_unittest": uncollected[:30], "count": len(uncollected)},
+                severity="medium",
+                recommendation="Turn them into TestCase methods or run them with a runner that collects them in CI.",
             )
         )
     if (tests or materializations) and not ci and not unittest_ci:

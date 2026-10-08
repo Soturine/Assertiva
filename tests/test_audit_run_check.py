@@ -48,8 +48,12 @@ def test_a_named_declared_check_runs_in_a_disposable_copy_and_is_reported(tmp_pa
     assert any(o.startswith(f"declared check {_CHECK} reproduced in an isolated copy: PASS") for o in report["claim_boundary"]["observed"])
     assert "no tests were executed; test outcomes are UNKNOWN" not in report["claim_boundary"]["not_evidenced"]
     assert {"stage": f"check:{_CHECK}", "decision": "EXECUTED"}.items() <= report["execution_budget"]["decisions"][-1].items()
+    # unittest has a native adapter: the CI command runs through it and yields per-test outcomes
+    assert check["scope"].startswith("per-test outcomes") and check["execution"]["via"] == "unittest"
+    [run] = report["states"]["current"]["runs"]
+    assert run["adapter"] == "unittest" and run["outcomes"] == {"PASSED": 1}
     page = render_html(report)
-    assert 'id="scope-tests"' in page and "Declared test check reproduced" in page
+    assert 'id="scope-tests"' in page and "Reproduced in a disposable copy" in page
 
 
 def test_a_failing_declared_check_is_a_finding(tmp_path, capsys):

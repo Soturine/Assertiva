@@ -179,17 +179,20 @@ def test_bare_pytest_represents_observed_full_scope(tmp_path):
 _UNITTEST_CASE = "import unittest\n\nclass TestX(unittest.TestCase):\n    def test_x(self):\n        self.assertEqual(1 + 1, 2)\n"
 
 
-def test_unittest_in_ci_is_the_suite_in_ci_with_native_support_kept_apart(tmp_path):
-    """Found by dogfooding: a CI running `python -X utf8 -m unittest discover -s tests` got CI_PYTEST_NOT_OBSERVED."""
+def test_unittest_in_ci_is_the_suite_in_ci_and_tests_it_never_runs_are_named(tmp_path):
+    """Found by dogfooding: a CI running `python -X utf8 -m unittest discover -s tests` got CI_PYTEST_NOT_OBSERVED.
+    Since the native unittest adapter the run is reproduced as declared; what remains is what unittest skips."""
     write(tmp_path / "tests" / "test_x.py", _UNITTEST_CASE)
     write(tmp_path / ".github" / "workflows" / "ci.yml",
           "jobs:\n  test:\n    steps:\n      - run: python -X utf8 -m unittest discover -s tests\n")
     report = audit_pytest_project(tmp_path)
     assert not report.has_finding("CI_PYTEST_NOT_OBSERVED")
     assert not report.has_finding("CI_TEST_EXECUTION_GAP")
-    [finding] = [f for f in report.findings if f.code == "CI_RUNS_PYTHON_UNITTEST"]
-    assert finding.evidence["ci_runner"] == "DECLARED"
-    assert finding.evidence["native_unittest_execution"] == "UNSUPPORTED"
+    assert not report.has_finding("CI_RUNS_PYTHON_UNITTEST")  # unittest runs every test here
+    write(tmp_path / "tests" / "test_y.py", "def test_plain():\n    assert 1 == 1\n\n\nclass TestGroup:\n    def test_m(self):\n        assert 1\n")
+    [finding] = [f for f in audit_pytest_project(tmp_path).findings if f.code == "CI_RUNS_PYTHON_UNITTEST"]
+    assert finding.evidence["ci_runner"] == "DECLARED" and finding.severity == "medium"
+    assert finding.evidence["not_collected_by_unittest"] == ["tests/test_y.py::test_plain", "tests/test_y.py::TestGroup::test_m"]
 
 
 def test_unittest_assertions_are_oracles_not_missing_assertions(tmp_path):

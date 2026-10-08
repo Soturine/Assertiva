@@ -36,6 +36,18 @@ def _pytest(python=None):
     return PytestNativeAdapter(python=python)
 
 
+def _unittest(python=None):
+    from .unittest_native import UnittestAdapter
+
+    return UnittestAdapter(python=python)
+
+
+def _django(python=None):
+    from .unittest_native import DjangoAdapter
+
+    return DjangoAdapter(python=python)
+
+
 def _jest(python=None):
     from .jest import JestAdapter
 
@@ -55,7 +67,7 @@ def _maven(python=None):
 
 
 # Plain lists of factories (called with the target interpreter); no plugin machinery.
-RUNNER_FACTORIES = [_pytest, _jest, _playwright, _maven]
+RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _playwright, _maven]
 ARTIFACT_FACTORIES = [_python_package]
 
 
@@ -83,3 +95,14 @@ def runner_adapters(root: str | Path, python: str | None = None) -> list:
     """Executable test-runner adapters that support the project at ``root``."""
     candidates = [factory(python=python) for factory in RUNNER_FACTORIES]
     return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
+
+
+def static_providers(adapters: list) -> list:
+    """Adapters whose static analysis to use: one per ``static_family`` (several runners can share one)."""
+    seen, out = set(), []
+    for adapter in adapters:
+        family = getattr(adapter, "static_family", adapter.adapter_id)
+        if family not in seen:
+            seen.add(family)
+            out.append(adapter)
+    return out

@@ -17,6 +17,8 @@ include = ["assertiva*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# pytest's defaults plus fixture projects (their own tests are run by the adapters under test, not collected here)
+norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "fixtures"]
 pythonpath = ["."]
 markers = [
     "integration: runs real project tooling in subprocesses (native runner, improve sessions)",

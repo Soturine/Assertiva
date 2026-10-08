@@ -77,3 +77,14 @@ Do the agent's choices of evidence, its stopping point and its priorities follow
 - [Stop when the question is answered](cases/STOP_WHEN_ENOUGH.md)
 - [Provenance is not importance](cases/ENGINE_FACT_VS_SEMANTIC_IMPORTANCE.md)
 - [The delivered report agrees with the conclusion](cases/REPORT_RECONCILIATION.md)
+
+## Evidence integrity, runners and safety (M3)
+
+Found by dogfooding 0.6.0: masked exit codes, a CI runner different from the local one, a run that cannot reach its database, indirect oracles, declared commands with effects, and a local reproduction read as CI.
+
+- [A green step whose status is not the runner's](cases/PIPELINE_MASKED_EXIT_CODE.md)
+- [Local pytest green, CI unittest green](cases/CI_RUNNER_DIFFERS_FROM_LOCAL.md)
+- [A Django suite that could not reach its database](cases/DJANGO_DATABASE_UNAVAILABLE.md)
+- [Indirect oracles and contracts without asserts](cases/INDIRECT_ORACLE_CONTRACTS.md)
+- ["Run what CI runs"](cases/DECLARED_COMMAND_SAFETY.md)
+- [A local reproduction is not CI](cases/LOCAL_REPRODUCTION_NOT_CI_PROOF.md)

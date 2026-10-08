@@ -733,8 +733,17 @@ def _identity(r: _R) -> str:
     meta = "".join(f'<div>{r.icon(icon, "ic m-ic")}<dt>{r.t(key)}</dt><dd>{value}</dd></div>' for icon, key, value in items)
     art = f'<span class="hero-art" aria-hidden="true">{r.icon("shield" if report["workflow"] == "audit" else "layers", "ic")}</span>'
     return (f'<div class="ident">{art}<p class="eyebrow">{r.icon("shield", "ic")}{r.t(mode)}</p>'
-            f'<h1 id="h-project">{_e(project.get("name") or "project")}</h1>{_technologies(r, project.get("technologies"))}'
+            f'<h1 id="h-project">{_e(project.get("name") or "project")}</h1>{_project_version(r, project.get("version"))}'
+            f'{_technologies(r, project.get("technologies"))}'
             f'{r.t("hero.lead." + report["workflow"], tag="p", cls="ident-lead")}<dl class="idline">{meta}</dl></div>')
+
+
+def _project_version(r: _R, version: dict | None) -> str:
+    """The version the project declares, with the manifest it comes from."""
+    if not version:
+        return ""
+    return (f'<p class="proj-version">{r.t("header.version", cls="pv-label")}<code>{_e(version["value"])}</code>'
+            f'<span class="pv-source">{_e(version["source"])}</span></p>')
 
 
 def _technologies(r: _R, found: dict | None) -> str:
@@ -2235,6 +2244,9 @@ h1{font-size:clamp(2rem,3.2vw,2.75rem);line-height:1.05;letter-spacing:-.03em;ma
 @media (min-width:1321px){.ident{position:relative;padding-right:130px}.hero-art{display:grid;place-items:center;position:absolute;right:10px;top:18px;width:92px;height:92px;border-radius:26px;color:#fff;
 background:linear-gradient(150deg,color-mix(in srgb,var(--logo-a) 88%,#fff),var(--logo-b));box-shadow:0 26px 50px -22px var(--logo-b),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -10px 22px rgba(10,10,60,.25);
 transform:perspective(500px) rotateY(-16deg) rotateX(8deg)}.hero-art .ic{width:42px;height:42px;filter:drop-shadow(0 3px 6px rgba(0,0,40,.35))}}
+.proj-version{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;margin:-2px 0 10px;font-size:.88rem;color:var(--ink-2)}
+.proj-version code{font-weight:640;color:var(--ink)}
+.pv-label,.pv-source{color:var(--muted);font-size:.8rem}
 .tech{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 14px;padding:0;min-width:0}
 .tech-chip,.tech-more{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:3px 11px 3px 9px;border:1px solid var(--rule);border-radius:999px;background:var(--surface);color:var(--ink-2);font-size:.8rem;font-weight:560;max-width:100%}
 .tech-ic{width:15px;height:15px;flex:none;color:var(--ink-2)}

@@ -113,3 +113,29 @@ def test_the_stack_renders_after_the_frameworks_with_a_separator(tmp_path):
     row = page[page.index('<ul class="tech"'):page.index("</ul>", page.index('<ul class="tech"'))]
     assert row.index("Django") < row.index('class="tech-sep"') < row.index("PostgreSQL")
     assert PATHS["postgresql"][:40] in row and 'class="tech-chip stack basis-configured"' in row
+
+
+def test_the_projects_declared_version_comes_from_its_manifest(tmp_path):
+    from assertiva.adapters.technologies import project_version
+
+    assert project_version(tmp_path) is None  # nothing declared: nothing shown, never guessed
+    write(tmp_path / "VERSION", "2.5.0\n")
+    assert project_version(tmp_path) == {"value": "2.5.0", "source": "VERSION"}
+    write(tmp_path / "pom.xml", '<project xmlns="http://maven.apache.org/POM/4.0.0"><parent><version>9.9</version></parent>'
+                                "<version>1.4.2</version></project>")
+    assert project_version(tmp_path) == {"value": "1.4.2", "source": "pom.xml"}  # its own, not the parent's
+    write(tmp_path / "pyproject.toml", '[project]\nname = "x"\ndynamic = ["version"]\n')
+    assert project_version(tmp_path)["source"] == "pom.xml"  # a dynamic version is not a value
+    write(tmp_path / "package.json", json.dumps({"version": "3.0.0-rc.1"}))
+    assert project_version(tmp_path) == {"value": "3.0.0-rc.1", "source": "package.json"}
+
+
+def test_the_version_renders_under_the_project_name(tmp_path):
+    report = _report(tmp_path, {"language": None, "technologies": [], "stack": [], "omitted": 0})
+    report["project"]["version"] = {"value": "2.5.0", "source": "VERSION"}
+    page = render_html(report)
+    assert page.index('<h1 id="h-project">') < page.index('class="proj-version"')
+    assert "<code>2.5.0</code>" in page and ">VERSION<" in page
+    assert "Versão" in render_html(report, lang="pt-BR")
+    report["project"]["version"] = None
+    assert 'class="proj-version"' not in render_html(report)

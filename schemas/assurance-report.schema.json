@@ -145,6 +145,29 @@
               "description": "containers, databases and brokers (same bases)"
             }
           }
+        },
+        "version": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "value",
+                "source"
+              ],
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "description": "the version the project declares for itself and the manifest that declares it (null when none does)"
         }
       },
       "additionalProperties": true

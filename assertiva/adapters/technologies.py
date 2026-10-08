@@ -165,3 +165,58 @@ def project_technologies(root: str | Path, files: list[str], executed: list[str]
     stack = [t for t in ranked if t["id"] in STACK]
     return {"language": language, "technologies": frameworks[:MAX_TECHNOLOGIES], "stack": stack[:MAX_STACK],
             "omitted": max(len(frameworks) - MAX_TECHNOLOGIES, 0) + max(len(stack) - MAX_STACK, 0)}
+
+
+def project_version(root: str | Path) -> dict | None:
+    """The version the project declares for itself, with the manifest that declares it; None when none does.
+
+    First match wins: pyproject.toml [project], package.json, Cargo.toml [package], pom.xml (the project's own
+    <version>, not its parent's), setup.cfg [metadata], a VERSION file. A dynamic or interpolated version is not a value."""
+    import configparser
+    import xml.etree.ElementTree as ET
+
+    root = Path(root)
+
+    def toml(name: str, table: str):
+        try:
+            return tomllib.loads((root / name).read_text(encoding="utf-8")).get(table, {}).get("version")
+        except (OSError, ValueError, AttributeError):
+            return None
+
+    def package_json():
+        try:
+            return json.loads((root / "package.json").read_text(encoding="utf-8")).get("version")
+        except (OSError, ValueError, AttributeError):
+            return None
+
+    def pom():
+        try:
+            tree = ET.parse(root / "pom.xml").getroot()
+        except (OSError, ET.ParseError):
+            return None
+        ns = tree.tag.split("}")[0] + "}" if tree.tag.startswith("{") else ""
+        node = tree.find(f"{ns}version")
+        return node.text.strip() if node is not None and node.text else None
+
+    def setup_cfg():
+        parser = configparser.ConfigParser(interpolation=None)
+        try:
+            parser.read_string((root / "setup.cfg").read_text(encoding="utf-8"))
+            return parser.get("metadata", "version", fallback=None)
+        except (OSError, configparser.Error):
+            return None
+
+    def version_file():
+        try:
+            text = (root / "VERSION").read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+        return text if text and "\n" not in text and len(text) <= 40 else None
+
+    for source, read in (("pyproject.toml", lambda: toml("pyproject.toml", "project")), ("package.json", package_json),
+                         ("Cargo.toml", lambda: toml("Cargo.toml", "package")), ("pom.xml", pom), ("setup.cfg", setup_cfg),
+                         ("VERSION", version_file)):
+        value = read()
+        if isinstance(value, str) and value.strip() and not any(m in value for m in ("${", "attr:", "file:")):
+            return {"value": value.strip()[:40], "source": source}
+    return None

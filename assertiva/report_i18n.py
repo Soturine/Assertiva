@@ -347,6 +347,7 @@ UI: dict[str, tuple[str, str]] = {
     "surface.limitations": ("Limitations", "Limitações"),
     "surface.check": ("Check", "Verificação"),
     "surface.reproduced": ("Reproduced in a disposable copy", "Reproduzida em uma cópia descartável"),
+    "header.version": ("Version", "Versão"),
     "tech.label": ("Technologies identified in the project", "Tecnologias identificadas no projeto"),
     "tech.basis.SOURCE": ("primary language: {evidence} source files", "linguagem principal: {evidence} arquivos-fonte"),
     "tech.basis.EXECUTED": ("its tests ran in this run", "seus testes executaram nesta execução"),

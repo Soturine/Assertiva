@@ -60,6 +60,7 @@ class MutationRun:
     limitations: list[str] = field(default_factory=list)
     error: str | None = None
     matches_state: bool | None = None  # None: the report cannot be tied to the measured state
+    test_locations: dict[str, str] = field(default_factory=dict)  # killing test id -> test file (or class path) when reported
 
     def count(self, status: MutantStatus) -> int:
         return self.counts.get(status.value, 0)

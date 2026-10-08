@@ -1,0 +1,1 @@
+{ "name": "pricing", "version": "0.1.0", "type": "module", "devDependencies": { "vitest": "^3.2.0" } }

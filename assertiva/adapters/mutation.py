@@ -39,6 +39,10 @@ def _counted(run: MutationRun) -> MutationRun:
 def _mutation_testing_elements(data: dict, run: MutationRun) -> MutationRun:
     framework = data.get("framework") or {}
     run.tool, run.tool_version = framework.get("name"), framework.get("version")
+    for path, result in (data.get("testFiles") or {}).items():  # test ids named in killedBy -> their file
+        for test in (result or {}).get("tests") or []:
+            if isinstance(test, dict) and test.get("id") is not None:
+                run.test_locations[str(test["id"])] = path
     for path, result in data["files"].items():
         if isinstance(result.get("source"), str):
             run.sources[path] = result["source"]
@@ -65,6 +69,11 @@ def _pit(root: ET.Element, run: MutationRun) -> MutationRun:
         cls, source_file = text("mutatedClass"), text("sourceFile")
         package = cls.rsplit(".", 1)[0].replace(".", "/") + "/" if cls and "." in cls else ""
         killers = text("killingTest") or text("killingTests")
+        for killer in (killers or "").split("|"):  # "pkg.ClassTest.method(...)" or "pkg.ClassTest.[engine:...]": its class path
+            owner = killer.split("(", 1)[0].split(".[", 1)[0]
+            parts = owner.split(".")
+            if killer and len(parts) > 1:
+                run.test_locations[killer] = "/".join(parts[:-1] if parts[-1][:1].islower() else parts)
         line = text("lineNumber")
         run.mutants.append(
             MutantRecord(

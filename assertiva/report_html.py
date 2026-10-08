@@ -1309,7 +1309,7 @@ def _snapshot(r: _R) -> str:
 
 
 def _evidence_area(r: _R) -> str:
-    panels = (_metrics_panel(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
+    panels = (_metrics_panel(r) + _effectiveness(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
               + _delivery(r) + _selection(r) + _history(r))
     return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><p class="eyebrow">{r.icon("doc", "ic")}{r.t("evidence.eyebrow")}</p>'
             f'<h2 id="h-evidence">{r.t("evidence.title")}</h2>{r.t("evidence.lead", tag="p", cls="lead")}</div>{_snapshot(r)}'
@@ -1795,6 +1795,42 @@ def _runs(r: _R) -> str:
             )
     body = f'<ul class="runs">{"".join(rows)}</ul>' if rows else r.t("runs.none", tag="p", cls="empty")
     return _panel(r, "runs", "runs.title", r.t("runs.summary", n=total) if total else r.t("runs.summary.none"), body)
+
+
+def _effectiveness(r: _R) -> str:
+    """What the tests prove, per language and dimension, and each candidate with what would settle it."""
+    data = r.report.get("test_effectiveness") or {}
+    languages = data.get("languages") or {}
+    if not languages:
+        return ""
+    dims = data.get("dimensions") or {}
+    rows = "".join(f'<tr><th scope="row"><code>{_e(lang)}</code></th><td>{_e(info["tests"])}</td>'
+                   f'<td>{r.items(info.get("limitations") or [], kind="narr")}</td></tr>' for lang, info in languages.items())
+    table = (f'<div class="table-wrap"><table class="responsive"><caption>{r.t("eff.languages")}</caption><thead><tr>'
+             f'<th scope="col">{r.t("eff.language")}</th><th scope="col">{r.t("eff.tests")}</th><th scope="col">{r.t("surface.limitations")}</th></tr></thead>'
+             f"<tbody>{rows}</tbody></table></div>")
+    oracles = (dims.get("oracle_strength") or {}).get("oracles") or {}
+    fidelity = dims.get("fidelity") or {}
+    facts = [("eff.oracles", ", ".join(f"{k} {v}" for k, v in sorted(oracles.items())) or "—"),
+             ("eff.levels", ", ".join(f"{k} {v}" for k, v in sorted((fidelity.get("declared_levels") or {}).items())) or "—"),
+             ("eff.crossed", ", ".join(f"{k} {v}" for k, v in sorted((fidelity.get("boundaries_crossed") or {}).items())) or "—"),
+             ("eff.simulated", ", ".join(f"{k} {v}" for k, v in sorted((fidelity.get("boundaries_simulated") or {}).items())) or "—")]
+    mutation = dims.get("mutation_sensitivity") or {}
+    if mutation.get("available"):
+        exclusive = mutation.get("exclusive_protection") or {}
+        facts.append(("eff.exclusive", ", ".join(f"{t} ({len(m)})" for t, m in list(exclusive.items())[:8]) or "—"))
+    kv = "".join(f"<dt>{r.t(k)}</dt><dd><code class=\"wrap\">{_e(v)}</code></dd>" for k, v in facts)
+    cards = []
+    for c in data.get("candidates") or []:
+        tests = "".join(f"<li><code>{_e(t)}</code></li>" for t in c["tests"][:8])
+        cards.append(
+            f'<li class="run"><div class="run-head"><span class="run-title"><code>{_e(c["kind"])}</code> <code class="raw">{_e(c.get("language"))}</code></span>'
+            f'<span class="tech-label">{r.t("eff.basis." + (c.get("basis") or "UNKNOWN"))}</span></div>'
+            f'<dl class="kv"><dt>{r.t("eff.shows")}</dt><dd>{_e(c["shows"])}</dd><dt>{r.t("eff.why")}</dt><dd>{_e(c["why"])}</dd>'
+            f'<dt>{r.t("eff.resolve")}</dt><dd>{_e(c["resolve_with"])}</dd><dt>{r.t("eff.recommend")}</dt><dd>{_e(c["recommendation"])}</dd></dl>'
+            f'<p class="tech-label">{r.t("eff.affected")}</p><ul class="list">{tests}</ul></li>')
+    body = table + f'<dl class="kv">{kv}</dl>' + (f'<ul class="runs">{"".join(cards)}</ul>' if cards else r.t("eff.none", tag="p", cls="empty"))
+    return _panel(r, "effectiveness", "eff.title", r.t("eff.summary", n=len(data.get("candidates") or []), m=len(languages)), body, "eff.lead")
 
 
 def _ci_runs(r: _R) -> str:

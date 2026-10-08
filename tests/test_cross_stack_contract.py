@@ -166,7 +166,7 @@ def test_report_renders_without_python_or_pytest_fields(fake_stack):
     assert not re.search(r"pytest|wheel|python", html, re.I)
 
 
-CORE = ("candidate.py", "evidence.py", "verification.py", "report.py", "workspace.py", "models.py", "process.py", "improve.py", "impact.py", "selection.py", "components.py")
+CORE = ("candidate.py", "evidence.py", "verification.py", "report.py", "workspace.py", "models.py", "process.py", "improve.py", "impact.py", "selection.py", "components.py", "effectiveness.py")
 TOOL_NAMES = r"pytest|py\.test|setuptools|\bwheel\b|\bpip\b|github|stryker|pitest|mutmut|cosmic|jest|vitest|junit|playwright|maven|gradle|dotnet|npm"
 
 

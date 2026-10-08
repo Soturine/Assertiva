@@ -375,6 +375,30 @@ UI: dict[str, tuple[str, str]] = {
     "runs.ingested": ("Ingested report, not executed by Assertiva", "Relatório ingerido, não executado pelo Assertiva"),
     "runs.accumulated": ("{value} of accumulated test time (not the run's duration)", "{value} de tempo acumulado de teste (não a duração da execução)"),
     "scope.coverage.product": ("{value} of product lines (test code excluded)", "{value} das linhas de produto (código de teste excluído)"),
+    "eff.title": ("Test effectiveness", "Efetividade dos testes"),
+    "eff.lead": ("What the tests prove, read the same way in every language: oracles, fidelity, doubles, smells, distinct "
+                 "contribution. Candidates are leads with their basis, never verdicts; nothing is removed because of them.",
+                 "O que os testes provam, lido da mesma forma em todas as linguagens: oráculos, fidelidade, dublês, smells, "
+                 "contribuição distinta. Candidatos são pistas com sua base, nunca veredictos; nada é removido por causa deles."),
+    "eff.summary.one": ("{n} candidates · {m} language", "{n} candidatos · {m} linguagem"),
+    "eff.summary.other": ("{n} candidates · {m} languages", "{n} candidatos · {m} linguagens"),
+    "eff.languages": ("Tests read per language, with the reading's limits", "Testes lidos por linguagem, com os limites da leitura"),
+    "eff.language": ("Language", "Linguagem"),
+    "eff.tests": ("Tests", "Testes"),
+    "eff.oracles": ("Oracles", "Oráculos"),
+    "eff.levels": ("Declared levels", "Níveis declarados"),
+    "eff.crossed": ("Boundaries crossed", "Limites atravessados"),
+    "eff.simulated": ("Boundaries simulated", "Limites simulados"),
+    "eff.exclusive": ("Only detector of a mutant", "Único detector de um mutante"),
+    "eff.shows": ("What the evidence shows", "O que a evidência mostra"),
+    "eff.why": ("Why it may be weak", "Por que pode ser fraco"),
+    "eff.resolve": ("What would settle it", "O que resolveria"),
+    "eff.recommend": ("Recommendation", "Recomendação"),
+    "eff.affected": ("Tests", "Testes"),
+    "eff.basis.INFERRED": ("inferred from source, not confirmed", "inferido do código, não confirmado"),
+    "eff.basis.CONFIRMED": ("confirmed by the evidence shown", "confirmado pela evidência mostrada"),
+    "eff.basis.UNKNOWN": ("cannot be decided here", "não pode ser decidido aqui"),
+    "eff.none": ("No candidate in the inspected tests.", "Nenhum candidato nos testes inspecionados."),
     "ci.title": ("CI runs observed at the provider", "Execuções de CI observadas no provedor"),
     "ci.lead": ("Runs the provider reported, read from an export; only a run of the audited revision proves it.",
                 "Execuções informadas pelo provedor, lidas de uma exportação; só uma execução da revisão auditada a comprova."),
@@ -859,6 +883,11 @@ METRICS: dict[str, tuple[str, str]] = {
     "mutation_survived": ("Mutants survived", "Mutantes sobreviventes"),
     "mutation_no_coverage": ("Mutants without coverage", "Mutantes sem cobertura"),
     "artifact_qualified": ("Artifact qualified (1 = yes, 0 = no)", "Artefato qualificado (1 = sim, 0 = não)"),
+    # candidates found by static patterns: counts of leads to review, never confirmed defects
+    "false_green_candidates": ("False-green candidates (static, unconfirmed)", "Candidatos a falso verde (estático, não confirmado)"),
+    "fidelity_mismatches": ("Fidelity-mismatch candidates (static, unconfirmed)", "Candidatos a fidelidade divergente (estático, não confirmado)"),
+    "redundancy_candidates": ("Redundancy candidates (static, unconfirmed)", "Candidatos a redundância (estático, não confirmado)"),
+    "distinct_oracle_signatures": ("Distinct assertion signatures", "Assinaturas de asserção distintas"),
 }
 
 METRIC_GROUPS: dict[str, str] = {
@@ -871,6 +900,7 @@ METRIC_GROUPS: dict[str, str] = {
     **{k: "fault" for k in ("negative_controls_killed", "negative_controls_survived", "negative_controls_invalid", "mutation_evaluated",
                             "mutation_killed", "mutation_survived", "mutation_no_coverage")},
     "artifact_qualified": "artifact",
+    **{k: "static" for k in ("false_green_candidates", "fidelity_mismatches", "redundancy_candidates", "distinct_oracle_signatures")},
 }
 
 # Finding catalog by stable code. `summary`/`rec` English texts equal the engine's fixed texts and act as guards:
@@ -1050,6 +1080,39 @@ FINDINGS: dict[str, dict] = {
                "A configuração de CI executa a suíte, ou o local onde ela é exigida fica registrado."),
         rec=("Add the test suite to the delivery pipeline or record where it is enforced.",
              "Adicione a suíte de testes ao pipeline de entrega ou registre onde ela é exigida.")),
+    "FALSE_GREEN_CANDIDATE": F(
+        category="tests", tier="E3",
+        title=("Tests that can pass while the behavior is broken", "Testes que podem passar com o comportamento quebrado"),
+        summary=("Some tests can pass while the behavior they protect is broken (static pattern, to be confirmed).",
+                 "Alguns testes podem passar mesmo com o comportamento que protegem quebrado (padrão estático, a confirmar)."),
+        why=("A green suite can hide these defects: the test cannot fail for them.", "Uma suíte verde pode esconder esses defeitos: o teste não consegue falhar por eles."),
+        close=("A deliberate behavior break (negative control or mutant) makes each test fail.",
+               "Uma quebra deliberada do comportamento (controle negativo ou mutante) faz cada teste falhar.")),
+    "TEST_FIDELITY_MISMATCH": F(
+        category="tests", tier="E3",
+        title=("Integration or end-to-end in name only", "Integração ou ponta a ponta só no nome"),
+        summary=("Some tests declared integration or end-to-end replace every boundary they cross.",
+                 "Alguns testes declarados de integração ou ponta a ponta substituem todos os limites que atravessam."),
+        why=("They prove the code against doubles, not the integration their level claims.", "Eles provam o código contra dublês, não a integração que o nível afirma."),
+        close=("One check of that behavior crosses the real boundary (a disposable service, browser or backend).",
+               "Uma verificação desse comportamento atravessa o limite real (serviço descartável, navegador ou backend).")),
+    "REDUNDANCY_CANDIDATE": F(
+        category="tests", tier="E3",
+        title=("Tests that may repeat the same evidence", "Testes que podem repetir a mesma evidência"),
+        summary=("Some tests appear to repeat the same evidence; review before consolidating anything.",
+                 "Alguns testes parecem repetir a mesma evidência; revise antes de consolidar qualquer coisa."),
+        why=("Repetition costs time and maintenance only when it adds no distinct protection.", "A repetição custa tempo e manutenção apenas quando não acrescenta proteção distinta."),
+        close=("Each test is shown to detect something the others miss, or a consolidation is qualified with equal results.",
+               "Cada teste mostra detectar algo que os outros não detectam, ou uma consolidação é qualificada com resultados iguais.")),
+    "TEST_SMELL_SIGNALS": F(
+        category="tests", tier="E3",
+        title=("Test smells", "Test smells"),
+        summary=("Some tests show maintenance or determinism smells; they are leads, not verdicts.",
+                 "Alguns testes mostram smells de manutenção ou determinismo; são pistas, não veredictos."),
+        why=("Sleeps, retries and heavy mocking make tests slow, flaky or blind to the real behavior.",
+             "Sleeps, retries e mocks em excesso deixam testes lentos, instáveis ou cegos ao comportamento real."),
+        close=("Each smell is reviewed and fixed where it hides behavior or causes instability.",
+               "Cada smell é revisado e corrigido onde esconde comportamento ou causa instabilidade.")),
     "ENVIRONMENT_NOT_PREPARED": F(
         category="execution", tier="E1",
         title=("Part of the test environment was not prepared", "Parte do ambiente de testes não foi preparada"),

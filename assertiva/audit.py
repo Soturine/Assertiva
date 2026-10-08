@@ -95,6 +95,42 @@ def environment_summary(prepared: environment.Prepared, executed: bool) -> dict:
     }
 
 
+def _effectiveness(root: Path, current: StateEvidence) -> dict:
+    """What the tests prove, per language, from the same facts and rules for every language (never a score)."""
+    from .adapters.test_facts import collect
+    from .effectiveness import summarize
+
+    facts, limits = collect(root)
+    return summarize(facts, limits, current.mutation)
+
+
+def _effectiveness_findings(summary: dict) -> list[Finding]:
+    """One finding per candidate: a lead for the agent to confirm, contextualize or reject in its assessment (with
+    per-test subjects), never a conclusion. The Python weak-oracle signal already comes from the static inventory."""
+    findings = []
+    for candidate in summary.get("candidates", []):
+        if candidate["kind"] == "WEAK_ORACLE":
+            if candidate["language"] != "python":
+                findings.append(Finding("WEAK_ORACLE_SIGNAL", "Some direct test definitions expose weak deterministic oracle signals.",
+                                        {"language": candidate["language"], "count": candidate["count"], "tests": candidate["tests"],
+                                         "signals": candidate["detail"].get("oracles", {})}))
+            continue
+        kind, evidence = candidate["kind"], {key: candidate[key] for key in ("language", "count", "tests", "shows", "why", "resolve_with", "basis", "detail")}
+        if kind == "FALSE_GREEN":
+            findings.append(Finding("FALSE_GREEN_CANDIDATE", "Some tests can pass while the behavior they protect is broken (static pattern, to be confirmed).",
+                                    evidence, severity="medium", recommendation=candidate["recommendation"]))
+        elif kind == "FIDELITY_MISMATCH":
+            findings.append(Finding("TEST_FIDELITY_MISMATCH", "Some tests declared integration or end-to-end replace every boundary they cross.",
+                                    evidence, severity="medium", recommendation=candidate["recommendation"]))
+        elif kind in ("REDUNDANCY", "DUPLICATE_CASES"):
+            findings.append(Finding("REDUNDANCY_CANDIDATE", "Some tests appear to repeat the same evidence; review before consolidating anything.",
+                                    evidence, severity="info", recommendation=candidate["recommendation"]))
+        elif kind == "SMELL":
+            findings.append(Finding("TEST_SMELL_SIGNALS", "Some tests show maintenance or determinism smells; they are leads, not verdicts.",
+                                    evidence, severity="info", recommendation=candidate["recommendation"]))
+    return findings
+
+
 def _now() -> str:
     from datetime import datetime, timezone
 
@@ -319,6 +355,8 @@ def run_audit(
         for report in mutation_reports:
             attach_mutation(current, load_mutation_report(report), root)
         findings.extend(_mutation_findings(current))
+        effectiveness = _effectiveness(root, current)
+        findings.extend(_effectiveness_findings(effectiveness))
         findings.extend(_artifact_findings(current))
         findings.extend(surface_findings(surface))
         declared: dict[str, dict] = {}
@@ -363,6 +401,7 @@ def run_audit(
             report["claim_boundary"]["observed"].append(
                 f"CI run reported by {run['provider']} for {run['head_sha'][:12]}: {run['conclusion']} ({run['identity']})")
     report["environment"] = environment_summary(prepared, execute)
+    report["test_effectiveness"] = effectiveness
     report["execution_manifest"] = execution_manifest(root, baseline, current, started, junit_reports, coverage_reports,
                                                       mutation_reports, ci_runs, withheld)
     boundary = report["claim_boundary"]

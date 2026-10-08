@@ -205,6 +205,13 @@ def measure(
             for name, value in adapter.static_signals(copy).items():
                 state.static[name] = state.static.get(name, 0) + value
             state.negative_paths.update(adapter.static_negative_paths(copy))
+        from .adapters.test_facts import collect
+        from .effectiveness import metrics as effectiveness_metrics
+        from .effectiveness import summarize
+
+        facts, limits = collect(copy)  # the same effectiveness view for every language, comparable between states
+        if facts:
+            state.static.update(effectiveness_metrics(summarize(facts, limits)))
     finally:
         remove_tree(copy)
     with traced_stage(f"{label}:negative-controls"):
@@ -281,6 +288,11 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         "negative_path_tests": MetricDirection.CONTEXTUAL,
         "negative_paths_without_contract_detail": MetricDirection.LOWER_IS_BETTER,
         "negative_paths_with_state_after_rejection": MetricDirection.HIGHER_IS_BETTER,
+        "false_green_candidates": MetricDirection.LOWER_IS_BETTER,
+        "fidelity_mismatches": MetricDirection.LOWER_IS_BETTER,
+        "redundancy_candidates": MetricDirection.LOWER_IS_BETTER,
+        # more distinct checks is better only when they check something new; contextual, never a goal by itself
+        "distinct_oracle_signatures": MetricDirection.CONTEXTUAL,
     }
     for name, value in state.static.items():
         add(name, value, static_directions.get(name, MetricDirection.INFORMATIONAL), tier="E3")

@@ -683,6 +683,16 @@
         }
       }
     },
+    "test_effectiveness": {
+      "type": "object",
+      "description": "What the tests prove, from the same normalized facts and rules for every language: per-language reading limits, dimensions (oracle strength, surfaces, negative paths, fidelity, doubles, distinct contribution, mutation sensitivity, determinism, maintainability) and candidates (FALSE_GREEN, WEAK_ORACLE, FIDELITY_MISMATCH, REDUNDANCY, DUPLICATE_CASES, SMELL) with their basis. Never a score.",
+      "properties": {
+        "languages": {"type": "object"},
+        "dimensions": {"type": "object"},
+        "candidates": {"type": "array", "items": {"type": "object", "required": ["kind", "tests", "shows", "why", "resolve_with", "recommendation"]}},
+        "note": {"type": "string"}
+      }
+    },
     "ci_runs": {
       "type": "array",
       "description": "CI runs the provider reported (`audit --ci-run`), each compared with the audited revision.",

@@ -274,16 +274,50 @@ def _negative_path_stage(changes, candidate: StateEvidence, deltas) -> CheckResu
     return _stage(stage, StageStatus.PASS, summary, provenance)
 
 
-def _mutation_stage(candidate: StateEvidence) -> CheckResult:
-    """Negative controls and mutation reports are separate evidence; both are reported."""
+def _owned_by(test_id: str, location: str | None, retired: str) -> bool:
+    """Whether a killing test belongs to a retired file: by the file the report names, its class path, or the id."""
+    retired = retired.replace("\\", "/")
+    stem = retired.rsplit(".", 1)[0]
+    for name in filter(None, (location, test_id)):
+        name = name.replace("\\", "/")
+        if name in (retired, stem) or name.startswith((retired + "::", retired + " ", retired + ":")) or (
+                "/" in name and (retired.endswith("/" + name) or stem.endswith("/" + name) or stem == name)):
+            return True
+    return False
+
+
+def _retirement(changes: list[CandidateTestChange], baseline: StateEvidence | None) -> tuple[list[str], list[str], list[str]]:
+    """A retired test that is the only detector of a known mutant removes protection: that is a failure, never a cleanup.
+    Returns (failures, unknown, passed)."""
+    retired = [c.path for c in changes if c.kind is CandidateChangeKind.RETIRE_CANDIDATE]
+    if not retired:
+        return [], [], []
+    runs = [r for r in (baseline.mutation if baseline else []) if not r.error and any(m.killed_by for m in r.mutants)]
+    if not runs:
+        return [], ["retirement not proven: no baseline mutation report names which tests detect each mutant"], []
+    exclusive = []
+    for run in runs:
+        for mutant in run.mutants:
+            if mutant.killed_by and all(any(_owned_by(t, run.test_locations.get(t), p) for p in retired) for t in mutant.killed_by):
+                exclusive.append(mutant_label(mutant))
+    if exclusive:
+        return [f"RETIRED_TEST_EXCLUSIVE_DETECTION: retired tests are the only detectors of {len(exclusive)} mutant(s): "
+                + ", ".join(exclusive[:5])], [], []
+    return [], [], [f"retired tests ({len(retired)} file(s)) detect no known mutant the remaining tests miss"]
+
+
+def _mutation_stage(candidate: StateEvidence, changes: list[CandidateTestChange] = (), baseline: StateEvidence | None = None) -> CheckResult:
+    """Negative controls and mutation reports are separate evidence; both are reported. A retirement is checked
+    against the baseline's per-test detection: removing the only detector of a mutant fails."""
     stage = QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS
     controls, runs = candidate.negative_controls, candidate.mutation
-    if not controls and not runs:
+    failures, unknown, passed = _retirement(list(changes), baseline)
+    if not controls and not runs and not failures and not passed:
         return _stage(
-            stage, StageStatus.NOT_RUN, "no negative controls or mutation evidence were provided",
+            stage, StageStatus.NOT_RUN, "; ".join(unknown + ["no negative controls or mutation evidence were provided"]),
             "a green suite was not challenged with deliberately broken behavior",
         )
-    failures, unknown, limitations, passed = [], [], [], []
+    limitations = []
     survived = [r.control_id for r in controls if r.outcome is ControlOutcome.SURVIVED]
     if survived:
         failures.append("NEGATIVE_CONTROL_SURVIVED: " + ", ".join(survived))
@@ -472,13 +506,14 @@ def _stability_stage(stability: StabilityEvidence, deltas) -> CheckResult:
     )
 
 
-def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed, budget: list) -> list[QualificationStageResult]:
+def _stages(session: ImproveSession, changes, candidate: StateEvidence, deltas, authorized: set[str], stability, timed, budget: list,
+            baseline: StateEvidence | None = None) -> list[QualificationStageResult]:
     plan = {
         QualificationCheck.CANDIDATE_TESTS: lambda: _execution_stage(changes, candidate),
         QualificationCheck.ORIGINAL_REGRESSION: lambda: _regression_stage(session, changes, candidate),
         QualificationCheck.COVERAGE_AND_ORACLES: lambda: _coverage_stage(deltas),
         QualificationCheck.NEGATIVE_PATHS: lambda: _negative_path_stage(changes, candidate, deltas),
-        QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS: lambda: _mutation_stage(candidate),
+        QualificationCheck.MUTATION_OR_NEGATIVE_CONTROLS: lambda: _mutation_stage(candidate, changes, baseline),
         QualificationCheck.PIPELINE_EQUIVALENT: lambda: _pipeline_stage(session, authorized, candidate, budget),
         QualificationCheck.BUILD_AND_ARTIFACT: lambda: _artifact_stage(candidate),
         QualificationCheck.STABILITY_AND_COST: lambda: _stability_stage(stability, deltas),
@@ -533,7 +568,7 @@ def qualify_candidate(
             f"reran {len(stability.records)} candidate-touched or failing invocations {stability.attempts - 1}x"
             if stability.records else "no relevant invocation to rerun, reruns disabled, or execution budget exhausted",
         ))
-        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()), stability, timed, budget)
+        stages = _stages(session, changes, candidate, deltas, set(authorized_checks or ()), stability, timed, budget, baseline)
     q = CandidateQualification(changes, deltas, stages)
     reruns = {}
     for r in stability.records:  # later attempts, kept beside the first outcome

@@ -66,6 +66,12 @@ def _playwright(python=None):
     return PlaywrightAdapter(python=python)
 
 
+def _gradle(python=None):
+    from .gradle import GradleAdapter
+
+    return GradleAdapter(python=python)
+
+
 def _maven(python=None):
     from .maven import MavenAdapter
 
@@ -73,7 +79,7 @@ def _maven(python=None):
 
 
 # Plain lists of factories (called with the target interpreter); no plugin machinery.
-RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _vitest, _playwright, _maven]
+RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _vitest, _playwright, _maven, _gradle]
 ARTIFACT_FACTORIES = [_python_package]
 
 

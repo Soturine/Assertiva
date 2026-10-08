@@ -3,7 +3,7 @@
 `.assertiva.toml` at the project root (or `[tool.assertiva]` in pyproject.toml) may only describe the project:
 
     [tests]
-    runners = ["unittest"]  # when detection cannot know: pytest, unittest, django, jest, vitest, playwright, maven
+    runners = ["unittest"]  # when detection cannot know: pytest, unittest, django, jest, vitest, playwright, maven, gradle
     timeout_s = 1800        # per test run (default 900; Maven 1200)
 
 Consent to effects outside the disposable copy is the user's, in `<ASSERTIVA_HOME>/consent.toml`, outside every
@@ -27,7 +27,7 @@ from pathlib import Path
 FILE = ".assertiva.toml"
 CONSENT = "consent.toml"
 _KNOWN = {"tests": {"runners", "timeout_s"}}
-RUNNERS = ("pytest", "unittest", "django", "jest", "vitest", "playwright", "maven")
+RUNNERS = ("pytest", "unittest", "django", "jest", "vitest", "playwright", "maven", "gradle")
 
 
 @dataclass(frozen=True)

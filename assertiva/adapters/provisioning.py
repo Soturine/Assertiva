@@ -323,6 +323,13 @@ def _jvm_plan(root: Path, prepared: Prepared) -> list[Step]:
     else:
         prepared.tools["java_home"] = home
         steps.append(Step("jdk", "jvm", f"use the JDK at {home}", "a JDK is installed", status="NOT_NEEDED"))
+    if gradle and any(re.search(r"com\.android\.(application|library)", p.read_text(encoding="utf-8", errors="replace"))
+                      for p in [*root.glob("*/build.gradle*"), *root.glob("build.gradle*")] if "apply false" not in p.read_text(encoding="utf-8", errors="replace")):
+        sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+        steps.append(Step("android-sdk", "jvm", f"use the Android SDK at {sdk}" if sdk else "an Android SDK",
+                          "the build applies the Android Gradle plugin", status="NOT_NEEDED" if sdk else "BLOCKED",
+                          detail="" if sdk else "this version does not download the Android SDK (a large download): set ANDROID_HOME to an "
+                          "installed SDK; local unit tests stay BLOCKED and instrumented tests need a device or emulator either way"))
     if gradle:
         version = (wrapper or {}).get("version")
         steps.append(Step("gradle", "jvm", f"Gradle {version or 'current'} distribution into the tools cache",

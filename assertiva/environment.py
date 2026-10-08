@@ -108,7 +108,9 @@ def child_overlay(env: dict) -> dict:
 # --- workspaces --------------------------------------------------------------------------------
 
 def tools_dir() -> Path:
-    path = assertiva_home() / "tools"
+    """Verified downloads kept between runs: ASSERTIVA_TOOLS when set (a shared cache), else ASSERTIVA_HOME/tools."""
+    configured = os.environ.get("ASSERTIVA_TOOLS")
+    path = Path(configured).resolve() if configured else assertiva_home() / "tools"
     path.mkdir(parents=True, exist_ok=True)
     return path
 

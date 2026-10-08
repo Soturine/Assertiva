@@ -26,10 +26,12 @@ from .verification import GateMode, VerificationKind, artifact_lineage, delivery
 from .workspace import boundary_report, capture_baseline, read_only_guard, remove_tree
 
 
-def _native_findings(current: StateEvidence, static_total: int) -> list[Finding]:
+def _native_findings(current: StateEvidence, static_total: int, reported: tuple = ()) -> list[Finding]:
+    """``reported``: runs whose failures a declared-check finding already reports (one cause, one finding)."""
     findings = []
-    invocations = [inv for run in current.runs for inv in run.invocations]
-    errors = [e for run in current.runs for e in run.collection_errors]
+    own = [run for run in current.runs if not any(run is r for r in reported)]
+    invocations = [inv for run in own for inv in run.invocations]
+    errors = [e for run in own for e in run.collection_errors]
     if errors:
         findings.append(Finding("NATIVE_COLLECTION_ERRORS", "The native runner could not collect some tests.", {"errors": errors[:20]}))
     failing = [inv.invocation_id for inv in invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
@@ -119,7 +121,7 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
 
 
 def _declared_checks(root: Path, surface, requested, adapters, python: str | None, budget: list, revision: dict,
-                     config: ProjectConfig, reusable: list) -> tuple[list[dict], list[Finding], list]:
+                     config: ProjectConfig, reusable: list) -> tuple[list[dict], list[Finding], list, list]:
     """Reproduce the discovered checks the caller named, in one disposable copy (never in the project).
 
     Naming a check selects it; test runners and side-effect-free checks run, other kinds need the project
@@ -128,7 +130,7 @@ def _declared_checks(root: Path, surface, requested, adapters, python: str | Non
     unknown = [c for c in requested if c not in by_id]
     if unknown:
         raise ValueError(f"no discovered check {', '.join(unknown)}; discovered check ids are listed in verification_surface")
-    results, findings, runs, copies = [], [], [], []
+    results, findings, runs, copies, runs_reported = [], [], [], [], []
 
     def copy() -> Path:
         if not copies:
@@ -147,13 +149,17 @@ def _declared_checks(root: Path, surface, requested, adapters, python: str | Non
                 runs.append(done.run)
             if done.status is StageStatus.FAIL:
                 allowed = check.gate in (GateMode.ALLOWED_FAILURE, GateMode.ADVISORY)
+                evidence = {"check_id": check_id, "command": check.command, "detail": done.record["detail"], "gate": check.gate.value}
+                if done.run is not None:  # per-test evidence: the failing tests belong to this finding, not to a second one
+                    evidence["failing_tests"] = [i.invocation_id for i in done.run.invocations if i.outcome in (Outcome.FAILED, Outcome.ERROR)][:20]
+                    evidence["collection_errors"] = done.run.collection_errors[:20]
+                    runs_reported.append(done.run)
                 findings.append(Finding("DECLARED_CHECK_FAILED", "A declared verification check failed when reproduced in an isolated copy.",
-                                        {"check_id": check_id, "command": check.command, "detail": done.record["detail"], "gate": check.gate.value},
-                                        severity="info" if allowed else "high"))
+                                        evidence, severity="info" if allowed else "high"))
     finally:
         for path in copies:
             remove_tree(path)
-    return results, findings, runs
+    return results, findings, runs, runs_reported
 
 
 @scoped
@@ -210,17 +216,17 @@ def run_audit(
                 current.static.update(adapter.static_signals(root))
             if adapters:
                 limitations.append("tests were not executed; --execute collects native evidence by running project code in an isolated copy")
-        reproduced, declared_findings, reproduced_runs = [], [], []
+        reproduced, declared_findings, reproduced_runs, runs_reported = [], [], [], []
         if run_checks:
             revision = {"digest": baseline.digest, "vcs_revision": baseline.revision, "dirty": baseline.dirty}
-            reproduced, declared_findings, reproduced_runs = _declared_checks(
+            reproduced, declared_findings, reproduced_runs, runs_reported = _declared_checks(
                 root, surface, list(run_checks), adapters, python, current.budget, revision, config, list(current.runs))
         findings.extend(declared_findings)
         if not current.runs:
             current.runs.extend(reproduced_runs)
         current.runs.extend(load_junit(report) for report in junit_reports)
         if current.runs:
-            findings.extend(_native_findings(current, static_total))
+            findings.extend(_native_findings(current, static_total, tuple(runs_reported)))
         for report in [*coverage_reports, *([coverage_json] if coverage_json else [])]:
             summary = load_coverage_report(report)
             current.coverage.append(summary)

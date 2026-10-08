@@ -15,18 +15,16 @@ import os
 import shlex
 import sys
 import tempfile
-from dataclasses import replace
 from pathlib import Path
 
 from assertiva.candidate import StageStatus
-from assertiva.models import CoverageSummary, Outcome, RunEvidence, TestInvocation
+from assertiva.models import Outcome, RunEvidence, TestInvocation
 from assertiva.process import execution_refusal, module_available, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
-from .coverage_reports import load_coverage_report
 from .python_discovery import declared_runners, python_runners
-from .python_static import PythonStatic
+from .python_static import PythonStatic, measured_coverage
 
 _MODULE = "assertiva_unittest_evidence"
 _SOURCE = Path(__file__).with_name("_unittest_evidence.py")
@@ -175,7 +173,7 @@ class _RecordingRunner(PythonStatic):
                 evidence.limitations.append(f"{self.adapter_id} could not be executed: {result.summary()}")
                 return evidence
             records = [json.loads(line) for line in evidence_file.read_text(encoding="utf-8").splitlines()] if evidence_file.exists() else []
-            coverage_summary = self._coverage(root, env, plugin_dir) if measure and records else None
+            coverage_summary = measured_coverage(self.python, root, env, plugin_dir, self.timeout_s) if measure and records else None
         run = normalize(records, self.adapter_id, result.returncode)
         sources = run.metadata.get("error_sources", {})
         for name in list(sources):  # unittest names a module relative to its start directory
@@ -197,14 +195,6 @@ class _RecordingRunner(PythonStatic):
             run.limitations.append(f"{self.adapter_id} stopped before running any test: " + " | ".join(tail))
         run.limitations += [lim for lim in [self.collect_limit()] if lim]
         return run
-
-    def _coverage(self, root: Path, env: dict, out_dir: Path) -> CoverageSummary | None:
-        report = out_dir / "coverage.json"
-        run_command([self.python, "-m", "coverage", "json", "-q", "-o", str(report)], root, env=env, timeout_s=self.timeout_s)
-        if not report.exists():
-            return None
-        summary = load_coverage_report(report)
-        return replace(summary, scope="project coverage configuration") if summary.error is None else None
 
     def reproduction_args(self, check) -> list[str] | None:
         if check.tool != self.tool or not check.command or "${{" in check.command or check.metadata.get("working_directory"):

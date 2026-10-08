@@ -4,6 +4,10 @@ Nothing is required: detection works without it. The file is the project owner's
 versioned file that an audit never writes), so it is where execution authorizations live. Unknown keys
 are reported, never guessed.
 
+    [tests]
+    runners = ["unittest"]  # when detection cannot know: pytest, unittest, django, jest, vitest, playwright, maven
+    timeout_s = 1800        # per test run (default 900; Maven 1200)
+
     [execution]
     authorize = ["gha:.github/workflows/ci.yml:test:3", "python manage.py migrate --check"]  # check ids or exact commands
     env = ["DATABASE_URL"]  # variables the tests need that look like credentials (withheld otherwise)
@@ -16,7 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 FILE = ".assertiva.toml"
-_KNOWN = {"execution": {"authorize", "env"}}
+_KNOWN = {"execution": {"authorize", "env"}, "tests": {"runners", "timeout_s"}}
+RUNNERS = ("pytest", "unittest", "django", "jest", "vitest", "playwright", "maven")
 
 
 @dataclass(frozen=True)
@@ -24,6 +29,8 @@ class ProjectConfig:
     source: str | None = None
     authorize: tuple[str, ...] = ()
     env: tuple[str, ...] = ()
+    runners: tuple[str, ...] = ()  # empty: detect from the project
+    timeout_s: float | None = None
     problems: tuple[str, ...] = field(default=())
 
     def authorizes(self, check) -> bool:
@@ -57,9 +64,22 @@ def load_config(root: str | Path) -> ProjectConfig:
         problems.append("[execution] must be a table; ignored")
         execution = {}
     problems += [f"unknown key execution.{key} ignored" for key in execution if key not in _KNOWN["execution"]]
+    tests = data.get("tests") or {}
+    if not isinstance(tests, dict):
+        problems.append("[tests] must be a table; ignored")
+        tests = {}
+    problems += [f"unknown key tests.{key} ignored" for key in tests if key not in _KNOWN["tests"]]
+    runners = _strings(tests.get("runners", []), "tests.runners", problems)
+    problems += [f"unknown runner {name!r} in tests.runners ignored" for name in runners if name not in RUNNERS]
+    timeout = tests.get("timeout_s")
+    if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0):
+        problems.append("tests.timeout_s must be a positive number; ignored")
+        timeout = None
     return ProjectConfig(
         source=source,
         authorize=_strings(execution.get("authorize", []), "execution.authorize", problems),
         env=_strings(execution.get("env", []), "execution.env", problems),
+        runners=tuple(name for name in runners if name in RUNNERS),
+        timeout_s=float(timeout) if timeout is not None else None,
         problems=tuple(problems),
     )

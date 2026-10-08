@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
@@ -24,6 +23,7 @@ from assertiva.process import execution_refusal, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
+from .jest import node_executable
 
 _CONFIGS = tuple(f"playwright.config.{ext}" for ext in ("ts", "js", "mjs", "cjs", "mts", "cts"))
 _ENGINES = {"chromium": ("chromium", "chrome", "edge"), "firefox": ("firefox",), "webkit": ("webkit", "safari")}
@@ -248,12 +248,6 @@ class PlaywrightAdapter:
     def installed_dependencies(self) -> tuple[str, ...]:
         return ("node_modules",)  # browsers live in Playwright's own cache, outside the project
 
-    def _node(self) -> str | None:
-        configured = os.environ.get("ASSERTIVA_NODE")
-        if configured:
-            return configured if Path(configured).is_file() else None
-        return shutil.which("node")
-
     def _remote_targets(self, root: Path) -> list[str]:
         hosts = []
         for name in _CONFIGS:
@@ -279,7 +273,7 @@ class PlaywrightAdapter:
         cli = next((p for p in (root / "node_modules" / "playwright" / "cli.js", root / "node_modules" / "@playwright" / "test" / "cli.js") if p.is_file()), None)
         if cli is None:
             return blocked("the project's Playwright is not installed (node_modules/playwright); Assertiva does not install dependencies or browsers")
-        node = self._node()
+        node = node_executable()
         if not node:
             return blocked("Node.js was not found (PATH or ASSERTIVA_NODE)")
         with tempfile.TemporaryDirectory(prefix="assertiva-playwright-") as tmp:

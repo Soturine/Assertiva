@@ -3,8 +3,6 @@
 import json
 import os
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -13,7 +11,7 @@ from assertiva.adapters.jest import JestAdapter, parse_jest_results
 from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.models import Outcome
 
-from conftest import write
+from conftest import commit_all as _commit_all, write
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PROJECT = FIXTURES / "js-jest"
@@ -91,12 +89,6 @@ def test_package_scripts_join_the_verification_surface(tmp_path):
     assert checks["package-script:test"].kind is VerificationKind.TEST and checks["package-script:test"].origin is VerificationOrigin.LOCAL
     assert checks["package-script:lint"].kind is VerificationKind.LINT
     assert checks["package-script:deploy"].kind is VerificationKind.UNKNOWN
-
-
-def _commit_all(root):
-    git = ["git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"]
-    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "fixture"]):
-        subprocess.run([*git, *args], cwd=root, check=True, capture_output=True)
 
 
 def test_installed_dependencies_are_linked_into_copies_never_copied(tmp_path):

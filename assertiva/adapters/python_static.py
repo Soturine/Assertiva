@@ -9,6 +9,22 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def measured_coverage(python: str, root: Path, env: dict, out_dir: Path, timeout_s: float):
+    """coverage.py's JSON for a run just measured with `coverage run` (shared by the Python runners)."""
+    from dataclasses import replace
+
+    from assertiva.process import run_command
+
+    from .coverage_reports import load_coverage_report
+
+    report = out_dir / "coverage.json"
+    run_command([python, "-m", "coverage", "json", "-q", "-o", str(report)], root, env=env, timeout_s=timeout_s)
+    if not report.exists():
+        return None
+    summary = load_coverage_report(report)
+    return replace(summary, scope="project coverage configuration") if summary.error is None else None
+
+
 class PythonStatic:
     static_family = "python"
 

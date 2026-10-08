@@ -124,6 +124,14 @@ def parse_jest_format(data: dict | str, root: str | Path, adapter_id: str, limit
     return run
 
 
+def node_executable() -> str | None:
+    """The Node.js the JS adapters run: ASSERTIVA_NODE when set (and present), otherwise `node` on PATH."""
+    configured = os.environ.get("ASSERTIVA_NODE")
+    if configured:
+        return configured if Path(configured).is_file() else None
+    return shutil.which("node")
+
+
 def _coverage(summary_file: Path) -> CoverageSummary | None:
     summary = load_coverage_report(summary_file)
     return summary if summary.error is None else None
@@ -151,12 +159,6 @@ class JestAdapter:
             AdapterCapability("static_oracle_analysis", SupportLevel.UNSUPPORTED),
         )
 
-    def _node(self) -> str | None:
-        configured = os.environ.get("ASSERTIVA_NODE")
-        if configured:
-            return configured if Path(configured).is_file() else None
-        return shutil.which("node")
-
     def run(self, root: str | Path, args: list[str] | None = None, coverage: bool = False) -> RunEvidence:
         root = Path(root)
         refusal = execution_refusal()
@@ -166,7 +168,7 @@ class JestAdapter:
         if not jest.is_file():
             return RunEvidence(adapter_id=self.adapter_id, mode="execute", status=StageStatus.BLOCKED, limitations=[
                 "the project's Jest is not installed (node_modules/jest); Assertiva does not install dependencies"])
-        node = self._node()
+        node = node_executable()
         if not node:
             return RunEvidence(adapter_id=self.adapter_id, mode="execute", status=StageStatus.BLOCKED,
                                limitations=["Node.js was not found (PATH or ASSERTIVA_NODE)"])

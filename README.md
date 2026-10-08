@@ -201,3 +201,5 @@ Assertiva is not:
 ## License
 
 No license has been selected yet.
+
+Third-party material: the technology icons in the Assurance Report header are path data from [Simple Icons](https://simpleicons.org) 16.34.0, released under CC0 1.0 Universal (`assertiva/report_icons.py`); the marks belong to their owners and only name the technologies a project uses.

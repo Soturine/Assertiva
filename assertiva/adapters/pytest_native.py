@@ -14,18 +14,16 @@ import json
 import os
 import sys
 import tempfile
-from dataclasses import replace
 from pathlib import Path
 
 from assertiva.candidate import StageStatus
-from .coverage_reports import load_coverage_report
-from assertiva.models import CoverageSummary, Outcome, RunEvidence, TestInvocation
+from assertiva.models import Outcome, RunEvidence, TestInvocation
 from assertiva.process import execution_refusal, module_available, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
 from .python_discovery import python_runners
-from .python_static import PythonStatic
+from .python_static import PythonStatic, measured_coverage
 
 _PLUGIN_MODULE = "assertiva_pytest_evidence"
 _PLUGIN_SOURCE = Path(__file__).with_name("_pytest_evidence_plugin.py")
@@ -172,7 +170,7 @@ class PytestNativeAdapter(PythonStatic):
             evidence.exit_code = completed.returncode
             records = [json.loads(line) for line in evidence_file.read_text(encoding="utf-8").splitlines()] if evidence_file.exists() else []
             if measure_coverage and records:
-                evidence.coverage = self._coverage_json(root, env, plugin_dir)
+                evidence.coverage = measured_coverage(self.python, root, env, plugin_dir, self.timeout_s)
                 if evidence.coverage is None:
                     evidence.limitations.append("coverage.py ran but produced no reportable data")
 
@@ -182,14 +180,6 @@ class PytestNativeAdapter(PythonStatic):
             tail = (completed.stderr or completed.stdout).strip().splitlines()[-3:]
             evidence.limitations.append("pytest produced no native evidence: " + " | ".join(tail))
         return evidence
-
-    def _coverage_json(self, root: Path, env: dict, out_dir: Path) -> CoverageSummary | None:
-        report = out_dir / "coverage.json"
-        run_command([self.python, "-m", "coverage", "json", "-q", "-o", str(report)], root, env=env, timeout_s=self.timeout_s)
-        if not report.exists():
-            return None
-        summary = load_coverage_report(report)
-        return replace(summary, scope="project coverage configuration") if summary.error is None else None
 
     def _normalize(self, evidence: RunEvidence, records: list[dict]) -> None:
         reports: dict[str, dict[str, dict]] = {}

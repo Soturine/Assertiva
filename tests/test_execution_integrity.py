@@ -159,3 +159,14 @@ def test_the_report_shows_what_ran_and_its_equivalence_in_both_languages(tmp_pat
     assert "Reproduced in a disposable copy" in english and "Equivalence with the declared step" in english
     assert "Reproduzida em uma cópia descartável" in portuguese and "Equivalência com o passo declarado" in portuguese
     assert "which revision CI ran is UNKNOWN" in english
+
+
+def test_one_failing_ci_check_is_one_finding_naming_its_failing_tests(tmp_path, capsys):
+    """Found in CP4 review: the reproduced check's own run also raised NATIVE_TESTS_FAILING for the same failure."""
+    root = _project(tmp_path / "p", "      - run: python -m pytest -q tests\n")
+    write(root / "tests" / "test_calc.py", "from calc import add\n\n\ndef test_add():\n    assert add(2, 2) == 5\n")
+    report = _audit(root, capsys, "--run-check", "gha:.github/workflows/ci.yml:test:1")
+    codes = [f["code"] for f in report["findings"]]
+    assert codes.count("DECLARED_CHECK_FAILED") == 1 and "NATIVE_TESTS_FAILING" not in codes
+    finding = next(f for f in report["findings"] if f["code"] == "DECLARED_CHECK_FAILED")
+    assert finding["evidence"]["failing_tests"] == ["tests/test_calc.py::test_add"]

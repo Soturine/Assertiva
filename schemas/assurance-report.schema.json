@@ -40,6 +40,111 @@
             "null"
           ],
           "description": "Content digest of the audited project files; an assessment is refused when the project no longer matches it."
+        },
+        "technologies": {
+          "type": "object",
+          "description": "Languages and frameworks shown in the report header, each with how it is known: SOURCE (counted files), EXECUTED (an adapter ran it), CONFIGURED (the project's configuration at its root), DECLARED (a dependency only: presence, not proven use).",
+          "properties": {
+            "language": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "basis"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "basis": {
+                      "enum": [
+                        "SOURCE",
+                        "EXECUTED",
+                        "CONFIGURED",
+                        "DECLARED"
+                      ]
+                    },
+                    "evidence": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "technologies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "basis"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "basis": {
+                    "enum": [
+                      "SOURCE",
+                      "EXECUTED",
+                      "CONFIGURED",
+                      "DECLARED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "omitted": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "stack": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "basis"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "basis": {
+                    "enum": [
+                      "SOURCE",
+                      "EXECUTED",
+                      "CONFIGURED",
+                      "DECLARED"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "containers, databases and brokers (same bases)"
+            }
+          }
         }
       },
       "additionalProperties": true

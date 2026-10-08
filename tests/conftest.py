@@ -20,6 +20,13 @@ def git(root: Path, *args: str) -> str:
     ).stdout
 
 
+def commit_all(root: Path) -> None:
+    """Make ``root`` a Git repository with everything committed (fixture copies of real projects)."""
+    git(root, "init", "-q")
+    git(root, "add", "-A")
+    git(root, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "fixture")
+
+
 @pytest.fixture(autouse=True)
 def assertiva_home(tmp_path, monkeypatch):
     """Keep Assertiva-owned state out of the real home directory during tests."""

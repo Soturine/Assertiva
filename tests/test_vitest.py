@@ -18,7 +18,7 @@ from assertiva.adapters.vitest import FORMAT_LIMITS
 from assertiva.candidate import QualificationCheck, StageStatus
 from assertiva.models import Outcome
 from assertiva.workspace import tree_fingerprint
-from conftest import write
+from conftest import commit_all as _commit_all, write
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PROJECT = FIXTURES / "js-vitest"
@@ -66,12 +66,6 @@ def test_an_old_vitest_is_blocked_instead_of_writing_into_the_project(tmp_path):
     write(tmp_path / "node_modules" / "vitest" / "package.json", json.dumps({"version": "1.6.0"}))
     run = VitestAdapter().run(tmp_path)
     assert run.status is StageStatus.BLOCKED and "Vitest 3+" in run.limitations[0]
-
-
-def _commit_all(root):
-    git = ["git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"]
-    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "fixture"]):
-        subprocess.run([*git, *args], cwd=root, check=True, capture_output=True)
 
 
 @pytest.fixture

@@ -93,7 +93,9 @@ Started with what the 0.6.0 dogfood exposed (evidence integrity, execution safet
 - [x] native unittest and Django (`manage.py test`) adapters; the declared runner decides
 - [x] Vitest adapter (3+, TypeScript and projects), sharing the Jest results normalization
 - Gradle: researched, deferred (no JDK where this was built; Maven proves the JVM path; Gradle needs its own CI qualification first)
-- [ ] stable CLI contract and project policy/config
+- [x] project configuration, minimal and optional (`.assertiva.toml`: runners, timeout, authorizations, environment pass-through)
+- [x] report header names language, frameworks and stack with how each is known
+- [ ] stable CLI contract
 - [ ] optional MCP server and revision-aware local evidence store
 - [ ] optional FTD import and FTE/Azure bridges
 - [ ] benchmark corpora: CI-green/deploy-fail, inherited/composed tests, expected-error paths

@@ -97,10 +97,26 @@ def artifact_adapters(root: str | Path, python: str | None = None) -> list:
     return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
 
 
+def runner_name(adapter) -> str:
+    """The runner's name as a project configuration names it (`tests.runners`)."""
+    return getattr(adapter, "runner", adapter.adapter_id.removesuffix("-native"))
+
+
 def runner_adapters(root: str | Path, python: str | None = None) -> list:
-    """Executable test-runner adapters that support the project at ``root``."""
+    """Executable test-runner adapters for the project at ``root``: the configured runners (`.assertiva.toml`
+    `[tests] runners`) when it names them, otherwise those that recognize the project."""
+    from assertiva.config import load_config
+
+    config = load_config(root)
     candidates = [factory(python=python) for factory in RUNNER_FACTORIES]
-    return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
+    if config.runners:
+        chosen = [adapter for adapter in candidates if runner_name(adapter) in config.runners]
+    else:
+        chosen = [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
+    if config.timeout_s:
+        for adapter in chosen:
+            adapter.timeout_s = config.timeout_s
+    return chosen
 
 
 def static_providers(adapters: list) -> list:

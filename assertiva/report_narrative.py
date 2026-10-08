@@ -64,6 +64,7 @@ NARRATIVE: list[tuple[str, str]] = [
      "nenhum adaptador executável reconheceu este projeto; a evidência de testes é DESCONHECIDA"),
     ("installed dependencies are linked from the project, not isolated ({deps}); runs can read and write them, and dependency changes made by a candidate are not installed",
      "dependências instaladas são vinculadas a partir do projeto, não isoladas ({deps}); execuções podem lê-las e alterá-las, e mudanças de dependência feitas por um candidato não são instaladas"),
+    ("configuration ({source}): {problem}", "configuração ({source}): {problem}"),
     ("coverage was requested but Vitest produced no json-summary",
      "a cobertura foi solicitada, mas o Vitest não produziu json-summary"),
     ("no Vitest coverage provider is installed (@vitest/coverage-v8 or -istanbul); coverage was not measured",

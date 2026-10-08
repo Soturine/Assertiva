@@ -162,6 +162,14 @@ def _surface(surface) -> list[dict]:
     return [to_jsonable(check) for check in surface.checks] if surface else []
 
 
+def _technologies(root: Path, files: list[str], runs) -> dict:
+    """Languages and frameworks for the report header, each with how it is known (never a measurement)."""
+    from .adapters.technologies import project_technologies
+
+    executed = [run.adapter_id for run in runs if run.mode != "report" and run.status is not StageStatus.BLOCKED]
+    return project_technologies(root, files, list(dict.fromkeys(executed)))
+
+
 def audit_model(
     root: Path, baseline, findings: list, current: StateEvidence, surface, limitations: list[str], adapters: list[str], status: str,
 ) -> dict:
@@ -206,7 +214,8 @@ def audit_model(
         "workflow": "audit",
         "run_id": uuid.uuid4().hex[:16],
         "status": status,
-        "project": {"name": root.name, "root": str(root), "revision": baseline.revision, "dirty": baseline.dirty, "digest": baseline.digest},
+        "project": {"name": root.name, "root": str(root), "revision": baseline.revision, "dirty": baseline.dirty, "digest": baseline.digest,
+                    "technologies": _technologies(root, list(baseline.files), current.runs)},
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "states": {"current": state_summary(current), "baseline": None, "candidate": None, "applied": None},
         "findings": findings_data,
@@ -245,6 +254,7 @@ def improve_report(session, result, applied=None) -> dict:
         "project": {
             "name": session.root.name, "root": str(session.root),
             "revision": session.baseline.revision, "dirty": session.baseline.dirty, "baseline_digest": session.baseline.digest,
+            "technologies": _technologies(session.root, list(session.baseline.files), result.baseline_evidence.runs),
         },
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "states": {

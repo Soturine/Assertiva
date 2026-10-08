@@ -9,8 +9,6 @@ of being bundled into `node_modules/.vite-temp`. Coverage uses the project's own
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -21,7 +19,7 @@ from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
 from .coverage_reports import load_coverage_report
-from .jest import _package, parse_jest_format
+from .jest import _package, node_executable, parse_jest_format
 
 _CONFIGS = tuple(f"{stem}.{ext}" for stem in ("vitest.config", "vitest.workspace", "vitest.projects")
                  for ext in ("ts", "mts", "cts", "js", "mjs", "cjs", "json"))
@@ -65,12 +63,6 @@ class VitestAdapter:
             AdapterCapability("static_oracle_analysis", u),
         )
 
-    def _node(self) -> str | None:
-        configured = os.environ.get("ASSERTIVA_NODE")
-        if configured:
-            return configured if Path(configured).is_file() else None
-        return shutil.which("node")
-
     def _blocked(self, reason: str, **fields) -> RunEvidence:
         return RunEvidence(adapter_id=self.adapter_id, mode="execute", status=StageStatus.BLOCKED, limitations=[reason], **fields)
 
@@ -86,7 +78,7 @@ class VitestAdapter:
         major = int(version.split(".")[0]) if version.split(".")[0].isdigit() else 0
         if major < 3:
             return self._blocked(f"Vitest {version}: the adapter needs Vitest 3+ to load the configuration without writing into the project")
-        node = self._node()
+        node = node_executable()
         if not node:
             return self._blocked("Node.js was not found (PATH or ASSERTIVA_NODE)")
         provider = next((name for package, name in _PROVIDERS.items() if (root / "node_modules" / package).is_dir()), None)

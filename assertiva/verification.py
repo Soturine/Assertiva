@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any
 
 
 class VerificationKind(str, Enum):
@@ -94,15 +94,26 @@ def discover_surface(root) -> VerificationSurface:
     from .adapters import surface_adapters
 
     surface = VerificationSurface()
-    for adapter in surface_adapters():
-        if adapter.supports(Path(root)) is SupportLevel.SUPPORTED:
-            for check in adapter.discover(Path(root)):
-                surface.add(check)
+    supported = [a for a in surface_adapters() if a.supports(Path(root)) is SupportLevel.SUPPORTED]
+    for adapter in supported:
+        for check in adapter.discover(Path(root)):
+            surface.add(check)
+    # Equivalence, not literal text: a step that runs a project script (`npm test`) is matched by the tool the
+    # script runs. Only for matching: the step's own kind, and what may be executed, never change.
+    resolvers = [a for a in supported if hasattr(a, "effective_tool")]
+    for check in surface.checks:
+        tool = next((t for a in resolvers if (t := a.effective_tool(Path(root), check))), None)
+        if tool and tool != check.tool:
+            check.metadata["effective_tool"] = tool
     return surface
 
 
+def _tool(check: VerificationCheck) -> str | None:
+    return check.metadata.get("effective_tool") or check.tool
+
+
 def _covers(delivery: VerificationCheck, local: VerificationCheck) -> bool:
-    if local.tool and delivery.tool == local.tool:
+    if _tool(local) and _tool(delivery) == _tool(local):
         return True
     runs = delivery.metadata.get("runs_hooks") or []
     return "*" in runs or local.metadata.get("hook_id") in runs
@@ -138,7 +149,7 @@ def surface_findings(surface: VerificationSurface) -> list:
             check.command or check.tool or check.check_id
             for check in delivery
             if check.kind is not VerificationKind.UNKNOWN or check.command
-            if not any(check.tool == item.tool for item in local) and not check.metadata.get("runs_hooks")
+            if not any(_tool(check) == _tool(item) for item in local) and not check.metadata.get("runs_hooks")
         ]
         if ci_only:
             findings.append(

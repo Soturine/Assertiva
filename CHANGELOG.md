@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.0] — 2026-10-08 — Evidence integrity, Python and Vitest runners, project configuration
 
-M3 has started (partial). Found by dogfooding 0.6.0 on functional-test-designer.
+Minor release; M3 is in progress (partial, see ROADMAP.md). Found by dogfooding 0.6.0 on functional-test-designer.
 
 ### Evidence integrity and execution safety
 - A run is evidence only with its own exit status. Processes run in their own process group and a timeout ends the whole tree (POSIX process group, Windows `taskkill /T`), not only the direct child; a process ended by a signal records it and is never a pass; every command keeps a digest of its complete output.
@@ -27,9 +27,15 @@ M3 has started (partial). Found by dogfooding 0.6.0 on functional-test-designer.
 - Optional project configuration, `.assertiva.toml` or `[tool.assertiva]` in pyproject.toml, never required: `[tests] runners` (when detection cannot know) and `timeout_s`; `[execution] authorize` and `env`. Unknown or malformed entries are reported in the audit's limitations, never guessed.
 - The Assurance Report header names the project's primary language, up to three frameworks/tools and up to three stack services (Docker, PostgreSQL, MySQL/MariaDB, MongoDB, Redis, SQLite, RabbitMQ, Elasticsearch), each with how it is known: counted source files, EXECUTED (its tests ran), CONFIGURED (the project's own configuration at its root, a Compose/CI service image or a Django ENGINE), DECLARED (a dependency only, drawn with a dashed border: presence, not proven use). Icons are inline SVG path data from Simple Icons (CC0), one central catalog (`assertiva/report_icons.py`), a generic icon otherwise; the page stays offline. English and Brazilian Portuguese, light/dark, no horizontal scroll at 390 px.
 - The header shows the version the project declares for itself under its name, with the manifest it comes from (pyproject.toml, package.json, Cargo.toml, the project's own pom.xml version, setup.cfg, VERSION); nothing when none declares one, never a dynamic or interpolated value.
-- Six hidden-rubric eval cases for this cycle's failure modes: masked exit codes, a CI runner different from the local one, a Django run that cannot reach its database, indirect oracles, declared commands with effects, a local reproduction read as CI (grader-ready; not yet run).
+- Six hidden-rubric eval cases for this cycle's failure modes: masked exit codes, a CI runner different from the local one, a Django run that cannot reach its database, indirect oracles, declared commands with effects, a local reproduction read as CI.
 - One cause, one finding: a failing `--run-check` reproduced through an adapter is one `DECLARED_CHECK_FAILED` naming the failing tests, no longer also `NATIVE_TESTS_FAILING` for the same run.
 - Shared helpers instead of copies: one Node.js lookup for the JS adapters, one coverage.py export for the Python runners, one fixture-commit helper in the tests.
+
+### Evaluation and dogfood
+- Six new cases × 3 runs, claude-haiku-4-5 evaluated, claude-sonnet-5-5 judge: 9 PASS, 3 REVIEW, 6 FAIL (`evals/results/2026-10-08-m3`). Consistent failure: every Django run proposed passing a shared staging `DATABASE_URL` through, which the CP1 wording of references/ENGINE.md invited; the reference now limits pass-through and authorization to disposable resources and leaves both to the owner. references/DELIVERY.md now explains how a CI step's status is formed (pipes, `pipefail`). The cases were not re-run after these changes; part of the safety case's shortfall is a case/harness mismatch (context-only runs cannot execute the safe step), recorded, not corrected after the fact.
+- functional-test-designer (deterministic, read-only): `--execute` now runs unittest as its CI declares — 599 declarations, 824 invocations (subTest cases reported individually), all PASS, coverage 91.8 % line / 78.7 % branch; static audit 5.6 s → 3.1 s, execute 254 s → 225 s against v0.6.0; weak-oracle candidates 19 → 8; project unchanged.
+- curso-django-projeto1 (Django 6.1.2, read-only): `manage.py test` ran through the project's DiscoverRunner; its only `tests.py` is empty, reported UNKNOWN (no test executed), never a pass; project unchanged.
+- Agent-led dogfoods on real projects were not run in this release.
 
 ### Static inventory and oracle signals
 - The Python static inventory follows the runner's discovery configuration: `testpaths`, `python_files` and `norecursedirs` (pytest.ini, pyproject `[tool.pytest.ini_options]`/`[tool.pytest]`, tox.ini, setup.cfg) and never enters virtual environments. Before, eval fixture projects under `evals/` were inventoried as Assertiva's own tests despite `testpaths = ["tests"]`.

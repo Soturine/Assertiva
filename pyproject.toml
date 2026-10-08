@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assertiva"
-version = "0.6.0"
+version = "0.7.0"
 description = "Adaptive Test Intelligence & Assurance for coding agents"
 requires-python = ">=3.11"
 dependencies = ["PyYAML>=6.0"]

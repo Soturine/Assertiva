@@ -18,6 +18,7 @@ Everything that can block or influence delivery counts: tests, lint, type and st
 ## CI and revision provenance
 
 - Workflow files are declared evidence: they say what *should* run, not what did.
+- A step's status is its shell's: a pipeline (`pytest | tee log`) returns its last command's status unless `pipefail` is set (GitHub Actions' default `bash -e` has none; `shell: bash` adds it), and grepping a log for "passed" is not a result. Read the runner's own summary or exit code before trusting a green step.
 - A CI run proves a revision only when its identity is confirmed — its head SHA equals `git rev-parse HEAD`, or an equally explicit link. Otherwise say "CI green observed; correspondence to HEAD unknown". A dirty working tree is proven by no run.
 - When the provider is reachable (for example `gh run list --json headSha,conclusion,name`), checking for a run on HEAD is cheaper than a full local run that only tells you whether HEAD is green. A local run still adds evidence when the question needs per-test outcomes, coverage or a different environment; say what it adds.
 - Expressions, conditions, reusable workflows, includes and branch protection are not evaluated from configuration: whether a conditional job ran or gates merges stays unknown without run evidence.

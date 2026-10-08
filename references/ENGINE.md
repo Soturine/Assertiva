@@ -24,7 +24,7 @@
 
 Optional `.assertiva.toml` (the project owner's file; never write it during an audit): `[tests] runners` and `timeout_s` when detection cannot know; `[execution] authorize` and `env`.
 
-Executions run project code with the user's permissions and network: a disposable copy protects the project tree, not the machine. Credential-looking environment variables are withheld (named in the report's limitations); a variable the tests need is passed through with `[execution] env` in `.assertiva.toml`.
+Executions run project code with the user's permissions and network: a disposable copy protects the project tree, not the machine. Credential-looking environment variables are withheld (named in the report's limitations). A variable the tests need can be passed through with `[execution] env` in `.assertiva.toml`, but only when it points at a disposable test resource (a local or throwaway database or service); never propose passing one that reaches a shared, staging or production system — offer a throwaway resource instead. The same holds for `[execution] authorize`: never propose authorizing a command that writes to shared systems. Both are the owner's decision.
 
 Options combine in one call; every call writes one canonical `audit.html` + `audit.json` under `ASSERTIVA_HOME` (outside the project) and replaces the previous one for the project. Exit code 0 means the audit ran and reported (a failing suite still exits 0: the verdict is in the report), 2 a refusal or misuse, 3 a read-only violation.
 

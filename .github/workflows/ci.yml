@@ -22,8 +22,10 @@ jobs:
         with:
           node-version: "24"
           package-manager-cache: false
-      - name: Prepare the JS adapter fixture once (lockfile, no package hooks)
-        run: npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-jest
+      - name: Prepare the JS adapter fixtures once (lockfiles, no package hooks)
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-jest
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-vitest
       - run: python scripts/validate_repo.py
       - name: Fast/core suite
         run: pytest -q -m "not integration and not artifact"

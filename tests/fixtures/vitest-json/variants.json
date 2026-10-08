@@ -1,0 +1,198 @@
+{
+ "numTotalTestSuites": 5,
+ "numPassedTestSuites": 3,
+ "numFailedTestSuites": 2,
+ "numPendingTestSuites": 0,
+ "numTotalTests": 8,
+ "numPassedTests": 5,
+ "numFailedTests": 1,
+ "numPendingTests": 1,
+ "numTodoTests": 1,
+ "snapshot": {
+  "added": 0,
+  "failure": false,
+  "filesAdded": 0,
+  "filesRemoved": 0,
+  "filesRemovedList": [],
+  "filesUnmatched": 0,
+  "filesUpdated": 0,
+  "matched": 0,
+  "total": 0,
+  "unchecked": 0,
+  "uncheckedKeysByFile": [],
+  "unmatched": 0,
+  "updated": 0,
+  "didUpdate": false
+ },
+ "startTime": 1791463997931,
+ "success": false,
+ "testResults": [
+  {
+   "assertionResults": [],
+   "startTime": 1791463997931,
+   "endTime": 1791463997931,
+   "status": "failed",
+   "message": "Cannot find module './missing' imported from <ROOT>/src/broken.test.ts",
+   "name": "<ROOT>/src/broken.test.ts"
+  },
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "fullName": "discount discount(100, VIP) is 90",
+     "status": "passed",
+     "title": "discount(100, VIP) is 90",
+     "duration": 1.249900000000025,
+     "failureMessages": [],
+     "location": {
+      "line": 8,
+      "column": 14
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "fullName": "discount discount(150, REGULAR) is 150",
+     "status": "passed",
+     "title": "discount(150, REGULAR) is 150",
+     "duration": 0.13349999999999795,
+     "failureMessages": [],
+     "location": {
+      "line": 8,
+      "column": 14
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "fullName": "discount rejects a negative total",
+     "status": "passed",
+     "title": "rejects a negative total",
+     "duration": 0.6019999999999754,
+     "failureMessages": [],
+     "location": {
+      "line": 12,
+      "column": 3
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "fullName": "discount waits for a currency rule",
+     "status": "skipped",
+     "title": "waits for a currency rule",
+     "failureMessages": [],
+     "location": {
+      "line": 16,
+      "column": 8
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [
+      "discount"
+     ],
+     "fullName": "discount handles rounding of fractional cents",
+     "status": "todo",
+     "title": "handles rounding of fractional cents",
+     "failureMessages": [],
+     "location": {
+      "line": 20,
+      "column": 8
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1791463998142,
+   "endTime": 1791463998143.602,
+   "status": "passed",
+   "message": "",
+   "name": "<ROOT>/src/price.test.ts"
+  },
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [],
+     "fullName": "fails",
+     "status": "failed",
+     "title": "fails",
+     "duration": 4.707700000000017,
+     "failureMessages": [
+      "AssertionError: expected 1 to be 2 // Object.is equality\n    at <ROOT>/api/fail.test.ts:2:33\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:1628:35\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:26\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3321:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3316:10)\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3301:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3259:10)\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3882:64"
+     ],
+     "location": {
+      "line": 2,
+      "column": 1
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    },
+    {
+     "ancestorTitles": [],
+     "fullName": "retried",
+     "status": "passed",
+     "title": "retried",
+     "duration": 0.8507999999999925,
+     "failureMessages": [
+      "AssertionError: expected 1 to be 2 // Object.is equality\n    at <ROOT>/api/fail.test.ts:3:90\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:1628:35\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:26\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3321:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3316:10)\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3301:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3259:10)\n    at file:///C:/Users/rafaelryan/Desktop/github/Assertiva/tests/fixtures/js-vitest/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3882:64"
+     ],
+     "location": {
+      "line": 3,
+      "column": 1
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1791463998102,
+   "endTime": 1791463998107.8508,
+   "status": "failed",
+   "message": "",
+   "name": "<ROOT>/api/fail.test.ts"
+  },
+  {
+   "assertionResults": [
+    {
+     "ancestorTitles": [],
+     "fullName": "quotes a VIP total asynchronously",
+     "status": "passed",
+     "title": "quotes a VIP total asynchronously",
+     "duration": 2.8567999999999927,
+     "failureMessages": [],
+     "location": {
+      "line": 4,
+      "column": 1
+     },
+     "meta": {},
+     "tags": [],
+     "benchmarks": []
+    }
+   ],
+   "startTime": 1791463998138,
+   "endTime": 1791463998140.8567,
+   "status": "passed",
+   "message": "",
+   "name": "<ROOT>/api/quote.test.ts"
+  }
+ ]
+}

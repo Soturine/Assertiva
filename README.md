@@ -89,9 +89,9 @@ suite
 
 The model is designed to accommodate ecosystems such as pytest, JUnit, Jest, Vitest, Playwright, xUnit/NUnit, Go, Rust, PHP and Ruby runners, custom runners and future frameworks.
 
-**Implemented today:** native adapters for pytest (Python), Jest, Playwright and Maven (Surefire/Failsafe, JUnit Platform); portable evidence from JUnit XML, coverage (coverage.py, istanbul, LCOV, Cobertura, JaCoCo) and mutation reports; CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins.
+**Implemented today:** native adapters for pytest, unittest and Django `manage.py test` (Python), Jest and Vitest (JavaScript/TypeScript), Playwright and Maven (Surefire/Failsafe, JUnit Platform) — the project's declared runner decides which one runs ([capabilities](adapters/README.md)); portable evidence from JUnit XML, coverage (coverage.py, istanbul, LCOV, Cobertura, JaCoCo) and mutation reports; CI configuration from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins.
 
-**Not implemented yet:** Vitest, .NET (xUnit/NUnit), Go, Rust, Gradle and other ecosystems. They degrade conservatively and explicitly to CUSTOM/UNKNOWN evidence, never to "0 tests" and never by silently inventing flags. See [STATUS.md](STATUS.md).
+**Not implemented yet:** Gradle, .NET (xUnit/NUnit/MSTest), Go, Rust, PHP and other ecosystems. They degrade conservatively and explicitly to CUSTOM/UNKNOWN evidence, never to "0 tests" and never by silently inventing flags. See [STATUS.md](STATUS.md).
 
 ## Test Evidence Graph
 

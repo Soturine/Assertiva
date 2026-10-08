@@ -53,7 +53,12 @@ def _relative(name: str, root: str) -> str:
 
 def parse_jest_results(data: dict | str, root: str | Path) -> RunEvidence:
     """Normalize Jest's ``--json`` results into run evidence (no execution)."""
-    run = RunEvidence(adapter_id="jest", mode="execute", status=StageStatus.UNKNOWN)
+    return parse_jest_format(data, root, "jest", FORMAT_LIMITS)
+
+
+def parse_jest_format(data: dict | str, root: str | Path, adapter_id: str, limits: list[str]) -> RunEvidence:
+    """Jest's results format (``testResults[].assertionResults[]``), which Vitest's JSON reporter also writes."""
+    run = RunEvidence(adapter_id=adapter_id, mode="execute", status=StageStatus.UNKNOWN)
     try:
         if isinstance(data, str):
             data = json.loads(data)
@@ -62,9 +67,9 @@ def parse_jest_results(data: dict | str, root: str | Path) -> RunEvidence:
             raise TypeError("testResults is not a list")
     except (ValueError, KeyError, TypeError) as exc:
         run.status = StageStatus.BLOCKED
-        run.limitations.append(f"Jest results could not be read: {exc}"[:300])
+        run.limitations.append(f"{adapter_id} results could not be read: {exc}"[:300])
         return run
-    run.limitations += FORMAT_LIMITS
+    run.limitations += limits
     root = str(root)
     retried = []
     for result in files:
@@ -93,6 +98,10 @@ def parse_jest_results(data: dict | str, root: str | Path) -> RunEvidence:
             if invocations > 1:
                 retried.append(invocation_id)
                 message = f"{status} after {invocations} invocations (earlier attempts failed)" + (f": {message}" if message else "")
+            elif status == "passed" and messages:  # Vitest: a pass after retries keeps the earlier failures
+                retried.append(invocation_id)
+                invocations = None
+                message = "passed after earlier failed attempts (attempt count not reported): " + message
             duration = item.get("duration")
             run.invocations.append(
                 TestInvocation(

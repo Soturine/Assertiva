@@ -54,6 +54,12 @@ def _jest(python=None):
     return JestAdapter(python=python)
 
 
+def _vitest(python=None):
+    from .vitest import VitestAdapter
+
+    return VitestAdapter(python=python)
+
+
 def _playwright(python=None):
     from .playwright import PlaywrightAdapter
 
@@ -67,7 +73,7 @@ def _maven(python=None):
 
 
 # Plain lists of factories (called with the target interpreter); no plugin machinery.
-RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _playwright, _maven]
+RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _vitest, _playwright, _maven]
 ARTIFACT_FACTORIES = [_python_package]
 
 

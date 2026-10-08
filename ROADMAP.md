@@ -91,11 +91,13 @@ Started with what the 0.6.0 dogfood exposed (evidence integrity, execution safet
 - [x] evidence integrity: a run's own exit status, process-tree timeouts, signals, output digests; `--run-check` execution records with per-dimension CI parity
 - [x] execution safety: credential-looking variables withheld; checks with effects outside the copy need the owner's authorization (`.assertiva.toml`); publishing build goals never run
 - [x] native unittest and Django (`manage.py test`) adapters; the declared runner decides
+- [x] Vitest adapter (3+, TypeScript and projects), sharing the Jest results normalization
+- Gradle: researched, deferred (no JDK where this was built; Maven proves the JVM path; Gradle needs its own CI qualification first)
 - [ ] stable CLI contract and project policy/config
 - [ ] optional MCP server and revision-aware local evidence store
 - [ ] optional FTD import and FTE/Azure bridges
 - [ ] benchmark corpora: CI-green/deploy-fail, inherited/composed tests, expected-error paths
-- [ ] multi-stack qualification (Python, JS, Playwright, Django, Java, .NET, Android, monorepo) — Django, unittest done; others open
+- [ ] multi-stack qualification (Python, JS, Playwright, Django, Java, .NET, Android, monorepo) — unittest, Django, Vitest done; Gradle, .NET, Go, Rust, PHP open
 - [ ] paired baseline vs Assertiva trials
 
 Milestones may reopen when new evidence exposes reusable gaps.

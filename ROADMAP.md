@@ -89,11 +89,11 @@ Found by dogfooding: a static-first Skill stopped at static evidence, sampled ca
 ## M3 — Productization & Empirical Validation (in progress)
 Started with what the 0.6.0 dogfood exposed (evidence integrity, execution safety) and the Python runners real projects use.
 - [x] evidence integrity: a run's own exit status, process-tree timeouts, signals, output digests; `--run-check` execution records with per-dimension CI parity
-- [x] execution safety: credential-looking variables withheld; checks with effects outside the copy need the owner's authorization (`.assertiva.toml`); publishing build goals never run
+- [x] execution safety: credential-looking variables withheld; checks with effects outside the copy need the user's consent (`<ASSERTIVA_HOME>/consent.toml`, never the project's files); connection targets withheld; publishing build goals never run
 - [x] native unittest and Django (`manage.py test`) adapters; the declared runner decides
 - [x] Vitest adapter (3+, TypeScript and projects), sharing the Jest results normalization
 - Gradle: researched, deferred (no JDK where this was built; Maven proves the JVM path; Gradle needs its own CI qualification first)
-- [x] project configuration, minimal and optional (`.assertiva.toml`: runners, timeout, authorizations, environment pass-through)
+- [x] project configuration, minimal and optional (`.assertiva.toml`: runners, timeout; consent stays with the user)
 - [x] report header names language, frameworks and stack with how each is known
 - [ ] stable CLI contract
 - [ ] optional MCP server and revision-aware local evidence store

@@ -84,6 +84,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "o unittest coleta apenas métodos de TestCase; funções de teste simples não são executadas por este executor"),
     ("credential-like environment variables were withheld from executed project code: {names}",
      "variáveis de ambiente com aparência de credencial foram retidas do código do projeto executado: {names}"),
+    ("{key} is not read from the project; consent belongs in <ASSERTIVA_HOME>/consent.toml",
+     "{key} não é lido do projeto; o consentimento fica em <ASSERTIVA_HOME>/consent.toml"),
     ("{adapter} cannot run a selected subset; it ran its full suite",
      "{adapter} não consegue executar um subconjunto selecionado; executou a suíte completa"),
     ("{adapter}: none of the selected tests belong to it; it was not run",

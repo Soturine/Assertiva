@@ -39,7 +39,7 @@ def test_credentials_are_withheld_from_child_processes_and_named_not_valued(tmp_
     assert "hunter2" not in json.dumps(withheld)
 
 
-def test_the_project_owner_can_pass_a_needed_variable_through(tmp_path):
+def test_the_user_can_pass_a_needed_variable_through(tmp_path):
     env = {**os.environ, "DATABASE_URL": "postgres://u:p@localhost/test"}
     with process.passthrough(["DATABASE_URL"]):
         result = process.run_command([sys.executable, "-c", _PRINT_ENV], tmp_path, env=env, timeout_s=60)
@@ -127,19 +127,71 @@ def test_a_pipeline_into_tail_is_never_reproduced_as_the_runner(tmp_path, capsys
     assert check["status"] == "NOT_RUN" and "compound shell step" in check["detail"]
 
 
-def test_a_check_with_effects_outside_the_copy_needs_the_owners_authorization(tmp_path, capsys):
+def _consent(home: Path, root: Path, *, authorize=(), env=()) -> None:
+    """The user's own consent file, outside every project (ASSERTIVA_HOME/consent.toml)."""
+    entries = ", ".join(f"{v!r}" for v in authorize)
+    names = ", ".join(f"{v!r}" for v in env)
+    write(home / "consent.toml", f"[[project]]\nroot = {str(root.resolve())!r}\nauthorize = [{entries}]\nenv = [{names}]\n")
+
+
+def test_a_check_with_effects_outside_the_copy_needs_the_users_consent(tmp_path, capsys, assertiva_home):
     root = _project(tmp_path / "p", "      - run: python manage.py migrate\n")
     check_id = "gha:.github/workflows/ci.yml:test:1"
     report = _audit(root, capsys, "--run-check", check_id)
     [check] = report["declared_checks"]
     assert check["kind"] == "MIGRATION" and check["status"] == "NOT_RUN" and check["authorization"] == "REQUIRED"
-    assert ".assertiva.toml" in check["detail"]
-    write(root / ".assertiva.toml", f'[execution]\nauthorize = ["{check_id}"]\n')
+    assert "consent.toml" in check["detail"]
+    _consent(assertiva_home, root, authorize=["python manage.py migrate"])
     before = tree_fingerprint(root)
     report = _audit(root, capsys, "--run-check", check_id)
     [check] = report["declared_checks"]
     assert check["status"] == "PASS" and check["authorization"] == "AUTHORIZED"
     assert tree_fingerprint(root) == before and not (root / "migrated.marker").exists()  # it ran in the copy
+
+
+def test_a_repository_cannot_authorize_its_own_commands_or_unlock_credentials(tmp_path, capsys, monkeypatch):
+    """0.7.0 read `[execution] authorize/env` from the audited project: an unknown repository could authorize itself."""
+    root = _project(tmp_path / "p", "      - run: python manage.py migrate\n")
+    write(root / ".assertiva.toml", '[execution]\nauthorize = ["python manage.py migrate", "gha:.github/workflows/ci.yml:test:1"]\n'
+                                    'env = ["DEPLOY_TOKEN"]\n')
+    monkeypatch.setenv("DEPLOY_TOKEN", "secret-value")
+    report = _audit(root, capsys, "--execute", "--run-check", "gha:.github/workflows/ci.yml:test:1")
+    [check] = report["declared_checks"]
+    assert check["status"] == "NOT_RUN" and check["authorization"] == "REQUIRED"
+    limitations = " ".join(report["claim_boundary"]["limitations"])  # the tests ran, the token stayed withheld
+    assert "execution.authorize is not read from the project" in limitations and "DEPLOY_TOKEN" in limitations
+
+
+def test_consent_names_the_command_not_a_positional_check_id(tmp_path, capsys, assertiva_home):
+    """A check id is a position in a workflow: a later commit can put another command behind it."""
+    root = _project(tmp_path / "p", "      - run: python manage.py migrate\n")
+    _consent(assertiva_home, root, authorize=["gha:.github/workflows/ci.yml:test:1"])
+    report = _audit(root, capsys, "--run-check", "gha:.github/workflows/ci.yml:test:1")
+    assert report["declared_checks"][0]["status"] == "NOT_RUN"
+
+
+@pytest.mark.parametrize("name, value", [
+    ("DATABASE_URL", "postgres://staging.internal/app"), ("PGHOST", "db.prod.example"), ("REDIS_URL", "redis://cache:6379/0"),
+    ("DJANGO_SETTINGS_MODULE", "site.settings.production"), ("ASSERTIVA_API_TOKEN", "t"), ("MONGO_URI", "mongodb://m1/x"),
+])
+def test_connection_targets_and_settings_are_withheld_even_without_a_password(tmp_path, name, value):
+    result = process.run_command([sys.executable, "-c", _PRINT_ENV], tmp_path, env={**os.environ, name: value}, timeout_s=60)
+    assert name not in _names(result)
+
+
+def test_engine_variables_still_reach_child_processes(tmp_path):
+    env = {**os.environ, "ASSERTIVA_HOME": str(tmp_path / "h"), "ASSERTIVA_NODE": "node"}
+    names = _names(process.run_command([sys.executable, "-c", _PRINT_ENV], tmp_path, env=env, timeout_s=60))
+    assert {"ASSERTIVA_HOME", "ASSERTIVA_NODE", "ASSERTIVA_DEPTH"} <= set(names)
+
+
+def test_a_consented_connection_reaches_only_a_local_target(tmp_path):
+    local = {**os.environ, "DATABASE_URL": "postgres://u:p@localhost:5432/test"}
+    remote = {**os.environ, "DATABASE_URL": "postgres://u:p@staging.internal:5432/app"}
+    with process.run_scope(), process.passthrough(["DATABASE_URL"]):
+        assert "DATABASE_URL" in _names(process.run_command([sys.executable, "-c", _PRINT_ENV], tmp_path, env=local, timeout_s=60))
+        assert "DATABASE_URL" not in _names(process.run_command([sys.executable, "-c", _PRINT_ENV], tmp_path, env=remote, timeout_s=60))
+        assert "DATABASE_URL" in process.withheld_variables()
 
 
 def test_withheld_credentials_are_a_reported_limitation(tmp_path, capsys, monkeypatch):

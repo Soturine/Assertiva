@@ -135,7 +135,7 @@ def active_target(kind: str, identity: str):
 # A disposable copy protects the project tree, not the machine: project code still runs as the user,
 # with network access. What Assertiva can withhold is the credentials its own environment carries.
 # Credential-looking variables are removed from every child environment (names are recorded, values
-# never); a project lists what its tests legitimately need in `.assertiva.toml` ([execution] env).
+# never); the user consents to what a project's tests need in <ASSERTIVA_HOME>/consent.toml, never the project.
 _CREDENTIAL_NAME = re.compile(
     r"(?i)(token|secret|passw(or)?d|passphrase|credential|api[-_]?key|private[-_]?key|access[-_]?key|auth|session|cookie)"
 )
@@ -145,19 +145,37 @@ _CREDENTIAL_PREFIXES = (
     "SYSTEM_ACCESSTOKEN", "ACTIONS_RUNTIME", "ACTIONS_ID_TOKEN", "ACTIONS_CACHE",
 )
 _URL_WITH_PASSWORD = re.compile(r"://[^/\s:@]+:[^@\s]+@")
-PASSTHROUGH: frozenset[str] = frozenset()  # set by the command from the project's configuration
+# Where tests would connect, or which settings they would load: never inherited, so a shell pointed at staging or
+# production (with or without a password in the value) cannot steer a test run there.
+_CONNECTION = re.compile(r"(?i)^(DJANGO_SETTINGS_MODULE|PG[A-Z]+|MYSQL_\w+|.*(DATABASE|DB|SQL|REDIS|MONGO|AMQP|BROKER|RABBIT|ELASTIC|KAFKA|CACHE)\w*_(URL|URI|DSN|HOST|SERVER|ADDR))$")
+_LOCAL_HOSTS = {"", "localhost", "127.0.0.1", "::1"}
+PASSTHROUGH: frozenset[str] = frozenset()  # set by the command from the user's consent
 
 
 def is_credential(name: str, value: str) -> bool:
-    if name.startswith("ASSERTIVA_"):
-        return False
     return (name.upper().startswith(_CREDENTIAL_PREFIXES) or bool(_CREDENTIAL_NAME.search(name))
-            or bool(_URL_WITH_PASSWORD.search(value)))
+            or bool(_URL_WITH_PASSWORD.search(value)) or bool(_CONNECTION.match(name)))
+
+
+def _remote_target(name: str, value: str) -> bool:
+    """A connection variable whose value names a host other than this machine."""
+    if not _CONNECTION.match(name) or name.upper() == "DJANGO_SETTINGS_MODULE":
+        return False
+    from urllib.parse import urlsplit
+
+    try:
+        host = urlsplit(value).hostname if "://" in value else (value.split(":")[0] if name.upper().endswith(("HOST", "SERVER", "ADDR")) else "")
+    except ValueError:
+        return True
+    host = (host or "").strip("[]").lower()
+    return host not in _LOCAL_HOSTS and not host.endswith(".localhost")
 
 
 def child_environment(env: dict) -> dict:
-    """``env`` without credential-looking variables (except those the project passes through)."""
-    withheld = {name for name, value in env.items() if name not in PASSTHROUGH and is_credential(name, value)}
+    """``env`` without credential, connection and settings variables; the user's consented ones pass, and a
+    consented connection only when it points at this machine."""
+    withheld = {name for name, value in env.items()
+                if (name not in PASSTHROUGH and is_credential(name, value)) or (name in PASSTHROUGH and _remote_target(name, value))}
     if withheld and _SCOPES:
         _SCOPES[-1].setdefault("__withheld__", set()).update(withheld)
     return {name: value for name, value in env.items() if name not in withheld}
@@ -165,7 +183,7 @@ def child_environment(env: dict) -> dict:
 
 @contextmanager
 def passthrough(names):
-    """Let the project's declared variables (``[execution] env``) reach its code during this block."""
+    """Let the variables the user consented to (consent.toml ``env``) reach project code during this block."""
     global PASSTHROUGH
     previous, PASSTHROUGH = PASSTHROUGH, frozenset(names)
     try:

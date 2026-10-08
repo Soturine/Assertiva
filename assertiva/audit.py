@@ -141,7 +141,7 @@ def _declared_checks(root: Path, surface, requested, adapters, python: str | Non
         for check_id in dict.fromkeys(requested):
             check = by_id[check_id]
             done = reproduce_check(check, copy, adapters, python, revision, config.authorizes, reusable,
-                                   authorize_hint=" (`[execution] authorize` in .assertiva.toml)")
+                                   authorize_hint=" (the exact command in <ASSERTIVA_HOME>/consent.toml)")
             results.append(done.record)
             budget.extend(done.budget)
             if done.run is not None and done.run not in reusable:

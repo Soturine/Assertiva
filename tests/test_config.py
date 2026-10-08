@@ -24,9 +24,21 @@ def test_configured_runners_replace_detection_and_the_budget_applies(tmp_path):
 
 
 def test_pyproject_tool_table_is_read_when_there_is_no_file(tmp_path):
-    write(tmp_path / "pyproject.toml", '[project]\nname = "x"\n\n[tool.assertiva.execution]\nenv = ["DATABASE_URL"]\n')
+    write(tmp_path / "pyproject.toml", '[project]\nname = "x"\n\n[tool.assertiva.tests]\nrunners = ["unittest"]\n')
     config = load_config(tmp_path)
-    assert config.source == "pyproject.toml [tool.assertiva]" and config.env == ("DATABASE_URL",)
+    assert config.source == "pyproject.toml [tool.assertiva]" and config.runners == ("unittest",)
+
+
+def test_consent_is_never_read_from_the_project_only_from_the_users_home(tmp_path, assertiva_home):
+    project = tmp_path / "p"
+    write(project / "pyproject.toml", '[tool.assertiva.execution]\nenv = ["DATABASE_URL"]\nauthorize = ["make seed"]\n')
+    config = load_config(project)
+    assert config.env == () and config.authorize == ()
+    assert "execution.env is not read from the project; consent belongs in <ASSERTIVA_HOME>/consent.toml" in config.problems
+    write(assertiva_home / "consent.toml", f'[[project]]\nroot = {str(project.resolve())!r}\nenv = ["DATABASE_URL"]\nauthorize = ["make seed"]\n'
+                                             f'\n[[project]]\nroot = {str((tmp_path / "other").resolve())!r}\nenv = ["X"]\n')
+    config = load_config(project)
+    assert config.env == ("DATABASE_URL",) and config.authorize == ("make seed",)
 
 
 def test_unknown_or_malformed_entries_are_reported_never_guessed(tmp_path):
@@ -36,7 +48,8 @@ def test_unknown_or_malformed_entries_are_reported_never_guessed(tmp_path):
     assert config.runners == ("pytest",) and config.timeout_s is None and config.authorize == ()
     assert set(config.problems) == {
         "unknown section [deploy] ignored", "unknown key tests.color ignored", "unknown runner 'nose' in tests.runners ignored",
-        "tests.timeout_s must be a positive number; ignored", "execution.authorize must be a list of strings; ignored",
+        "tests.timeout_s must be a positive number; ignored",
+        "execution.authorize is not read from the project; consent belongs in <ASSERTIVA_HOME>/consent.toml",
     }
 
 

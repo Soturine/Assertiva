@@ -682,6 +682,74 @@
           }
         }
       }
+    },
+    "ci_runs": {
+      "type": "array",
+      "description": "CI runs the provider reported (`audit --ci-run`), each compared with the audited revision.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "head_sha": {
+            "type": "string"
+          },
+          "conclusion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "identity": {
+            "enum": [
+              "SAME_REVISION",
+              "LOCAL_CHANGES",
+              "OTHER_REVISION",
+              "UNKNOWN"
+            ]
+          },
+          "provenance": {
+            "enum": [
+              "EXTERNAL_VERIFIED",
+              "EXTERNAL_UNVERIFIED"
+            ]
+          },
+          "jobs": {
+            "type": "array"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "execution_manifest": {
+      "type": "object",
+      "description": "Identity of the audit: code (tree digest, VCS revision when there is one), engine, what ran (provenance, command, exit code, duration), what was only read (sha256), environment names withheld or passed through.",
+      "properties": {
+        "started_at": {
+          "type": "string"
+        },
+        "ended_at": {
+          "type": "string"
+        },
+        "code": {
+          "type": "object"
+        },
+        "engine": {
+          "type": "object"
+        },
+        "runs": {
+          "type": "array"
+        },
+        "read": {
+          "type": "array"
+        },
+        "environment": {
+          "type": "object"
+        }
+      }
     }
   },
   "additionalProperties": false

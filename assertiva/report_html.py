@@ -540,7 +540,11 @@ def _scope(report: dict) -> list[dict]:
             parts.append(pair_of("scope.coverage.line", value=_num(line, "%", 1)))
         if branch is not None:
             parts.append(pair_of("scope.coverage.branch", value=_num(branch, "%", 1)))
-        rows.append({"area": "coverage", "level": "MEASURED", "detail": _join(parts, (" · ", " · ")), "href": "#domains"})
+        product = _metric(state, "product_line_coverage")
+        if product is not None:
+            parts.append(pair_of("scope.coverage.product", value=_num(product, "%", 1)))
+        ingested = all(c.get("origin") == "INGESTED" for c in state.get("coverage") or []) and state.get("coverage")
+        rows.append({"area": "coverage", "level": "INGESTED" if ingested else "MEASURED", "detail": _join(parts, (" · ", " · ")), "href": "#domains"})
     else:
         rows.append({"area": "coverage", "level": "NOT_EVIDENCED", "detail": pair_of("scope.coverage.none"), "href": "#claim"})
     weak = _metric(state, "weak_oracle_tests")
@@ -1305,7 +1309,7 @@ def _snapshot(r: _R) -> str:
 
 
 def _evidence_area(r: _R) -> str:
-    panels = (_metrics_panel(r) + _surface(r) + _runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
+    panels = (_metrics_panel(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
               + _delivery(r) + _selection(r) + _history(r))
     return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><p class="eyebrow">{r.icon("doc", "ic")}{r.t("evidence.eyebrow")}</p>'
             f'<h2 id="h-evidence">{r.t("evidence.title")}</h2>{r.t("evidence.lead", tag="p", cls="lead")}</div>{_snapshot(r)}'
@@ -1480,6 +1484,13 @@ def _provenance(r: _R) -> str:
         full.append(("prov.interpreter", f'<code class="wrap">{_e(prov["interpreter"])}</code>'))
     if "read_only_verified" in prov:
         full.append(("prov.readonly", r.t("yes" if prov["read_only_verified"] else "no")))
+    if prov.get("read_only_scope"):
+        full.append(("prov.readonly_scope", r.narr(prov["read_only_scope"]["measured"])))
+    manifest = report.get("execution_manifest") or {}
+    if manifest:
+        code = manifest.get("code") or {}
+        full.append(("prov.identity", f'<code class="wrap">{_e(code.get("tree_digest"))}</code> · {_e(code.get("files"))} · '
+                     f'<code>{_e(manifest.get("started_at"))}</code> → <code>{_e(manifest.get("ended_at"))}</code>'))
     if "read_only_until_approval" in prov:
         full.append(("prov.until", r.t("yes" if prov["read_only_until_approval"] else "no")))
     if project.get("baseline_digest"):
@@ -1767,6 +1778,10 @@ def _runs(r: _R) -> str:
         for run in state.get("runs", []):
             total += 1
             how = r.t("runs.ingested") if run["mode"] == "report" else r.t("runs.executed")
+            if run.get("provenance"):
+                how += f' · <code class="raw">{_e(run["provenance"])}</code>'
+            if run.get("cases_duration_sum_s") is not None:
+                how += " · " + r.t("runs.accumulated", value=_num(run["cases_duration_sum_s"], " s", 1))
             command = " ".join(run["command"]) if isinstance(run["command"], list) else str(run["command"] or "")
             matrix = "".join(f'<li><code>{_e(n)}</code> <code class="raw">{_e(v)}</code></li>' for n, v in (run.get("matrix") or {}).items())
             rows.append(
@@ -1780,6 +1795,25 @@ def _runs(r: _R) -> str:
             )
     body = f'<ul class="runs">{"".join(rows)}</ul>' if rows else r.t("runs.none", tag="p", cls="empty")
     return _panel(r, "runs", "runs.title", r.t("runs.summary", n=total) if total else r.t("runs.summary.none"), body)
+
+
+def _ci_runs(r: _R) -> str:
+    """CI runs the provider reported, each tied (or not) to the audited revision."""
+    runs = r.report.get("ci_runs") or []
+    if not runs:
+        return ""
+    rows = []
+    for run in runs:
+        if run.get("error"):
+            rows.append(f'<li class="run"><p class="run-how"><code>{_e(run["source"])}</code> {r.t("ci.unreadable")}</p></li>')
+            continue
+        jobs = "".join(f'<li><code>{_e(j["name"])}</code> <code class="raw">{_e(j["conclusion"])}</code></li>' for j in run.get("jobs") or [])
+        rows.append(
+            f'<li class="run"><div class="run-head"><span class="run-title"><code>{_e(run["provider"])}</code> {_e(run.get("name") or "")}</span>'
+            f'{r.pill(run.get("conclusion") or "UNKNOWN")}</div>'
+            f'<p class="run-how">{r.t("ci.identity." + run["identity"])} · <code>{_e(run["head_sha"][:12])}</code> · <code class="raw">{_e(run["provenance"])}</code></p>'
+            + (f'<ul class="matrix">{jobs}</ul>' if jobs else "") + "</li>")
+    return _panel(r, "ci-runs", "ci.title", r.t("ci.summary", n=len(runs)), f'<ul class="runs">{"".join(rows)}</ul>', "ci.lead")
 
 
 def _negative(r: _R) -> str:

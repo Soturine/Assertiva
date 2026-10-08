@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 from .candidate import StageStatus
@@ -205,6 +204,10 @@ class CoverageSummary:
     scope: str | None = None
     limitations: tuple[str, ...] = ()
     error: str | None = None
+    origin: str | None = None  # MEASURED (an engine run) or INGESTED (a report read by Assertiva)
+    product_counts: dict[str, dict[str, int]] = field(default_factory=dict)  # counts without test files, when per-file data exists
+    files: int | None = None
+    test_files: int | None = None
 
     def percent(self, kind: str) -> float | None:
         count = self.counts.get(kind)

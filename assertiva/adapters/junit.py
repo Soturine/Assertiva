@@ -7,6 +7,8 @@ semantics, so those stay unknown.
 
 from __future__ import annotations
 
+import hashlib
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -18,7 +20,10 @@ FORMAT_LIMITS = [
     "JUnit XML has no parameter identity, xfail/xpass, retry or materialization semantics; those are unknown",
     "no coverage, fixture graph or declaration provenance is available from JUnit XML",
     "results were produced outside Assertiva; the revision and environment they ran against are not verified",
+    "JUnit XML names executed cases, not declarations: how many distinct tests were declared is unknown",
+    "case durations are summed as accumulated test time; the real duration of a parallel run is shorter and is not in the report",
 ]
+_PARAMS = re.compile(r"^(?P<base>.+?)(?P<params>\[.*\])$")
 _OUTCOME_TAGS = (("failure", Outcome.FAILED), ("error", Outcome.ERROR), ("skipped", Outcome.SKIPPED))
 
 
@@ -49,7 +54,8 @@ def load_junit(path: str | Path) -> RunEvidence:
             name = f"{prefix}/{element.get('name')}" if prefix else element.get("name")
         if element.tag == "testsuite":
             props = {p.get("name"): p.get("value") for p in element.findall("properties/property")}
-            suites.append({"name": name, "timestamp": element.get("timestamp"), "properties": props})
+            suites.append({"name": name, "timestamp": element.get("timestamp"), "properties": props,
+                           "reported_time_s": _float(element.get("time"))})
         for child in element:
             if child.tag in ("testsuite", "testsuites"):
                 visit(child, name)
@@ -65,9 +71,13 @@ def load_junit(path: str | Path) -> RunEvidence:
                     system_out += sum(len(s.text or "") for s in child.findall(stream))
                 case = "::".join(x for x in (child.get("classname"), child.get("name")) if x)
                 invocation_id = f"{name}::{case}" if name else case
+                # Only a `name[params]` suffix says two cases share a declaration; anything else stays one case
+                # whose declaration identity is unknown (the run says so).
+                match = _PARAMS.match(invocation_id)
                 run.invocations.append(
                     TestInvocation(
-                        invocation_id=invocation_id, declaration_id=invocation_id, materialization_id=invocation_id,
+                        invocation_id=invocation_id, declaration_id=match.group("base") if match else invocation_id,
+                        materialization_id=invocation_id, parameters_id=match.group("params")[1:-1] if match else None,
                         outcome=outcome, duration_s=_float(child.get("time")), message=message,
                     )
                 )
@@ -75,7 +85,9 @@ def load_junit(path: str | Path) -> RunEvidence:
                 system_out += len(child.text or "")
 
     visit(root, "")
-    run.metadata = {"source": str(path), "suites": suites[:50], "system_out_chars": system_out}
+    run.metadata = {"source": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "suites": suites[:50],
+                    "system_out_chars": system_out, "provenance": "EXTERNAL_UNVERIFIED", "declaration_identity": "UNKNOWN",
+                    "reported_root_time_s": _float(root.get("time")) if root.tag == "testsuites" else None}
     outcomes = [inv.outcome for inv in run.invocations]
     if any(o in (Outcome.FAILED, Outcome.ERROR) for o in outcomes):
         run.status = StageStatus.FAIL
@@ -84,5 +96,8 @@ def load_junit(path: str | Path) -> RunEvidence:
         run.limitations.append("the report contains no executed test cases")
     else:
         run.status = StageStatus.PASS
-    run.wall_clock_s = round(sum(inv.duration_s or 0 for inv in run.invocations), 6) or None
+    # The real duration of the run is not in the format (suites may have run in parallel): never the sum of cases.
+    run.wall_clock_s = None
+    times = [inv.duration_s for inv in run.invocations if inv.duration_s is not None]
+    run.metadata["cases_duration_sum_s"] = round(sum(times), 6) if times else None
     return run

@@ -20,7 +20,8 @@ from .models import BudgetDecision, Finding, MutantStatus, Outcome
 from .process import passthrough, scoped, withheld_variables
 from .reproduction import reproduce_check
 from .history import record_state
-from .report import audit_model, execution_budget, selection_summary
+from .adapters.ci_runs import green, identity, load_ci_run
+from .report import audit_model, execution_budget, execution_manifest, selection_summary
 from .selection import select_changes
 from .verification import GateMode, VerificationKind, artifact_lineage, delivery_matrix, discover_surface, matrix_findings, surface_findings
 from .workspace import boundary_report, capture_baseline, read_only_guard, remove_tree
@@ -57,6 +58,33 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
             )
         )
     return findings
+
+
+def _now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def _observed_ci(paths, baseline) -> tuple[list[dict], list[Finding]]:
+    """Provider runs the caller exported, each tied (or not) to the audited revision."""
+    runs, findings = [], []
+    for path in paths:
+        run = load_ci_run(path)
+        run["identity"] = identity(run, baseline.revision, baseline.dirty)
+        run["provenance"] = "EXTERNAL_VERIFIED" if run["identity"] == "SAME_REVISION" else "EXTERNAL_UNVERIFIED"
+        runs.append(run)
+        if run.get("error"):
+            findings.append(Finding("CI_RUN_UNREADABLE", "A CI run export could not be read; it provides no evidence.", {"source": run["source"], "error": run["error"]}))
+        elif run["identity"] == "OTHER_REVISION":
+            findings.append(Finding("CI_RUN_FOR_ANOTHER_REVISION", "The CI run provided is for another commit; it says nothing about the audited revision.",
+                                    {"run": run.get("url") or run.get("id"), "run_sha": run["head_sha"], "audited_revision": baseline.revision}, severity="medium"))
+        elif run["identity"] == "SAME_REVISION" and not green(run):
+            findings.append(Finding("CI_RUN_NOT_GREEN", "The provider reports the CI run for this revision as not successful.",
+                                    {"run": run.get("url") or run.get("id"), "conclusion": run["conclusion"],
+                                     "failed_jobs": [j["name"] for j in run["jobs"] if j["conclusion"] not in ("success", "skipped", "neutral", None)]},
+                                    severity="high"))
+    return runs, findings
 
 
 def _boundary_findings(report: dict) -> list[Finding]:
@@ -177,8 +205,10 @@ def run_audit(
     coverage_reports: list[str | Path] | tuple = (),
     changed_since: str | None = None,
     run_checks: list[str] | tuple = (),
+    ci_runs: list[str | Path] | tuple = (),
 ) -> dict:
     root = Path(root).resolve()
+    started = _now()
     selection = None
     findings: list[Finding] = []
     limitations: list[str] = []
@@ -260,6 +290,8 @@ def run_audit(
     withheld = withheld_variables()
     if withheld:
         limitations.append("credential-like environment variables were withheld from executed project code: " + ", ".join(withheld))
+    observed_ci, ci_findings = _observed_ci(ci_runs, baseline)
+    findings.extend(ci_findings)
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
     for run in current.runs:
         limitations.extend(f"{run.adapter_id}: {item}" for item in run.limitations)
@@ -271,6 +303,13 @@ def run_audit(
     report["delivery"] = {"matrix": {"declared": declared, "ci": covered}, "artifact_lineage": lineage}
     report["review_candidates"] = review
     report["declared_checks"] = reproduced
+    report["ci_runs"] = observed_ci
+    for run in report["ci_runs"]:
+        if not run.get("error"):
+            report["claim_boundary"]["observed"].append(
+                f"CI run reported by {run['provider']} for {run['head_sha'][:12]}: {run['conclusion']} ({run['identity']})")
+    report["execution_manifest"] = execution_manifest(root, baseline, current, started, junit_reports, coverage_reports,
+                                                      mutation_reports, ci_runs, withheld)
     boundary = report["claim_boundary"]
     for check in reproduced:
         if check["status"] != StageStatus.NOT_RUN.value:

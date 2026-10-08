@@ -237,7 +237,9 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         deselected = sum(len(run.deselected) for run in state.runs)
         if deselected:
             add("deselected", deselected, MetricDirection.CONTEXTUAL)
-        add("test_declarations", len({inv.declaration_id for inv in invocations}), MetricDirection.CONTEXTUAL)
+        known = [inv for run in state.runs if run.metadata.get("declaration_identity") != "UNKNOWN" for inv in run.invocations]
+        if known:  # a format that names cases, not declarations, never yields a declaration count
+            add("test_declarations", len({inv.declaration_id for inv in known}), MetricDirection.CONTEXTUAL)
         add("inherited_materializations", sum(inv.inherited for inv in invocations), MetricDirection.CONTEXTUAL)
         add("passed", sum(inv.outcome is Outcome.PASSED for inv in invocations), MetricDirection.CONTEXTUAL)
         add("failed", sum(inv.outcome is Outcome.FAILED for inv in invocations), MetricDirection.LOWER_IS_BETTER)
@@ -248,6 +250,9 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         add("xpassed", sum(inv.outcome is Outcome.XPASSED for inv in invocations), MetricDirection.LOWER_IS_BETTER)
         wall = [run.wall_clock_s for run in state.runs]
         add("wall_clock_s", round(sum(wall), 3) if None not in wall else None, MetricDirection.CONTEXTUAL, "s")
+        accumulated = [run.metadata.get("cases_duration_sum_s") for run in state.runs if run.metadata.get("cases_duration_sum_s") is not None]
+        if accumulated:
+            add("test_time_accumulated_s", round(sum(accumulated), 3), MetricDirection.CONTEXTUAL, "s")
     coverage = _coverage(state)
     if coverage:
         for kind in sorted({"line", "branch", *coverage.counts}):
@@ -258,6 +263,9 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
             if kind in coverage.counts:
                 add(f"{kind}_covered", coverage.counts[kind]["covered"], MetricDirection.HIGHER_IS_BETTER)
                 add(f"{kind}_total", coverage.counts[kind]["total"], MetricDirection.CONTEXTUAL)
+        for kind, count in (coverage.product_counts or {}).items():  # a different population: its own metric, never mixed
+            if count["total"]:
+                add(f"product_{kind}_coverage", round(count["covered"] * 100.0 / count["total"], 4), MetricDirection.HIGHER_IS_BETTER, "%")
     static_directions = {
         "weak_oracle_tests": MetricDirection.LOWER_IS_BETTER,
         "broad_error_expectations": MetricDirection.LOWER_IS_BETTER,

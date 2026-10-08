@@ -12,7 +12,6 @@ import uuid
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from . import __version__
 from .identity import runtime_identity
@@ -82,6 +81,10 @@ def state_summary(state: StateEvidence | None) -> dict | None:
         "runs": [
             {
                 "adapter": run.adapter_id, "mode": run.mode, "status": run.status.value, "command": run.command,
+                # who produced the results: an engine run, or a report read by the engine (revision not verified)
+                "provenance": run.metadata.get("provenance") or ("EXTERNAL_UNVERIFIED" if run.mode == "report" else "ENGINE_EXECUTED"),
+                "cases_duration_sum_s": run.metadata.get("cases_duration_sum_s"),
+                "declaration_identity": run.metadata.get("declaration_identity", "KNOWN"),
                 "exit_code": run.exit_code, "invocations": len(run.invocations), "collection_errors": run.collection_errors,
                 # per-outcome counts: a run's invocations include skipped and not-run cases, which never count as passed
                 "outcomes": dict(Counter(inv.outcome.value for inv in run.invocations if inv.outcome is not None)),
@@ -96,7 +99,8 @@ def state_summary(state: StateEvidence | None) -> dict | None:
         "mutation": [_mutation_summary(run) for run in state.mutation],
         "artifacts": to_jsonable(state.artifacts),
         "negative_paths": {k: list(v) for k, v in state.negative_paths.items()},
-        "coverage": [to_jsonable(c) for c in (state.coverage or [run.coverage for run in state.runs if run.coverage])],
+        "coverage": [{**to_jsonable(c), "origin": c.origin or origin} for c, origin in
+                     ([(c, "INGESTED") for c in state.coverage] or [(run.coverage, "MEASURED") for run in state.runs if run.coverage])],
         "limitations": list(state.limitations),
     }
 
@@ -173,6 +177,36 @@ READ_ONLY_SCOPE = {
 }
 
 
+def execution_manifest(root: Path, baseline, current: StateEvidence, started: str, results=(), coverage=(), mutation=(), ci=(),
+                       withheld=()) -> dict:
+    """Identity of this audit: the code, what ran (who ran it, how, exit status, duration), what was only read."""
+    import hashlib
+    import platform
+    import sys
+
+    from .process import PASSTHROUGH, redact
+
+    def digest(path) -> str | None:
+        try:
+            return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        except OSError:
+            return None
+
+    return {
+        "started_at": started,
+        "ended_at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+        "code": {"tree_digest": baseline.digest, "files": len(baseline.files), "vcs_revision": baseline.revision,
+                 "local_changes": baseline.dirty, "note": None if baseline.revision else "no version control: the tree digest identifies the code"},
+        "engine": {"assertiva_version": __version__, "runtime_version": sys.version.split()[0], "platform": platform.platform(terse=True)},
+        "runs": [{"adapter": run.adapter_id, "provenance": run.metadata.get("provenance") or ("EXTERNAL_UNVERIFIED" if run.mode == "report" else "ENGINE_EXECUTED"),
+                  "command": [redact(str(c)) for c in run.command], "exit_code": run.exit_code, "wall_clock_s": run.wall_clock_s,
+                  "status": run.status.value, "invocations": len(run.invocations)} for run in current.runs],
+        "read": [{"kind": kind, "path": str(path), "sha256": digest(path)} for kind, paths in
+                 (("test_results", results), ("coverage", coverage), ("mutation", mutation), ("ci_run", ci)) for path in paths],
+        "environment": {"withheld": list(withheld), "passed_through": sorted(PASSTHROUGH)},
+    }
+
+
 def _technologies(root: Path, files: list[str], runs) -> dict:
     """Languages and frameworks for the report header, each with how it is known (never a measurement)."""
     from .adapters.technologies import project_technologies
@@ -210,6 +244,9 @@ def audit_model(
         not_evidenced.append("whether declared CI checks actually ran, on which revision, and whether they gate merges")
     if not any(run.coverage for run in current.runs) and not any(c.error is None for c in current.coverage):
         not_evidenced.append("coverage")
+    for c in current.coverage:
+        if c.error is None:
+            observed.append(f"coverage report ingested from {c.source} ({c.tool}): read by Assertiva, not measured; the revision it measured is not verified")
     for run in current.runs:
         for name, value in (run.metadata.get("matrix") or {}).items():
             if value != "EXECUTED":

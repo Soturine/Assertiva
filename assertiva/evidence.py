@@ -81,8 +81,15 @@ def installed_dependencies(adapters) -> list[str]:
 
 def runnable_copy(source: str | Path, adapters, origin: str | Path | None = None) -> Path:
     """A disposable copy of the project plus links to the installed dependencies its runners need."""
+    from . import environment
+
     copy = snapshot(source)
-    link_installed(copy, Path(origin or source), installed_dependencies(adapters))
+    names = installed_dependencies(adapters)
+    prepared = environment.ACTIVE.dirs if environment.ACTIVE else {}
+    for name in names:  # dependencies prepared for this run come from its workspace, never the project
+        if name in prepared:
+            link_installed(copy, prepared[name].parent, [name])
+    link_installed(copy, Path(origin or source), [n for n in names if n not in prepared])
     return copy
 
 

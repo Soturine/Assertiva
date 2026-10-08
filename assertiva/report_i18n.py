@@ -1050,6 +1050,13 @@ FINDINGS: dict[str, dict] = {
                "A configuração de CI executa a suíte, ou o local onde ela é exigida fica registrado."),
         rec=("Add the test suite to the delivery pipeline or record where it is enforced.",
              "Adicione a suíte de testes ao pipeline de entrega ou registre onde ela é exigida.")),
+    "ENVIRONMENT_NOT_PREPARED": F(
+        category="execution", tier="E1",
+        title=("Part of the test environment was not prepared", "Parte do ambiente de testes não foi preparada"),
+        summary=("Part of the environment the tests need could not be prepared; what depends on it was not executed.",
+                 "Parte do ambiente de que os testes precisam não pôde ser preparada; o que depende dela não foi executado."),
+        why=("Tests that need it stay unknown: neither passed nor failed.", "Os testes que dependem dela ficam desconhecidos: nem aprovados nem reprovados."),
+        close=("The environment is prepared (with consent) or provided, and the tests run.", "O ambiente é preparado (com consentimento) ou fornecido, e os testes executam.")),
     "CI_RUN_FOR_ANOTHER_REVISION": F(
         category="delivery", tier="E2",
         title=("The CI run is for another commit", "A execução de CI é de outro commit"),

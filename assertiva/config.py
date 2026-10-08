@@ -13,6 +13,7 @@ project: a cloned repository cannot authorize its own commands or unlock the use
     root = "/home/me/src/shop"
     authorize = ["python manage.py migrate"]  # exact commands (a check id is a position a later commit can reuse)
     env = ["DATABASE_URL"]                    # withheld variables the tests need; connections reach local hosts only
+    provision = true                          # prepare missing environments in isolation (downloads, installers)
 
 Nothing is required: detection works without either file. Unknown keys are reported, never guessed.
 """
@@ -36,6 +37,7 @@ class ProjectConfig:
     env: tuple[str, ...] = ()
     runners: tuple[str, ...] = ()  # empty: detect from the project
     timeout_s: float | None = None
+    provision: bool = False  # the user consented to preparing environments for this project (downloads, installers)
     problems: tuple[str, ...] = field(default=())
 
     def authorizes(self, check) -> bool:
@@ -52,7 +54,7 @@ def _strings(value, where: str, problems: list[str]) -> tuple[str, ...]:
 def load_config(root: str | Path) -> ProjectConfig:
     root = Path(root)
     data, source = None, None
-    authorize, env, consent_problems = _consent(root)  # the user's, whatever the project's file says
+    authorize, env, consent_problems, provision = _consent(root)  # the user's, whatever the project's file says
     try:
         if (root / FILE).is_file():
             data, source = tomllib.loads((root / FILE).read_text(encoding="utf-8")), FILE
@@ -61,10 +63,10 @@ def load_config(root: str | Path) -> ProjectConfig:
             if isinstance(tool, dict) and "assertiva" in tool:
                 data, source = tool["assertiva"], "pyproject.toml [tool.assertiva]"
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        return ProjectConfig(source=FILE, authorize=authorize, env=env,
+        return ProjectConfig(source=FILE, authorize=authorize, env=env, provision=provision,
                              problems=(f"configuration could not be read: {exc}"[:200], *consent_problems))
     if not isinstance(data, dict):
-        return ProjectConfig(authorize=authorize, env=env, problems=tuple(consent_problems))
+        return ProjectConfig(authorize=authorize, env=env, provision=provision, problems=tuple(consent_problems))
     execution = data.get("execution")
     problems = [f"unknown section [{name}] ignored" for name in data if name not in _KNOWN and name != "execution"]
     if isinstance(execution, dict):
@@ -83,14 +85,14 @@ def load_config(root: str | Path) -> ProjectConfig:
         problems.append("tests.timeout_s must be a positive number; ignored")
         timeout = None
     return ProjectConfig(
-        source=source, authorize=authorize, env=env,
+        source=source, authorize=authorize, env=env, provision=provision,
         runners=tuple(name for name in runners if name in RUNNERS),
         timeout_s=float(timeout) if timeout is not None else None,
         problems=tuple(problems + consent_problems),
     )
 
 
-def _consent(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], list[str]]:
+def _consent(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], list[str], bool]:
     """The user's consent for this project (authorized commands, passed-through variables), from outside it."""
     from .workspace import assertiva_home
 
@@ -99,7 +101,7 @@ def _consent(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], list[str]]:
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        return (), (), [f"{CONSENT} could not be read: {exc}"[:200]]
+        return (), (), [f"{CONSENT} could not be read: {exc}"[:200]], False
     target = path_key(root)
     for entry in data.get("project", []) if isinstance(data.get("project"), list) else []:
         if not isinstance(entry, dict):
@@ -110,8 +112,8 @@ def _consent(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], list[str]]:
             continue
         if target is not None and path_key(Path(declared).expanduser()) == target:
             return (_strings(entry.get("authorize", []), "consent authorize", problems),
-                    _strings(entry.get("env", []), "consent env", problems), problems)
-    return (), (), problems
+                    _strings(entry.get("env", []), "consent env", problems), problems, entry.get("provision") is True)
+    return (), (), problems, False
 
 
 def path_key(path: str | Path, windows: bool | None = None) -> str | None:

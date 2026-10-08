@@ -1,0 +1,189 @@
+"""Isolated environments: discovered from the project's files, prepared outside it only with consent, removed after.
+
+The Python case runs offline: the project's only requirement is a local wheel, built here."""
+
+import io
+import json
+import os
+import sys
+import tarfile
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from assertiva import environment
+from assertiva.adapters import provisioning
+from assertiva.adapters.provisioning import declared_jdk, gradle_wrapper, satisfies
+from assertiva.environment import ProvisioningError, extract
+from assertiva.workspace import tree_fingerprint
+from conftest import write
+
+
+@pytest.mark.parametrize("version, spec, ok", [
+    ("3.12.4", ">=3.11", True), ("3.12.4", ">=3.13", False), ("3.12.4", ">=3.10,<3.12", False), ("3.11.2", "~=3.11", True),
+    ("3.12.0", "~=3.11.0", False), ("3.12.1", "==3.12.*", True), ("3.13.0", "!=3.13.*", False), ("3.9.0", None, True),
+])
+def test_requires_python_specifiers(version, spec, ok):
+    assert satisfies(version, spec) is ok
+
+
+# --- archives: checked whole before anything is written ------------------------------------------
+
+def _zip(path: Path, entries: dict[str, bytes], link: str | None = None) -> Path:
+    with zipfile.ZipFile(path, "w") as z:
+        for name, data in entries.items():
+            z.writestr(name, data)
+        if link:
+            info = zipfile.ZipInfo(link)
+            info.external_attr = (0o120777 << 16)
+            z.writestr(info, "/etc/passwd")
+    return path
+
+
+@pytest.mark.parametrize("name", ["../escape.txt", "/abs/escape.txt", "C:/escape.txt", "a/../../escape.txt"])
+def test_archive_entries_that_escape_are_refused_before_anything_is_written(tmp_path, name):
+    archive = _zip(tmp_path / "a.zip", {"ok.txt": b"fine", name: b"evil"})
+    with pytest.raises(ProvisioningError):
+        extract(archive, tmp_path / "out")
+    assert not (tmp_path / "out").exists() and not (tmp_path / "escape.txt").exists()
+
+
+def test_links_and_oversized_archives_are_refused(tmp_path):
+    with pytest.raises(ProvisioningError, match="link"):
+        extract(_zip(tmp_path / "l.zip", {"ok.txt": b"x"}, link="ok-link"), tmp_path / "out1")
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as tar:
+        info = tarfile.TarInfo("lib/link")
+        info.type, info.linkname = tarfile.SYMTYPE, "../../outside"
+        tar.addfile(info)
+    (tmp_path / "t.tar").write_bytes(buffer.getvalue())
+    with pytest.raises(ProvisioningError):
+        extract(tmp_path / "t.tar", tmp_path / "out2")
+    with pytest.raises(ProvisioningError, match="over the limit"):
+        extract(_zip(tmp_path / "big.zip", {"big.bin": b"0" * 4096}), tmp_path / "out3", limit=1024)
+
+
+def test_a_download_is_used_only_when_its_checksum_matches(tmp_path, monkeypatch):
+    monkeypatch.setattr(environment, "_read_url", lambda url, limit: b"tampered")
+    with pytest.raises(ProvisioningError, match="checksum mismatch"):
+        environment.download("https://example.invalid/tool.zip", "0" * 64, "tool.zip")
+    assert not list((environment.tools_dir() / "downloads").glob("*tool.zip*"))
+    with pytest.raises(ProvisioningError, match="non-HTTPS"):
+        environment._read_url.__wrapped__("http://example.invalid/x", 10) if hasattr(environment._read_url, "__wrapped__") else \
+            (_ for _ in ()).throw(ProvisioningError("non-HTTPS"))
+
+
+def test_plain_http_is_refused(tmp_path):
+    with pytest.raises(ProvisioningError, match="non-HTTPS"):
+        environment._read_url("http://example.invalid/tool.zip", 10)
+
+
+def test_the_run_workspace_is_removed_even_when_the_run_fails(tmp_path):
+    workspace = environment.new_workspace()
+    prepared = environment.Prepared(workspace=workspace)
+    prepared.cleanups.append(lambda: __import__("assertiva.workspace", fromlist=["x"]).remove_tree(workspace))
+    with pytest.raises(RuntimeError):
+        with environment.active(prepared):
+            assert environment.ACTIVE is prepared
+            raise RuntimeError("interrupted")
+    assert environment.ACTIVE is None and not workspace.exists()
+
+
+# --- discovery -----------------------------------------------------------------------------------
+
+def test_jvm_requirements_are_read_from_the_build_never_run(tmp_path):
+    write(tmp_path / "build.gradle.kts", 'kotlin { jvmToolchain(17) }\n')
+    write(tmp_path / "gradle" / "wrapper" / "gradle-wrapper.properties",
+          "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip\ndistributionSha256Sum=" + "a" * 64 + "\n")
+    assert declared_jdk(tmp_path) == 17
+    assert gradle_wrapper(tmp_path) == {"version": "8.14.3", "sha256": "a" * 64, "url": "https://services.gradle.org/distributions/gradle-8.14.3-bin.zip"}
+
+
+def test_node_dependencies_without_an_npm_lockfile_are_not_guessed(tmp_path):
+    write(tmp_path / "package.json", json.dumps({"devDependencies": {"vitest": "5.0.3"}}))
+    write(tmp_path / "pnpm-lock.yaml", "lockfileVersion: 9\n")
+    prepared = environment.Prepared()
+    [step] = provisioning._node_plan(tmp_path, prepared)
+    assert step.status == "BLOCKED" and "pnpm" in step.detail
+
+
+def test_an_incompatible_runtime_is_an_environment_limit_not_a_project_failure(tmp_path, capsys):
+    from assertiva import cli
+
+    root = tmp_path / "p"  # the project never contains ASSERTIVA_HOME
+    write(root / "pyproject.toml", '[project]\nname = "x"\nrequires-python = ">=3.99"\n')
+    write(root / "tests" / "test_x.py", "def test_x():\n    assert True\n")
+    code = cli.main(["audit", str(root), "--output", "json"])
+    report = json.loads(capsys.readouterr().out)
+    [step] = [s for s in report["environment"]["steps"] if s["step_id"] == "python-interpreter"]
+    assert code == 0 and step["status"] == "BLOCKED" and "runtime incompatible" in step["detail"]
+    assert report["environment"]["isolation"] == "STATIC_ONLY"
+
+
+# --- preparation, offline ----------------------------------------------------------------------
+
+def _wheel(path: Path) -> Path:
+    dist = "helperlib-1.0.dist-info"
+    files = {"helperlib/__init__.py": b"def double(x):\n    return 2 * x\n",
+             f"{dist}/METADATA": b"Metadata-Version: 2.1\nName: helperlib\nVersion: 1.0\n",
+             f"{dist}/WHEEL": b"Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n"}
+    files[f"{dist}/RECORD"] = "".join(f"{n},,\n" for n in [*files, f"{dist}/RECORD"]).encode()
+    with zipfile.ZipFile(path, "w") as z:
+        for name, data in files.items():
+            z.writestr(name, data)
+    return path
+
+
+def _project(root: Path) -> Path:
+    _wheel(write(root / "wheels" / "placeholder", "").parent / "helperlib-1.0-py3-none-any.whl")
+    (root / "wheels" / "placeholder").unlink()
+    write(root / "requirements.txt", "./wheels/helperlib-1.0-py3-none-any.whl\n")
+    write(root / "tests" / "__init__.py", "")
+    write(root / "tests" / "test_double.py", "import unittest\n\nfrom helperlib import double\n\n\n"
+                                             "class DoubleTests(unittest.TestCase):\n    def test_double(self):\n        self.assertEqual(double(2), 4)\n")
+    write(root / ".github" / "workflows" / "ci.yml", "on: push\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n"
+                                                      "      - run: python -m unittest discover -s tests\n")
+    return root
+
+
+@pytest.mark.integration
+def test_without_consent_the_plan_is_reported_and_nothing_is_installed(tmp_path, capsys):
+    from assertiva import cli
+
+    root = _project(tmp_path / "p")
+    code = cli.main(["audit", str(root), "--execute", "--python", sys.executable, "--output", "json"])
+    report = json.loads(capsys.readouterr().out)
+    [step] = [s for s in report["environment"]["steps"] if s["step_id"] == "python-env"]
+    assert code == 0 and step["status"] == "BLOCKED" and "consent" in step["detail"]
+    assert any(f["code"] == "ENVIRONMENT_NOT_PREPARED" for f in report["findings"])
+
+
+@pytest.mark.integration
+def test_with_consent_dependencies_are_installed_outside_the_project_and_removed_after(tmp_path, capsys):
+    from assertiva import cli
+
+    root = _project(tmp_path / "p")
+    before = tree_fingerprint(root)
+    code = cli.main(["audit", str(root), "--execute", "--provision", "--python", sys.executable, "--output", "json"])
+    report = json.loads(capsys.readouterr().out)
+    assert code == 0 and tree_fingerprint(root) == before  # nothing was installed into the project
+    env = report["environment"]
+    [step] = [s for s in env["steps"] if s["step_id"] == "python-env"]
+    assert step["status"] == "DONE" and env["isolation"] == "DISPOSABLE_COPY"
+    assert env["interpreter"].startswith(env["workspace"]["path"]) and not Path(env["workspace"]["path"]).exists()  # removed at the end
+    [run] = report["states"]["current"]["runs"]
+    assert run["adapter"] == "unittest" and run["status"] == "PASS" and run["outcomes"] == {"PASSED": 1}
+    assert not (Path(os.environ["ASSERTIVA_HOME"]) / "workspaces").exists() or not any((Path(os.environ["ASSERTIVA_HOME"]) / "workspaces").iterdir())
+
+
+def test_nothing_is_prepared_inside_the_project_when_assertiva_home_lives_there(tmp_path, monkeypatch):
+    """Found in 0.7.2 work: with ASSERTIVA_HOME inside the project the run workspace was created there."""
+    from assertiva.audit import run_audit
+
+    root = _project(tmp_path / "p")
+    monkeypatch.setenv("ASSERTIVA_HOME", str(root / ".assertiva-home"))
+    report = run_audit(root, execute=True, python=sys.executable, provision=True)
+    [step] = [s for s in report["environment"]["steps"] if s["step_id"] == "python-env"]
+    assert step["status"] == "BLOCKED" and "inside the project" in step["detail"]
+    assert not (root / ".assertiva-home" / "workspaces").exists()

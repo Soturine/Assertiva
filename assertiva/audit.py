@@ -17,7 +17,11 @@ from .config import ProjectConfig, load_config
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label, runnable_copy
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
-from .process import passthrough, scoped, withheld_variables
+from contextlib import ExitStack
+
+from . import environment
+from .adapters.provisioning import plan, prepare
+from .process import passthrough, scoped, traced_stage, withheld_variables
 from .reproduction import reproduce_check
 from .history import record_state
 from .adapters.ci_runs import green, identity, load_ci_run
@@ -58,6 +62,37 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
             )
         )
     return findings
+
+
+def _prepare(root: Path, python: str | None, consented: bool) -> environment.Prepared:
+    """A run workspace, the plan for this project and, with consent, its preparation (removed when the run ends)."""
+    home = environment.assertiva_home()
+    if home == root or root in home.parents:  # a workspace there would be written into the project
+        prepared = environment.Prepared()
+        prepared.steps = plan(root, python, prepared)
+        for step in prepared.steps:
+            if step.status == "PLANNED":
+                step.status, step.detail = "BLOCKED", "ASSERTIVA_HOME is inside the project: nothing is prepared there"
+        return prepared
+    workspace = environment.new_workspace()
+    prepared = environment.Prepared(workspace=workspace)
+    prepared.cleanups.append(lambda: remove_tree(workspace))  # runs last: services stop before their data goes
+    with traced_stage("environment:prepare"):
+        prepared.steps = plan(root, python, prepared)
+        prepare(root, prepared.steps, prepared, consented)
+    environment.write_manifest(prepared, {"project": str(root), "consented": consented})
+    return prepared
+
+
+def environment_summary(prepared: environment.Prepared, executed: bool) -> dict:
+    return {
+        "isolation": environment.ISOLATION_COPY if executed else environment.ISOLATION_STATIC,
+        "isolation_limits": ["a disposable copy and a virtual environment are not a security sandbox: project code runs as the user, with network access"]
+        if executed else [],
+        "requirements": prepared.requirements, "steps": [step.__dict__ for step in prepared.steps], "services": prepared.services,
+        "tools": prepared.tools, "interpreter": prepared.python,
+        "workspace": {"path": str(prepared.workspace), "removed_at_end": True} if prepared.workspace else None,
+    }
 
 
 def _now() -> str:
@@ -206,6 +241,7 @@ def run_audit(
     changed_since: str | None = None,
     run_checks: list[str] | tuple = (),
     ci_runs: list[str | Path] | tuple = (),
+    provision: bool = False,
 ) -> dict:
     root = Path(root).resolve()
     started = _now()
@@ -214,9 +250,20 @@ def run_audit(
     limitations: list[str] = []
     config = load_config(root)
     limitations += [f"configuration ({config.source}): {problem}" for problem in config.problems]
-    with read_only_guard(root), passthrough(config.env):
+    with read_only_guard(root), passthrough(config.env), ExitStack() as stack:
         baseline = capture_baseline(root)
         surface = discover_surface(root)
+        # What execution needs, prepared outside the project (only with the user's consent), before any runner exists.
+        prepared = environment.Prepared()
+        if execute:
+            prepared = stack.enter_context(environment.active(_prepare(root, python, provision or config.provision)))
+            python = prepared.python or python
+        else:
+            with traced_stage("environment:plan"):
+                prepared.steps = plan(root, python, prepared)
+            for step in prepared.steps:
+                if step.status == "PLANNED":
+                    step.status, step.detail = "NOT_RUN", "static audit: nothing is prepared (audit --execute --provision would)"
         adapters = runner_adapters(root, python)
         if changed_since:
             selection = select_changes(root, changed_since)
@@ -290,6 +337,11 @@ def run_audit(
     withheld = withheld_variables()
     if withheld:
         limitations.append("credential-like environment variables were withheld from executed project code: " + ", ".join(withheld))
+    unprepared = [s for s in prepared.steps if s.status in ("BLOCKED", "FAILED")]
+    if unprepared:
+        findings.append(Finding("ENVIRONMENT_NOT_PREPARED",
+                                "Part of the environment the tests need could not be prepared; what depends on it was not executed.",
+                                {"steps": [{"step": s.step_id, "status": s.status, "why": s.detail} for s in unprepared]}, severity="info"))
     observed_ci, ci_findings = _observed_ci(ci_runs, baseline)
     findings.extend(ci_findings)
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")
@@ -308,6 +360,7 @@ def run_audit(
         if not run.get("error"):
             report["claim_boundary"]["observed"].append(
                 f"CI run reported by {run['provider']} for {run['head_sha'][:12]}: {run['conclusion']} ({run['identity']})")
+    report["environment"] = environment_summary(prepared, execute)
     report["execution_manifest"] = execution_manifest(root, baseline, current, started, junit_reports, coverage_reports,
                                                       mutation_reports, ci_runs, withheld)
     boundary = report["claim_boundary"]

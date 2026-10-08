@@ -750,6 +750,46 @@
           "type": "object"
         }
       }
+    },
+    "environment": {
+      "type": "object",
+      "description": "What the tests need and how it was prepared: isolation obtained (STATIC_ONLY, DISPOSABLE_COPY), requirements found, preparation steps (PLANNED, DONE, REUSED, BLOCKED, FAILED, NOT_NEEDED, NOT_RUN) with downloads and divergences, disposable services, tools, the run workspace (removed at the end).",
+      "properties": {
+        "isolation": {
+          "enum": [
+            "STATIC_ONLY",
+            "DISPOSABLE_COPY",
+            "SANDBOX"
+          ]
+        },
+        "isolation_limits": {
+          "type": "array"
+        },
+        "requirements": {
+          "type": "array"
+        },
+        "steps": {
+          "type": "array"
+        },
+        "services": {
+          "type": "array"
+        },
+        "tools": {
+          "type": "object"
+        },
+        "interpreter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
     }
   },
   "additionalProperties": false

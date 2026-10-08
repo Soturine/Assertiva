@@ -89,7 +89,7 @@ def _audit(args: argparse.Namespace) -> int:
         return _attach(root, directory, args)
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
                        junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since,
-                       ci_runs=args.ci_run or [],
+                       ci_runs=args.ci_run or [], provision=args.provision,
                        run_checks=args.run_check or [])
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
@@ -252,6 +252,9 @@ def _parser() -> argparse.ArgumentParser:
                                                               "with --execute, only the selected set runs")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
+    audit.add_argument("--provision", action="store_true",
+                       help="with --execute: prepare what the tests need in isolation (interpreter environment, dependencies, JDK, "
+                            "build tool, a disposable local database); downloads and runs installers outside the project")
     audit.add_argument("--ci-run", action="append", metavar="FILE",
                        help="a CI provider run exported as JSON (gh run view --json headSha,conclusion,jobs,url; a GitLab pipeline), compared with the audited revision")
     audit.add_argument("--run-check", action="append", metavar="CHECK_ID",

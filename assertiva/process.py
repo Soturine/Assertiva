@@ -280,7 +280,10 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
         command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
     )
     trace("command_start", command=[redact(c) for c in result.command], cwd=result.cwd, timeout_s=timeout_s)
-    env = child_environment(dict(os.environ if env is None else env))
+    from .environment import child_overlay
+
+    # withheld first, then what this run prepared (tool homes, a disposable local service), added deliberately
+    env = child_overlay(child_environment(dict(os.environ if env is None else env)))
     env[DEPTH_ENV] = str(current_depth() + 1)
     if os.environ.get(TARGETS_ENV):
         env[TARGETS_ENV] = os.environ[TARGETS_ENV]

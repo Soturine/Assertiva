@@ -66,3 +66,36 @@ def test_configuration_problems_reach_the_audit_report(tmp_path):
     write(tmp_path / ".assertiva.toml", "[tests]\nspeed = 3\n")
     report = run_audit(tmp_path)
     assert "configuration (.assertiva.toml): unknown key tests.speed ignored" in report["claim_boundary"]["limitations"]
+
+
+def test_consent_paths_follow_the_filesystem_case_rules():
+    from assertiva.config import path_key
+
+    assert path_key("/srv/App", windows=False) != path_key("/srv/app", windows=False)  # POSIX: two directories
+    assert path_key(r"C:\Work\App", windows=True) == path_key(r"c:\work\app", windows=True)  # NTFS folds case
+
+
+def test_consent_never_matches_a_relative_root_or_a_sibling_or_child_directory(tmp_path, assertiva_home):
+    project, sibling, child = tmp_path / "shop", tmp_path / "shop2", tmp_path / "shop" / "sub"
+    for folder in (project, sibling, child):
+        folder.mkdir(parents=True, exist_ok=True)
+    write(assertiva_home / "consent.toml", '[[project]]\nroot = "shop"\nenv = ["DATABASE_URL"]\n\n'
+                                           f'[[project]]\nroot = {str(project.resolve())!r}\nauthorize = ["make seed"]\n')
+    assert load_config(project).authorize == ("make seed",) and load_config(project).env == ()
+    assert any("must be an absolute path" in p for p in load_config(project).problems)
+    assert load_config(sibling).authorize == () and load_config(child).authorize == ()
+
+
+def test_consent_follows_a_link_to_the_real_directory_not_its_name(tmp_path, assertiva_home):
+    import os
+
+    real, alias = tmp_path / "real", tmp_path / "alias"
+    real.mkdir()
+    try:
+        os.symlink(real, alias, target_is_directory=True)
+    except OSError:
+        import _winapi
+
+        _winapi.CreateJunction(str(real), str(alias))
+    write(assertiva_home / "consent.toml", f'[[project]]\nroot = {str(alias)!r}\nauthorize = ["make seed"]\n')
+    assert load_config(real).authorize == ("make seed",)  # the same directory, reached through a link

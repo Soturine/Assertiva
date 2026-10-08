@@ -100,9 +100,30 @@ def _consent(root: Path) -> tuple[tuple[str, ...], tuple[str, ...], list[str]]:
         data = tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         return (), (), [f"{CONSENT} could not be read: {exc}"[:200]]
-    target = str(Path(root).resolve()).replace("\\", "/").rstrip("/").casefold()
+    target = path_key(root)
     for entry in data.get("project", []) if isinstance(data.get("project"), list) else []:
-        if isinstance(entry, dict) and str(Path(str(entry.get("root", ""))).resolve()).replace("\\", "/").rstrip("/").casefold() == target:
+        if not isinstance(entry, dict):
+            continue
+        declared = str(entry.get("root", ""))
+        if not declared or not Path(declared).expanduser().is_absolute():
+            problems.append(f"{CONSENT}: a project root must be an absolute path; entry {declared!r} ignored")
+            continue
+        if target is not None and path_key(Path(declared).expanduser()) == target:
             return (_strings(entry.get("authorize", []), "consent authorize", problems),
                     _strings(entry.get("env", []), "consent env", problems), problems)
     return (), (), problems
+
+
+def path_key(path: str | Path, windows: bool | None = None) -> str | None:
+    """How the filesystem identifies a directory: the resolved real path, compared case-insensitively only on
+    Windows (where NTFS folds case by default); on POSIX `/srv/App` and `/srv/app` are different directories.
+    None when the path cannot be resolved (consent then matches nothing)."""
+    import ntpath
+    import os
+
+    windows = os.name == "nt" if windows is None else windows
+    try:
+        resolved = os.path.realpath(os.fspath(path), strict=False)
+    except (OSError, ValueError):
+        return None
+    return ntpath.normcase(resolved) if windows else resolved

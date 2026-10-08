@@ -62,10 +62,14 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
 def _boundary_findings(report: dict) -> list[Finding]:
     findings = []
     if report["external_links"]:
+        kinds = report.get("external_link_kinds") or {}
+        tooling_only = all(kinds.get(link) == "AGENT_TOOL" for link in report["external_links"])
         findings.append(Finding(
             "PROJECT_LINK_ESCAPES_ROOT",
             "Project links point outside the project root; they are not followed or copied, but executions can reach their targets.",
-            {"links": report["external_links"][:30]},
+            {"links": report["external_links"][:30], "kinds": {link: kinds.get(link, "UNKNOWN") for link in report["external_links"][:30]}},
+            # an agent's or editor's own tool install is a fact worth stating, not a risk of the product
+            severity="info" if tooling_only else None,
         ))
     if report["broken_links"]:
         findings.append(Finding("BROKEN_PROJECT_LINK", "Some project links point to nothing.", {"links": report["broken_links"][:30]}))

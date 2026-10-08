@@ -189,3 +189,46 @@ def test_cleaning_up_execution_copies_never_deletes_through_links(project, outsi
     state = measure(project, "current", "isolated-project-copy", sys.executable)
     assert (outside / "secret.txt").read_text() == "outside content\n"
     assert any("outside its root" in item for item in state.limitations)
+
+
+# --- links leaving the project are classified; the technical fact is kept --------------------------
+
+def test_an_agent_tool_install_is_reported_as_tooling_not_as_a_product_risk(project, outside):
+    from assertiva.audit import run_audit
+
+    git(project, "init", "-q")
+    link_dir(project / ".claude" / "skills" / "auditor", outside)
+    report = run_audit(project)
+    [finding] = [f for f in report["findings"] if f["code"] == "PROJECT_LINK_ESCAPES_ROOT"]
+    assert finding["evidence"]["links"] == [".claude/skills/auditor"]  # the fact stays
+    assert finding["evidence"]["kinds"] == {".claude/skills/auditor": "AGENT_TOOL"} and finding["severity"] == "info"
+
+
+def test_a_product_link_leaving_the_project_keeps_its_default_priority(project, outside):
+    from assertiva.audit import run_audit
+
+    git(project, "init", "-q")
+    link_dir(project / ".claude" / "skills" / "auditor", outside)
+    link_dir(project / "vendor" / "shared", outside)
+    report = run_audit(project)
+    [finding] = [f for f in report["findings"] if f["code"] == "PROJECT_LINK_ESCAPES_ROOT"]
+    assert finding["evidence"]["kinds"]["vendor/shared"] == "UNTRACKED" and finding["severity"] != "info"
+
+
+def test_the_report_says_what_read_only_verification_measured(project):
+    from assertiva.audit import run_audit
+
+    provenance = run_audit(project)["provenance"]
+    assert provenance["read_only_verified"] is True
+    assert "project tree" in provenance["read_only_scope"]["measured"]
+    assert any("outside the project" in item for item in provenance["read_only_scope"]["not_measured"])
+
+
+def test_files_reached_through_a_linked_directory_are_never_project_files(project, outside):
+    """Found in 0.7.2 work: Git on Windows lists files *through* a junction (`ls-files --others`), so content
+    outside the project was listed as project files and the link itself went unreported."""
+    git(project, "init", "-q")
+    link_dir(project / "vendor" / "shared", outside)
+    files = project_files(project)
+    assert "vendor/shared" in files and not any(f.startswith("vendor/shared/") for f in files)
+    assert boundary_report(project)["external_links"] == ["vendor/shared"]

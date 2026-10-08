@@ -161,7 +161,24 @@ def _listing(root: Path) -> _Listing:
     if listed is None or _git_toplevel(root) is None:
         _walk(root, root, listing)
     else:
+        links: dict[str, bool] = {}
+
+        def linked_ancestor(rel: str) -> str | None:
+            # Git on Windows lists files *through* a junction; the project entry is the link itself.
+            parts = rel.split("/")
+            for i in range(1, len(parts)):
+                prefix = "/".join(parts[:i])
+                if prefix not in links:
+                    links[prefix] = is_link(root / prefix)
+                if links[prefix]:
+                    return prefix
+            return None
+
         for rel in sorted({p.rstrip("/") for p in listed.split("\0") if p}):
+            ancestor = linked_ancestor(rel)
+            if ancestor is not None:
+                listing.files.append(ancestor)
+                continue
             path = root / rel
             if is_link(path) or path.is_file():
                 listing.files.append(rel)
@@ -188,7 +205,21 @@ def project_files(root: str | Path) -> list[str]:
     return _listing(Path(root)).files
 
 
-def boundary_report(root: str | Path) -> dict[str, list[str]]:
+# Directories where coding agents and editors install their own tools (skills, rules, extensions): a link
+# there is the auditor's or the developer's tooling, not part of the product, its build or its tests.
+AGENT_TOOL_DIRS = frozenset({".claude", ".codex", ".cursor", ".gemini", ".agents", ".windsurf", ".continue", ".vscode", ".idea"})
+
+
+def link_kind(root: Path, rel: str, tracked: set[str] | None) -> str:
+    """AGENT_TOOL (inside an agent/editor tool directory), TRACKED (versioned with the project), UNTRACKED."""
+    if rel.split("/", 1)[0] in AGENT_TOOL_DIRS:
+        return "AGENT_TOOL"
+    if tracked is None:
+        return "UNKNOWN"
+    return "TRACKED" if rel in tracked else "UNTRACKED"
+
+
+def boundary_report(root: str | Path) -> dict:
     """Links leaving the project, broken links and nested repositories (reported, never followed)."""
     root = Path(root)
     listing = _listing(root)
@@ -200,7 +231,10 @@ def boundary_report(root: str | Path) -> dict[str, list[str]]:
                 external.append(rel)
             if not os.path.exists(path):
                 broken.append(rel)
-    return {"external_links": external, "broken_links": broken, "nested_repositories": listing.nested}
+    listed = _git(root, "ls-files", "-z", "--cached") if external else None
+    tracked = {p for p in listed.split("\0") if p} if listed is not None else None
+    kinds = {rel: link_kind(root, rel, tracked) for rel in external}
+    return {"external_links": external, "broken_links": broken, "nested_repositories": listing.nested, "external_link_kinds": kinds}
 
 
 @contextmanager

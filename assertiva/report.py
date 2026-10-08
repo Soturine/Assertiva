@@ -162,6 +162,17 @@ def _surface(surface) -> list[dict]:
     return [to_jsonable(check) for check in surface.checks] if surface else []
 
 
+# What `read_only_verified` covers, so it is never read as more than was measured.
+READ_ONLY_SCOPE = {
+    "measured": "every entry of the project tree, including ignored files and caches, fingerprinted by content before and after (links by their target, never followed)",
+    "not_measured": [
+        "files outside the project tree (home directory, temporary directories, Assertiva's own state)",
+        "targets of links that leave the project",
+        "network effects and external services",
+    ],
+}
+
+
 def _technologies(root: Path, files: list[str], runs) -> dict:
     """Languages and frameworks for the report header, each with how it is known (never a measurement)."""
     from .adapters.technologies import project_technologies
@@ -233,7 +244,8 @@ def audit_model(
         "candidate_qualification": None,
         "claim_boundary": {"observed": observed, "not_evidenced": not_evidenced, "limitations": limitations},
         "remaining_unknowns": list(not_evidenced),
-        "provenance": {"assertiva_version": __version__, "runtime": runtime_identity(), "adapters": adapters, "read_only_verified": True},
+        "provenance": {"assertiva_version": __version__, "runtime": runtime_identity(), "adapters": adapters, "read_only_verified": True,
+                       "read_only_scope": READ_ONLY_SCOPE},
     }
 
 

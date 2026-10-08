@@ -2,6 +2,10 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+![Assertiva overview: input repository, agent-led audit, actionable report](docs/assets/overview.png)
+
+*Overview (illustrative): the auditing agent investigates the project, the engine collects and qualifies evidence, and the result is one report that keeps unknowns visible.*
+
 **Adaptive Test Intelligence & Assurance for coding agents and engineering teams.**
 
 Assertiva audits whether a test suite provides meaningful evidence, selects the smallest reasonable test surface for the current change or failure, localizes failures without blindly rerunning expensive suites, and expands confidence when risk or lifecycle gates require it.

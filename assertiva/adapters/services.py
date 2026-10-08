@@ -51,6 +51,20 @@ def service_plan(root: Path, prepared: Prepared) -> list[Step]:
                  detail=json.dumps({"installed": bool(have)}))]
 
 
+def _verify_instance(data: Path, port: int) -> None:
+    """The listener on 127.0.0.1:port is the server whose data directory is ``data`` (this run's), or this raises."""
+    try:
+        lines = (data / "postmaster.pid").read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as exc:
+        raise ProvisioningError(f"no postmaster.pid in the run's data directory: {exc}") from exc
+    if len(lines) < 4 or Path(lines[1]).resolve() != data.resolve() or lines[3].strip() != str(port):
+        raise ProvisioningError(f"the server's postmaster.pid does not name this run's data directory and port {port}")
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(5)
+        if s.connect_ex(("127.0.0.1", port)) != 0:
+            raise ProvisioningError(f"nothing accepts connections on 127.0.0.1:{port}")
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
@@ -89,7 +103,7 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     installed = json.loads(step.detail).get("installed")
     bin_dir = Path(shutil.which("initdb")).parent if installed else _portable_binaries() / "bin"
     exe = ".exe" if os.name == "nt" else ""
-    data = prepared.workspace / "env" / "postgresql"
+    data = prepared.workspace / "env" / "pg"
     password = secrets.token_urlsafe(18)
     pwfile = prepared.workspace / "env" / "pg-password"
     pwfile.write_text(password, encoding="utf-8")
@@ -100,7 +114,14 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
         raise ProvisioningError(f"initdb failed: {created.summary()}")
     port = _free_port()
     log = prepared.workspace / "env" / "postgresql.log"
-    options = f"-p {port} -k {data}" if os.name != "nt" else f"-p {port}"
+    if os.name != "nt":  # a Unix socket path is limited to ~107 characters: a short directory of its own
+        import tempfile
+
+        socket_dir = tempfile.mkdtemp(prefix="apg")
+        prepared.cleanups.append(lambda: shutil.rmtree(socket_dir, ignore_errors=True))
+        options = f"-p {port} -k {socket_dir}"
+    else:
+        options = f"-p {port}"
     options += " -c listen_addresses=127.0.0.1 -c fsync=off"
     started = run_command([str(bin_dir / f"pg_ctl{exe}"), "-D", str(data), "-l", str(log), "-o", options, "-w", "-t", "60", "start"],
                           Path.cwd(), timeout_s=120)
@@ -109,17 +130,15 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     if not started.ok:
         raise ProvisioningError(f"PostgreSQL did not start: {started.summary()}")
     # Verify the target before any test connects: the server answering on this port is ours (its data directory).
-    env = {**os.environ, "PGPASSWORD": password}
-    probe = run_command([str(bin_dir / f"psql{exe}"), "-h", "127.0.0.1", "-p", str(port), "-U", "assertiva", "-d", "postgres",
-                         "-tAc", "show data_directory"], Path.cwd(), env=env, timeout_s=60)
-    reported = probe.stdout.strip()
-    if not probe.ok or Path(reported).resolve() != data.resolve():
-        raise ProvisioningError(f"the server on port {port} is not the disposable instance (data_directory {reported!r})")
+    # Verify the target before any test connects, without a client or credentials: the server's own postmaster.pid,
+    # in this run's data directory, must name that directory and the port, and the port must accept connections.
+    _verify_instance(data, port)
     url = f"postgresql://assertiva:{password}@127.0.0.1:{port}/postgres"
     prepared.env.update({"DATABASE_URL": url, "PGHOST": "127.0.0.1", "PGPORT": str(port), "PGUSER": "assertiva",
                          "PGPASSWORD": password, "PGDATABASE": "postgres"})
     version = run_command([str(bin_dir / f"postgres{exe}"), "--version"], Path.cwd(), timeout_s=30).stdout.strip()
     prepared.services.append({"service": "postgresql", "version": version, "host": "127.0.0.1", "port": port,
                               "data_directory": str(data), "binaries": "installed" if installed else f"portable {POSTGRES_VERSION}",
-                              "verified": "data_directory of the answering server is this run's", "credentials": "generated for this run"})
+                              "verified": "postmaster.pid in this run's data directory names it and the port; the port accepts connections",
+                              "credentials": "generated for this run"})
     step.detail = f"{version} on 127.0.0.1:{port}"

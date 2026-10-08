@@ -308,6 +308,8 @@ def run_audit(
         current.runs.extend(load_junit(report) for report in junit_reports)
         if current.runs:
             findings.extend(_native_findings(current, static_total, tuple(runs_reported)))
+            if any(run.invocations for run in current.runs):  # native collection found tests: the static "none" is contradicted
+                findings = [f for f in findings if f.code != "NO_TESTS_DISCOVERED"]
         for report in [*coverage_reports, *([coverage_json] if coverage_json else [])]:
             summary = load_coverage_report(report)
             current.coverage.append(summary)

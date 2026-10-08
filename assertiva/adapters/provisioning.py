@@ -176,21 +176,28 @@ def _python_plan(root: Path, given: str | None, runner_needs: list[str], prepare
         prepared.python = current["executable"]
         return [Step("python-env", "python", "use the given interpreter", "every declared distribution is installed",
                      status="NOT_NEEDED", divergences=divergences)]
+    # coverage.py is the engine's measuring instrument: added to an environment being created anyway, and said so
+    instrument = ["coverage"] if "coverage" not in {n.lower() for n in names} else []
+    if instrument:
+        divergences.append("coverage.py is added to the prepared environment by Assertiva to measure coverage; the project does not declare it")
     return [Step("python-env", "python", f"create a virtual environment with Python {compatible['version']} and install "
                  + (", ".join(missing[:8]) + ("…" if len(missing) > 8 else "") if missing else "nothing"),
                  ("interpreter " + (current or {}).get("version", "none") + f" does not satisfy {spec}; " if compatible is not current else "")
                  + (f"{len(missing)} declared distributions are not installed" if missing else "all distributions present"),
                  downloads=["PyPI (pip)"] if missing else [], runs_third_party_code=bool(missing), divergences=divergences,
-                 detail=json.dumps({"root": str(root), "base": compatible["executable"], "install": install if files else [*install, *runner, *runner_needs],
+                 detail=json.dumps({"root": str(root), "base": compatible["executable"],
+                                    "install": [*(install if files else [*install, *runner, *runner_needs]), *instrument],
                                     "missing": missing}))]
 
 
 def _prepare_python(step: Step, prepared: Prepared) -> None:
     data = json.loads(step.detail)
-    venv = prepared.workspace / "env" / "python"
+    venv = prepared.workspace / "env" / "py"
     created = run_command([data["base"], "-m", "venv", str(venv)], Path.cwd(), timeout_s=300)
     if not created.ok:
-        raise ProvisioningError(f"virtual environment could not be created: {created.summary()}")
+        hint = (f"; the path ({len(str(venv))} characters) may exceed the Windows 260-character limit: a shorter ASSERTIVA_HOME helps"
+                if os.name == "nt" and len(str(venv)) > 120 else "")
+        raise ProvisioningError(f"virtual environment could not be created: {created.summary()}{hint}")
     python = str(venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
     if data["missing"]:
         from assertiva.workspace import snapshot

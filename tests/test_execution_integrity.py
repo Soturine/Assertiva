@@ -222,3 +222,23 @@ def test_one_failing_ci_check_is_one_finding_naming_its_failing_tests(tmp_path, 
     assert codes.count("DECLARED_CHECK_FAILED") == 1 and "NATIVE_TESTS_FAILING" not in codes
     finding = next(f for f in report["findings"] if f["code"] == "DECLARED_CHECK_FAILED")
     assert finding["evidence"]["failing_tests"] == ["tests/test_calc.py::test_add"]
+
+
+@pytest.mark.integration
+def test_a_command_that_leaves_a_server_running_returns_when_it_exits(tmp_path):
+    """Found in 0.7.2 work: `pg_ctl start` returned, but the server it started kept the inherited output pipes
+    open, so the engine waited until its timeout (Windows). Output now goes to files; waiting is on the process."""
+    pid_file = tmp_path / "child.pid"
+    child = "import time; time.sleep(60)"
+    parent = (f"import subprocess, sys; p = subprocess.Popen([sys.executable, '-c', {child!r}]); "
+              f"open({str(pid_file)!r}, 'w').write(str(p.pid)); print('started')")
+    started = time.perf_counter()
+    result = process.run_command([sys.executable, "-c", parent], tmp_path, timeout_s=40)
+    elapsed = time.perf_counter() - started
+    try:
+        assert result.ok and "started" in result.stdout and elapsed < 20
+    finally:
+        try:
+            os.kill(int(pid_file.read_text()), 9 if os.name != "nt" else 1)
+        except (OSError, ValueError):
+            pass

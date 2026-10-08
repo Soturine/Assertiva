@@ -9,6 +9,7 @@ import os
 import re
 import signal
 import subprocess
+import tempfile
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -288,24 +289,29 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
     if os.environ.get(TARGETS_ENV):
         env[TARGETS_ENV] = os.environ[TARGETS_ENV]
     group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
-    try:
-        proc = subprocess.Popen(result.command, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, **group)
-    except OSError as exc:
-        result.error = str(exc)
-    else:
+    # Output goes to files, not pipes: a descendant that outlives the command (a database server, a test's live
+    # server) keeps inherited pipe handles open forever on Windows; with files, waiting is on the process itself.
+    with tempfile.TemporaryFile() as out_file, tempfile.TemporaryFile() as err_file:
         try:
-            out, err = proc.communicate(timeout=timeout_s)
-        except subprocess.TimeoutExpired:
-            result.timed_out = True
-            _kill_tree(proc)
+            proc = subprocess.Popen(result.command, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=out_file,
+                                    stderr=err_file, **group)
+        except OSError as exc:
+            result.error = str(exc)
+            proc = None
+        if proc is not None:
             try:
-                out, err = proc.communicate(timeout=30)
-            except subprocess.TimeoutExpired:  # a descendant that left the group still holds the pipes
-                out, err = b"", b""
-                for stream in (proc.stdout, proc.stderr):
-                    stream.close()
-                proc.wait()
+                proc.wait(timeout=timeout_s)
+            except subprocess.TimeoutExpired:
+                result.timed_out = True
+                _kill_tree(proc)
+                try:
+                    proc.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    pass
+            out_file.seek(0)
+            err_file.seek(0)
+            out, err = out_file.read(), err_file.read()
+    if proc is not None:
         result.output_sha256 = hashlib.sha256((out or b"") + b"|" + (err or b"")).hexdigest()
         result.stdout, result.stderr = _tail(out), _tail(err)
         if not result.timed_out:

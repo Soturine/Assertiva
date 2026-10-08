@@ -1,6 +1,7 @@
 """Isolated environments: discovered from the project's files, prepared outside it only with consent, removed after.
 
-The Python case runs offline: the project's only requirement is a local wheel, built here."""
+The Python case installs the project's only requirement from a local wheel built here; coverage.py, the engine's
+instrument, comes from the package index (so that case needs network)."""
 
 import io
 import json
@@ -187,3 +188,18 @@ def test_nothing_is_prepared_inside_the_project_when_assertiva_home_lives_there(
     [step] = [s for s in report["environment"]["steps"] if s["step_id"] == "python-env"]
     assert step["status"] == "BLOCKED" and "inside the project" in step["detail"]
     assert not (root / ".assertiva-home" / "workspaces").exists()
+
+
+def test_inner_links_of_a_tool_bundle_are_kept_and_escaping_ones_refused(tmp_path):
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w") as tar:
+        data = b"library"
+        info = tarfile.TarInfo("lib/libx.so.5.1")
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+        link = tarfile.TarInfo("lib/libx.so.5")
+        link.type, link.linkname = tarfile.SYMTYPE, "libx.so.5.1"
+        tar.addfile(link)
+    (tmp_path / "bundle.tar").write_bytes(buffer.getvalue())
+    out = extract(tmp_path / "bundle.tar", tmp_path / "out")
+    assert (out / "lib" / "libx.so.5").read_bytes() == b"library"

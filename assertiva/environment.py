@@ -24,7 +24,6 @@ import uuid
 import zipfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 from .workspace import assertiva_home, remove_tree
@@ -125,7 +124,7 @@ def new_workspace() -> Path:
                 remove_tree(old)
         except OSError:
             pass
-    path = base / f"{datetime.now(timezone.utc):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}"
+    path = base / uuid.uuid4().hex[:8]  # short: Windows tools still hit the 260-character path limit
     for sub in ("env", "artifacts", "evidence"):
         (path / sub).mkdir(parents=True)
     return path
@@ -225,15 +224,25 @@ def extract(archive: Path, target: Path, limit: int = MAX_EXTRACTED_BYTES) -> Pa
         raise ProvisioningError(f"not a supported archive: {archive.name}") from exc
     with tar:
         members = tar.getmembers()
+        links = []
         for member in members:
-            _safe_member(member.name)
+            name = _safe_member(member.name)
+            if member.issym():
+                # a relative link that stays inside the extraction (shared-library aliases in tool bundles)
+                resolved = PurePosixPath(*_normalized(name.parent / member.linkname))
+                if member.linkname.startswith("/") or resolved.parts[:1] == ("..",):
+                    raise ProvisioningError(f"archive link points outside its target: {member.name!r} -> {member.linkname!r}")
+                links.append((name, member.linkname))
+                continue
             if not (member.isfile() or member.isdir()):
-                raise ProvisioningError(f"archive entry is not a regular file or directory: {member.name!r}")
+                raise ProvisioningError(f"archive entry is not a regular file, directory or inner link: {member.name!r}")
             total += member.size
         if total > limit:
             raise ProvisioningError(f"archive expands to {total} bytes, over the limit of {limit}")
         target.mkdir(parents=True, exist_ok=True)
         for member in members:
+            if member.issym():
+                continue
             destination = target / _safe_member(member.name)
             if member.isdir():
                 destination.mkdir(parents=True, exist_ok=True)
@@ -243,4 +252,26 @@ def extract(archive: Path, target: Path, limit: int = MAX_EXTRACTED_BYTES) -> Pa
                 shutil.copyfileobj(source, out)
             if os.name != "nt":
                 os.chmod(destination, member.mode & 0o777)
+        for name, linkname in links:
+            destination = target / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if os.name != "nt":
+                os.symlink(linkname, destination)
+            else:  # no unprivileged links on Windows: a copy of the (inner) target when it is a file
+                source = (destination.parent / linkname)
+                if source.is_file():
+                    shutil.copy2(source, destination)
     return target
+
+
+def _normalized(path: PurePosixPath) -> list[str]:
+    parts: list[str] = []
+    for part in path.parts:
+        if part == "..":
+            if parts and parts[-1] != "..":
+                parts.pop()
+            else:
+                parts.append("..")
+        elif part not in (".", ""):
+            parts.append(part)
+    return parts or ["."]

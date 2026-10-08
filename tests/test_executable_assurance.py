@@ -111,7 +111,6 @@ def test_testcase_inheritance_materializes_without_the_test_prefix(tmp_path):
 
 @pytest.mark.parametrize("source", [
     "from tests.base import BaseCase\n\nclass PermissionsCase(BaseCase):\n    def test_x(self):\n        pass\n",
-    "from django.test import TestCase\n\nclass PermissionsCase(TestCase):\n    def test_x(self):\n        pass\n",
     "class PermissionsCase(make_base()):\n    def test_x(self):\n        pass\n",
     "class PermissionsCase(metaclass=Registry):\n    def test_x(self):\n        pass\n",
 ])
@@ -344,3 +343,11 @@ def test_the_weak_oracle_finding_names_each_candidates_signal(tmp_path):
     write(tmp_path / "tests" / "test_x.py", "def test_a():\n    call()\n\n\ndef test_b():\n    assert call() is not None\n")
     finding = next(f for f in audit_pytest_project(tmp_path).findings if f.code == "WEAK_ORACLE_SIGNAL")
     assert finding.evidence["signals"] == {"tests/test_x.py::test_a": ["NO_ASSERTION"], "tests/test_x.py::test_b": ["EXISTENCE_ONLY"]}
+
+
+def test_framework_testcase_bases_documented_as_unittest_subclasses_are_collected(tmp_path):
+    """Django's and DRF's test bases are unittest.TestCase subclasses by definition: not a guess, not UNRESOLVED."""
+    assert _ids(tmp_path, "from django.test import TestCase\n\nclass PermissionsCase(TestCase):\n    def test_x(self):\n        pass\n") == [
+        "PermissionsCase::test_x"]
+    assert _ids(tmp_path, "from rest_framework.test import APITestCase as Base\n\nclass Api(Base):\n    def test_y(self):\n        pass\n") == [
+        "Api::test_y"]

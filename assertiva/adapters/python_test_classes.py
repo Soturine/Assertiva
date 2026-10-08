@@ -15,6 +15,12 @@ from enum import Enum
 
 TESTCASE_METHOD_PREFIX = "test"  # unittest.TestLoader.testMethodPrefix
 _UNITTEST_CASES = {"TestCase", "IsolatedAsyncioTestCase"}
+# Frameworks whose documented test bases are unittest.TestCase subclasses (imported by name from these modules).
+_CASE_MODULES = {
+    "unittest": _UNITTEST_CASES,
+    "django.test": {"SimpleTestCase", "TestCase", "TransactionTestCase", "LiveServerTestCase"},
+    "rest_framework.test": {"APISimpleTestCase", "APITestCase", "APITransactionTestCase", "APILiveServerTestCase"},
+}
 
 
 class ClassKind(str, Enum):
@@ -39,7 +45,7 @@ def classify_classes(tree: ast.Module) -> dict[str, ClassKind]:
         elif isinstance(node, ast.ImportFrom):
             for alias in node.names:
                 star = star or alias.name == "*"
-                if node.module == "unittest" and not node.level and alias.name in _UNITTEST_CASES:
+                if not node.level and alias.name in _CASE_MODULES.get(node.module or "", ()):
                     cases.add(alias.asname or alias.name)
                 else:
                     imported.add(alias.asname or alias.name)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from assertiva.impact import ImpactEdge, ImpactGraph, Relation, StaleGraphError, build_impact_graph
+from assertiva.impact import ImpactEdge, Relation, StaleGraphError, build_impact_graph
 from assertiva.evidence import to_jsonable
 
 from conftest import write

@@ -33,8 +33,7 @@ def test_agent_context_does_not_announce_the_case_title(case):
     """A case title names the failure mode under test; the evaluated agent sees only the scenario and the task."""
     title, sections = semantic.case_sections(case)
     visible = "\n".join(sections.get(name, "") for name in semantic.AGENT_SECTIONS)
-    if title not in visible:
-        assert title not in semantic.agent_context(case)
+    assert title in visible or title not in semantic.agent_context(case)  # only the scenario itself may name it
 
 
 def test_agent_context_carries_the_skill_and_every_reference_it_can_load():

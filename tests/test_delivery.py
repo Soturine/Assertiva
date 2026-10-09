@@ -3,7 +3,6 @@ matrix visibility, artifact lineage and review candidates. Declared evidence onl
 
 import hashlib
 
-import pytest
 
 from assertiva.adapters.azure_pipelines import AzurePipelinesAdapter
 from assertiva.adapters.gitlab_ci import GitLabCiAdapter

@@ -612,12 +612,13 @@ def test_terminology_is_progressive_tier_codes_only_as_metadata(report):
 def test_technical_claim_boundary_is_grouped_and_counted(report):
     page_html = render_html(report)
     claim = section(page_html, 'id="claim"', '<section id="unknowns"')
-    for name in ("observed", "not_evidenced", "limitations"):
+    groups = ("observed", "not_evidenced", "limitations")
+    assert any(report["claim_boundary"][name] for name in groups)  # the fixture exercises the grouping
+    for name in groups:
         values = report["claim_boundary"][name]
-        if values:
-            assert f'<details class="claim-g cg-{name} ' in claim
-            listed = re.findall(rf'<div class="cd" id="claim-{name}-\w+">.*?<span class="count">(\d+)</span>', claim)
-            assert sum(map(int, listed)) == len(values)  # grouped, nothing dropped
+        assert (f'<details class="claim-g cg-{name} ' in claim) == bool(values)  # an empty group is not drawn
+        listed = re.findall(rf'<div class="cd" id="claim-{name}-\w+">.*?<span class="count">(\d+)</span>', claim)
+        assert sum(map(int, listed)) == len(values)  # grouped, nothing dropped
 
 
 def test_print_and_filters_and_raw_blocks_are_supported(report):

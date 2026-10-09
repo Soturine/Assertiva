@@ -289,7 +289,8 @@ def _checks(statements) -> bool:
                 return True
             if isinstance(item, ast.Call):
                 name = _expr_name(item.func) or ""
-                if name.split(".")[-1].startswith(("assert", "fail")) or name in ("pytest.fail", "pytest.skip", "self.skipTest"):
+                leaf = name.split(".")[-1]
+                if leaf.startswith(("assert", "fail")) or leaf in ("raises", "warns") or name in ("pytest.skip", "self.skipTest"):
                     return True
     return False
 

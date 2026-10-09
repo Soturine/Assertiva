@@ -371,3 +371,18 @@ def test_the_agent_decides_each_candidate_and_the_engine_fact_stays():
     kept = next(f for f in out["findings"] if f["id"] == target["id"])
     assert kept["evidence"] == target["evidence"] and kept["summary"] == target["summary"]
     assert kept["assessment"]["disposition"] == "FALSE_POSITIVE" and kept["priority"] == "none"
+
+
+def test_an_expected_exception_in_the_else_branch_is_a_check(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_branch.py").write_text(
+        "import pytest\n\n"
+        "@pytest.mark.parametrize('bad', [False, True])\n"
+        "def test_verify(bad):\n"
+        "    if not bad:\n"
+        "        assert verify() == 1\n"
+        "    else:\n"
+        "        with pytest.raises(ValueError):\n"
+        "            verify()\n", encoding="utf-8")
+    [fact] = collect(tmp_path)[0]
+    assert "CONDITIONAL_ASSERTION" not in fact.smells  # found by running the model on Assertiva's own suite

@@ -12,7 +12,6 @@ from assertiva.candidate import DeltaState, QualificationCheck, StageStatus
 from assertiva.improve import discard_session, qualify_candidate, start_improve
 from assertiva.models import MutantStatus
 
-from conftest import write
 
 CALC = "def add(a, b):\n    return a + b\n"
 

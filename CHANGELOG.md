@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.7.2] — 2026-10-09 — Environments, Gradle, provider CI runs and test effectiveness
+
+M3 stays in progress (ROADMAP.md).
+
+### Security and evidence integrity
+- Consent paths are compared exactly: case is folded only on Windows; relative roots in the consent file are refused. Files reached through a linked directory are listed as the link, never as project files; links to agent tools are reported as tooling, not as a product risk. The report states the read-only scope that was measured.
+- JUnit XML keeps its provenance (file digest, imported vs executed), the reported times (root and suite) apart from the sum of case durations, and marks declaration identity UNKNOWN when a parameterized case is reported only by its display name. Coverage records whether it was measured or ingested and separates product code from test files.
+- Provider CI runs (`--ci-run FILE`, from `gh run view` or GitLab's API) are compared with the audited revision: only the same SHA on a clean tree is EXTERNAL_VERIFIED.
+- Each audit carries an execution manifest: revision, runtime, what ran, inputs and withheld variables.
+- GitLab CI: local includes (globs, nesting, cycles, missing and outside-the-repository files), defaults, `extends` and `!reference` are resolved; equivalent steps are matched.
+- Command output is written to files, not pipes, so a server that outlives its command cannot hang a run. Output is kept as a bounded tail unless the caller parses it (Gradle's task list was being cut).
+
+### Environments and services
+- `audit --execute --provision`, or `provision = true` for the project in `<ASSERTIVA_HOME>/consent.toml`: a run workspace outside the project with a virtual environment (a compatible installed interpreter, from the py launcher, PATH, uv, pyenv or python.org installs; interpreters are never downloaded), `npm ci --ignore-scripts`, a Temurin JDK and a Gradle distribution (sha256-verified; the project's wrapper jar never runs). Each step is reported with its downloads and divergences; what cannot be prepared (an Android SDK, an incompatible runtime with the versions probed) is BLOCKED, never failed.
+- An installed JDK is used only when it is the build's declared toolchain and can run Gradle (17+); otherwise the declared Temurin is provisioned. On Windows, a PostgreSQL cluster started by an administrator lives in a fresh directory under the user's temp, since initdb's restricted token cannot read owner-only directories. Both found by the first Windows CI runs.
+- On a machine whose application-control policy blocks newly downloaded native libraries (seen here with a database driver), the run is BLOCKED with the import error, never failed or passed.
+- Run workspaces are leased by their run (an OS file lock): a live run's workspace is never removed, whatever its age; one left by a killed run is. Archives extract safely and under long Windows paths.
+- Disposable PostgreSQL: a new cluster with a generated password on a free local port (installed binaries or a portable build from Maven Central), verified before tests connect by its pid file, a SCRAM-SHA-256 login in which the server proves it holds this run's password, and the data directory and port the authenticated server reports. The caller's own `DATABASE_URL` stays withheld.
+
+### Gradle: Java, Kotlin/JVM, Android local tests, Kotlin Multiplatform
+- A Gradle adapter runs the build's test tasks in the disposable copy with JUnit XML per task and JaCoCo/Kover the build already applies. Modules and plugins are read through version-catalog aliases and convention plugins of included builds, with a layout fallback; Gradle's own task list confirms the tasks before running (Android debug unit tests of every flavor, the JVM targets of multiplatform modules, `test`). Other variants and custom test tasks are listed as AVAILABLE; instrumented Android tests and non-JVM targets as NOT_RUN with the host they need; Android local tests without an SDK as BLOCKED.
+- unittest/Django: test classes from `django.test` and `rest_framework.test` are recognized.
+
+### Test effectiveness (all languages)
+- Every audit reads the tests into one model — oracles, doubles, boundaries crossed or simulated, surfaces, smells, declared level — with extractors for Python (syntax tree), JavaScript/TypeScript and Kotlin/Java (lexical; limits stated). One set of rules nominates candidates: false greens, weak oracles, fidelity mismatches, redundancy and smells, each with what the evidence shows, why it may be weak, what would settle it and its basis. They are findings for the agent to confirm or reject (per test), never verdicts, never a score; the HTML shows them as "inferred, not confirmed".
+- With a mutation report that names killing tests, per-test exclusive detection is shown, and improve fails a retirement that removes the only detector of a known mutant; a retirement without that evidence is not proven.
+- Fixture projects inside test directories (`tests/fixtures`, `testdata`, `__fixtures__`) are inputs of the tests, not tests of the project: found by the self-audit, which counted seeded defects.
+- Calibrated against the same defects written in Python, JavaScript and Kotlin, and against negatives that must not be nominated (timeout tests that sleep, conditionals whose `else` checks, helpers, inheritance, callbacks, awaited rejections, cleanup in `finally`).
+
+### Skill and evaluation
+- SKILL.md points the agent to the effectiveness candidates as leads to confirm or reject against the code, to consented provisioning, and forbids retiring tests on similarity; a not-run check is neither failed nor untested.
+- Six agent-led evaluation cases (rejecting a candidate the code disproves, targeted evidence, evidence not worth its cost, simple vs shallow tests, no removal on similarity, fidelity across languages): run 1 4/6 PASS; after a reference fix, the candidate case passes; the not-run-on-device case still fails (evals/results/2026-10-09-effectiveness).
+
+### CI
+- New jobs: `services` (provisioning, PostgreSQL), `gradle` (Gradle, Kotlin, Android with the runner's SDK) and `windows` (fast, integration and artifact suites, and the real provisioning, PostgreSQL and Gradle paths on Windows).
+
+### Investigated
+- A CP6 suite failure in `test_installed_artifact_context` was not intermittent: it re-runs the narrative-template contract inside an installed wheel, so one untranslated engine sentence fails both tests. Reproduced deterministically by injecting one sentence (both fail) and removing it (both pass).
+
+### Not done
+- The Skill does not yet reliably answer "unknown on a device" (with an offered, authorized next step) for tests that were listed but not run: EVIDENCE_NOT_WORTH_ITS_COST failed twice. No regression re-run of the earlier agent-led cases.
+- Interpreter downloads; Android instrumented tests, iOS/JS/Native targets; .NET, Go, Rust, PHP.
+
 ## [0.7.1] — 2026-10-08 — Consent outside the project, connection targets withheld
 
 Patch release (security). M3 stays in progress.

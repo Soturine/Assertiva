@@ -31,7 +31,8 @@ from .workspace import assertiva_home, remove_tree
 MAX_DOWNLOAD_BYTES = 600 * 1024 * 1024
 MAX_EXTRACTED_BYTES = 3 * 1024 * 1024 * 1024
 DOWNLOAD_TIMEOUT_S = 120
-STALE_WORKSPACE_S = 24 * 3600
+STALE_WORKSPACE_S = 15 * 60  # an unleased workspace this old was left by a killed run
+UNLEASED_STALE_S = 24 * 3600  # workspaces from versions without a lease
 
 # Isolation the run actually had, never more than was obtained.
 ISOLATION_STATIC = "STATIC_ONLY"  # read and parsed; no project code ran
@@ -115,21 +116,99 @@ def tools_dir() -> Path:
     return path
 
 
+_LEASES: dict[str, object] = {}  # workspace -> the open, locked lease file held for the whole run
+
+
+def _lock(handle) -> bool:
+    """A non-blocking exclusive OS lock on the lease (released by the OS when the holder dies, however it dies)."""
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def _unlock(handle) -> None:
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+    handle.close()
+
+
+def in_use(workspace: Path) -> bool:
+    """Whether a live run holds the workspace's lease (this process or another one)."""
+    if str(workspace) in _LEASES:
+        return True
+    lease = workspace / "lease"
+    if not lease.is_file():
+        return False
+    try:
+        handle = open(lease, "r+b")
+    except OSError:
+        return True  # cannot even open it: assume a holder
+    if not _lock(handle):
+        handle.close()
+        return True
+    _unlock(handle)
+    return False
+
+
+def _removable(old: Path, now: float) -> bool:
+    age = now - max(old.stat().st_mtime, (old / "lease").stat().st_mtime if (old / "lease").exists() else 0)
+    if not (old / "lease").exists():  # nothing to ask: only the old age rule is safe
+        return age > UNLEASED_STALE_S
+    return age > STALE_WORKSPACE_S and not in_use(old)
+
+
 def new_workspace() -> Path:
-    """A fresh run workspace; stale ones left by killed runs are removed first."""
+    """A fresh run workspace, leased by this process until ``remove_workspace``; workspaces left by killed runs
+    (lease free) are removed first, and a workspace whose lease is held is never touched, however old."""
     base = assertiva_home() / "workspaces"
     base.mkdir(parents=True, exist_ok=True)
     now = time.time()
     for old in base.iterdir():
         try:
-            if old.is_dir() and now - old.stat().st_mtime > STALE_WORKSPACE_S:
+            if old.is_dir() and _removable(old, now):
                 remove_tree(old)
         except OSError:
             pass
     path = base / uuid.uuid4().hex[:8]  # short: Windows tools still hit the 260-character path limit
+    path.mkdir()
+    handle = open(path / "lease", "w+b")
+    handle.write(f"{os.getpid()}\n".encode())
+    handle.flush()
+    if not _lock(handle):
+        handle.close()
+        raise ProvisioningError(f"could not lease the run workspace {path}")
+    _LEASES[str(path)] = handle
     for sub in ("env", "artifacts", "evidence"):
         (path / sub).mkdir(parents=True)
     return path
+
+
+def remove_workspace(workspace: Path) -> None:
+    """Release this run's lease and remove its workspace."""
+    handle = _LEASES.pop(str(workspace), None)
+    if handle is not None:
+        _unlock(handle)
+    remove_tree(workspace)
 
 
 def write_manifest(prepared: Prepared, extra: dict | None = None) -> None:
@@ -195,7 +274,8 @@ def _safe_member(name: str) -> PurePosixPath:
 def extract(archive: Path, target: Path, limit: int = MAX_EXTRACTED_BYTES) -> Path:
     """Extract a zip or tar archive into ``target``: no absolute paths, no ``..``, no links or devices, bounded size.
     The whole archive is checked before anything is written."""
-    archive, target = Path(archive), Path(target)
+    archive, given = Path(archive), Path(target)
+    target = _extended(given)
     total = 0
     if zipfile.is_zipfile(archive):
         with zipfile.ZipFile(archive) as z:
@@ -219,7 +299,7 @@ def extract(archive: Path, target: Path, limit: int = MAX_EXTRACTED_BYTES) -> Pa
                 mode = (info.external_attr >> 16) & 0o777
                 if mode and os.name != "nt":
                     os.chmod(destination, mode)
-        return target
+        return given
     try:
         tar = tarfile.open(archive)
     except tarfile.TarError as exc:
@@ -263,7 +343,18 @@ def extract(archive: Path, target: Path, limit: int = MAX_EXTRACTED_BYTES) -> Pa
                 source = (destination.parent / linkname)
                 if source.is_file():
                     shutil.copy2(source, destination)
-    return target
+    return given
+
+
+def _extended(path: Path) -> Path:
+    """On Windows, the extended-length form of an absolute path, so deep archive entries (JDK legal notices, Node
+    modules) extract under a long tools directory despite the 260-character limit; unchanged elsewhere."""
+    if os.name != "nt":
+        return path
+    text = str(path.resolve())
+    if text.startswith("\\\\?\\"):
+        return path
+    return Path("\\\\?\\UNC\\" + text[2:] if text.startswith("\\\\") else "\\\\?\\" + text)
 
 
 def _normalized(path: PurePosixPath) -> list[str]:

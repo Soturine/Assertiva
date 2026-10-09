@@ -121,8 +121,29 @@ def _probe(python: str) -> dict | None:
         return None
 
 
+def _managed_interpreters() -> list[str]:
+    """Interpreters already installed by version managers and per-user installers (never downloaded here):
+    uv (UV_PYTHON_INSTALL_DIR or its default), pyenv / pyenv-win, python.org per-user installs on Windows."""
+    home = Path.home()
+    roots = [Path(os.environ["UV_PYTHON_INSTALL_DIR"])] if os.environ.get("UV_PYTHON_INSTALL_DIR") else []
+    if os.name == "nt":
+        appdata, local = Path(os.environ.get("APPDATA", home)), Path(os.environ.get("LOCALAPPDATA", home))
+        roots += [appdata / "uv" / "python"]
+        patterns = [(r, "cpython-*/python.exe") for r in roots] + [
+            (home / ".pyenv" / "pyenv-win" / "versions", "*/python.exe"), (local / "Programs" / "Python", "Python3*/python.exe")]
+    else:
+        roots += [Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share")) / "uv" / "python"]
+        patterns = [(r, "cpython-*/bin/python3") for r in roots] + [(Path(os.environ.get("PYENV_ROOT", home / ".pyenv")) / "versions", "*/bin/python3")]
+    found = []
+    for base, pattern in patterns:
+        if base.is_dir():
+            found += sorted((str(p) for p in base.glob(pattern) if p.is_file()), reverse=True)
+    return found
+
+
 def candidate_interpreters(given: str | None) -> list[str]:
-    """The interpreter the caller named first, then this one, then those installed (the py launcher, PATH)."""
+    """The interpreter the caller named first, then this one, then those installed (the py launcher, PATH, version
+    managers). Interpreters are found, never downloaded: a missing compatible one leaves the run BLOCKED."""
     out = [p for p in (given, sys.executable) if p]
     if os.name == "nt" and shutil.which("py"):
         listed = run_command(["py", "-0p"], Path.cwd(), timeout_s=30)
@@ -131,6 +152,7 @@ def candidate_interpreters(given: str | None) -> list[str]:
         found = shutil.which(f"python3.{minor}")
         if found:
             out.append(found)
+    out += _managed_interpreters()
     return list(dict.fromkeys(out))
 
 
@@ -159,16 +181,21 @@ def _python_plan(root: Path, given: str | None, runner_needs: list[str], prepare
     divergences = [f"{tool} lockfile {name} is not honored: dependencies come from "
                    + ("the requirement files" if files else "pyproject.toml ranges") for name, tool in _LOCKFILES.items() if (root / name).is_file()]
     compatible = current if current and satisfies(current["version"], spec) else None
+    probed = {current["version"]} if current else set()
     if compatible is None:
         for candidate in candidate_interpreters(given)[1:]:
             probe = _probe(candidate)
+            if probe:
+                probed.add(probe["version"])
             if probe and satisfies(probe["version"], spec):
                 compatible = probe
                 break
     if compatible is None:
         return [Step("python-interpreter", "python", "select a compatible interpreter",
                      f"requires-python {spec}; available {current['version'] if current else 'none'}", status="BLOCKED",
-                     detail=f"no installed Python satisfies {spec}; this version does not download interpreters (runtime incompatible, not a project defect)")]
+                     detail=f"no installed Python satisfies {spec} (probed: {', '.join(sorted(probed)) or 'none'}); interpreters are "
+                            "found, never downloaded by this version: install a matching one (python.org, uv python install, pyenv) "
+                            "and pass --python, or rerun; runtime incompatible, not a project defect")]
     missing = _missing(compatible["executable"], [n for n in names if n != UNVERIFIABLE])
     if UNVERIFIABLE in names:
         missing.append(UNVERIFIABLE)
@@ -346,18 +373,18 @@ def _prepare_jdk(step: Step, prepared: Prepared) -> None:
     home = tools_dir() / "jdk" / f"temurin-{feature}-{system}-{arch}"
     if not (home / "bin").is_dir():
         query = f"https://api.adoptium.net/v3/assets/latest/{feature}/hotspot?architecture={arch}&image_type=jdk&os={system}&vendor=eclipse"
-        from assertiva.environment import _read_url
+        from assertiva.environment import _extended, _read_url
 
         assets = json.loads(_read_url(query, 1 << 20))
         package = assets[0]["binary"]["package"]
         archive = download(package["link"], package["checksum"], package["name"])
         staging = home.with_name(home.name + ".staging")
-        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(_extended(staging), ignore_errors=True)  # deep entries: extended-length paths on Windows
         extract(archive, staging)
         [top] = [p for p in staging.iterdir() if p.is_dir()]
-        shutil.rmtree(home, ignore_errors=True)
+        shutil.rmtree(_extended(home), ignore_errors=True)
         os.replace(top, home)
-        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(_extended(staging), ignore_errors=True)
         step.status = "DONE"
     else:
         step.status = "REUSED"

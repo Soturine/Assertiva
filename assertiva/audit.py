@@ -76,7 +76,7 @@ def _prepare(root: Path, python: str | None, consented: bool) -> environment.Pre
         return prepared
     workspace = environment.new_workspace()
     prepared = environment.Prepared(workspace=workspace)
-    prepared.cleanups.append(lambda: remove_tree(workspace))  # runs last: services stop before their data goes
+    prepared.cleanups.append(lambda: environment.remove_workspace(workspace))  # runs last: services stop before their data goes
     with traced_stage("environment:prepare"):
         prepared.steps = plan(root, python, prepared)
         prepare(root, prepared.steps, prepared, consented)

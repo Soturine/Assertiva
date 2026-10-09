@@ -6,8 +6,10 @@ instrument, comes from the package index (so that case needs network)."""
 import io
 import json
 import os
+import subprocess
 import sys
 import tarfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -83,12 +85,47 @@ def test_plain_http_is_refused(tmp_path):
 def test_the_run_workspace_is_removed_even_when_the_run_fails(tmp_path):
     workspace = environment.new_workspace()
     prepared = environment.Prepared(workspace=workspace)
-    prepared.cleanups.append(lambda: __import__("assertiva.workspace", fromlist=["x"]).remove_tree(workspace))
+    prepared.cleanups.append(lambda: environment.remove_workspace(workspace))
     with pytest.raises(RuntimeError):
         with environment.active(prepared):
             assert environment.ACTIVE is prepared
             raise RuntimeError("interrupted")
     assert environment.ACTIVE is None and not workspace.exists()
+
+
+def _age(path, seconds):
+    old = time.time() - seconds
+    for item in (path, *path.iterdir()):
+        os.utime(item, (old, old))
+
+
+def test_a_leased_workspace_is_never_removed_however_old(tmp_path):
+    active = environment.new_workspace()
+    _age(active, 7 * 24 * 3600)
+    other = environment.new_workspace()  # another run starts and sweeps old workspaces
+    assert active.exists() and environment.in_use(active)
+    environment.remove_workspace(other)
+    environment.remove_workspace(active)
+    assert not active.exists() and not other.exists()
+
+
+def test_a_workspace_held_by_another_process_survives_and_one_left_by_a_killed_run_is_removed(tmp_path):
+    holder = subprocess.Popen([sys.executable, "-c", (
+        "import sys, time; from assertiva import environment; w = environment.new_workspace(); "
+        "print(w, flush=True); time.sleep(60)")], stdout=subprocess.PIPE, text=True, env={**os.environ})
+    try:
+        held = Path(holder.stdout.readline().strip())
+        _age(held, 3600)
+        assert environment.in_use(held)
+        environment.remove_workspace(environment.new_workspace())  # a concurrent run's sweep
+        assert held.exists(), "a live run's workspace was removed"
+    finally:
+        holder.kill()  # killed: the OS releases its lease
+        holder.wait(10)
+    assert not environment.in_use(held)
+    _age(held, 3600)
+    environment.remove_workspace(environment.new_workspace())
+    assert not held.exists(), "a workspace left by a killed run stays"
 
 
 # --- discovery -----------------------------------------------------------------------------------
@@ -119,6 +156,7 @@ def test_an_incompatible_runtime_is_an_environment_limit_not_a_project_failure(t
     report = json.loads(capsys.readouterr().out)
     [step] = [s for s in report["environment"]["steps"] if s["step_id"] == "python-interpreter"]
     assert code == 0 and step["status"] == "BLOCKED" and "runtime incompatible" in step["detail"]
+    assert "probed:" in step["detail"] and "never downloaded" in step["detail"]  # what was tried, and how to resolve
     assert report["environment"]["isolation"] == "STATIC_ONLY"
 
 
@@ -203,3 +241,22 @@ def test_inner_links_of_a_tool_bundle_are_kept_and_escaping_ones_refused(tmp_pat
     (tmp_path / "bundle.tar").write_bytes(buffer.getvalue())
     out = extract(tmp_path / "bundle.tar", tmp_path / "out")
     assert (out / "lib" / "libx.so.5").read_bytes() == b"library"
+
+
+def test_interpreters_installed_by_version_managers_are_candidates_never_downloads(tmp_path, monkeypatch):
+    exe = ("cpython-3.13.1-windows-x86_64-none/python.exe" if os.name == "nt" else "cpython-3.13.1-linux-x86_64-gnu/bin/python3")
+    write(tmp_path / "uv" / exe, "")
+    monkeypatch.setenv("UV_PYTHON_INSTALL_DIR", str(tmp_path / "uv"))
+    found = provisioning.candidate_interpreters(None)
+    assert str(tmp_path / "uv" / exe) in found and found[0] == sys.executable
+
+
+def test_deep_archive_entries_extract_under_a_long_tools_path(tmp_path):
+    deep = "jdk/legal/" + "/".join(["module.with.a.long.name"] * 6) + "/ADDITIONAL_LICENSE_INFO"
+    archive = tmp_path / "deep.zip"
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr(deep, "notice")
+    target = tmp_path / ("t" * 60) / ("u" * 60)
+    assert len(str(target / deep)) > 260
+    assert extract(archive, target) == target
+    assert environment._extended(target / deep).read_text() == "notice"

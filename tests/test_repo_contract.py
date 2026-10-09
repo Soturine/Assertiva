@@ -109,3 +109,14 @@ def test_only_the_java_job_needs_a_jdk_and_its_tests_cannot_skip():
     gradle = [step for step in jobs["gradle"]["steps"] if (step.get("env") or {}).get("ASSERTIVA_RUN_GRADLE") == "1"]
     assert any("tests/test_gradle.py" in str(step.get("run", "")) for step in gradle)  # its real runs cannot skip there
     assert "and not jvm" in _script(jobs["validate"])
+
+
+def test_windows_runs_the_same_suites_and_the_real_provisioning_paths():
+    _, jobs = _ci()
+    windows = [job for job in jobs.values() if str(job.get("runs-on", "")).startswith("windows") and "if" not in job]
+    assert len(windows) == 1, "Windows compatibility is qualified on every commit"
+    script = _script(windows[0])
+    assert '-m "not integration and not artifact"' in script
+    assert '-m "(integration or artifact) and not browser and not jvm"' in script
+    real = [step for step in windows[0]["steps"] if (step.get("env") or {}).get("ASSERTIVA_RUN_SERVICES") == "1"]
+    assert real and real[0]["env"].get("ASSERTIVA_RUN_GRADLE") == "1" and "tests/test_gradle.py" in real[0]["run"]

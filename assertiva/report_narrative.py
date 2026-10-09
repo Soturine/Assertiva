@@ -202,6 +202,12 @@ NARRATIVE: list[tuple[str, str]] = [
     ("negative-path evidence weakened: {names:metrics}", "a evidência de caminhos negativos enfraqueceu: {names:metrics}"),
     ("the candidate does not add or modify negative-path tests", "o candidato não adiciona nem modifica testes de caminho negativo"),
     ("no negative controls or mutation evidence were provided", "nenhum controle negativo ou evidência de mutação foi fornecido"),
+    ("Gradle's task list could not be read: test tasks were planned from the build scripts, not confirmed",
+     "a lista de tarefas do Gradle não pôde ser lida: as tarefas de teste foram planejadas a partir dos scripts de build, sem confirmação"),
+    ("results are Gradle's JUnit XML per test task: a case named by its method keeps its declaration (class and method); "
+     "a parameterized case reported by display name only does not, and its declaration stays UNKNOWN",
+     "os resultados são o JUnit XML do Gradle por tarefa de teste: um caso nomeado pelo método mantém sua declaração (classe e "
+     "método); um caso parametrizado relatado só pelo nome de exibição não mantém, e sua declaração fica UNKNOWN"),
     ("retirement not proven: no baseline mutation report names which tests detect each mutant",
      "remoção não comprovada: nenhum relatório de mutação do baseline indica quais testes detectam cada mutante"),
     ("RETIRED_TEST_EXCLUSIVE_DETECTION: retired tests are the only detectors of {n} mutant(s): {mutants}",

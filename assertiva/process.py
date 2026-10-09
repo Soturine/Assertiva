@@ -48,12 +48,12 @@ def traced_stage(name: str):
         _stage = previous
 
 
-def _tail(text: str | bytes | None) -> str:
+def _tail(text: str | bytes | None, limit: int = OUTPUT_LIMIT) -> str:
     if text is None:
         return ""
     if isinstance(text, bytes):
         text = text.decode("utf-8", errors="replace")
-    return text[-OUTPUT_LIMIT:]
+    return text[-limit:]
 
 
 @dataclass
@@ -271,11 +271,13 @@ def _kill_tree(proc: subprocess.Popen) -> None:
         pass
 
 
-def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0) -> CommandResult:
+def run_command(command: list[str], cwd: str | Path, env: dict | None = None, timeout_s: float = 900.0,
+                output_limit: int = OUTPUT_LIMIT) -> CommandResult:
     """Run ``command`` non-interactively in its own process group, bounded by ``timeout_s``.
 
     The result is the command's own exit status (or the signal that ended it, a timeout or a start
-    failure); a timeout ends the whole process tree, not just the direct child."""
+    failure); a timeout ends the whole process tree, not just the direct child. Output is kept as its last
+    ``output_limit`` characters (a caller that parses the output asks for more); the digest covers all of it."""
     started = time.perf_counter()
     result = CommandResult(
         command=[str(c) for c in command], cwd=str(cwd), started_at=_now(), duration_s=0.0, timeout_s=timeout_s,
@@ -313,7 +315,7 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
             out, err = out_file.read(), err_file.read()
     if proc is not None:
         result.output_sha256 = hashlib.sha256((out or b"") + b"|" + (err or b"")).hexdigest()
-        result.stdout, result.stderr = _tail(out), _tail(err)
+        result.stdout, result.stderr = _tail(out, output_limit), _tail(err, output_limit)
         if not result.timed_out:
             result.returncode = proc.returncode
             if proc.returncode < 0 and os.name != "nt":

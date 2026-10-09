@@ -242,3 +242,13 @@ def test_a_command_that_leaves_a_server_running_returns_when_it_exits(tmp_path):
             os.kill(int(pid_file.read_text()), 9 if os.name != "nt" else 1)
         except (OSError, ValueError):
             pass
+
+
+def test_output_is_a_bounded_tail_unless_the_caller_parses_it(tmp_path):
+    OUTPUT_LIMIT = process.OUTPUT_LIMIT
+
+    script = "print('x' * 10000 + 'END')"
+    short = process.run_command([sys.executable, "-c", script], tmp_path)
+    full = process.run_command([sys.executable, "-c", script], tmp_path, output_limit=100_000)
+    assert len(short.stdout) == OUTPUT_LIMIT and short.stdout.rstrip().endswith("END")
+    assert full.stdout.strip() == "x" * 10000 + "END" and full.output_sha256 == short.output_sha256

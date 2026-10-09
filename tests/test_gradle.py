@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from assertiva.adapters import runner_adapters
 from assertiva.adapters.gradle import GradleAdapter, _declaration, _tasks, modules
 from assertiva.workspace import tree_fingerprint
 
@@ -128,3 +127,73 @@ def test_android_local_tests_run_with_an_sdk_and_instrumented_ones_never_without
         assert run["status"] == "PASS" and run["outcomes"] == {"PASSED": 2} and run["matrix"][":app testDebugUnitTest"] == "EXECUTED"
     else:
         assert run["status"] == "BLOCKED" and run["matrix"][":app testDebugUnitTest (local)"].startswith("BLOCKED: no Android SDK")
+
+
+# --- discovery beyond literal strings: catalogs, convention plugins, variants, targets, Gradle's own task list --------
+
+def test_catalog_aliases_and_convention_plugins_resolve_each_module_kind():
+    found = {m["path"]: m for m in modules(FIXTURES / "gradle-conventions")}
+    assert found["app"]["kind"] == "android" and "com.android.application" in found["app"]["plugins"]  # alias(libs.plugins...)
+    assert found["core/data"]["kind"] == "android" and found["core/data"]["kind_basis"] == "plugins"  # class convention plugin
+    assert found["features/feature-a"]["kind"] == "kotlin-jvm"  # precompiled convention -> another convention -> kotlin.jvm
+    assert found["features/feature-a"]["coverage"] == ["jacoco"]  # applied by the convention plugin
+    assert found["shared"]["kind"] == "kmp" and found["shared"]["jvm_targets"] == ["desktop"]
+    assert found["."]["kind"] == "unknown"  # `apply false` applies nothing
+    assert found["features/feature-a"]["declared"] is False and found["app"]["declared"] is True  # computed include
+    assert "build-logic" not in found and "build-logic/convention" not in found  # an included build is not a module
+
+
+def test_static_plan_follows_flavors_and_named_jvm_targets_and_skips_unconfirmed_modules():
+    found = {m["path"]: m for m in modules(FIXTURES / "gradle-conventions")}
+    assert found["app"]["flavors"] == ["free", "paid"]
+    tasks, matrix = _tasks(found["app"])
+    assert tasks == [":app:testFreeDebugUnitTest", ":app:testPaidDebugUnitTest"]
+    assert matrix[":app connectedAndroidTest (instrumented)"].startswith("NOT_RUN")
+    tasks, matrix = _tasks(found["shared"])
+    assert tasks == [":shared:desktopTest"] and matrix[":shared iosTest"].startswith("NOT_RUN")
+    assert _tasks(found["features/feature-a"])[0] == []  # not literally included: only Gradle's task list can confirm it
+
+
+TASKS_OUTPUT = """
+Build tasks
+-----------
+assemble - Assembles the outputs of this project.
+
+Verification tasks
+------------------
+app:check - Runs all checks.
+app:connectedFreeDebugAndroidTest - Installs and runs the tests for freeDebug on connected devices.
+app:testFreeDebugUnitTest - Run unit tests for the freeDebug build.
+app:testFreeReleaseUnitTest - Run unit tests for the freeRelease build.
+app:testPaidDebugUnitTest - Run unit tests for the paidDebug build.
+features:feature-a:integrationTest - Runs the integration tests.
+features:feature-a:test - Runs the test suite.
+shared:allTests - Runs the tests for all targets.
+shared:desktopTest - Runs the tests for desktop.
+shared:iosArm64Test
+"""
+
+
+def test_gradle_task_list_confirms_tasks_and_lists_custom_ones_without_running_them():
+    from assertiva.adapters.gradle import available_tests
+
+    listing = available_tests(TASKS_OUTPUT)
+    assert listing[":app"] == ["testFreeDebugUnitTest", "testFreeReleaseUnitTest", "testPaidDebugUnitTest"]
+    assert listing[":features:feature-a"] == ["integrationTest", "test"] and "allTests" not in listing[":shared"]
+    found = {m["path"]: m for m in modules(FIXTURES / "gradle-conventions")}
+    tasks, matrix = _tasks(found["app"], listing[":app"])
+    assert tasks == [":app:testFreeDebugUnitTest", ":app:testPaidDebugUnitTest"]
+    assert matrix[":app testFreeReleaseUnitTest"].startswith("AVAILABLE")
+    tasks, matrix = _tasks(found["features/feature-a"], listing[":features:feature-a"])
+    assert tasks == [":features:feature-a:test"]  # confirmed by Gradle although the include is computed
+    assert matrix[":features:feature-a integrationTest"].startswith("AVAILABLE: a custom test task")
+    tasks, matrix = _tasks(found["shared"], listing[":shared"])
+    assert tasks == [":shared:desktopTest"] and matrix[":shared iosArm64Test"].startswith("NOT_RUN: needs a macOS host")
+    assert _tasks(found["shared"], [])[0] == []  # Gradle lists no JVM test task: none is assumed
+
+
+def test_a_task_list_with_windows_line_endings_ends_at_its_blank_line():
+    from assertiva.adapters.gradle import available_tests
+
+    output = "Verification tasks\r\n------------------\r\njvmTest - Runs\r\n\r\nOther tasks\r\n-----------\r\nfooTest - y\r\n"
+    assert available_tests(output) == {"": ["jvmTest"]}

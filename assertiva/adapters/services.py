@@ -194,9 +194,22 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     installed = json.loads(step.detail).get("installed")
     bin_dir = Path(shutil.which("initdb")).parent if installed else _portable_binaries() / "bin"
     exe = ".exe" if os.name == "nt" else ""
-    data = prepared.workspace / "env" / "pg"
+    cluster = prepared.workspace / "env"
+    if os.name == "nt":
+        # initdb started by an administrator drops to a restricted token, which cannot read a directory whose ACL
+        # names only its owner (Python 3.12+ mkdir(0o700), as test and temp trees use): the cluster lives in a fresh
+        # directory under the user's temp, created with the default ACL, removed after the server stops
+        import tempfile
+        import uuid
+
+        cluster = Path(tempfile.gettempdir()) / f"apg-{uuid.uuid4().hex[:8]}"
+        cluster.mkdir()
+        from assertiva.workspace import remove_tree
+
+        prepared.cleanups.append(lambda: remove_tree(cluster))  # registered before the stop, so it runs after it
+    data = cluster / "pg"
     password = secrets.token_urlsafe(18)
-    pwfile = prepared.workspace / "env" / "pg-password"
+    pwfile = cluster / "pg-password"
     pwfile.write_text(password, encoding="utf-8")
     created = run_command([str(bin_dir / f"initdb{exe}"), "-D", str(data), "-U", "assertiva", "--pwfile", str(pwfile),
                            "-A", "scram-sha-256", "-E", "UTF8", "--no-instructions"], Path.cwd(), timeout_s=300)

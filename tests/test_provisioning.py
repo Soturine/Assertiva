@@ -260,3 +260,25 @@ def test_deep_archive_entries_extract_under_a_long_tools_path(tmp_path):
     assert len(str(target / deep)) > 260
     assert extract(archive, target) == target
     assert environment._extended(target / deep).read_text() == "notice"
+
+
+def _fake_jdk(path, version):
+    write(path / "release", f'JAVA_VERSION="{version}"\n')
+    write(path / "bin" / ("java.exe" if os.name == "nt" else "java"), "")
+    return path
+
+
+@pytest.mark.parametrize("installed, declared, provisioned", [
+    ("21.0.5", 21, False),  # the toolchain is installed: used
+    ("17.0.12", 21, True),  # another version than the toolchain: found by Windows CI, whose JAVA_HOME is not 21
+    ("1.8.0_402", None, True),  # too old to run Gradle
+    ("17.0.12", None, False),
+])
+def test_an_installed_jdk_serves_only_when_it_is_the_builds_toolchain(tmp_path, monkeypatch, installed, declared, provisioned):
+    monkeypatch.setenv("JAVA_HOME", str(_fake_jdk(tmp_path / "jdk", installed)))
+    root = tmp_path / "proj"
+    write(root / "settings.gradle.kts", 'rootProject.name = "x"\n')
+    write(root / "build.gradle.kts", 'plugins { kotlin("jvm") }\n' + (f"kotlin {{ jvmToolchain({declared}) }}\n" if declared else ""))
+    [jdk] = [s for s in provisioning._jvm_plan(root, environment.Prepared()) if s.step_id == "jdk"]
+    assert (jdk.status == "PLANNED") is provisioned, jdk
+    assert provisioning.jdk_major(tmp_path / "jdk") == int(installed.split(".")[1] if installed.startswith("1.") else installed.split(".")[0])

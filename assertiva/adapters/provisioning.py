@@ -39,6 +39,7 @@ _TEST_GROUPS = ("test", "tests", "testing", "dev")
 _JDK_DECLARED = (re.compile(r"JavaLanguageVersion\.of\(\s*(\d+)\s*\)"), re.compile(r"jvmToolchain\(\s*(\d+)\s*\)"),
                  re.compile(r"<maven\.compiler\.(?:release|source)>\s*(\d+)\s*<"), re.compile(r"<release>\s*(\d+)\s*</release>"))
 DEFAULT_JDK = 21
+MIN_GRADLE_JDK = 17  # current Gradle releases run on JDK 17+
 
 
 # --- versions ------------------------------------------------------------------------------------
@@ -299,6 +300,19 @@ def _java_home() -> str | None:
     return str(Path(java).resolve().parent.parent) if java else None
 
 
+def jdk_major(home: str | Path) -> int | None:
+    """The feature version of the JDK at ``home``, from its ``release`` file (``JAVA_VERSION="21.0.5"`` or ``"1.8.0_402"``)."""
+    try:
+        text = (Path(home) / "release").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    match = re.search(r'^JAVA_VERSION="(\d+)(?:\.(\d+))?', text, re.M)
+    if not match:
+        return None
+    major = int(match.group(1))
+    return int(match.group(2) or 0) if major == 1 else major
+
+
 def declared_jdk(root: Path) -> int | None:
     for path in [*root.glob("*.gradle"), *root.glob("*.gradle.kts"), *root.glob("*/build.gradle*"), root / "pom.xml"]:
         try:
@@ -338,14 +352,20 @@ def _jvm_plan(root: Path, prepared: Prepared) -> list[Step]:
         return []
     feature = declared_jdk(root)
     home = _java_home()
+    installed = jdk_major(home) if home else None
     wrapper = gradle_wrapper(root) if gradle else None
     prepared.requirements.append({"ecosystem": "jvm", "build": "gradle" if gradle else "maven", "jdk_declared": feature,
                                   "jdk_available": home, "gradle_wrapper": wrapper})
     steps = []
-    if home is None:
+    # the installed JDK serves when the build's toolchain is that version (or none is declared) and it can run Gradle
+    mismatch = home is not None and ((feature is not None and installed != feature) or (gradle and (installed or 0) < MIN_GRADLE_JDK))
+    if home is None or mismatch:
         version = feature or DEFAULT_JDK
+        why = ("no JDK on this machine" if home is None else
+               f"the installed JDK ({installed or 'unknown version'}) is not the build's toolchain {feature}" if feature is not None
+               else f"the installed JDK ({installed or 'unknown version'}) cannot run Gradle (needs {MIN_GRADLE_JDK}+)")
         steps.append(Step("jdk", "jvm", f"Temurin JDK {version} into the tools cache",
-                          "no JDK on this machine" + ("" if feature else f"; the build declares no toolchain, JDK {DEFAULT_JDK} is used"),
+                          why + ("" if feature else f"; the build declares no toolchain, JDK {DEFAULT_JDK} is used"),
                           downloads=["api.adoptium.net / github.com/adoptium"], detail=json.dumps({"feature": version})))
     else:
         prepared.tools["java_home"] = home

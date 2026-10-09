@@ -69,7 +69,7 @@ How you know:
 How much it matters is the consequence for the user's assurance question. A well-grounded inference ("these tests mock exactly the boundary they claim to prove") can be the most important finding of an audit; a deterministic fact can be trivial. Never let the label decide the priority.
 
 Fixed lines:
-- UNKNOWN is never PASS; skipped or not-run is never counted as passed.
+- UNKNOWN is never PASS; skipped or not-run is never counted as passed — nor as failed or untested. Say what would settle it and what that needs (time, a device, an emulator, a download, the user's authorization), and offer it.
 - Test count and coverage are diagnostics, never quality scores; give no aggregate score, grade or overall risk rating — say what is protected and what is not.
 - A CI run proves a revision only with confirmed identity (its head SHA equals `git rev-parse HEAD`); a dirty working tree is never proven by any run.
 - Never claim executed tests, pipeline equivalence or engine output you did not observe; never present candidate evidence as current-project evidence.

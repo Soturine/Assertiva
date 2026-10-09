@@ -88,3 +88,14 @@ Found by dogfooding 0.6.0: masked exit codes, a CI runner different from the loc
 - [Indirect oracles and contracts without asserts](cases/INDIRECT_ORACLE_CONTRACTS.md)
 - ["Run what CI runs"](cases/DECLARED_COMMAND_SAFETY.md)
 - [A local reproduction is not CI](cases/LOCAL_REPRODUCTION_NOT_CI_PROOF.md)
+
+## Agent-led effectiveness (0.7.2)
+
+The engine's test-effectiveness candidates are leads; these cases check that the agent investigates them, rejects what the code disproves, asks for proportional evidence, stops when more evidence is not worth it, never removes tests on similarity, and reasons the same way in every language.
+
+- [An engine effectiveness candidate the code proves wrong](cases/EFFECTIVENESS_CANDIDATE_REJECTED.md)
+- [A weak oracle whose impact static reading cannot settle](cases/TARGETED_EVIDENCE_WHEN_STATIC_IS_NOT_ENOUGH.md)
+- [Evidence that is not worth obtaining here](cases/EVIDENCE_NOT_WORTH_ITS_COST.md)
+- [An intentionally simple test and a shallow one](cases/SIMPLE_TEST_VS_SHALLOW_TEST.md)
+- [Two identical-looking tests and a request to remove duplicates](cases/REDUNDANCY_NOT_BY_SIMILARITY.md)
+- [The same integration claim, simulated, in two languages](cases/FIDELITY_ACROSS_LANGUAGES.md)

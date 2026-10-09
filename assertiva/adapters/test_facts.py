@@ -23,15 +23,24 @@ _LEVEL_WORDS = (("e2e", "E2E"), ("end-to-end", "E2E"), ("integration", "INTEGRAT
                 ("functional", "FUNCTIONAL"), ("contract", "CONTRACT"), ("unit", "UNIT"))
 LIMITS = {
     "python": ["Python tests are read from their syntax tree: helpers in other modules, fixtures and plugins are not followed"],
-    "javascript": ["JavaScript/TypeScript tests are read lexically: imported helpers, custom matchers and macros are not followed"],
-    "jvm": ["Kotlin/Java tests are read lexically: helpers in other files, custom matchers and inherited setup are not followed"],
+    "javascript": ["JavaScript/TypeScript tests are read lexically: imported helpers, custom matchers and macros are not followed",
+                   "fixture projects inside test directories (tests/fixtures, testdata, __fixtures__) are inputs of the tests and are not read"],
+    "jvm": ["Kotlin/Java tests are read lexically: helpers in other files, custom matchers and inherited setup are not followed",
+            "fixture projects inside test directories (tests/fixtures, testdata, __fixtures__) are inputs of the tests and are not read"],
 }
 
 
+_FIXTURE_DIRS = {"fixtures", "__fixtures__", "testdata", "test-fixtures", "test_data"}
+_TEST_DIRS = {"tests", "test", "__tests__", "spec", "specs"}
+
+
 def _walk(root: Path, predicate) -> list[Path]:
+    """Files under ``root``, skipping tooling directories and fixture projects inside test directories (inputs of
+    the tests, not tests of this project; the Python inventory skips them through the runner's own settings)."""
     out = []
     for current, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.startswith(".")]
+        inside_tests = bool(_TEST_DIRS & set(Path(current).relative_to(root).parts))
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.startswith(".") and not (inside_tests and d in _FIXTURE_DIRS)]
         out += [Path(current) / f for f in files if predicate(Path(current) / f)]
     return sorted(out)
 

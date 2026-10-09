@@ -386,3 +386,15 @@ def test_an_expected_exception_in_the_else_branch_is_a_check(tmp_path):
         "            verify()\n", encoding="utf-8")
     [fact] = collect(tmp_path)[0]
     assert "CONDITIONAL_ASSERTION" not in fact.smells  # found by running the model on Assertiva's own suite
+
+
+def test_fixture_projects_inside_test_directories_are_inputs_not_tests(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.test.js").write_text("test('own', () => {\n  expect(f()).toBe(1)\n})\n", encoding="utf-8")
+    fixture = tmp_path / "tests" / "fixtures" / "bad-project" / "src"
+    fixture.mkdir(parents=True)
+    (fixture / "b.test.js").write_text("test('seeded defect', () => {\n  expect(true).toBe(true)\n})\n", encoding="utf-8")
+    facts, limits = collect(tmp_path)
+    assert [_name(f.test_id) for f in facts] == ["own"]  # found by the self-audit: seeded defects were counted
+    assert any("fixture projects" in limit for limit in limits["javascript"])
+    assert collect(MATRIX)[0]  # a fixture audited as its own project is still read

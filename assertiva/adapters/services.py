@@ -12,12 +12,16 @@ prepared leaves the tests that need it BLOCKED, never failed.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import os
 import platform
 import secrets
 import shutil
 import socket
+import struct
 from pathlib import Path
 
 from assertiva.environment import Prepared, ProvisioningError, Step, download, extract, published_sha256, tools_dir
@@ -51,18 +55,105 @@ def service_plan(root: Path, prepared: Prepared) -> list[Step]:
                  detail=json.dumps({"installed": bool(have)}))]
 
 
-def _verify_instance(data: Path, port: int) -> None:
-    """The listener on 127.0.0.1:port is the server whose data directory is ``data`` (this run's), or this raises."""
+def _verify_instance(data: Path, port: int, user: str, password: str) -> dict:
+    """The server answering on 127.0.0.1:port is this run's cluster, or this raises.
+
+    Three independent checks: the cluster's own postmaster.pid names this data directory and port; a SCRAM-SHA-256
+    login with this run's generated password succeeds and the server proves it holds that password's verifier
+    (mutual authentication: only a cluster initialized by this run can sign the exchange); and, on that connection,
+    the server reports this data directory and port. A listener that is another PostgreSQL, or not PostgreSQL,
+    fails one of them."""
     try:
         lines = (data / "postmaster.pid").read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError as exc:
         raise ProvisioningError(f"no postmaster.pid in the run's data directory: {exc}") from exc
     if len(lines) < 4 or Path(lines[1]).resolve() != data.resolve() or lines[3].strip() != str(port):
         raise ProvisioningError(f"the server's postmaster.pid does not name this run's data directory and port {port}")
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(5)
-        if s.connect_ex(("127.0.0.1", port)) != 0:
-            raise ProvisioningError(f"nothing accepts connections on 127.0.0.1:{port}")
+    reported = _scram_query(port, user, password, "SELECT current_setting('data_directory'), current_setting('port')")
+    if len(reported) != 2 or Path(reported[0]).resolve() != data.resolve() or reported[1] != str(port):
+        raise ProvisioningError(f"the authenticated server reports another data directory or port ({reported})")
+    return {"data_directory": reported[0], "port": int(reported[1])}
+
+
+def _message(kind: bytes, payload: bytes) -> bytes:
+    return kind + struct.pack("!i", len(payload) + 4) + payload
+
+
+def _receive(sock: socket.socket) -> tuple[bytes, bytes]:
+    def exact(n: int) -> bytes:
+        out = b""
+        while len(out) < n:
+            chunk = sock.recv(n - len(out))
+            if not chunk:
+                raise ProvisioningError("the server closed the connection during verification")
+            out += chunk
+        return out
+
+    head = exact(5)
+    length = struct.unpack("!i", head[1:])[0]
+    if not 4 <= length <= 1 << 20:
+        raise ProvisioningError("the listener does not speak the PostgreSQL protocol")
+    return head[:1], exact(length - 4)
+
+
+def _scram_query(port: int, user: str, password: str, query: str, timeout_s: float = 10.0) -> list[str]:
+    """Log in with SCRAM-SHA-256 (verifying the server's signature) and return the first row of ``query``."""
+    with socket.create_connection(("127.0.0.1", port), timeout=timeout_s) as sock:
+        startup = struct.pack("!i", 196608) + f"user\0{user}\0database\0postgres\0\0".encode()
+        sock.sendall(struct.pack("!i", len(startup) + 4) + startup)
+        nonce = base64.b64encode(secrets.token_bytes(18)).decode()
+        client_first_bare = f"n=,r={nonce}"
+        salted = auth_message = None
+        row: list[str] = []
+        while True:
+            kind, body = _receive(sock)
+            if kind == b"E":
+                fields = dict((f[:1], f[1:]) for f in body.split(b"\0") if f)
+                raise ProvisioningError("the server refused the run's credentials: " + fields.get(b"M", b"").decode(errors="replace"))
+            if kind == b"R":
+                code = struct.unpack("!i", body[:4])[0]
+                if code == 10:  # SASL: mechanisms offered
+                    if b"SCRAM-SHA-256\0" not in body[4:]:
+                        raise ProvisioningError("the server does not offer SCRAM-SHA-256")
+                    first = ("n,," + client_first_bare).encode()
+                    sock.sendall(_message(b"p", b"SCRAM-SHA-256\0" + struct.pack("!i", len(first)) + first))
+                elif code == 11:  # server-first: nonce, salt, iterations
+                    server_first = body[4:].decode()
+                    attrs = dict(item.split("=", 1) for item in server_first.split(","))
+                    if not attrs.get("r", "").startswith(nonce):
+                        raise ProvisioningError("the server's SCRAM nonce does not extend the client's")
+                    salted = hashlib.pbkdf2_hmac("sha256", password.encode(), base64.b64decode(attrs["s"]), int(attrs["i"]))
+                    without_proof = f"c=biws,r={attrs['r']}"
+                    auth_message = f"{client_first_bare},{server_first},{without_proof}".encode()
+                    client_key = hmac.new(salted, b"Client Key", hashlib.sha256).digest()
+                    signature = hmac.new(hashlib.sha256(client_key).digest(), auth_message, hashlib.sha256).digest()
+                    proof = base64.b64encode(bytes(a ^ b for a, b in zip(client_key, signature))).decode()
+                    sock.sendall(_message(b"p", f"{without_proof},p={proof}".encode()))
+                elif code == 12:  # server-final: the server proves it holds this password's verifier
+                    expected = hmac.new(hmac.new(salted, b"Server Key", hashlib.sha256).digest(), auth_message, hashlib.sha256).digest()
+                    given = dict(item.split("=", 1) for item in body[4:].decode().split(",")).get("v", "")
+                    if salted is None or not hmac.compare_digest(base64.b64decode(given), expected):
+                        raise ProvisioningError("the server could not prove it holds this run's credentials")
+                elif code == 0:
+                    if auth_message is None:
+                        raise ProvisioningError("the server accepted the login without authenticating: it is not this run's cluster")
+                else:
+                    raise ProvisioningError(f"unexpected authentication request {code}")
+            elif kind == b"Z":
+                if row:
+                    sock.sendall(_message(b"X", b""))
+                    return row
+                sock.sendall(_message(b"Q", query.encode() + b"\0"))
+                row = [None]  # type: ignore[list-item]  # marks the query as sent
+            elif kind == b"D":
+                count = struct.unpack("!h", body[:2])[0]
+                values, offset = [], 2
+                for _ in range(count):
+                    size = struct.unpack("!i", body[offset:offset + 4])[0]
+                    offset += 4
+                    values.append(body[offset:offset + size].decode() if size >= 0 else "")
+                    offset += max(size, 0)
+                row = values
 
 
 def _free_port() -> int:
@@ -129,16 +220,17 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     prepared.cleanups.append(lambda: run_command(stop, Path.cwd(), timeout_s=60))
     if not started.ok:
         raise ProvisioningError(f"PostgreSQL did not start: {started.summary()}")
-    # Verify the target before any test connects: the server answering on this port is ours (its data directory).
-    # Verify the target before any test connects, without a client or credentials: the server's own postmaster.pid,
-    # in this run's data directory, must name that directory and the port, and the port must accept connections.
-    _verify_instance(data, port)
+    # Verify the target before any test connects: pid file, a mutually authenticated login with this run's password,
+    # and the data directory and port the authenticated server reports.
+    _verify_instance(data, port, "assertiva", password)
     url = f"postgresql://assertiva:{password}@127.0.0.1:{port}/postgres"
     prepared.env.update({"DATABASE_URL": url, "PGHOST": "127.0.0.1", "PGPORT": str(port), "PGUSER": "assertiva",
                          "PGPASSWORD": password, "PGDATABASE": "postgres"})
     version = run_command([str(bin_dir / f"postgres{exe}"), "--version"], Path.cwd(), timeout_s=30).stdout.strip()
     prepared.services.append({"service": "postgresql", "version": version, "host": "127.0.0.1", "port": port,
                               "data_directory": str(data), "binaries": "installed" if installed else f"portable {POSTGRES_VERSION}",
-                              "verified": "postmaster.pid in this run's data directory names it and the port; the port accepts connections",
+                              "verified": "postmaster.pid names this run's data directory and port; a SCRAM-SHA-256 login with the "
+                                          "run's generated password succeeded and the server proved it holds that password; the "
+                                          "authenticated server reports this data directory and port",
                               "credentials": "generated for this run"})
     step.detail = f"{version} on 127.0.0.1:{port}"

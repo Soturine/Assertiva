@@ -31,7 +31,7 @@ M3 stays in progress (ROADMAP.md).
 
 ### Skill and evaluation
 - SKILL.md points the agent to the effectiveness candidates as leads to confirm or reject against the code, to consented provisioning, and forbids retiring tests on similarity; a not-run check is neither failed nor untested.
-- Six agent-led evaluation cases (rejecting a candidate the code disproves, targeted evidence, evidence not worth its cost, simple vs shallow tests, no removal on similarity, fidelity across languages): run 1 4/6 PASS; after a reference fix, the candidate case passes; the not-run-on-device case still fails (evals/results/2026-10-09-effectiveness).
+- Six agent-led evaluation cases (rejecting a candidate the code disproves, targeted evidence, evidence not worth its cost, simple vs shallow tests, no removal on similarity, fidelity across languages): run 1 4/6 PASS; after a reference fix, the candidate case passes; after SKILL.md's evidence ladder (exists, selected, executed, outcome, proven), the not-run-on-device case passes (run 3) — earlier failures kept in evals/results/2026-10-09-effectiveness.
 
 ### CI
 - New jobs: `services` (provisioning, PostgreSQL), `gradle` (Gradle, Kotlin, Android with the runner's SDK) and `windows` (fast, integration and artifact suites, and the real provisioning, PostgreSQL and Gradle paths on Windows).
@@ -40,7 +40,7 @@ M3 stays in progress (ROADMAP.md).
 - A CP6 suite failure in `test_installed_artifact_context` was not intermittent: it re-runs the narrative-template contract inside an installed wheel, so one untranslated engine sentence fails both tests. Reproduced deterministically by injecting one sentence (both fail) and removing it (both pass).
 
 ### Not done
-- The Skill does not yet reliably answer "unknown on a device" (with an offered, authorized next step) for tests that were listed but not run: EVIDENCE_NOT_WORTH_ITS_COST failed twice. No regression re-run of the earlier agent-led cases.
+- Semantic evaluation is thin: one passing run of the not-run case after the fix (it failed twice before), no transfer check in another ecosystem, no re-run of the other five new cases or of the earlier agent-led cases after the SKILL.md change.
 - Interpreter downloads; Android instrumented tests, iOS/JS/Native targets; .NET, Go, Rust, PHP.
 
 ## [0.7.1] — 2026-10-08 — Consent outside the project, connection targets withheld

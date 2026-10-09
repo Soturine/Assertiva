@@ -23,6 +23,8 @@ Everything that can block or influence delivery counts: tests, lint, type and st
 - When the provider is reachable (for example `gh run list --json headSha,conclusion,name`), checking for a run on HEAD is cheaper than a full local run that only tells you whether HEAD is green. A local run still adds evidence when the question needs per-test outcomes, coverage or a different environment; say what it adds.
 - Expressions, conditions, reusable workflows, includes and branch protection are not evaluated from configuration: whether a conditional job ran or gates merges stays unknown without run evidence.
 
+To tie a provider run to the audited revision, export it with the user's provider access and pass it with `--ci-run`: for GitHub, `gh run list --commit "$(git rev-parse HEAD)" --json databaseId` then `gh run view <id> --json headSha,conclusion,jobs,url,workflowName`; for GitLab, the pipeline and its jobs from the API for that SHA. Only `SAME_REVISION` on a clean tree proves that revision.
+
 ## Local vs pipeline parity and matrices
 
 Compare what runs locally with what CI runs: commands, filters, markers, environment variables (a skip condition that holds in CI too means the tests never run anywhere), runtime and OS versions. A runtime declared as supported (`requires-python`, `engines.node`, compiler release, browser projects) but selected by no CI job is untested. Reproducing one matrix cell locally is partial evidence; reproducing a CI step locally is not pipeline equivalence.

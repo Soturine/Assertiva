@@ -50,9 +50,14 @@ Typical families include:
 | Vitest (3+) | dependency/config | JSON reporter (Jest format) | yes, writes nothing into the project | yes: skips/todo, table cases by location, pass after retries | the project's v8/istanbul provider | `vitest` arguments (projects, filters) | no | none |
 | Playwright | config | JSON reporter | yes | yes: projects, retries, attachments | no | declared/selected/executed projects | no | none |
 | Maven | `pom.xml` | Surefire/Failsafe reports | offline only | yes: reruns, parameterized methods | JaCoCo | goal-level (`test` vs `verify`) | by method | none |
+| Gradle (Java, Kotlin/JVM, Android local, KMP JVM targets) | settings and build scripts, version-catalog aliases, convention plugins of included builds, source sets; tasks confirmed by Gradle's own task list | JUnit XML per test task | yes, through a provisioned Gradle (never the wrapper jar); offline unless provisioned | yes; a parameterized case reported by display name only keeps an UNKNOWN declaration | JaCoCo / Kover the build already applies | test-task arguments | no (full suite, stated) | none |
+
+Instrumented Android tests, iOS, JS, Wasm and Native targets are listed per module as NOT_RUN with the host they need; Android local tests without an SDK are BLOCKED; custom test tasks are listed as AVAILABLE and run only when named.
+
+Test effectiveness (every audit) reads tests in Python (syntax tree), JavaScript/TypeScript and Kotlin/Java (lexically) into one shared model; the extractors' limits are stated in each report.
 
 Absent support is a limitation of Assertiva, not a failure of the audited project: it is reported as UNKNOWN or NOT_RUN.
 
-Executable reference adapters today: pytest (native + static), unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe, JaCoCo, build surface), Python packaging, GitHub Actions, Azure Pipelines, GitLab CI, Jenkins (through one shared CI normalization in `ci_common.py`), pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
+Executable reference adapters today: pytest (native + static), unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe, JaCoCo, build surface), Gradle (JUnit XML, JaCoCo/Kover), Python packaging, GitHub Actions, Azure Pipelines, GitLab CI, Jenkins (through one shared CI normalization in `ci_common.py`), pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
 
 First-party support is incremental. The absence of a dedicated adapter does not make a project unsupported: preserve observed commands and declared checks generically, mark unknown capabilities honestly, and avoid guessing semantics.

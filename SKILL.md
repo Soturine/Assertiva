@@ -23,6 +23,8 @@ Work in a loop:
    | --- | --- |
    | Do the tests pass at this revision; what runs, skips, fails? | a run: `assertiva audit --execute` (disposable copy) or the runner in your own copy |
    | Do assertions check the behavior that matters? | the tests and the implementation, read together; engine oracle signals as leads |
+   | Which tests could stay green while behavior breaks, claim more fidelity than they have, or repeat each other (any language)? | the audit's test-effectiveness candidates, each a lead you confirm or reject by reading the test, its contract and the code; a negative control or mutant settles a suspected false green |
+   | What do the tests need to run (runtime, dependencies, a database)? | `assertiva audit --execute` prepares it in a disposable workspace when the project's owner consented (`provision` in Assertiva's consent file, never the repository); what it cannot prepare is BLOCKED, never failed |
    | Do test doubles hide the boundary under test? | the doubles, the real collaborator and its contract |
    | What does CI run, on which revision? | workflow files (declared); provider runs with their head SHA |
    | Would a real defect be caught? | mutation reports, negative controls |
@@ -81,7 +83,7 @@ When the engine wrote an Assurance Report for this run, the report must not cont
 
 ## Improve
 
-Audit first. Then drive `assertiva improve`: it measures the baseline in isolation, gives you a candidate workspace, qualifies what you write there (original regression, coverage and oracles, negative paths, mutation or negative controls, delivery checks, artifact, stability) and reports baseline versus candidate. Do not trust a generated or changed test because it passes; challenge it. Show the report; the human approves.
+Audit first. Then drive `assertiva improve`: it measures the baseline in isolation, gives you a candidate workspace, qualifies what you write there (original regression, coverage and oracles, negative paths, mutation or negative controls, delivery checks, artifact, stability) and reports baseline versus candidate. Do not trust a generated or changed test because it passes; challenge it. Never retire a test because it looks like another: the engine fails a retirement that removes the only detector of a known mutant, and similarity alone proves nothing. Show the report; the human approves.
 
 ## References
 

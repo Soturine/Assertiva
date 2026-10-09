@@ -92,14 +92,16 @@ Started with what the 0.6.0 dogfood exposed (evidence integrity, execution safet
 - [x] execution safety: credential-looking variables withheld; checks with effects outside the copy need the user's consent (`<ASSERTIVA_HOME>/consent.toml`, never the project's files); connection targets withheld; publishing build goals never run
 - [x] native unittest and Django (`manage.py test`) adapters; the declared runner decides
 - [x] Vitest adapter (3+, TypeScript and projects), sharing the Jest results normalization
-- Gradle: researched, deferred (no JDK where this was built; Maven proves the JVM path; Gradle needs its own CI qualification first)
+- [x] Gradle adapter (0.7.2): Java, Kotlin/JVM, Android local tests, KMP JVM targets; catalogs, convention plugins, task confirmation by Gradle; qualified on Windows and Linux CI
+- [x] consented provisioning (0.7.2): virtual environments, npm, JDK, Gradle, disposable PostgreSQL; interpreter downloads not done
+- [x] cross-language test effectiveness (0.7.2): one model, per-language extractors, candidates for the agent
 - [x] project configuration, minimal and optional (`.assertiva.toml`: runners, timeout; consent stays with the user)
 - [x] report header names language, frameworks and stack with how each is known
 - [ ] stable CLI contract
 - [ ] optional MCP server and revision-aware local evidence store
 - [ ] optional FTD import and FTE/Azure bridges
 - [ ] benchmark corpora: CI-green/deploy-fail, inherited/composed tests, expected-error paths
-- [ ] multi-stack qualification (Python, JS, Playwright, Django, Java, .NET, Android, monorepo) — unittest, Django, Vitest done; Gradle, .NET, Go, Rust, PHP open
+- [ ] multi-stack qualification (Python, JS, Playwright, Django, Java, .NET, Android, monorepo) — unittest, Django, Vitest, Gradle/Kotlin/Android local done; .NET, Go, Rust, PHP open
 - [ ] paired baseline vs Assertiva trials
 
 Milestones may reopen when new evidence exposes reusable gaps.

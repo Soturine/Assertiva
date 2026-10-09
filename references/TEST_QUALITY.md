@@ -73,6 +73,14 @@ Mutation testing (or a deliberate negative control: a hand-made behavior-breakin
 - An automated accessibility scan with zero violations is partial evidence, not accessibility.
 - Retries keep the first failure; a raised timeout is not a root-cause fix unless the latency contract changed.
 
+## Effectiveness across languages
+
+Judge a test by what it can fail for, the same way in every language: `status == 400` in pytest, `expect(res.status).toBe(400)` and `assertEquals(400, response.status)` are the same weak oracle when the contract also fixes the error body. Questions that settle the engine's candidates:
+- **False green** — can this test fail when the behavior breaks? Read the condition, the caught exception or the unawaited promise; when it is unclear and the behavior matters, break the behavior in a copy (a negative control) and see.
+- **Fidelity** — a test named or placed as integration/E2E whose every boundary is a double proves the code against the doubles. Keep it as a fast test and say so; the integration claim needs one check that crosses the real boundary (a disposable service, a real browser, a device).
+- **Redundancy** — two tests with the same body at the same level and component are a review lead; other platforms, configurations or matrices can still make them distinct. Only per-test detection evidence (killing tests in a mutation report, a negative control) shows overlap without loss; never consolidate or retire on similarity.
+- **Intentionally simple tests** — a smoke check whose contract is "does not raise" or "the page renders" is not weak; say so in the disposition.
+
 ## Weak-test signals
 
 Signals to investigate, not verdicts: no effective assertion; assertion roulette; one test asserting everything; mystery guest (hidden file, network, clock); oversized fixtures; sleeps without a condition; excessive mocking; assertions on implementation details; giant snapshots; semantic duplicates; quarantined or ignored failures; retry dependence; expected values computed by the code under test. Connect each to a concrete risk before recommending a change.

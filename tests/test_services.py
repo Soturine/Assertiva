@@ -146,7 +146,8 @@ def test_django_runs_on_a_disposable_postgresql_never_on_the_callers_database(tm
     report = json.loads(capsys.readouterr().out)
     assert code == 0 and tree_fingerprint(root) == before
     steps = {s["step_id"]: s for s in report["environment"]["steps"]}
-    assert steps["python-env"]["status"] in ("DONE", "REUSED") and steps["postgresql"]["status"] == "DONE", steps
+    assert steps["python-env"]["status"] in ("DONE", "REUSED") and steps["postgresql"]["status"] == "DONE", "\n".join(
+        f"{s['step_id']}: {s['status']}: {s['detail']}" for s in steps.values())  # the full cause in a CI log
     [service] = report["environment"]["services"]
     assert service["host"] == "127.0.0.1" and "17.9" in service["version"]
     [run] = report["states"]["current"]["runs"]

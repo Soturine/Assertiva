@@ -65,6 +65,13 @@ def test_a_ci_gradle_test_step_is_reproduced_through_the_adapter_only_for_test_t
     assert publish.kind.value == "DEPLOY" and adapter.reproduction_args(publish) is None
 
 
+def _why(report: dict) -> str:
+    """Steps and run limitations, in full, so a CI log shows the cause of a failed real run."""
+    steps = [f"{s['step_id']}: {s['status']}: {s['detail']}" for s in report["environment"]["steps"]]
+    runs = [f"{r['adapter']} {r['status']}: {r.get('limitations')} {r.get('matrix')}" for r in report["states"]["current"]["runs"]]
+    return "\n".join(steps + runs)
+
+
 def _audit(root: Path, capsys) -> dict:
     from assertiva import cli
 
@@ -82,7 +89,7 @@ def test_kotlin_and_java_modules_run_with_per_module_results_and_coverage(tmp_pa
     report = _audit(root, capsys)
     assert tree_fingerprint(root) == before  # build/, .gradle/ and caches went to the copy and the tools cache
     [run] = report["states"]["current"]["runs"]
-    assert run["adapter"] == "gradle" and run["status"] == "PASS"
+    assert run["adapter"] == "gradle" and run["status"] == "PASS", _why(report)
     assert run["outcomes"] == {"PASSED": 7, "SKIPPED": 1} and set(run["matrix"]) == {":pricing test", ":legacy test"}
     assert run["declaration_identity"] == "UNKNOWN"  # parameterized cases are named by display only
     metrics = report["states"]["current"]["metrics"]
@@ -96,11 +103,13 @@ def test_a_failing_kotlin_test_fails_the_run_and_a_broken_test_source_is_a_colle
     shutil.copytree(FIXTURES / "gradle-kotlin", root)
     source = root / "pricing" / "src" / "main" / "kotlin" / "demo" / "pricing" / "Discount.kt"
     source.write_text(source.read_text(encoding="utf-8").replace("total * 90", "total * 80"), encoding="utf-8")
-    [run] = _audit(root, capsys)["states"]["current"]["runs"]
-    assert run["status"] == "FAIL" and run["outcomes"]["FAILED"] == 1
+    report = _audit(root, capsys)
+    [run] = report["states"]["current"]["runs"]
+    assert run["status"] == "FAIL" and run["outcomes"]["FAILED"] == 1, _why(report)
     (root / "legacy" / "src" / "test" / "java" / "demo" / "legacy" / "StockTest.java").write_text("class Broken {", encoding="utf-8")
-    [run] = _audit(root, capsys)["states"]["current"]["runs"]
-    assert run["status"] == "FAIL" and run["collection_errors"]
+    report = _audit(root, capsys)
+    [run] = report["states"]["current"]["runs"]
+    assert run["status"] == "FAIL" and run["collection_errors"], _why(report)
 
 
 @pytest.mark.integration
@@ -108,8 +117,10 @@ def test_a_failing_kotlin_test_fails_the_run_and_a_broken_test_source_is_a_colle
 def test_multiplatform_runs_jvm_tests_and_lists_the_other_targets(tmp_path, capsys):
     root = tmp_path / "proj"
     shutil.copytree(FIXTURES / "kmp-totals", root)
-    [run] = _audit(root, capsys)["states"]["current"]["runs"]
-    assert run["status"] == "PASS" and run["outcomes"] == {"PASSED": 4}  # 3 common + 1 JVM-only, on the JVM
+    report = _audit(root, capsys)
+    [run] = report["states"]["current"]["runs"]
+    assert run["status"] == "PASS" and run["outcomes"] == {"PASSED": 4}, _why(report)
+    # 3 common + 1 JVM-only, on the JVM
     assert run["matrix"][": jvmTest"] == "EXECUTED" and run["matrix"][": iosTest"].startswith("NOT_RUN")
 
 

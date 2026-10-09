@@ -217,7 +217,7 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     if not created.ok:
         raise ProvisioningError(f"initdb failed: {created.summary()}")
     port = _free_port()
-    log = prepared.workspace / "env" / "postgresql.log"
+    log = cluster / "postgresql.log"  # written by the server itself (a restricted token on Windows)
     if os.name != "nt":  # a Unix socket path is limited to ~107 characters: a short directory of its own
         import tempfile
 
@@ -232,7 +232,11 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     stop = [str(bin_dir / f"pg_ctl{exe}"), "-D", str(data), "-m", "immediate", "-w", "stop"]
     prepared.cleanups.append(lambda: run_command(stop, Path.cwd(), timeout_s=60))
     if not started.ok:
-        raise ProvisioningError(f"PostgreSQL did not start: {started.summary()}")
+        try:
+            tail = " | ".join(log.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-5:])
+        except OSError:
+            tail = "no server log"
+        raise ProvisioningError(f"PostgreSQL did not start: {started.summary()} | server log: {tail}")
     # Verify the target before any test connects: pid file, a mutually authenticated login with this run's password,
     # and the data directory and port the authenticated server reports.
     _verify_instance(data, port, "assertiva", password)

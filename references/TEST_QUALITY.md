@@ -56,7 +56,9 @@ Coverage says what executed, not what was checked. Keep metric kind (line, branc
 
 ## Mutation and negative controls
 
-Mutation testing (or a deliberate negative control: a hand-made behavior-breaking edit in a disposable copy) asks whether tests detect a real defect. Useful on boundaries, conditionals, arithmetic, critical rules and code with high coverage but doubtful oracles. A surviving mutant may be equivalent, unreachable or immaterial: interpret it, do not optimize the score. Targeted mutation is often enough. Mutation reports apply only to the source revision they were produced from.
+Mutation testing (or a deliberate negative control: a hand-made behavior-breaking edit in a disposable copy) asks whether tests detect a real defect. Useful on boundaries, conditionals, arithmetic, critical rules and code with high coverage but doubtful oracles. A surviving mutant may be equivalent, unreachable or immaterial: interpret it, do not optimize the score. Targeted mutation is often enough. Mutation reports apply only to the source revision and the tests they were produced from.
+
+Keep the static and the executed apart: "likely killed" or "candidate survivor" from reading the code is inferred; killed and survived come from a run, and the two never share a ratio. Before calling a survivor a gap, state its witness — an input, what the original returns, what the mutant returns — and whether a test the contract needs would observe it; a mutant with no observable difference is a candidate equivalent, a hypothesis to say as such. When a test is strengthened, its expected values should come from the contract (a requirement, a specification, a protocol, a hand calculation); a value copied from what the code returns today makes a characterization test, which pins current behavior, bugs included — label it so.
 
 ## Parameterized, property and fuzz tests
 

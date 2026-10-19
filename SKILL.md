@@ -27,7 +27,7 @@ Work in a loop:
    | What do the tests need to run (runtime, dependencies, a database)? | `assertiva audit --execute` prepares it in a disposable workspace when the project's owner consented (`provision` in Assertiva's consent file, never the repository); what it cannot prepare is BLOCKED, never failed |
    | Do test doubles hide the boundary under test? | the doubles, the real collaborator and its contract |
    | What does CI run, on which revision? | workflow files (declared); provider runs with their head SHA |
-   | Would a real defect be caught? | mutation reports, negative controls |
+   | Would a real defect be caught? | mutation runs (`--execute --mutate FILE`), mutation reports, negative controls |
    | Does the shipped artifact behave like the source tree? | engine artifact qualification |
    | What does this change affect? | `assertiva audit --changed-since REV` |
 
@@ -55,6 +55,7 @@ Freedom to reason is not permission to act. These hold whatever the investigatio
 - A run is evidence only with its own exit status. When you run a command yourself, never judge it through a pipe (`| tail`, `| tee`, `| head` report their own status) or by words in its output; keep the command, the exit code and what it ran on. A local run of what CI declares is not proof that CI ran it.
 - **Improve** writes candidate changes only in the engine's candidate workspace. Applying requires the human's explicit approval of named change ids; never pass `--approve` on your own initiative. A stale baseline blocks apply.
 - Never deploy, publish, push, or change external systems; never use secrets you were not given; stay inside the project and the paths the user named.
+- When an operation is blocked (a permission, a missing tool, a consent you do not have), do not retry it through another shell, tool or agent; report it and what would unblock it.
 
 ## Claims
 
@@ -88,11 +89,13 @@ Fixed lines:
 
 Lead with the answer to the question. Then what green proves and does not, the findings ranked by consequence (each with its evidence and how you know), what you decided about each material engine finding, what stays unknown and why, and recommendations that fit the project's delivery model (a library is not an application: no automatic lockfile, for example). Say plainly what the answer rests on — "ran the suite through the engine", "read the 14 refund tests", "the engine is not installed: no runtime evidence".
 
+Before answering, check that your opening sentence, your dispositions and any counts you give agree with each other, and say what is protected as well as what is not.
+
 When the engine wrote an Assurance Report for this run, the report must not contradict your answer. Write your assessment (conclusion, dispositions of engine findings, your own findings, unknowns) with the same dispositions and scope as your answer and attach it with `assertiva audit <project> --assessment <file>`; the engine validates it against that run and re-renders the same page, raw engine evidence intact. Never edit or render the HTML yourself. End with `Assurance Report: <report_path>`.
 
 ## Improve
 
-Audit first. Then drive `assertiva improve`: it measures the baseline in isolation, gives you a candidate workspace, qualifies what you write there (original regression, coverage and oracles, negative paths, mutation or negative controls, delivery checks, artifact, stability) and reports baseline versus candidate. Do not trust a generated or changed test because it passes; challenge it. Never retire a test because it looks like another: the engine fails a retirement that removes the only detector of a known mutant, and similarity alone proves nothing. Show the report; the human approves.
+Audit first. Then drive `assertiva improve`: it measures the baseline in isolation, gives you a candidate workspace, qualifies what you write there (original regression, coverage and oracles, negative paths, mutation or negative controls, delivery checks, artifact, stability) and reports baseline versus candidate. Do not trust a generated or changed test because it passes or raises coverage; challenge it: a strengthened test protects more when the same break, run on the baseline and on the candidate, is missed by one and detected by the other (`--mutate`, negative controls). Never retire a test because it looks like another: the engine fails a retirement that removes the only detector of a known mutant, and similarity alone proves nothing. Show the report; the human approves.
 
 ## References
 

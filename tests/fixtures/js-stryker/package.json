@@ -1,0 +1,17 @@
+{
+  "name": "assertiva-js-stryker-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The proof-of-protection demo in JavaScript, with Jest and Stryker installed by the project (Assertiva never installs them).",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/jest-runner": "10.0.0",
+    "jest": "30.5.2"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}

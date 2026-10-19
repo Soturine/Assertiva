@@ -5,6 +5,7 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 ## Start here
 
 - [Architecture](ARCHITECTURE.md) — layers, records, trust model and execution boundaries.
+- [Proof of Protection](PROOF_OF_PROTECTION.md) — a reproducible audit → gap → stronger test → proven gain walk-through with a native mutation tool run on both states.
 - [Execution Security](EXECUTION_SECURITY.md) — boundaries that hold when project code runs, what each security review fixed, and the residual risks still open.
 - [Quality Model](QUALITY_MODEL.md) — what makes test evidence meaningful.
 - [Determinism and Evidence Tiers](DETERMINISM_AND_EVIDENCE_TIERS.md) — E0–E4 provenance/authority model.

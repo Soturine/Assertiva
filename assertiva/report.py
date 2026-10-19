@@ -330,6 +330,8 @@ def improve_report(session, result, applied=None) -> dict:
             "ready_for_review": q.ready_for_review,
             "stages": to_jsonable(q.stages),
             "baseline_negative_controls": to_jsonable(result.baseline_controls),
+            # breaks the baseline missed and the candidate detects (and the reverse), from evidence executed on both
+            "protection": dict(getattr(result, "protection", {}) or {}),
             "stability": to_jsonable(result.stability),
             "timings": list(result.timings),
         },

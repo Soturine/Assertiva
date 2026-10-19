@@ -1370,7 +1370,28 @@ def _candidate_area(r: _R) -> str:
                         f'<th scope="col">{r.t("qual.outcomes")}</th><th scope="col">{r.t("qual.durations")}</th><th scope="col">{r.t("qual.verdict")}</th></tr></thead>'
                         f"<tbody>{rows}</tbody></table></div>", "qual.reruns.lead")
     return (f'<section id="candidate" class="area" data-layer="decision" aria-labelledby="h-candidate">{head}'
-            f'<div class="pillars">{pillars}</div>{_changes(r)}<div class="panels-d">{reruns}</div></section>')
+            f'<div class="pillars">{pillars}</div>{_changes(r)}<div class="panels-d">{_protection(r, q)}{reruns}</div></section>')
+
+
+def _protection(r: _R, q: dict) -> str:
+    """Breaks the candidate detects that the baseline missed (and the reverse), from evidence executed on both."""
+    p = q.get("protection") or {}
+    if not p.get("compared"):
+        return ""
+    rows = []
+    for key, status, label in (("lost", "FAIL", "prot.lost"), ("gained", "PASS", "prot.gained"), ("still_undetected", "UNKNOWN", "prot.still")):
+        for e in p.get(key) or []:
+            claim = f"<br>{_e(e['claim'])}" if e.get("claim") else ""
+            rows.append(f'<tr><th scope="row"><code>{_e(e.get("label") or e["id"])}</code>{claim}</th>'
+                        f'<td {r.label_attr("prot.change")}>{r.pill(status)} {r.t(label)}</td>'
+                        f'<td {r.label_attr("prot.by")}>{_e(e.get("detected_by") or "")}</td></tr>')
+    rows = "".join(rows)
+    summary = r.t("prot.summary", gained=len(p.get("gained") or []), lost=len(p.get("lost") or []), still=len(p.get("still_undetected") or []))
+    body = (f'<p class="muted">{r.t("prot.compared", what=_e("; ".join(p["compared"])))}</p>'
+            f'<div class="table-wrap"><table class="responsive"><caption>{r.t("prot.title")}</caption><thead><tr>'
+            f'<th scope="col">{r.t("prot.break")}</th><th scope="col">{r.t("prot.change")}</th><th scope="col">{r.t("prot.by")}</th></tr></thead>'
+            f"<tbody>{rows}</tbody></table></div>")
+    return _panel(r, "protection", "prot.title", summary, body, "prot.lead")
 
 
 # --- technical details -------------------------------------------------------------------------

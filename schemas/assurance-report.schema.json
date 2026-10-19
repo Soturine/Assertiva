@@ -402,6 +402,17 @@
         "ready_for_review": {
           "type": "boolean"
         },
+        "protection": {
+          "type": "object",
+          "description": "Protection the candidate adds or removes, from the same breaks executed on both states: negative controls, and mutants of the same tool and targets run by Assertiva on a copy of each state. gained: missed by the baseline, detected by the candidate; lost: the reverse (fails qualification). Imported or untied reports are not compared.",
+          "properties": {
+            "gained": {"type": "array", "items": {"type": "object", "required": ["kind", "id"], "properties": {"kind": {"enum": ["negative_control", "mutant"]}, "id": {"type": "string"}, "label": {"type": "string"}, "claim": {"type": "string"}, "tool": {"type": ["string", "null"]}, "detected_by": {"type": "string"}}}},
+            "lost": {"type": "array", "items": {"type": "object", "required": ["kind", "id"], "properties": {"kind": {"enum": ["negative_control", "mutant"]}, "id": {"type": "string"}, "label": {"type": "string"}, "claim": {"type": "string"}, "tool": {"type": ["string", "null"]}, "detected_by": {"type": "string"}}}},
+            "still_undetected": {"type": "array", "items": {"type": "object", "required": ["kind", "id"], "properties": {"kind": {"enum": ["negative_control", "mutant"]}, "id": {"type": "string"}, "label": {"type": "string"}, "claim": {"type": "string"}, "tool": {"type": ["string", "null"]}, "detected_by": {"type": "string"}}}},
+            "compared": {"type": "array", "items": {"type": "string"}},
+            "not_compared": {"type": "array", "items": {"type": "string"}}
+          }
+        },
         "stages": {
           "type": "array",
           "items": {

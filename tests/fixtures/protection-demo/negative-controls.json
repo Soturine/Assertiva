@@ -1,0 +1,4 @@
+[
+  {"control_id": "threshold-exclusive", "path": "pricing.py", "find": "total_cents >= 10000", "replace": "total_cents > 10000",
+   "claim": "orders of exactly 100.00 get the discount"}
+]

@@ -7,8 +7,9 @@ Supported (see research/2026-10-05-mutation-report-formats.md):
 - Cosmic Ray ``cosmic-ray dump`` (JSON lines): per mutant, no killing tests. Its ``cr-xml`` stays unsupported: it
   cannot distinguish pending from killed (research/2026-10-19-competitive/mutation.md).
 
-``run_mutation_tool`` runs a native tool on a copy of a state (``adapters/cosmic_ray.py`` for Python projects that
-use pytest); the run is tied to that state by the sources and tests it saw.
+``run_mutation_tool`` runs one native tool on a copy of a state, chosen by capability (``mutation_tools``): Cosmic Ray
+for Python tests under the declared runner, StrykerJS for Jest/Vitest projects. The run is tied to that state by the
+sources and tests it saw.
 """
 
 from __future__ import annotations
@@ -188,18 +189,71 @@ def load_mutation_report(path: str | Path) -> MutationRun:
         return MutationRun(source=str(path), error=f"{type(exc).__name__}: {exc}"[:300])
 
 
-def run_mutation_tool(state_root: str | Path, python: str, targets: list[str]) -> MutationRun:
-    """Run the native mutation tool that fits the project on a copy of ``state_root``; a project no integrated tool
-    supports yet gets an explained error, never a result."""
-    from assertiva.adapters import cosmic_ray
-    from assertiva.adapters.python_discovery import python_runners, test_files
+_PYTHON_RUNNERS = ("pytest-native", "unittest", "django")
 
-    root = Path(state_root)
-    # a Python project with tests its runner selection would run with pytest (the default runner for Python tests)
-    if test_files(root) and "pytest" in python_runners(root):
-        return cosmic_ray.run(root, python, targets, test_paths=[])
-    return MutationRun(source="mutation tool", error="no integrated mutation tool runs this project's tests yet "
-                       "(0.8.0 runs Cosmic Ray for Python projects tested with pytest); import a report with --mutation-report")
+
+def mutation_tools(root: str | Path, python: str, origin: str | Path | None = None) -> list[dict]:
+    """Each integrated mutation tool and whether it applies to this project (language, test runner, build) and, when it
+    does, whether it can run here and why not. Chosen by capability, never by project name; ``origin`` is the project
+    whose installed dependencies a copy of ``root`` would use."""
+    from assertiva.adapters import cosmic_ray, runner_adapters, stryker
+    from assertiva.adapters.python_discovery import test_files
+    from assertiva.process import module_available
+
+    root, origin = Path(root), Path(origin or root)
+    runners = [a.adapter_id for a in runner_adapters(root, python) if a.adapter_id in _PYTHON_RUNNERS] if test_files(root) else []
+    blocked = None
+    if len(runners) > 1:
+        blocked = (f"the project declares several Python runners ({', '.join(runners)}); keep the one to mutate with in "
+                   ".assertiva.toml [tests] runners")
+    elif runners and not module_available(python, "cosmic_ray"):
+        blocked = f"{cosmic_ray.TOOL} is not installed in {python}; Assertiva does not install it"
+    js_runner = stryker.test_runner(root)
+    js = stryker.applies(root)
+    return [
+        {"tool": "cosmic-ray", "name": cosmic_ray.TOOL, "applies": bool(runners), "blocked": blocked,
+         "runner": runners[0] if len(runners) == 1 else None,
+         "why": f"Python tests run by {', '.join(runners)}" if runners else "no Python tests under a supported runner"},
+        {"tool": "stryker", "name": stryker.TOOL, "applies": js, "runner": js_runner,
+         "blocked": stryker.availability(origin) if js else None,
+         "why": f"package.json declares {js_runner}" if js else "no Jest or Vitest project"},
+    ]
+
+
+def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], tool: str | None = None,
+                      origin: str | Path | None = None) -> MutationRun:
+    """Run one native mutation tool on a copy of ``state_root``: the one the user names, otherwise the only one that
+    applies. Several applicable tools need the user's choice; a tool that does not apply or cannot run gives an
+    explained error, never a result. Tools are never all run, and a missing tool is never a pass."""
+    from assertiva.adapters import cosmic_ray, stryker
+
+    options = mutation_tools(state_root, python, origin)
+    known = [o["tool"] for o in options]
+    if tool is not None and tool not in known:
+        return MutationRun(source="mutation tool", error=f"unknown mutation tool {tool!r}; integrated: {', '.join(known)}")
+    named = [o for o in options if tool is None or o["tool"] == tool]
+    applicable = [o for o in named if o["applies"]]
+    if not applicable:
+        why = "; ".join(f"{o['name']}: {o['why']}" for o in named)
+        return MutationRun(source="mutation tool", error=f"no integrated mutation tool applies to this project ({why}); "
+                                                        "import a report with --mutation-report")
+    if len(applicable) > 1:
+        return MutationRun(source="mutation tool", error="several mutation tools apply ("
+                           + "; ".join(f"{o['tool']}: {o['why']}" for o in applicable) + "); choose one with --mutation-tool")
+    chosen = applicable[0]
+    if chosen["blocked"]:
+        return MutationRun(source="mutation tool", tool=chosen["name"], error=chosen["blocked"])
+    try:
+        if chosen["tool"] == "cosmic-ray":
+            run = cosmic_ray.run(state_root, python, targets, test_paths=[], runner=chosen["runner"])
+        else:
+            run = stryker.run(state_root, targets, origin=origin)
+    except OSError as exc:  # the copy could not be made or read (a path too long, a file in use): nothing was concluded
+        return MutationRun(source="mutation tool", tool=chosen["name"], orchestrated=True, targets=tuple(targets),
+                           error=f"the run could not use a copy of this state ({type(exc).__name__}: {exc})"[:300])
+    run.config = {**run.config, "selected": chosen["tool"],
+                  "selected_because": chosen["why"] + (" (named by the user)" if tool else "")}
+    return run
 
 
 def unsafe_target(root: Path, target: str, suffixes: tuple[str, ...]) -> str | None:

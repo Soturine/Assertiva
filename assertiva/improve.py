@@ -645,9 +645,11 @@ def qualify_candidate(
     stability_reruns: int = MAX_STABILITY_RERUNS,
     coverage_reports: dict[str, str | Path] | None = None,
     mutation_targets: list[str] | None = None,
+    mutation_tool: str | None = None,
 ) -> QualificationResult:
     """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state;
-    mutation_targets names files the project's native mutation tool mutates on both states (executed here)."""
+    mutation_targets names files the project's native mutation tool mutates on both states (executed here);
+    mutation_tool names that tool when several apply."""
     controls = list(negative_controls or [])
     reports = dict(mutation_reports or {})
     unknown_states = set(reports) - {"baseline", "candidate"}
@@ -677,7 +679,8 @@ def qualify_candidate(
         if mutation_targets:
             python = session.python or sys.executable
             for state, tree, name in ((baseline, session.baseline_copy, "baseline"), (candidate, session.workspace, "candidate")):
-                run = timed(f"{name}-mutation", lambda tree=tree: run_mutation_tool(tree, python, list(mutation_targets)))
+                run = timed(f"{name}-mutation", lambda tree=tree: run_mutation_tool(tree, python, list(mutation_targets),
+                                                                                      mutation_tool, session.root))
                 attach_mutation(state, run, tree)
         for state_name, report in (coverage_reports or {}).items():
             {"baseline": baseline, "candidate": candidate}[state_name].coverage.append(load_coverage_report(report))

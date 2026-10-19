@@ -26,6 +26,7 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-jest
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-vitest
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-stryker
       - run: python scripts/validate_repo.py
       - name: Fast/core suite
         run: pytest -q -m "not integration and not artifact"
@@ -189,6 +190,7 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-jest
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-vitest
+          npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-stryker
       - name: Fast/core suite
         run: pytest -q -m "not integration and not artifact"
       - name: Integration and artifact suites

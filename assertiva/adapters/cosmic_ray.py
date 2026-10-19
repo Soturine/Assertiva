@@ -49,9 +49,17 @@ def unsafe_target(root: Path, target: str) -> str | None:
     return check(root, target, (".py",))
 
 
-def run(state_root: str | Path, python: str, targets: list[str], test_paths: list[str], timeout_s: float = 60.0,
+_COMMANDS = {  # the runner the project declares, as the engine runs it with --execute; never swapped for another
+    "pytest-native": ["-m", "pytest", "-x", "-q", "-p", "no:cacheprovider"],
+    "unittest": ["-m", "unittest", "discover", "--failfast"],
+    "django": ["manage.py", "test", "--noinput", "--failfast"],
+}
+
+
+def run(state_root: str | Path, python: str, targets: list[str], test_paths: list[str], runner: str = "pytest-native",
+        timeout_s: float = 60.0,
         budget_s: float = 3600.0) -> MutationRun:
-    """Mutate ``targets`` (files relative to ``state_root``) and run the project's pytest for each mutant."""
+    """Mutate ``targets`` (files relative to ``state_root``) and run the project's declared ``runner`` for each mutant."""
     from assertiva.adapters.mutation import cosmic_ray_dump
     from assertiva.workspace import remove_tree, snapshot
 
@@ -79,14 +87,18 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
             if in_copy:  # the copy must hold the targets as plain files too, or nothing is mutated
                 result.error = "mutation targets are not plain files in the copy: " + "; ".join(f"{t}: {why}" for t, why in in_copy.items())
                 return result
-            test_command = [_posix(python), "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider", *test_paths]
+            if runner not in _COMMANDS:
+                result.error = f"{TOOL} cannot run the {runner} runner"
+                return result
+            test_command = [_posix(python), *_COMMANDS[runner], *test_paths]
             baseline = run_command(test_command, copy, timeout_s=budget_s)
             if not baseline.ok:
                 result.error = f"the tests do not pass on this state before mutation ({baseline.summary()}); no mutant was run"
                 return result
             config, db = tmp / "mutation.toml", tmp / "session.sqlite"
             result.config = {"timeout_s": float(timeout_s), "test_command": [_posix(part) for part in test_command[1:]],
-                             "distributor": "local", "operators": "Cosmic Ray defaults", "max_mutants": MAX_MUTANTS}
+                             "distributor": "local", "operators": "Cosmic Ray defaults", "max_mutants": MAX_MUTANTS,
+                             "runner": runner}
             config.write_text(
                 "[cosmic-ray]\n"
                 f"module-path = {json.dumps([_posix(t) for t in targets])}\n"

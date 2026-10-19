@@ -285,6 +285,7 @@ def run_audit(
     ci_runs: list[str | Path] | tuple = (),
     provision: bool = False,
     mutation_targets: list[str] | tuple = (),
+    mutation_tool: str | None = None,
 ) -> dict:
     root = Path(root).resolve()
     started = _now()
@@ -364,7 +365,8 @@ def run_audit(
         if mutation_targets and execute:  # the native tool runs on a copy; the run is tied to this state by what it saw
             from .adapters.mutation import run_mutation_tool
 
-            attach_mutation(current, run_mutation_tool(root, python or sys.executable, list(mutation_targets)), root)
+            attach_mutation(current, run_mutation_tool(root, python or sys.executable, list(mutation_targets), mutation_tool, root),
+                            root)
         elif mutation_targets:
             limitations.append("mutation targets were given without --execute: no mutant was run")
         findings.extend(_mutation_findings(current))

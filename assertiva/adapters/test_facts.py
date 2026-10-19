@@ -219,6 +219,8 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
     parents = {child: parent for parent in ast.walk(node) for child in ast.iter_child_nodes(parent)}
     asserts, signature, doubles, smells = [], [], [], []
     boundaries, simulated, surfaces = set(), set(), set()
+    if _self_referential(node):
+        smells.append("SELF_REFERENTIAL_ORACLE")
     for item in ast.walk(node):
         if _mock_no_op(item):
             smells.append("NO_OP_ASSERTION")
@@ -346,6 +348,34 @@ def _literal_row(value, expr_name) -> bool:
     except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
         return False
     return True
+
+
+def _self_referential(node) -> bool:
+    """An assertion whose expected value is the same call as its actual value, made just before it: `expected =
+    total(cart)` immediately followed by `assert total(cart) == expected`. Nothing happens in between, so the test passes
+    whatever the code returns. The same call before and after an action is a state check (a fingerprint before and
+    after a run), not this; a name assigned more than once is not resolved."""
+    def compared(statement):
+        if isinstance(statement, ast.Assert) and isinstance(statement.test, ast.Compare) and len(statement.test.comparators) == 1 \
+                and isinstance(statement.test.ops[0], (ast.Eq, ast.Is)):
+            return statement.test.left, statement.test.comparators[0]
+        call = statement.value if isinstance(statement, ast.Expr) else None
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute) and call.func.attr in ("assertEqual", "assertIs") \
+                and len(call.args) == 2:
+            return tuple(call.args)
+        return None
+
+    names = [s.targets[0].id for s in node.body if isinstance(s, ast.Assign) and len(s.targets) == 1 and isinstance(s.targets[0], ast.Name)]
+    for first, second in zip(node.body, node.body[1:]):
+        pair = compared(second)
+        if not (pair and isinstance(first, ast.Assign) and len(first.targets) == 1 and isinstance(first.targets[0], ast.Name)
+                and isinstance(first.value, ast.Call) and names.count(first.targets[0].id) == 1):
+            continue
+        name, value = first.targets[0].id, ast.dump(first.value)
+        sides = [ast.dump(side) for side in pair]
+        if any(isinstance(side, ast.Name) and side.id == name for side in pair) and value in sides:
+            return True
+    return False
 
 
 _MOCK_ASSERTS = frozenset({"assert_called", "assert_called_once", "assert_not_called", "assert_called_with",

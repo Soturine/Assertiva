@@ -14,7 +14,7 @@ from conftest import write
 
 
 def _line(occurrence, result, operator="core/ReplaceBinaryOperator_Add_Mul"):
-    item = {"job_id": f"j{occurrence}", "mutations": [{"module_path": "pkg\calc.py", "operator_name": operator, "occurrence": occurrence,
+    item = {"job_id": f"j{occurrence}", "mutations": [{"module_path": "pkg\\calc.py", "operator_name": operator, "occurrence": occurrence,
                                                        "start_pos": [2, 13], "end_pos": [2, 14], "definition_name": "add"}]}
     return json.dumps([item, result])
 

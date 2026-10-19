@@ -573,3 +573,22 @@ def test_mock_checks_that_cannot_fail_are_false_greens_and_real_ones_are_not(tmp
         assert "NO_OP_ASSERTION" not in facts[name].smells, name
     found = [c for c in candidates(list(facts.values())) if c.kind == "FALSE_GREEN" and c.detail["pattern"] == "NO_OP_ASSERTION"]
     assert len(found) == 1 and len(found[0].tests) == 3
+
+
+def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(tmp_path):
+    write(tmp_path / "tests" / "test_s.py",
+          "import unittest\n\n"
+          "def test_through_a_name():\n    expected = total([1, 2])\n    assert total([1, 2]) == expected\n\n\n"
+          "def test_inline():\n    assert total([1, 2]) == total([1, 2])\n\n\n"
+          "def test_contract_value():\n    expected = 3\n    assert total([1, 2]) == expected\n\n\n"
+          "def test_other_input():\n    expected = total([2, 1])\n    assert total([1, 2]) == expected\n\n\n"
+          "def test_name_reassigned():\n    expected = total([1, 2])\n    expected = 3\n    assert total([1, 2]) == expected\n\n\n"
+          # found by running the rule on this repository: the same call before and after an action is a state check
+          "def test_state_before_and_after():\n    before = fingerprint(root)\n    run(root)\n    assert fingerprint(root) == before\n\n\n"
+          "class T(unittest.TestCase):\n    def test_unittest(self):\n        want = total([1, 2])\n        self.assertEqual(total([1, 2]), want)\n")
+    facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
+    for name in ("test_through_a_name", "test_unittest"):
+        assert "SELF_REFERENTIAL_ORACLE" in facts[name].smells, name
+    assert "TAUTOLOGY" in facts["test_inline"].smells  # the direct form was already a tautology; not counted twice
+    for name in ("test_inline", "test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
+        assert "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name

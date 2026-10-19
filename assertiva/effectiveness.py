@@ -26,6 +26,8 @@ FALSE_GREEN_SMELLS = {
     "SNAPSHOT_ONLY": "the only oracle is a snapshot, which an update accepts without review",
     "NO_OP_ASSERTION": "a mock check is referenced but never called, or misspelled so that the mock answers it with a new "
                        "attribute: it checks nothing",
+    "SELF_REFERENTIAL_ORACLE": "the expected value is computed by the same call as the actual one: the test passes whatever "
+                               "the code returns",
 }
 SMELL_NOTES = {
     "SLEEP": "a fixed sleep stands in for synchronization (slow, and flaky when the wait is too short)",

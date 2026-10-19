@@ -102,8 +102,12 @@ def mutation_report(path, source_dir, statuses):
         ))
     ]
     source = (source_dir / "shop" / "__init__.py").read_text(encoding="utf-8")
+    # produced on that state: the report carries the source it mutated and the tests it ran (as StrykerJS writes)
+    tests = {p.relative_to(source_dir).as_posix(): {"source": p.read_text(encoding="utf-8"), "tests": []}
+             for p in sorted((source_dir / "tests").glob("test_*.py"))}
     path.write_text(json.dumps({"schemaVersion": "2", "thresholds": {"high": 80, "low": 60},
-                                "files": {"shop/__init__.py": {"language": "python", "source": source, "mutants": mutants}}}))
+                                "files": {"shop/__init__.py": {"language": "python", "source": source, "mutants": mutants}},
+                                "testFiles": tests}))
     return path
 
 

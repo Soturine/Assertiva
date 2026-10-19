@@ -189,35 +189,24 @@ def load_mutation_report(path: str | Path) -> MutationRun:
         return MutationRun(source=str(path), error=f"{type(exc).__name__}: {exc}"[:300])
 
 
-_PYTHON_RUNNERS = ("pytest-native", "unittest", "django")
+# Integrated tools, in the order they are listed. Each module gives ``KEY`` and ``TOOL``, ``describe(root, python,
+# origin)`` (does it apply, can it run here, with which runner, why) and ``execute(state_root, python, targets, origin,
+# option)``; adding a tool is adding its module here, nothing in the engine changes.
+MUTATION_ADAPTERS = ("cosmic_ray", "stryker")
+
+
+def _adapters():
+    from importlib import import_module
+
+    return [import_module(f"assertiva.adapters.{name}") for name in MUTATION_ADAPTERS]
 
 
 def mutation_tools(root: str | Path, python: str, origin: str | Path | None = None) -> list[dict]:
     """Each integrated mutation tool and whether it applies to this project (language, test runner, build) and, when it
     does, whether it can run here and why not. Chosen by capability, never by project name; ``origin`` is the project
     whose installed dependencies a copy of ``root`` would use."""
-    from assertiva.adapters import cosmic_ray, runner_adapters, stryker
-    from assertiva.adapters.python_discovery import test_files
-    from assertiva.process import module_available
-
     root, origin = Path(root), Path(origin or root)
-    runners = [a.adapter_id for a in runner_adapters(root, python) if a.adapter_id in _PYTHON_RUNNERS] if test_files(root) else []
-    blocked = None
-    if len(runners) > 1:
-        blocked = (f"the project declares several Python runners ({', '.join(runners)}); keep the one to mutate with in "
-                   ".assertiva.toml [tests] runners")
-    elif runners and not module_available(python, "cosmic_ray"):
-        blocked = f"{cosmic_ray.TOOL} is not installed in {python}; Assertiva does not install it"
-    js_runner = stryker.test_runner(root)
-    js = stryker.applies(root)
-    return [
-        {"tool": "cosmic-ray", "name": cosmic_ray.TOOL, "applies": bool(runners), "blocked": blocked,
-         "runner": runners[0] if len(runners) == 1 else None,
-         "why": f"Python tests run by {', '.join(runners)}" if runners else "no Python tests under a supported runner"},
-        {"tool": "stryker", "name": stryker.TOOL, "applies": js, "runner": js_runner,
-         "blocked": stryker.availability(origin) if js else None,
-         "why": f"package.json declares {js_runner}" if js else "no Jest or Vitest project"},
-    ]
+    return [{"tool": adapter.KEY, "name": adapter.TOOL, **adapter.describe(root, python, origin)} for adapter in _adapters()]
 
 
 def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], tool: str | None = None,
@@ -225,12 +214,10 @@ def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], t
     """Run one native mutation tool on a copy of ``state_root``: the one the user names, otherwise the only one that
     applies. Several applicable tools need the user's choice; a tool that does not apply or cannot run gives an
     explained error, never a result. Tools are never all run, and a missing tool is never a pass."""
-    from assertiva.adapters import cosmic_ray, stryker
-
+    adapters = {adapter.KEY: adapter for adapter in _adapters()}
     options = mutation_tools(state_root, python, origin)
-    known = [o["tool"] for o in options]
-    if tool is not None and tool not in known:
-        return MutationRun(source="mutation tool", error=f"unknown mutation tool {tool!r}; integrated: {', '.join(known)}")
+    if tool is not None and tool not in adapters:
+        return MutationRun(source="mutation tool", error=f"unknown mutation tool {tool!r}; integrated: {', '.join(adapters)}")
     named = [o for o in options if tool is None or o["tool"] == tool]
     applicable = [o for o in named if o["applies"]]
     if not applicable:
@@ -244,10 +231,7 @@ def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], t
     if chosen["blocked"]:
         return MutationRun(source="mutation tool", tool=chosen["name"], error=chosen["blocked"])
     try:
-        if chosen["tool"] == "cosmic-ray":
-            run = cosmic_ray.run(state_root, python, targets, test_paths=[], runner=chosen["runner"])
-        else:
-            run = stryker.run(state_root, targets, origin=origin)
+        run = adapters[chosen["tool"]].execute(Path(state_root), python, list(targets), Path(origin or state_root), chosen)
     except OSError as exc:  # the copy could not be made or read (a path too long, a file in use): nothing was concluded
         return MutationRun(source="mutation tool", tool=chosen["name"], orchestrated=True, targets=tuple(targets),
                            error=f"the run could not use a copy of this state ({type(exc).__name__}: {exc})"[:300])

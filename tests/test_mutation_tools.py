@@ -62,6 +62,7 @@ def test_several_applicable_tools_need_the_users_choice_and_only_one_runs(tmp_pa
     from assertiva.models import MutationRun
 
     monkeypatch.setattr(cosmic_ray, "run", lambda root, python, targets, test_paths, runner: ran.append(runner) or MutationRun(source="x"))
+    monkeypatch.setattr(cosmic_ray, "module_available", lambda python, module: True)
     monkeypatch.setattr("assertiva.process.module_available", lambda python, module: True)
     run = run_mutation_tool(tmp_path, sys.executable, ["calc.py"], tool="cosmic-ray")
     assert ran == ["pytest-native"] and run.config["selected"] == "cosmic-ray" and "named by the user" in run.config["selected_because"]

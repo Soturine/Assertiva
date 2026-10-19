@@ -22,6 +22,7 @@ from assertiva.models import MutationRun
 from assertiva.process import execution_refusal, module_available, run_command
 
 TOOL = "Cosmic Ray"
+KEY = "cosmic-ray"
 MAX_MUTANTS = 300  # one test-suite run per mutant: beyond this the targets must be narrowed
 _LIMITS = [
     "Cosmic Ray runs the whole test command for each mutant and records no killing test: per-test contribution is unknown",
@@ -54,6 +55,26 @@ _COMMANDS = {  # the runner the project declares, as the engine runs it with --e
     "unittest": ["-m", "unittest", "discover", "--failfast"],
     "django": ["manage.py", "test", "--noinput", "--failfast"],
 }
+
+
+def describe(root: Path, python: str, origin: Path) -> dict:
+    """Applies to Python tests under one runner the project declares; never chooses a runner for it."""
+    from assertiva.adapters import runner_adapters
+    from assertiva.adapters.python_discovery import test_files
+
+    runners = [a.adapter_id for a in runner_adapters(root, python) if a.adapter_id in _COMMANDS] if test_files(root) else []
+    blocked = None
+    if len(runners) > 1:
+        blocked = (f"the project declares several Python runners ({', '.join(runners)}); keep the one to mutate with in "
+                   ".assertiva.toml [tests] runners")
+    elif runners and not module_available(python, "cosmic_ray"):
+        blocked = f"{TOOL} is not installed in {python}; Assertiva does not install it"
+    return {"applies": bool(runners), "blocked": blocked, "runner": runners[0] if len(runners) == 1 else None,
+            "why": f"Python tests run by {', '.join(runners)}" if runners else "no Python tests under a supported runner"}
+
+
+def execute(state_root: Path, python: str, targets: list[str], origin: Path, option: dict) -> MutationRun:
+    return run(state_root, python, targets, test_paths=[], runner=option["runner"])
 
 
 def run(state_root: str | Path, python: str, targets: list[str], test_paths: list[str], runner: str = "pytest-native",

@@ -19,6 +19,7 @@ from assertiva.models import MutationRun
 from assertiva.process import execution_refusal, run_command
 
 TOOL = "StrykerJS"
+KEY = "stryker"
 MAX_MUTANTS = 300
 _RUNNERS = {"jest": "@stryker-mutator/jest-runner", "vitest": "@stryker-mutator/vitest-runner"}
 _JS_SUFFIXES = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte")
@@ -60,6 +61,18 @@ def availability(root: Path) -> str | None:
     if not node_executable():
         return "Node.js was not found (PATH or ASSERTIVA_NODE)"
     return None
+
+
+def describe(root: Path, python: str, origin: Path) -> dict:
+    """Applies to a package.json project tested with Jest or Vitest; runs with the origin's installed StrykerJS."""
+    runner = test_runner(root)
+    found = applies(root)
+    return {"applies": found, "runner": runner, "blocked": availability(origin) if found else None,
+            "why": f"package.json declares {runner}" if found else "no Jest or Vitest project"}
+
+
+def execute(state_root: Path, python: str, targets: list[str], origin: Path, option: dict) -> MutationRun:
+    return run(state_root, targets, origin=origin)
 
 
 def unsafe_target(root: Path, target: str) -> str | None:

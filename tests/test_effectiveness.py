@@ -610,3 +610,76 @@ def test_numeric_test_ids_of_different_reports_are_different_tests():
     second.test_names, second.test_locations = {"2": "applies the rate"}, {"2": "src/rate.test.js"}
     view = mutation_contribution([first, second])
     assert set(view["tests"]) == {"StrykerJS#2", "applies the rate (src/rate.test.js)"}
+
+
+_JS_CANNOT_FAIL = """
+test('matcher never called', () => { expect(spy).toHaveBeenCalled; });
+test('no matcher', () => { expect(() => parse('x')); });
+test('same both sides', () => { expect(total(cart)).toEqual(total(cart)); });
+test('expected from the same call', () => {
+  const expected = total(cart);
+  expect(total(cart)).toBe(expected);
+});
+"""
+_JS_SOUND = """
+test('called', () => { expect(spy).toHaveBeenCalled(); });
+test('negated and awaited', async () => { await expect(load()).rejects.not.toThrow(); });
+test('chained on the next line', () => {
+  expect(total(cart))
+    .toBe(1500);
+});
+test('different strings', () => { expect(f("a")).toBe(f("b")); });
+test('state before and after', () => {
+  const before = snapshot(store);
+  store.clear();
+  expect(snapshot(store)).not.toEqual(before);
+});
+test('assertion counts', () => { expect.assertions(1); expect(add(1, 2)).toBe(3); });
+"""
+
+
+def test_js_assertions_that_cannot_fail_are_false_green_candidates(tmp_path):
+    from conftest import write
+
+    write(tmp_path / "src" / "bad.test.js", _JS_CANNOT_FAIL)
+    write(tmp_path / "src" / "good.test.js", _JS_SOUND)
+    facts, _ = collect(tmp_path)
+    smells = {f.test_id.split(" › ")[1]: set(f.smells) for f in facts}
+    assert "NO_OP_ASSERTION" in smells["matcher never called"] and "NO_OP_ASSERTION" in smells["no matcher"]
+    assert "TAUTOLOGY" in smells["same both sides"]
+    assert "SELF_REFERENTIAL_ORACLE" in smells["expected from the same call"]
+    sound = {"called", "negated and awaited", "chained on the next line", "different strings", "state before and after", "assertion counts"}
+    assert all(not smells[name] & {"NO_OP_ASSERTION", "TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"} for name in sound), smells
+
+
+_JVM = """
+class PricingTest {
+    @Test fun noOp() { assertThat(price(1)) }
+    @Test fun sameBothSides() { assertEquals(price(cart), price(cart)) }
+    @Test fun junit4Message() { assertEquals("same", price(cart), price(cart)) }
+    @Test fun fromTheSameCall() {
+        val expected = price(cart)
+        assertThat(price(cart)).isEqualTo(expected)
+    }
+    @Test fun sound() { assertThat(price(cart)).isEqualTo(1500) }
+    @Test fun hamcrest() { assertThat(price(cart), equalTo(1500)) }
+    @Test fun chainedNextLine() {
+        assertThat(price(cart))
+            .isEqualTo(1500)
+    }
+    @Test fun different() { assertEquals(price("a"), price("b")) }
+}
+"""
+
+
+def test_jvm_assertions_that_cannot_fail_are_false_green_candidates(tmp_path):
+    from conftest import write
+
+    write(tmp_path / "src" / "test" / "kotlin" / "PricingTest.kt", _JVM)
+    facts, _ = collect(tmp_path)
+    smells = {f.test_id.split("::")[1]: set(f.smells) for f in facts}
+    assert "NO_OP_ASSERTION" in smells["noOp"]
+    assert "TAUTOLOGY" in smells["sameBothSides"] and "TAUTOLOGY" in smells["junit4Message"]
+    assert "SELF_REFERENTIAL_ORACLE" in smells["fromTheSameCall"]
+    for name in ("sound", "hamcrest", "chainedNextLine", "different"):
+        assert not smells[name] & {"NO_OP_ASSERTION", "TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"}, (name, smells[name])

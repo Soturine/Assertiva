@@ -114,6 +114,101 @@ def _top_level_items(clean: str, start: int, end: int) -> list[tuple[int, int]]:
     return [(a, b) for a, b in spans if clean[a:b].strip()]
 
 
+def _calls(text: str, clean: str, name: str):
+    """Each call ``name(...)`` in ``text``: (start, argument spans, index after the closing parenthesis). Found on
+    ``clean`` (strings and comments blanked, same length) so parentheses inside strings do not count; the spans index
+    both, and comparisons read ``text`` so that ``f("a")`` and ``f("b")`` stay different."""
+    for m in re.finditer(rf"(?<![\w.$]){name}\s*\(", clean):
+        found = _arguments(clean, m.end() - 1)
+        if found is not None:
+            yield m.start(), *found
+
+
+def _arguments(clean: str, opening: int) -> tuple[list[tuple[int, int]], int] | None:
+    """The argument spans of the parenthesis at ``opening`` and the index after its match (None when unbalanced)."""
+    depth = 0
+    for i in range(opening, len(clean)):
+        depth += {"(": 1, ")": -1}.get(clean[i], 0)
+        if depth == 0:
+            return _top_level_items(clean, opening + 1, i), i + 1
+    return None
+
+
+def _same(text: str, a: tuple[int, int], b: tuple[int, int]) -> bool:
+    return _norm(text[a[0]:a[1]]) == _norm(text[b[0]:b[1]])
+
+
+def _expected_from_same_call(text: str, clean: str, start: int, actual: tuple[int, int], expected: tuple[int, int]) -> bool:
+    """`const expected = total(cart)` (or `val`/`var`/a typed local) on the line just before an assertion of
+    `total(cart)` against `expected`: the expected value is the actual one (as `_self_referential` for Python)."""
+    before = clean.rfind("\n", 0, start)
+    previous = clean.rfind("\n", 0, max(before, 0))
+    if before < 0:
+        return False
+    line = re.match(r"\s*(?:const|let|var|val|final\s+\w+|[A-Z]\w*(?:<[^>]*>)?)\s+(?P<name>\w+)\s*(?::\s*[\w<>?]+\s*)?=\s*(?P<value>.+?);?\s*$",
+                    clean[previous + 1:before])
+    if line is None or "(" not in line.group("value"):
+        return False
+    offset = previous + 1
+    value = _norm(text[offset + line.start("value"):offset + line.end("value")].rstrip().rstrip(";"))
+    name = line.group("name")
+    sides = [_norm(text[a:b]) for a, b in (actual, expected)]
+    return name in sides and value in sides and len(re.findall(rf"\b{name}\s*=[^=]", clean)) == 1
+
+
+def _js_assertion_smells(text: str, clean: str) -> list[str]:
+    """Assertions that cannot fail in Jest/Vitest-style `expect`: no matcher (`expect(x)` alone), a matcher named but
+    not called (`expect(spy).toHaveBeenCalled`), the same expression on both sides, and an expected value computed by
+    the same call just before."""
+    smells = []
+    for start, args, after in _calls(text, clean, "expect"):
+        if len(args) != 1:
+            continue
+        chain = re.match(r"\s*(?:\.\s*(?:not|resolves|rejects|soft)\b\s*)*(?:\.\s*(?P<matcher>\w+)\s*(?P<call>\()?)?", clean[after:])
+        if chain.group("matcher") is None or chain.group("call") is None:
+            smells.append("NO_OP_ASSERTION")
+            continue
+        if chain.group("matcher") in ("toBe", "toEqual", "toStrictEqual"):
+            found = _arguments(clean, after + chain.start("call"))
+            if found and len(found[0]) == 1:
+                expected = found[0][0]
+                if _same(text, args[0], expected):
+                    smells.append("TAUTOLOGY")
+                elif _expected_from_same_call(text, clean, start, args[0], expected):
+                    smells.append("SELF_REFERENTIAL_ORACLE")
+    return smells
+
+
+def _jvm_assertion_smells(text: str, clean: str) -> list[str]:
+    """JUnit `assertEquals(a, a)` and AssertJ/Truth `assertThat(a).isEqualTo(a)` (the same expression both sides), an
+    expected value computed by the same call just before, and a one-argument `assertThat(x)` with nothing chained,
+    which checks nothing (Hamcrest's two-argument form is a complete assertion)."""
+    smells = []
+    for name in ("assertEquals", "assertSame"):
+        for start, args, _ in _calls(text, clean, name):
+            # JUnit 4 puts an optional message first, JUnit 5 last
+            pair = args[1:3] if len(args) == 3 and text[args[0][0]:args[0][1]].strip().startswith('"') else args[:2]
+            if len(pair) == 2 and _same(text, *pair):
+                smells.append("TAUTOLOGY")
+            elif len(pair) == 2 and _expected_from_same_call(text, clean, start, pair[1], pair[0]):
+                smells.append("SELF_REFERENTIAL_ORACLE")
+    for start, args, after in _calls(text, clean, "assertThat"):
+        if len(args) != 1:
+            continue
+        chain = re.match(r"\s*\.\s*(?P<matcher>\w+)\s*(?P<call>\()", clean[after:])
+        if chain is None:
+            smells.append("NO_OP_ASSERTION")
+            continue
+        if chain.group("matcher") in ("isEqualTo", "isSameAs"):
+            found = _arguments(clean, after + chain.start("call"))
+            if found and len(found[0]) == 1:
+                if _same(text, args[0], found[0][0]):
+                    smells.append("TAUTOLOGY")
+                elif _expected_from_same_call(text, clean, start, args[0], found[0][0]):
+                    smells.append("SELF_REFERENTIAL_ORACLE")
+    return smells
+
+
 _JS_LITERAL_WORDS = re.compile(r"\b(true|false|null|undefined|NaN|Infinity)\b")
 
 
@@ -547,6 +642,7 @@ def _js_test(test_id, rel, body, body_clean, file_doubles, level, msw, retries) 
             surfaces.add("INTERACTION")
         else:
             surfaces.add("RETURN")
+    smells += _js_assertion_smells(body, body_clean)
     if _swallowed(body_clean, _JS_ASSERTION):
         smells.append("SWALLOWED_EXCEPTION")
     if re.search(r"waitForTimeout\(|new Promise\(\s*\(?\w*\)?\s*=>\s*setTimeout", body) and not _time_is_subject(test_id, body):
@@ -683,8 +779,9 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
                 oracles.append(oracle)
                 signature.append(_norm(statement))
                 break
-        if re.search(r"assertTrue\(\s*true\s*\)|assertEquals\(\s*(\w+)\s*,\s*\1\s*\)", statement):
+        if re.search(r"assertTrue\(\s*true\s*\)", statement):
             smells.append("TAUTOLOGY")
+    smells += _jvm_assertion_smells(body, body_clean)
     doubles = [*class_doubles, *re.findall(r"\bmockk<(\w+)>|\bmock\(\s*(\w+)(?:::class|\.class)", body)]
     doubles = [d if isinstance(d, str) else next(x for x in d if x) for d in doubles]
     boundaries, simulated, surfaces = set(), set(), set()

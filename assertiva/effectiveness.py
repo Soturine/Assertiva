@@ -180,11 +180,17 @@ def mutation_contribution(runs) -> dict:
         for mutant in mutants:
             owners[mutant].append(test)
     exclusive = {test: sorted(m for m in mutants if owners[m] == [test]) for test, mutants in kills.items()}
+    complete = all(getattr(run, "killers_complete", None) is True for run in runs if any(m.killed_by for m in getattr(run, "mutants", [])))
     return {
         "available": True, "mutants_with_killers": with_killers, "survivors": survivors,
         "tests": {test: {"kills": len(mutants), "exclusive": len(exclusive[test])} for test, mutants in sorted(kills.items())},
         "exclusive_protection": {t: m[:10] for t, m in exclusive.items() if m},
-        "note": "per-test detection of known mutants: a test that killed none may still protect behavior no mutant changed",
+        # kills are a lower bound and "exclusive" means "the only named detector" unless every report records all
+        # detecting tests (tools stop at the first failing test by default)
+        "killers_complete": complete,
+        "note": "per-test detection of known mutants: a test that killed none may still protect behavior no mutant changed"
+                + ("" if complete else "; the reports name only the first detecting test of each mutant, so kills are a lower "
+                                       "bound and an exclusive detector may have unrecorded peers"),
     }
 
 

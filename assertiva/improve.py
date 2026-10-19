@@ -295,14 +295,29 @@ def _retirement(changes: list[CandidateTestChange], baseline: StateEvidence | No
     runs = [r for r in (baseline.mutation if baseline else []) if not r.error and any(m.killed_by for m in r.mutants)]
     if not runs:
         return [], ["retirement not proven: no baseline mutation report names which tests detect each mutant"], []
-    exclusive = []
+    exclusive, maybe_exclusive, unnamed = [], [], []
     for run in runs:
         for mutant in run.mutants:
             if mutant.killed_by and all(any(_owned_by(t, run.test_locations.get(t), p) for p in retired) for t in mutant.killed_by):
-                exclusive.append(mutant_label(mutant))
+                # the only *named* detector is exclusive only when the report records every detecting test
+                (exclusive if run.killers_complete is True else maybe_exclusive).append(mutant_label(mutant))
+            elif not mutant.killed_by and mutant.status in (MutantStatus.KILLED, MutantStatus.TIMEOUT):
+                unnamed.append(mutant_label(mutant))  # detected, but by which tests is not recorded
     if exclusive:
         return [f"RETIRED_TEST_EXCLUSIVE_DETECTION: retired tests are the only detectors of {len(exclusive)} mutant(s): "
                 + ", ".join(exclusive[:5])], [], []
+    unknown = []
+    if maybe_exclusive:
+        unknown.append(f"retirement not proven: retired tests are the only named detectors of {len(maybe_exclusive)} mutant(s) "
+                       f"({', '.join(maybe_exclusive[:5])}), and the report does not record every detecting test; rerun the "
+                       "mutation tool recording all killing tests to decide")
+    if unnamed:
+        unknown.append(f"retirement not proven: {len(unnamed)} detected mutant(s) name no detecting test, so the retired tests "
+                       f"may be their only detectors ({', '.join(unnamed[:5])})")
+    if any(r.reused or r.incremental for r in runs):
+        unknown.append("retirement not proven by this run: the mutation evidence includes results carried over from an earlier run")
+    if unknown:
+        return [], unknown, []
     return [], [], [f"retired tests ({len(retired)} file(s)) detect no known mutant the remaining tests miss"]
 
 

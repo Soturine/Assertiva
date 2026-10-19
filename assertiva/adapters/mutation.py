@@ -29,6 +29,8 @@ _MUTMUT = {
     "segfault": S.ERROR, "skipped": S.IGNORED, "suspicious": S.UNKNOWN, "check_was_interrupted_by_user": S.UNKNOWN,
 }
 _NO_REVISION = "the report does not record which revision/source it was produced from"
+_BAIL = ("the report does not show that every detecting test was recorded (tools stop at the first failing test unless "
+         "told otherwise): a mutant's named killers are a lower bound, not exclusive detection")
 
 
 def _counted(run: MutationRun) -> MutationRun:
@@ -39,6 +41,11 @@ def _counted(run: MutationRun) -> MutationRun:
 def _mutation_testing_elements(data: dict, run: MutationRun) -> MutationRun:
     framework = data.get("framework") or {}
     run.tool, run.tool_version = framework.get("name"), framework.get("version")
+    config = data.get("config") if isinstance(data.get("config"), dict) else None  # StrykerJS writes its options here
+    if config is not None and "disableBail" in config:
+        run.killers_complete = config["disableBail"] is True
+    if config is not None and "incremental" in config:
+        run.incremental = config["incremental"] is True
     for path, result in (data.get("testFiles") or {}).items():  # test ids named in killedBy -> their file
         for test in (result or {}).get("tests") or []:
             if isinstance(test, dict) and test.get("id") is not None:
@@ -54,9 +61,16 @@ def _mutation_testing_elements(data: dict, run: MutationRun) -> MutationRun:
                     mutant_id=str(item["id"]), status=_MTE.get(native, S.UNKNOWN), native_status=native, path=path,
                     line=start.get("line"), operator=item.get("mutatorName"), replacement=item.get("replacement"),
                     description=item.get("description"), killed_by=tuple(item.get("killedBy") or ()),
-                    duration_ms=item.get("duration"),
+                    duration_ms=item.get("duration"), status_reason=item.get("statusReason"),
                 )
             )
+    run.reused = sum(1 for m in run.mutants if (m.status_reason or "").startswith("Result based on previous run"))
+    if run.reused:
+        run.limitations.append(f"{run.reused} mutant result(s) were carried over from an earlier run, not executed in this one")
+    if run.incremental:
+        run.limitations.append("the tool ran incrementally: results of unchanged mutants may be carried over without a marker")
+    if run.killers_complete is not True:
+        run.limitations.append(_BAIL)
     return _counted(run)
 
 
@@ -85,6 +99,13 @@ def _pit(root: ET.Element, run: MutationRun) -> MutationRun:
         )
     if root.get("partial") == "true":
         run.limitations.append("PIT reported a partial run")
+    # `killingTests` is written only with the full mutation matrix; `killingTest` names the first detector only
+    if any(node.find("killingTests") is not None for node in root.iter("mutation")):
+        run.killers_complete = True
+    elif any(node.find("killingTest") is not None for node in root.iter("mutation")):
+        run.killers_complete = False
+    if run.killers_complete is not True:
+        run.limitations.append(_BAIL)
     return _counted(run)
 
 

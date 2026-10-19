@@ -120,8 +120,8 @@ def test_exception_ignored_in_cleanup_is_not_a_false_green(tmp_path):
     assert facts and "SWALLOWED_EXCEPTION" not in facts[0].smells
 
 
-def _run(*mutants, locations=None):
-    run = MutationRun(source="m.json", mutants=list(mutants), test_locations=dict(locations or {}))
+def _run(*mutants, locations=None, complete=True):
+    run = MutationRun(source="m.json", mutants=list(mutants), test_locations=dict(locations or {}), killers_complete=complete)
     run.counts = {MutantStatus.KILLED.value: len(mutants)}
     return run
 
@@ -501,3 +501,32 @@ def test_same_body_over_different_parameter_tables_is_not_redundant(tmp_path):
           "def test_small_again(n, expected):\n    assert double(n) == expected\n")
     found = [c for c in candidates(collect(tmp_path)[0]) if c.kind == "REDUNDANCY"]
     assert [sorted(_name(t) for t in c.tests) for c in found] == [["test_small", "test_small_again"]]
+
+
+# --- a retirement is decided only on evidence that can decide it (0.7.3) -------------------------------------------
+
+def test_the_only_named_detector_in_an_incomplete_report_is_unknown_not_exclusive():
+    # tools stop at the first failing test by default: the named killer may have unrecorded peers
+    baseline = _state(_run(_mutant("m1", "tests/test_old.py::test_edge"), complete=False))
+    failures, unknown, passed = _retirement([_retire("tests/test_old.py")], baseline)
+    assert not failures and not passed and "does not record every detecting test" in unknown[0]
+    assert _mutation_stage(StateEvidence(label="candidate", observed_in="copy"), [_retire("tests/test_old.py")], baseline).status is not StageStatus.PASS
+
+
+def test_detected_mutants_without_named_detectors_block_a_retirement_pass():
+    baseline = _state(_run(_mutant("m1", "tests/test_old.py::test_a", "tests/test_new.py::test_a"), _mutant("m2")))
+    failures, unknown, passed = _retirement([_retire("tests/test_old.py")], baseline)
+    assert not failures and not passed and "name no detecting test" in unknown[0]  # 0.7.2 passed: m2 was skipped
+
+
+def test_carried_over_mutation_results_do_not_prove_a_retirement():
+    run = _run(_mutant("m1", "tests/test_old.py::test_a", "tests/test_new.py::test_a"))
+    run.reused = 1
+    failures, unknown, passed = _retirement([_retire("tests/test_old.py")], _state(run))
+    assert not passed and any("carried over" in u for u in unknown)
+
+
+def test_contribution_says_when_exclusive_means_only_named():
+    view = mutation_contribution([_run(_mutant("m1", "a"), complete=False)])
+    assert view["killers_complete"] is False and "lower bound" in view["note"]
+    assert mutation_contribution([_run(_mutant("m1", "a"))])["killers_complete"] is True

@@ -105,6 +105,8 @@ def run_negative_control(source: Path, control: NegativeControl, adapters: list,
         text = target.read_text(encoding="utf-8") if target.is_file() else ""
         if text.count(control.find) != 1:
             return result(ControlOutcome.INVALID, f"expected exactly one occurrence of the target in {control.path}")
+        # the same tests on the same copy before the break: only a test that passed there can detect the control
+        before = [adapter.run(copy, args=list(control.tests)) for adapter in adapters]
         target.write_text(text.replace(control.find, control.replace), encoding="utf-8")
         runs = [adapter.run(copy, args=list(control.tests)) for adapter in adapters]
     finally:
@@ -112,16 +114,19 @@ def run_negative_control(source: Path, control: NegativeControl, adapters: list,
 
     if any(run.collection_errors for run in runs):
         return result(ControlOutcome.INVALID, "the control broke collection/compilation instead of behavior")
+    green = {inv.invocation_id for run in before for inv in run.invocations if inv.outcome is Outcome.PASSED}
     killers = [
         inv.invocation_id
         for run in runs
         for inv in run.invocations
-        if inv.outcome in (Outcome.FAILED, Outcome.ERROR)
+        if inv.outcome in (Outcome.FAILED, Outcome.ERROR) and inv.invocation_id in green
     ]
     if killers:
         return result(ControlOutcome.KILLED, "detected by " + ", ".join(sorted(killers)[:5]))
-    if all(run.status is StageStatus.PASS for run in runs):
-        return result(ControlOutcome.SURVIVED, "tests stayed green with the behavior deliberately broken")
+    if not green:
+        return result(ControlOutcome.INVALID, "no selected test passed before the control, so none can show it detected the break")
+    if all(inv.outcome is Outcome.PASSED for run in runs for inv in run.invocations if inv.invocation_id in green):
+        return result(ControlOutcome.SURVIVED, "tests that passed before stayed green with the behavior deliberately broken")
     return result(ControlOutcome.INVALID, "runner did not produce a usable result: " + ", ".join(r.status.value for r in runs))
 
 

@@ -129,6 +129,14 @@ NARRATIVE: list[tuple[str, str]] = [
     ("the report does not record which revision/source it was produced from",
      "o relatório não registra a revisão/código a partir do qual foi produzido"),
     ("PIT reported a partial run", "o PIT relatou uma execução parcial"),
+    ("the report does not show that every detecting test was recorded (tools stop at the first failing test unless told "
+     "otherwise): a mutant's named killers are a lower bound, not exclusive detection",
+     "o relatório não mostra que todos os testes detectores foram registrados (as ferramentas param no primeiro teste que "
+     "falha, salvo configuração em contrário): os detectores nomeados de um mutante são um limite inferior, não detecção exclusiva"),
+    ("{n} mutant result(s) were carried over from an earlier run, not executed in this one",
+     "{n} resultado(s) de mutante foram reaproveitados de uma execução anterior, não executados nesta"),
+    ("the tool ran incrementally: results of unchanged mutants may be carried over without a marker",
+     "a ferramenta rodou de forma incremental: resultados de mutantes inalterados podem ter sido reaproveitados sem marcação"),
     ("JUnit XML could not be read: {detail}", "o JUnit XML não pôde ser lido: {detail}"),
     ("the report contains no executed test cases", "o relatório não contém casos de teste executados"),
     ("no Surefire or Failsafe report was produced by this run; test outcomes are unknown",

@@ -239,3 +239,33 @@ def test_improve_cli_accepts_state_targeted_mutation_reports(calc_project, tmp_p
     assert stage["status"] == "PASS"
     assert cli.main(["improve", str(calc_project), "--mutation-report", "elsewhere=x.json"]) == 2
     cli.main(["improve", str(calc_project), "--discard"])
+
+
+
+def test_reports_say_whether_every_detecting_test_was_recorded(tmp_path):
+    def mte(config):
+        path = tmp_path / f"mte-{len(list(tmp_path.iterdir()))}.json"
+        data = {"schemaVersion": "2", "thresholds": {}, "files": {"a.js": {"language": "javascript", "mutants": [
+            {"id": "1", "mutatorName": "M", "status": "Killed", "killedBy": ["t1"], "location": {"start": {"line": 1, "column": 1}}},
+            {"id": "2", "mutatorName": "M", "status": "Killed", "statusReason": "Result based on previous run",
+             "location": {"start": {"line": 2, "column": 1}}}]}}}
+        if config is not None:
+            data["config"] = config
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return load_mutation_report(path)
+
+    assert mte({"disableBail": False}).killers_complete is False  # the default: the first failing test only
+    assert mte({"disableBail": True, "incremental": True}).killers_complete is True
+    unknown = mte(None)
+    assert unknown.killers_complete is None and unknown.reused == 1
+    assert any("lower bound" in lim for lim in unknown.limitations) and any("carried over" in lim for lim in unknown.limitations)
+    assert mte({"disableBail": True, "incremental": True}).incremental is True
+
+    def pit(element):
+        path = tmp_path / f"pit-{element}.xml"
+        path.write_text(f"<mutations><mutation detected='true' status='KILLED'><sourceFile>A.java</sourceFile>"
+                        f"<mutatedClass>p.A</mutatedClass><mutatedMethod>m</mutatedMethod><lineNumber>1</lineNumber>"
+                        f"<mutator>M</mutator><{element}>p.ATest.t()</{element}></mutation></mutations>", encoding="utf-8")
+        return load_mutation_report(path)
+
+    assert pit("killingTest").killers_complete is False and pit("killingTests").killers_complete is True

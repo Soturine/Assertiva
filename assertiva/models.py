@@ -44,6 +44,7 @@ class MutantRecord:
     description: str | None = None
     killed_by: tuple[str, ...] = ()
     duration_ms: float | None = None
+    status_reason: str | None = None  # the tool's own reason, when it gives one ("Result based on previous run")
 
 
 @dataclass
@@ -61,6 +62,12 @@ class MutationRun:
     error: str | None = None
     matches_state: bool | None = None  # None: the report cannot be tied to the measured state
     test_locations: dict[str, str] = field(default_factory=dict)  # killing test id -> test file (or class path) when reported
+    # Whether each mutant names every test that detects it. Mutation tools usually stop at the first failing test, so
+    # a single named killer is not exclusive detection. True or False only when the report says so (the adapter knows
+    # how each format says it); None when it does not.
+    killers_complete: bool | None = None
+    reused: int = 0  # mutants whose result the tool carried over from an earlier run instead of executing
+    incremental: bool | None = None  # the tool ran in a mode that may carry results over without marking them
 
     def count(self, status: MutantStatus) -> int:
         return self.counts.get(status.value, 0)

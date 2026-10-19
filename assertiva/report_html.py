@@ -1845,6 +1845,9 @@ def _effectiveness(r: _R) -> str:
     if mutation.get("available"):
         exclusive = mutation.get("exclusive_protection") or {}
         facts.append(("eff.exclusive", ", ".join(f"{t} ({len(m)})" for t, m in list(exclusive.items())[:8]) or "—"))
+        subsumed = mutation.get("subsumed") or {}
+        if subsumed:
+            facts.append(("eff.subsumed", "; ".join(f"{t} ⊂ {', '.join(w)}" for t, w in list(subsumed.items())[:8])))
     kv = "".join(f"<dt>{r.t(k)}</dt><dd><code class=\"wrap\">{_e(v)}</code></dd>" for k, v in facts)
     cards = []
     for c in data.get("candidates") or []:
@@ -1904,7 +1907,9 @@ def _mutation(r: _R) -> str:
             counts = ", ".join(f"{k.lower()}: {v}" for k, v in sorted(run["counts"].items())) or "—"
             status = (f'{r.t("mut.unreadable")}: <span class="raw-text" lang="en">{_e(run["error"])}</span>' if run["error"]
                       else r.t("mut.mismatch") if run["matches_state"] is False else f"<code>{_e(counts)}</code>")
-            survivors = (r.items(run["survivors"], kind="code") if run["survivors"]
+            sites = [f'{s["mutant"]} — {s["original"]}' for s in run.get("survivor_sites") or [] if s.get("original")]
+            survivors = (r.items(sites + run["survivors"][len(sites):], kind="code") if sites
+                         else r.items(run["survivors"], kind="code") if run["survivors"]
                          else r.t("mut.none_listed" if run["per_mutant"] else "mut.no_identity", tag="p", cls="muted"))
             rows.append(f'<tr><th scope="row">{r.state(key)}</th><td {r.label_attr("mut.tool")}><code>{_e(run["tool"] or "unknown")}</code></td>'
                         f'<td {r.label_attr("mut.result")}>{status}</td><td {r.label_attr("mut.survivors")}>{survivors}</td>'

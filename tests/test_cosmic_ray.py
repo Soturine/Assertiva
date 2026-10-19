@@ -192,3 +192,16 @@ def test_mutants_are_compared_by_a_stable_identity_and_collisions_are_not_guesse
     object.__setattr__(candidate.mutation[0].mutants[1], "stable_id", "a.js:3:5:op:x")  # a collision
     collided = protection_delta(baseline, candidate, [], change)
     assert collided["gained"] == [] and all(e["reason"] == "its identity is not unique in the run" for e in collided["not_comparable"])
+
+
+def test_a_tied_runs_survivors_show_the_original_line_and_the_change():
+    from assertiva.models import MutantRecord, MutationRun
+    from assertiva.report import survivor_sites
+
+    run = MutationRun(source="x", sources={"calc.py": "def add(a, b):\n    return a + b\n"}, matches_state=True,
+                      mutants=[MutantRecord("m", S.SURVIVED, "Survived", path="calc.py", line=2, operator="ArithmeticOperator",
+                                            replacement="a - b")])
+    [site] = survivor_sites(run)
+    assert site["original"] == "return a + b" and site["change"] == "a - b"
+    run.matches_state = None  # an untied report: its lines may not be this state's
+    assert survivor_sites(run) == []

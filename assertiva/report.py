@@ -106,11 +106,26 @@ def state_summary(state: StateEvidence | None) -> dict | None:
     }
 
 
+def survivor_sites(run, limit: int = 20) -> list[dict]:
+    """Where each surviving mutant of a run tied to its state changed the code: the original line, as the run saw it,
+    and the change. The material for a witness (an input on which original and mutant differ), not the witness."""
+    if run.matches_state is not True:
+        return []
+    out = []
+    for m in run.survivors()[:limit]:
+        lines = (run.sources.get(m.path or "") or "").splitlines()
+        original = lines[m.line - 1].strip()[:200] if m.line and 0 < m.line <= len(lines) else None
+        out.append({"mutant": mutant_label(m), "path": m.path, "line": m.line, "original": original,
+                    "change": m.replacement or m.description or m.operator, "operator": m.operator})
+    return out
+
+
 def _mutation_summary(run) -> dict:
     return {
         "tool": run.tool, "tool_version": run.tool_version, "source": run.source, "error": run.error,
         "per_mutant": run.per_mutant, "matches_state": run.matches_state, "counts": dict(run.counts),
         "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:50]],
+        "survivor_sites": survivor_sites(run),
         # where the evidence came from and how much it can decide
         "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,
         "reused": run.reused, "incremental": run.incremental, "config": dict(run.config), "inputs_digest": run.inputs_digest,

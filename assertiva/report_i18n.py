@@ -390,6 +390,8 @@ UI: dict[str, tuple[str, str]] = {
     "eff.crossed": ("Boundaries crossed", "Limites atravessados"),
     "eff.simulated": ("Boundaries simulated", "Limites simulados"),
     "eff.exclusive": ("Only detector of a mutant", "Único detector de um mutante"),
+    "eff.subsumed": ("Detects only mutants another test detects (known mutants; never a reason to remove alone)",
+                     "Detecta só mutantes que outro teste detecta (mutantes conhecidos; nunca motivo para remover sozinho)"),
     "eff.shows": ("What the evidence shows", "O que a evidência mostra"),
     "eff.why": ("Why it may be weak", "Por que pode ser fraco"),
     "eff.resolve": ("What would settle it", "O que resolveria"),

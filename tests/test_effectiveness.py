@@ -592,3 +592,21 @@ def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(t
     assert "TAUTOLOGY" in facts["test_inline"].smells  # the direct form was already a tautology; not counted twice
     for name in ("test_inline", "test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
         assert "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name
+
+
+def test_complete_tied_matrices_show_subsumption_on_known_mutants_never_a_removal():
+    view = mutation_contribution([_run(_mutant("m1", "a", "b"), _mutant("m2", "b"), _mutant("m3", "c", "d"), _mutant("m4", "c", "d"))])
+    assert view["subsumed"] == {"a": ["b"]} and view["same_detection"] == [["c", "d"]]
+    assert "never remove on this alone" in view["subsumption_note"]
+    for run in ([_run(_mutant("m1", "a", "b"), _mutant("m2", "b"), complete=False)],
+                [_run(_mutant("m1", "a", "b"), _mutant("m2", "b"), tied=False)]):
+        view = mutation_contribution(run)
+        assert view["subsumed"] == {} and "not computed" in view["subsumption_note"]
+
+
+def test_numeric_test_ids_of_different_reports_are_different_tests():
+    first, second = _run(_mutant("m1", "2")), _run(_mutant("m1", "2"))
+    first.tool = second.tool = "StrykerJS"
+    second.test_names, second.test_locations = {"2": "applies the rate"}, {"2": "src/rate.test.js"}
+    view = mutation_contribution([first, second])
+    assert set(view["tests"]) == {"StrykerJS#2", "applies the rate (src/rate.test.js)"}

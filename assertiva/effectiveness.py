@@ -161,20 +161,34 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
     return out
 
 
+def _test_label(run, test_id: str) -> str:
+    """A detecting test as people know it: its name and file when the report gives them, otherwise the tool's id
+    prefixed by the tool (ids such as StrykerJS's "2" are only unique within one report)."""
+    name, where = run.test_names.get(test_id), run.test_locations.get(test_id)
+    if name:
+        return f"{name} ({where})" if where else name
+    return test_id if where or not test_id.isdigit() else f"{run.tool or 'mutation'}#{test_id}"
+
+
 def mutation_contribution(runs) -> dict:
     """Which tests detect which mutants, from reports that name the killing tests; exclusive vs shared detection.
-    Not proof of equivalence: a test that killed no known mutant may still guard behavior no mutant touched."""
+    Not proof of equivalence: a test that killed no known mutant may still guard behavior no mutant touched.
+
+    With complete killer matrices from runs tied to this state, also which tests detect only mutants another test
+    detects too (``subsumed``) and which detect exactly the same ones (``same_detection``): evidence on the known
+    mutants for the agent to weigh, never a reason to remove a test on its own."""
     kills: dict[str, set[str]] = defaultdict(set)
     survivors = 0
     with_killers = 0
-    for run in runs:
+    for index, run in enumerate(runs):
         for mutant in getattr(run, "mutants", []):
             if mutant.status.value == "SURVIVED":
                 survivors += 1
             if mutant.killed_by:
                 with_killers += 1
+                identity = f"{index}:{mutant.stable_id or mutant.mutant_id}"
                 for test in mutant.killed_by:
-                    kills[test].add(mutant.mutant_id)
+                    kills[_test_label(run, test)].add(identity)
     if not kills:
         return {"available": False, "reason": "no mutation report names the tests that killed each mutant"}
     owners: dict[str, list[str]] = defaultdict(list)
@@ -182,11 +196,31 @@ def mutation_contribution(runs) -> dict:
         for mutant in mutants:
             owners[mutant].append(test)
     exclusive = {test: sorted(m for m in mutants if owners[m] == [test]) for test, mutants in kills.items()}
-    complete = all(getattr(run, "killers_complete", None) is True for run in runs if any(m.killed_by for m in getattr(run, "mutants", [])))
+    with_matrix = [run for run in runs if any(m.killed_by for m in getattr(run, "mutants", []))]
+    complete = all(getattr(run, "killers_complete", None) is True for run in with_matrix)
+    tied = all(getattr(run, "matches_state", None) is True for run in with_matrix)
+    subsumed: dict[str, list[str]] = {}
+    same: list[list[str]] = []
+    if complete and tied:
+        groups: dict[frozenset, list[str]] = defaultdict(list)
+        for test, mutants in kills.items():
+            groups[frozenset(mutants)].append(test)
+        same = sorted(sorted(g) for g in groups.values() if len(g) > 1)
+        for test, mutants in sorted(kills.items()):
+            wider = sorted(other for other, theirs in kills.items() if mutants < theirs)
+            if wider:
+                subsumed[test] = wider[:5]
     return {
         "available": True, "mutants_with_killers": with_killers, "survivors": survivors,
         "tests": {test: {"kills": len(mutants), "exclusive": len(exclusive[test])} for test, mutants in sorted(kills.items())},
-        "exclusive_protection": {t: m[:10] for t, m in exclusive.items() if m},
+        "exclusive_protection": {t: [m.split(":", 1)[1] for m in ms[:10]] for t, ms in exclusive.items() if ms},
+        "tied": tied,
+        "subsumed": subsumed,
+        "same_detection": same[:MAX_LISTED],
+        "subsumption_note": ("on the known mutants only: a subsumed test may still check behavior no mutant changed, a "
+                             "contract, or a level the wider test does not reach; weigh it with the tests' intent, never "
+                             "remove on this alone" if complete and tied else
+                             "not computed: needs complete killer matrices from runs tied to this state"),
         # kills are a lower bound and "exclusive" means "the only named detector" unless every report records all
         # detecting tests (tools stop at the first failing test by default)
         "killers_complete": complete,

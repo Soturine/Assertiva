@@ -107,6 +107,10 @@ def test_stryker_proves_the_protection_a_strengthened_jest_test_adds(tmp_path, c
     assert run["error"] is None and run["tool"] == "StrykerJS" and run["matches_state"] is True
     assert run["counts"].get("SURVIVED", 0) > 0 and run["killers_complete"] is True
     assert run["config"]["selected"] == "stryker" and run["config"]["test_runner"] == "jest"
+    assert any(s["original"] == "if (member && totalCents >= 10000) {" for s in run["survivor_sites"])
+    contribution = audit["test_effectiveness"]["dimensions"]["mutation_sensitivity"]
+    assert contribution["tied"] is True and "not computed" not in contribution["subsumption_note"]
+    assert all(test.endswith("(src/pricing.test.js)") for test in contribution["tests"])
 
     workspace = Path(_run(capsys, "improve", str(root))["candidate_workspace"])
     shutil.copy(JS / "strengthened" / "pricing.test.js", workspace / "src" / "pricing.test.js")

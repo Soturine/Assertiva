@@ -46,7 +46,7 @@ inclusive threshold (10000 and 9999) and the rounding (10005 → 1000).
 assertiva improve protection-demo --python <interpreter> --mutate pricing.py --negative-controls negative-controls.json
 ```
 
-Observed on 2026-10-19 (Cosmic Ray 8.7.0, Windows and Linux):
+Observed on 2026-10-19 (Cosmic Ray 8.7.0, Python 3.12, Windows; Linux is qualified with the release):
 
 | | Baseline | Candidate |
 | --- | --- | --- |

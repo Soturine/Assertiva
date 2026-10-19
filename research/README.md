@@ -21,6 +21,10 @@ Research records are dated evidence and benchmarks, not permanent Assertiva poli
 
 - [JavaScript Test Result Formats](2026-10-06-js-test-result-formats.md) — Jest `--json` shape from its sources and a real run; Vitest's Jest-compatible claim (not verified).
 
+## 2026-10-19
+
+- [Competitive research, wave 1](2026-10-19-competitive/README.md) — mutation tools, test smells and oracles, testing agents and skills, selection and flakiness, E2E/contracts/accessibility, reporting and observability: source-level reading with commit SHAs, what each does better and how, integrate/adapt/build/reject decisions and a prioritized backlog. Documentary and source-level only; no tool was executed.
+
 ## Rule
 
 When a mutable external tool changes, update or add a dated record instead of silently rewriting history. Promote only reusable, evidence-supported conclusions into canonical docs.

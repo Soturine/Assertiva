@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased] — 0.9.0 — Advanced Test Intelligence & Continuous Assurance
+
+In progress on `release/0.9.0`, by checkpoints; it includes the scope first planned for 0.8.1. Compatible with 0.8.0: report fields are only added.
+
+### Security and evidence integrity (CP1)
+- A mutation target reached through a symlink or junction is never rewritten: every component from the project root to the file is checked on the project and again on the copy the tool runs in (a link in a copy could point back outside it).
+- One meaning of a tied mutation run across metrics, findings and the report; errored mutants, attribution (the named detecting test vs the changed files as context) and comparability (identical mutated sources only) in the protection delta; an executed run records its configuration and a digest of the sources and tests it saw.
+
+### Mutation testing across stacks (CP2)
+- **Chosen by capability:** `--mutate FILE` runs the one integrated tool that applies to the project (language, declared runner, build); when several apply, `--mutation-tool cosmic-ray|stryker|pit` chooses, and tools are never all run. A tool that does not apply, is not installed (never installed by Assertiva) or whose copy cannot be made gives an explained error, never a result. Each tool is an adapter module; the registry only lists them.
+- **Cosmic Ray** runs under the Python runner the project declares (pytest, unittest or Django's `manage.py test`) instead of substituting pytest.
+- **StrykerJS** (Jest, Vitest): the project's installed StrykerJS on a disposable copy, every detecting test recorded, no incremental reuse, the project's JSON Stryker configuration honoured.
+- **PIT** (Maven): when the pom declares the plugin; offline, full mutation matrix, report outside the copy. Gradle builds with the PIT plugin are recognized and blocked with the import route.
+- **Stable mutant identity:** a mutant is identified by what was changed where, not by the tool's per-run number, so the same mutant is compared across baseline and candidate; colliding identities are not compared. Detecting tests are shown by name and file.
+- Real runs: StrykerJS 10.0.0 with Jest and PIT 1.30.0 with JUnit 5, each showing the protection a strengthened test adds, attributed to the named test; Cosmic Ray 8.7.0 under unittest (test) and Django 6.1.2 (local run). mutmut 3.8.0 evaluated on Linux and not integrated (ROADMAP).
+
 ## [Unreleased] — 0.8.0 — Intelligence & Proof of Protection
 
 In progress on `release/0.8.0`. Compatible with 0.7.2: report fields and metrics are only added; existing ones keep their meaning.

@@ -112,3 +112,21 @@ def test_audit_of_unknown_toolchain_uses_portable_results(tmp_path, capsys):
     assert any(f["code"] == "NATIVE_TESTS_FAILING" for f in report["findings"])
     assert any("junit-xml" in item and "not executed by Assertiva" in item for item in report["claim_boundary"]["observed"])
     assert any(f["code"] == "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED" for f in report["findings"])
+
+
+def test_imported_surefire_reruns_keep_their_failed_attempts(tmp_path):
+    # a report imported with --junit-xml (not run by Assertiva's Maven adapter) still says a pass came after failures
+    report = tmp_path / "TEST-demo.xml"
+    report.write_text(
+        '<testsuite name="demo"><testcase classname="demo.PriceTest" name="rounds">'
+        '<flakyFailure message="expected 3 but was 2"/></testcase>'
+        '<testcase classname="demo.PriceTest" name="totals"><failure message="boom"/>'
+        '<rerunFailure message="boom"/><rerunFailure message="boom"/></testcase>'
+        '<testcase classname="demo.PriceTest" name="plain"/></testsuite>', encoding="utf-8")
+    run = load_junit(report)
+    by_name = {inv.invocation_id.rsplit("::", 1)[-1]: inv for inv in run.invocations}
+    assert by_name["rounds"].outcome is Outcome.PASSED and by_name["rounds"].attempts == 2
+    assert "earlier attempts failed" in by_name["rounds"].message
+    assert by_name["totals"].outcome is Outcome.FAILED and by_name["totals"].attempts == 3
+    assert by_name["plain"].attempts is None  # JUnit XML alone does not say how many attempts ran
+    assert any("passed only after earlier failed attempts" in lim for lim in run.limitations)

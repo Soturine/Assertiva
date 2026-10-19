@@ -134,11 +134,18 @@ def test_remote_base_url_is_never_targeted(tmp_path):
 # --- real Playwright runs (Node, the fixture's node_modules and a Chromium build) ----------
 
 def _browser_available() -> bool:
+    """A Chromium build of the revision the fixture's Playwright expects (an older revision in the cache cannot run
+    it: the run would report every project as not executed)."""
     if os.environ.get("ASSERTIVA_PW_CHANNEL"):
         return True
     cache = os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or (
         Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright" if os.name == "nt" else Path.home() / ".cache" / "ms-playwright")
-    return any(Path(cache).glob("chromium*"))
+    try:
+        browsers = json.loads((PROJECT / "node_modules" / "playwright-core" / "browsers.json").read_text(encoding="utf-8"))["browsers"]
+    except (OSError, ValueError, KeyError):
+        return False
+    wanted = {f"{b['name'].replace('-', '_')}-{b['revision']}" for b in browsers if b["name"] in ("chromium", "chromium-headless-shell")}
+    return any((Path(cache) / name / "INSTALLATION_COMPLETE").is_file() for name in wanted)
 
 
 @pytest.fixture
@@ -146,7 +153,8 @@ def playwright_project(tmp_path):
     node = os.environ.get("ASSERTIVA_NODE") or shutil.which("node")
     modules = PROJECT / "node_modules"
     if not node or not (modules / "playwright").is_dir() or not _browser_available():
-        reason = "requires Node, `npm ci --ignore-scripts` in tests/fixtures/js-playwright and a Chromium build"
+        reason = ("requires Node, `npm ci --ignore-scripts` in tests/fixtures/js-playwright and a Chromium build of the revision "
+                  "its Playwright expects (playwright-core/browsers.json)")
         if os.environ.get("ASSERTIVA_REQUIRE_PLAYWRIGHT"):
             pytest.fail(reason)
         pytest.skip(reason)
@@ -204,3 +212,27 @@ def test_real_playwright_candidate_qualification(playwright_project):
     assert stages[QualificationCheck.CANDIDATE_TESTS] is StageStatus.PASS
     assert stages[QualificationCheck.ORIGINAL_REGRESSION] is StageStatus.PASS
     assert json.dumps([d.name for d in q.metric_deltas]).count("locator_role") == 1
+
+
+# --- outcomes Playwright folds into "skipped" and "flaky" (computeTestCaseOutcome, teleReceiver.ts at 41e6a18) ------
+
+def _one(title, expected, status, *results):
+    return json.dumps({"config": {"projects": [{"id": "chromium", "name": "chromium", "testDir": "<ROOT>/tests"}]},
+                       "suites": [{"title": "a.spec.js", "file": "a.spec.js", "specs": [{"title": title, "file": "a.spec.js", "line": 1, "column": 1,
+                                   "tests": [{"projectId": "chromium", "projectName": "chromium", "expectedStatus": expected, "status": status,
+                                              "annotations": [], "results": [{"status": s, "retry": i, "errors": []} for i, s in enumerate(results)]}]}]}]})
+
+
+@pytest.mark.parametrize(("expected", "status", "results", "outcome"), [
+    ("skipped", "skipped", ["skipped"], Outcome.SKIPPED),  # test.skip / fixme: the author skipped it
+    ("passed", "skipped", ["skipped"], Outcome.NOT_RUN),  # expected to run: the run stopped before it or a serial predecessor failed
+    ("passed", "skipped", ["interrupted"], Outcome.NOT_RUN),  # only interrupted results
+    ("passed", "flaky", ["failed", "passed"], Outcome.PASSED),  # a pass after a failed attempt
+    ("failed", "flaky", ["failed", "passed"], Outcome.XFAILED),  # test.fail: failed as expected once, passed once
+    ("skipped", "flaky", ["failed", "skipped"], Outcome.SKIPPED),  # failed, then skipped on retry: never a pass
+])
+def test_skipped_and_flaky_keep_what_playwright_folds_into_them(expected, status, results, outcome):
+    [inv] = parse_playwright_results(_one("t", expected, status, *results), "<ROOT>").invocations
+    assert inv.outcome is outcome
+    if status == "flaky" and outcome is not Outcome.PASSED:
+        assert "passed after" not in (inv.message or "")

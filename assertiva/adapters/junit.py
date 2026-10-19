@@ -45,6 +45,7 @@ def load_junit(path: str | Path) -> RunEvidence:
         return run
     run.limitations += FORMAT_LIMITS
     suites: list[dict] = []
+    retried: list[str] = []
     system_out = 0
 
     def visit(element: ET.Element, prefix: str) -> None:
@@ -71,6 +72,14 @@ def load_junit(path: str | Path) -> RunEvidence:
                     system_out += sum(len(s.text or "") for s in child.findall(stream))
                 case = "::".join(x for x in (child.get("classname"), child.get("name")) if x)
                 invocation_id = f"{name}::{case}" if name else case
+                # Surefire's rerun elements: a pass after failed attempts, or a failure in every attempt
+                flaky = sum(1 for c in child if c.tag in ("flakyFailure", "flakyError"))
+                reruns = sum(1 for c in child if c.tag in ("rerunFailure", "rerunError"))
+                if flaky and outcome is Outcome.PASSED:
+                    retried.append(invocation_id)
+                    message = f"passed after {flaky + 1} attempts (earlier attempts failed)"
+                elif reruns and outcome in (Outcome.FAILED, Outcome.ERROR):
+                    message = f"failed in all {reruns + 1} attempts" + (f": {message}" if message else "")
                 # Only a `name[params]` suffix says two cases share a declaration; anything else stays one case
                 # whose declaration identity is unknown (the run says so).
                 match = _PARAMS.match(invocation_id)
@@ -78,13 +87,15 @@ def load_junit(path: str | Path) -> RunEvidence:
                     TestInvocation(
                         invocation_id=invocation_id, declaration_id=match.group("base") if match else invocation_id,
                         materialization_id=invocation_id, parameters_id=match.group("params")[1:-1] if match else None,
-                        outcome=outcome, duration_s=_float(child.get("time")), message=message,
+                        outcome=outcome, duration_s=_float(child.get("time")), message=message, attempts=(1 + flaky + reruns) if flaky or reruns else None,
                     )
                 )
             elif child.tag in ("system-out", "system-err"):
                 system_out += len(child.text or "")
 
     visit(root, "")
+    if retried:
+        run.limitations.append("retried tests passed only after earlier failed attempts: " + ", ".join(retried[:5]))
     run.metadata = {"source": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "suites": suites[:50],
                     "system_out_chars": system_out, "provenance": "EXTERNAL_UNVERIFIED", "declaration_identity": "UNKNOWN",
                     "reported_root_time_s": _float(root.get("time")) if root.tag == "testsuites" else None}

@@ -161,6 +161,12 @@ def parse_playwright_results(data: dict | str, root: str | Path) -> RunEvidence:
         elif errors and all(_MISSING_BROWSER.search(e) for e in errors):
             outcome, message = Outcome.NOT_RUN, f"not executed: the browser for project {project} is not installed"
             missing_browser.add(project)
+        elif status == "skipped" and expected != "skipped":
+            # Playwright folds into "skipped" a test that was expected to run and did not (the run stopped early, a
+            # serial predecessor failed) or whose only results were interrupted: not run, never skipped by its author
+            outcome = Outcome.NOT_RUN
+            message = ("interrupted" if all(r.get("status") == "interrupted" for r in results)
+                       else "selected but not executed: the run stopped before it or a serial predecessor failed")
         elif status == "skipped":
             outcome = Outcome.SKIPPED
             message = message or next((f"{a['type']}: {a.get('description') or ''}".strip(": ")
@@ -168,9 +174,15 @@ def parse_playwright_results(data: dict | str, root: str | Path) -> RunEvidence:
         elif status == "expected":
             outcome = Outcome.XFAILED if expected == "failed" else Outcome.PASSED
         elif status == "flaky":
-            outcome = Outcome.PASSED
+            # "flaky" is any mix of an expected and an unexpected result; it is a pass only when a test expected to
+            # pass passed in some attempt
             retried.append(invocation_id)
-            message = f"passed after {len(results)} attempts (earlier attempts failed)"
+            if expected == "passed":
+                outcome, message = Outcome.PASSED, f"passed after {len(results)} attempts (earlier attempts failed)"
+            elif expected == "failed":
+                outcome, message = Outcome.XFAILED, f"failed as expected in some of {len(results)} attempts and passed in others"
+            else:
+                outcome, message = Outcome.SKIPPED, f"skipped after a failed attempt ({len(results)} attempts)"
         elif expected == "failed" and final.get("status") == "passed":
             outcome = Outcome.XPASSED
         elif final.get("status") == "interrupted":

@@ -47,6 +47,8 @@ def _mutation_testing_elements(data: dict, run: MutationRun) -> MutationRun:
     if config is not None and "incremental" in config:
         run.incremental = config["incremental"] is True
     for path, result in (data.get("testFiles") or {}).items():  # test ids named in killedBy -> their file
+        if isinstance((result or {}).get("source"), str):
+            run.test_sources[path] = result["source"]
         for test in (result or {}).get("tests") or []:
             if isinstance(test, dict) and test.get("id") is not None:
                 run.test_locations[str(test["id"])] = path

@@ -120,8 +120,10 @@ def test_exception_ignored_in_cleanup_is_not_a_false_green(tmp_path):
     assert facts and "SWALLOWED_EXCEPTION" not in facts[0].smells
 
 
-def _run(*mutants, locations=None, complete=True):
-    run = MutationRun(source="m.json", mutants=list(mutants), test_locations=dict(locations or {}), killers_complete=complete)
+def _run(*mutants, locations=None, complete=True, tied=True):
+    # tied: the report's source and tests match the state it is attached to (what attach_mutation establishes)
+    run = MutationRun(source="m.json", mutants=list(mutants), test_locations=dict(locations or {}), killers_complete=complete,
+                      matches_state=True if tied else None)
     run.counts = {MutantStatus.KILLED.value: len(mutants)}
     return run
 

@@ -16,8 +16,14 @@ from assertiva.models import MutantStatus
 CALC = "def add(a, b):\n    return a + b\n"
 
 
-def mte(path, mutants, source=CALC, framework=None):
+# the calc project's tests (tests/conftest.py): a report that includes them is tied to that state, as StrykerJS writes
+CALC_TESTS = "from calc import add\n\ndef test_add_runs():\n    assert add(1, 2) is not None\n\ndef test_add_value():\n    assert add(2, 2) == 4\n"
+
+
+def mte(path, mutants, source=CALC, framework=None, tests=CALC_TESTS):
     report = {"schemaVersion": "2", "thresholds": {"high": 80, "low": 60}, "files": {"calc.py": {"language": "python", "source": source, "mutants": mutants}}}
+    if tests is not None:
+        report["testFiles"] = {"tests/test_calc.py": {"source": tests, "tests": []}}
     if framework:
         report["framework"] = framework
     path.write_text(json.dumps(report), encoding="utf-8")

@@ -58,9 +58,11 @@ class MutationRun:
     mutants: list[MutantRecord] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)  # MutantStatus value -> count
     sources: dict[str, str] = field(default_factory=dict)  # mutated file -> source text the tool saw
+    test_sources: dict[str, str] = field(default_factory=dict)  # test file -> source text of the tests the tool ran
     limitations: list[str] = field(default_factory=list)
     error: str | None = None
-    matches_state: bool | None = None  # None: the report cannot be tied to the measured state
+    # True only when the mutated sources and the tests the tool ran both match the state; None: cannot be tied
+    matches_state: bool | None = None
     test_locations: dict[str, str] = field(default_factory=dict)  # killing test id -> test file (or class path) when reported
     # Whether each mutant names every test that detects it. Mutation tools usually stop at the first failing test, so
     # a single named killer is not exclusive detection. True or False only when the report says so (the adapter knows

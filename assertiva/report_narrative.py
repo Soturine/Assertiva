@@ -133,6 +133,10 @@ NARRATIVE: list[tuple[str, str]] = [
      "otherwise): a mutant's named killers are a lower bound, not exclusive detection",
      "o relatório não mostra que todos os testes detectores foram registrados (as ferramentas param no primeiro teste que "
      "falha, salvo configuração em contrário): os detectores nomeados de um mutante são um limite inferior, não detecção exclusiva"),
+    ("the report does not include the tests it ran, so it cannot be tied to the tests of this state",
+     "o relatório não inclui os testes que executou, então não pode ser vinculado aos testes deste estado"),
+    ("the report does not include the source it mutated, so it cannot be tied to the code of this state",
+     "o relatório não inclui o código que mutou, então não pode ser vinculado ao código deste estado"),
     ("{n} mutant result(s) were carried over from an earlier run, not executed in this one",
      "{n} resultado(s) de mutante foram reaproveitados de uma execução anterior, não executados nesta"),
     ("the tool ran incrementally: results of unchanged mutants may be carried over without a marker",

@@ -292,9 +292,11 @@ def _retirement(changes: list[CandidateTestChange], baseline: StateEvidence | No
     retired = [c.path for c in changes if c.kind is CandidateChangeKind.RETIRE_CANDIDATE]
     if not retired:
         return [], [], []
-    runs = [r for r in (baseline.mutation if baseline else []) if not r.error and any(m.killed_by for m in r.mutants)]
+    named = [r for r in (baseline.mutation if baseline else []) if not r.error and any(m.killed_by for m in r.mutants)]
+    runs = [r for r in named if r.matches_state is True]
     if not runs:
-        return [], ["retirement not proven: no baseline mutation report names which tests detect each mutant"], []
+        return [], ["retirement not proven: no baseline mutation report names which tests detect each mutant"
+                    + ("; the reports that name them cannot be tied to the baseline" if named else "")], []
     exclusive, maybe_exclusive, unnamed = [], [], []
     for run in runs:
         for mutant in run.mutants:
@@ -350,6 +352,11 @@ def _mutation_stage(candidate: StateEvidence, changes: list[CandidateTestChange]
             continue
         if run.matches_state is False:
             unknown.append(f"mutation report {run.source} was produced for different source")
+            continue
+        if run.matches_state is not True:  # neither a pass nor a failure of this state: it may describe another one
+            undetected = run.count(MutantStatus.SURVIVED) + run.count(MutantStatus.NO_COVERAGE)
+            unknown.append(f"mutation report {run.source} cannot be tied to the {candidate.label} state"
+                           + (f" ({undetected} undetected mutants in it, a lead)" if undetected else ""))
             continue
         tool = run.tool or "mutation report"
         survivors = run.survivors()

@@ -136,21 +136,31 @@ def mutant_label(m: MutantRecord) -> str:
 
 
 def attach_mutation(state: StateEvidence, run: MutationRun, state_dir: str | Path) -> MutationRun:
-    """Attach a mutation report to a state, checking it against that state's sources when possible."""
-    if run.error is None and run.sources:
+    """Attach a mutation report to a state, tied to it only when the report shows both the source it mutated and the
+    tests it ran, and both match the state. A report that matches the code but carries no tests is not tied: improve
+    changes tests, so a report produced before the candidate's tests were written matches the candidate's code."""
+    if run.error is None and (run.sources or run.test_sources):
         def norm(text: str) -> str:
             return text.replace("\r\n", "\n")
 
         mismatched = [
-            path for path, source in run.sources.items()
+            path for path, source in {**run.sources, **run.test_sources}.items()
             if not (Path(state_dir) / path).is_file()
             or norm((Path(state_dir) / path).read_text(encoding="utf-8", errors="replace")) != norm(source)
         ]
-        run.matches_state = not mismatched
         if mismatched:
+            run.matches_state = False
             run.limitations.append(f"report source does not match the {state.label} state: " + ", ".join(sorted(mismatched)[:5]))
+        elif run.sources and run.test_sources:
+            run.matches_state = True
+        else:
+            run.limitations.append(UNTIED_TESTS if run.sources else UNTIED_CODE)
     state.mutation.append(run)
     return run
+
+
+UNTIED_TESTS = "the report does not include the tests it ran, so it cannot be tied to the tests of this state"
+UNTIED_CODE = "the report does not include the source it mutated, so it cannot be tied to the code of this state"
 
 
 @scoped

@@ -45,6 +45,8 @@ class MutantRecord:
     killed_by: tuple[str, ...] = ()
     duration_ms: float | None = None
     status_reason: str | None = None  # the tool's own reason, when it gives one ("Result based on previous run")
+    # identity across two runs of the same code: what was changed where, not the tool's per-run number
+    stable_id: str | None = None
 
 
 @dataclass
@@ -64,6 +66,7 @@ class MutationRun:
     # True only when the mutated sources and the tests the tool ran both match the state; None: cannot be tied
     matches_state: bool | None = None
     test_locations: dict[str, str] = field(default_factory=dict)  # killing test id -> test file (or class path) when reported
+    test_names: dict[str, str] = field(default_factory=dict)  # killing test id -> the test's name, when the report gives it
     # Whether each mutant names every test that detects it. Mutation tools usually stop at the first failing test, so
     # a single named killer is not exclusive detection. True or False only when the report says so (the adapter knows
     # how each format says it); None when it does not.

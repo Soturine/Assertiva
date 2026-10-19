@@ -43,27 +43,10 @@ def _version(python: str, cwd: Path) -> str | None:
 
 
 def unsafe_target(root: Path, target: str) -> str | None:
-    """Why the tool must not write ``target`` under ``root``, or None. The tool rewrites the file in place, so every
-    component from the root to the file must be a real directory or file (no symlink or junction: a link in a copy
-    can point back outside it, and a write through it changes the outside), and the resolved file must lie under the
-    resolved root. Checked on the project and again on the copy the tool runs in."""
-    from assertiva.workspace import is_link
+    """Why Cosmic Ray must not rewrite ``target`` (a Python file) under ``root``; see ``mutation.unsafe_target``."""
+    from assertiva.adapters.mutation import unsafe_target as check
 
-    rel = Path(target)
-    if rel.is_absolute() or ".." in rel.parts or not rel.parts or rel.suffix != ".py":
-        return "not a Python file path relative to the project"
-    current = root
-    for part in rel.parts:
-        current = current / part
-        if is_link(current):
-            return f"{current.relative_to(root).as_posix()} is a link: a write through it can reach outside the copy"
-    if not current.is_file():
-        return "not a file in the project"
-    try:
-        current.resolve().relative_to(root.resolve())
-    except ValueError:
-        return "resolves outside the project"
-    return None
+    return check(root, target, (".py",))
 
 
 def run(state_root: str | Path, python: str, targets: list[str], test_paths: list[str], timeout_s: float = 60.0,

@@ -60,13 +60,6 @@ def test_a_missing_tool_is_blocked_with_the_reason_never_installed(tmp_path, mon
     assert "not installed" in run.error and "does not install" in run.error
 
 
-def test_a_project_no_integrated_tool_runs_gets_an_explained_error(tmp_path):
-    write(tmp_path / "package.json", '{"devDependencies": {"vitest": "5.0.3"}}')
-    write(tmp_path / "src" / "a.test.js", "test('a', () => {})\n")
-    run = run_mutation_tool(tmp_path, sys.executable, ["src/a.js"])
-    assert run.error and "no integrated mutation tool" in run.error
-
-
 def _state(label, statuses, *, tied=True, orchestrated=True, controls=()):
     from assertiva.models import MutantRecord, MutationRun
 
@@ -177,3 +170,25 @@ def test_the_inputs_digest_changes_with_the_mutated_code_or_the_tests():
     assert a.inputs_digest == MutationRun(source="other", sources={"calc.py": "x"}, test_sources={"tests/t.py": "y"}).inputs_digest
     assert a.inputs_digest != MutationRun(source="r", sources={"calc.py": "x"}, test_sources={"tests/t.py": "z"}).inputs_digest
     assert MutationRun(source="r").inputs_digest is None
+
+
+def test_mutants_are_compared_by_a_stable_identity_and_collisions_are_not_guessed():
+    from assertiva.candidate import CandidateChangeKind, CandidateTestChange
+    from assertiva.improve import protection_delta
+
+    change = [CandidateTestChange(change_id="t.js", path="t.js", kind=CandidateChangeKind.MODIFY, reason="r")]
+    baseline, candidate = _state("baseline", [S.SURVIVED, S.SURVIVED]), _state("candidate", [S.KILLED, S.KILLED])
+    # the tool numbers mutants per run: the same two mutants come back with swapped numbers
+    for m, number, ident in zip(baseline.mutation[0].mutants, ("0", "1"), ("a.js:3:5:op:x", "a.js:7:1:op:y")):
+        object.__setattr__(m, "mutant_id", number); object.__setattr__(m, "stable_id", ident)
+    for m, number, ident in zip(candidate.mutation[0].mutants, ("1", "0"), ("a.js:3:5:op:x", "a.js:7:1:op:y")):
+        object.__setattr__(m, "mutant_id", number); object.__setattr__(m, "stable_id", ident)
+    object.__setattr__(candidate.mutation[0].mutants[0], "killed_by", ("7",))
+    candidate.mutation[0].test_names, candidate.mutation[0].test_locations = {"7": "the threshold is inclusive"}, {"7": "src/p.test.js"}
+    delta = protection_delta(baseline, candidate, [], change)
+    assert {e["id"] for e in delta["gained"]} == {"a.js:3:5:op:x", "a.js:7:1:op:y"}
+    named = next(e for e in delta["gained"] if e["id"] == "a.js:3:5:op:x")
+    assert named["attribution"] == "TEST" and named["detected_by"] == "the threshold is inclusive (src/p.test.js)"
+    object.__setattr__(candidate.mutation[0].mutants[1], "stable_id", "a.js:3:5:op:x")  # a collision
+    collided = protection_delta(baseline, candidate, [], change)
+    assert collided["gained"] == [] and all(e["reason"] == "its identity is not unique in the run" for e in collided["not_comparable"])

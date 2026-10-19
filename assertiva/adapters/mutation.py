@@ -56,6 +56,8 @@ def _mutation_testing_elements(data: dict, run: MutationRun) -> MutationRun:
         for test in (result or {}).get("tests") or []:
             if isinstance(test, dict) and test.get("id") is not None:
                 run.test_locations[str(test["id"])] = path
+                if test.get("name"):
+                    run.test_names[str(test["id"])] = str(test["name"])
     for path, result in data["files"].items():
         if isinstance(result.get("source"), str):
             run.sources[path] = result["source"]
@@ -68,6 +70,7 @@ def _mutation_testing_elements(data: dict, run: MutationRun) -> MutationRun:
                     line=start.get("line"), operator=item.get("mutatorName"), replacement=item.get("replacement"),
                     description=item.get("description"), killed_by=tuple(item.get("killedBy") or ()),
                     duration_ms=item.get("duration"), status_reason=item.get("statusReason"),
+                    stable_id=f"{path}:{start.get('line')}:{start.get('column')}:{item.get('mutatorName')}:{item.get('replacement')}",
                 )
             )
     run.reused = sum(1 for m in run.mutants if (m.status_reason or "").startswith("Result based on previous run"))
@@ -135,7 +138,8 @@ def cosmic_ray_dump(text: str) -> list[MutantRecord]:
                 status = {"killed": S.TIMEOUT if result.get("output") == "timeout" else S.KILLED,
                           "survived": S.SURVIVED, "incompetent": S.ERROR}.get(native, S.UNKNOWN)
             start = mutation.get("start_pos") or [None]
-            out.append(MutantRecord(mutant_id=f"{path}:{operator}:{occurrence}", status=status, native_status=native, path=path,
+            identity = f"{path}:{operator}:{occurrence}"
+            out.append(MutantRecord(mutant_id=identity, status=status, native_status=native, path=path, stable_id=identity,
                                     line=start[0], operator=operator, description=mutation.get("definition_name")))
     return out
 
@@ -196,3 +200,27 @@ def run_mutation_tool(state_root: str | Path, python: str, targets: list[str]) -
         return cosmic_ray.run(root, python, targets, test_paths=[])
     return MutationRun(source="mutation tool", error="no integrated mutation tool runs this project's tests yet "
                        "(0.8.0 runs Cosmic Ray for Python projects tested with pytest); import a report with --mutation-report")
+
+
+def unsafe_target(root: Path, target: str, suffixes: tuple[str, ...]) -> str | None:
+    """Why a mutation tool must not rewrite ``target`` under ``root``, or None. Tools rewrite files in place, so every
+    component from the root to the file must be a real directory or file (no symlink or junction: a link in a copy can
+    point back outside it, and a write through it changes the outside), and the resolved file must lie under the
+    resolved root. Adapters check it on the project and again on the copy the tool runs in."""
+    from assertiva.workspace import is_link
+
+    rel = Path(target)
+    if rel.is_absolute() or ".." in rel.parts or not rel.parts or rel.suffix not in suffixes:
+        return f"not a {'/'.join(suffixes)} file path relative to the project"
+    current = Path(root)
+    for part in rel.parts:
+        current = current / part
+        if is_link(current):
+            return f"{current.relative_to(root).as_posix()} is a link: a write through it can reach outside the copy"
+    if not current.is_file():
+        return "not a file in the project"
+    try:
+        current.resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return "resolves outside the project"
+    return None

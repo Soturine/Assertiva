@@ -143,16 +143,26 @@ def protection_delta(baseline: StateEvidence, candidate: StateEvidence, baseline
             out["not_compared"].append(f"{where}: the mutated code differs between the states, so its mutants are not the same")
             continue
         out["compared"].append(f"{after.tool} {after.tool_version or ''} on {', '.join(after.targets)}".replace("  ", " "))
-        old = {m.mutant_id: m for m in prior.mutants}
+        def key(m):
+            return m.stable_id or m.mutant_id
+
+        from collections import Counter
+
+        twice = {k for runs in (prior.mutants, after.mutants) for k, n in Counter(key(m) for m in runs).items() if n > 1}
+        old = {key(m): m for m in prior.mutants}
         for m in after.mutants:
-            entry = {"kind": "mutant", "id": m.mutant_id, "label": mutant_label(m), "tool": after.tool}
-            was = old[m.mutant_id].status if m.mutant_id in old else None
+            entry = {"kind": "mutant", "id": key(m), "label": mutant_label(m), "tool": after.tool}
+            if key(m) in twice:  # two mutants share an identity: which is which cannot be told, so neither is compared
+                out["not_comparable"].append({**entry, "reason": "its identity is not unique in the run"})
+                continue
+            was = old[key(m)].status if key(m) in old else None
             now = m.status
             if was not in _DETECTED + _UNDETECTED or now not in _DETECTED + _UNDETECTED:
                 out["not_comparable"].append({**entry, "reason": f"{(was.value if was else 'absent')} on the baseline, {now.value} on the candidate"})
             elif was in _UNDETECTED and now in _DETECTED:
                 if m.killed_by:  # a named killer detects it, even when the report may not name every detector
-                    out["gained"].append({**entry, "attribution": "TEST", "detected_by": ", ".join(m.killed_by)})
+                    names = [after.test_names.get(t, t) + (f" ({after.test_locations[t]})" if t in after.test_locations else "") for t in m.killed_by]
+                    out["gained"].append({**entry, "attribution": "TEST", "detected_by": ", ".join(names)})
                 else:
                     out["gained"].append({**entry, "attribution": "SUITE", "changed_files": changed})
             elif was in _DETECTED and now in _UNDETECTED:

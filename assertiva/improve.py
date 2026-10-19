@@ -360,6 +360,10 @@ def _mutation_stage(candidate: StateEvidence, changes: list[CandidateTestChange]
             failures.append(f"MUTATION_NO_COVERAGE ({tool}): {run.count(MutantStatus.NO_COVERAGE)} mutants not covered by any test")
         if run.count(MutantStatus.UNKNOWN):
             unknown.append(f"{tool}: {run.count(MutantStatus.UNKNOWN)} mutants with unknown/pending status")
+        if run.reused:
+            unknown.append(f"{tool}: {run.reused} mutant result(s) carried over from an earlier run, not executed in this one")
+        elif run.incremental:
+            unknown.append(f"{tool}: incremental run; results of unchanged mutants may be carried over without a marker")
         if not run.evaluated:
             unknown.append(f"{tool}: no evaluated mutants")
         elif not run.count(MutantStatus.SURVIVED) and not run.count(MutantStatus.NO_COVERAGE):

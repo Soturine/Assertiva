@@ -530,3 +530,15 @@ def test_contribution_says_when_exclusive_means_only_named():
     view = mutation_contribution([_run(_mutant("m1", "a"), complete=False)])
     assert view["killers_complete"] is False and "lower bound" in view["note"]
     assert mutation_contribution([_run(_mutant("m1", "a"))])["killers_complete"] is True
+
+
+def test_carried_over_mutation_results_never_pass_the_stage_alone():
+    candidate = StateEvidence(label="candidate", observed_in="copy")
+    run = _run(_mutant("m1", "tests/test_a.py::test_a"))
+    run.reused = 1
+    candidate.mutation = [run]
+    result = _mutation_stage(candidate)
+    assert result.status is StageStatus.UNKNOWN and "carried over" in result.summary
+    fresh = StateEvidence(label="candidate", observed_in="copy")
+    fresh.mutation = [_run(_mutant("m1", "tests/test_a.py::test_a"))]
+    assert _mutation_stage(fresh).status is StageStatus.PASS

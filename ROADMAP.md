@@ -2,7 +2,9 @@
 
 Milestones were simplified on 2026-10-05. The former M0, M0.1 and the completed part of M0.2 are merged into **M0**; the former M1–M7 lists are regrouped into M1–M3 below. Earlier milestone history remains in `CHANGELOG.md` and Git history.
 
-TDD rule for every item: reproduce the false-green or evidence gap first, then implement the smallest deterministic capability. Core contracts stay tool-neutral; concrete behavior lives in adapters.
+Development rule (since 0.7.3): evidence-driven, with validation proportional to risk. A bug or regression is reproduced before it is fixed when that is technically feasible; a new capability is delivered with tests of its contracts, in whatever order serves the work; a refactoring keeps existing behavior (characterization tests where none pins it) and tests the risks it introduces; research and exploration may start with spikes before contracts are formalized; Skill and agent behavior is judged by behavioral evals, adversarial cases, independent judging and confirmation sets; a trivial change gets no redundant tests and no costly checks without a demonstrable benefit. Targeted checks run first and widen with impact, uncertainty and criticality; a release still needs its complete applicable qualification. Existing tests, regression and security checks, compatibility, CI and release gates are kept; tests are never weakened to get green, snapshots or mocks never hide defects, and test count is never inflated. Core contracts stay tool-neutral; concrete behavior lives in adapters.
+
+Until 0.7.2 the rule was strict TDD for every item ("reproduce the false-green or evidence gap first, then implement the smallest deterministic capability"); the M0–M3 items above were built under it.
 
 ## M0 — Foundation and contracts ✅
 - [x] provider-neutral SKILL.md, quality model, diagnostics D0–D4, Test Evidence Graph semantics
@@ -55,11 +57,11 @@ Scale and hardening
 
 Cross-stack
 - [x] cross-stack core contract tests (fake runner/coverage/artifact adapters)
-- [x] first JavaScript/TypeScript test adapter (Jest; Vitest not yet)
+- [x] first JavaScript/TypeScript test adapter (Jest; Vitest not yet at M2 close — *added in M3, 0.7.0*)
 - [x] LCOV / Cobertura / JaCoCo coverage with numerators and denominators
 - [x] Playwright semantic browser evidence (declared / selected / executed projects)
-- [x] Java test evidence (JUnit Platform via Maven Surefire/Failsafe, JaCoCo; Gradle not yet)
-- .NET / Go / Rust, Vitest, Gradle: not required for M2 (Python, Jest, Playwright and Maven/Java proved the cross-stack core); not implemented
+- [x] Java test evidence (JUnit Platform via Maven Surefire/Failsafe, JaCoCo; Gradle not yet at M2 close — *added in M3, 0.7.2*)
+- .NET / Go / Rust, Vitest, Gradle: not required for M2 (Python, Jest, Playwright and Maven/Java proved the cross-stack core); not implemented in M2 — *Vitest and Gradle were added in M3; .NET, Go and Rust remain open*
 
 Impact and selection
 - [x] revision-scoped test impact graph with evidence tiers
@@ -106,7 +108,14 @@ Started with what the 0.6.0 dogfood exposed (evidence integrity, execution safet
 
 Milestones may reopen when new evidence exposes reusable gaps.
 
+## 0.7.3 — stabilization (in qualification)
+No new capability. Security re-audit fixes, evidence-integrity fixes found by the audit and by the competitive research (negative controls, mutation completeness and reuse, retirement, Playwright outcomes, imported Surefire reruns, parameter rows, counts), documentation brought up to date, a transfer evaluation, a confirmation benchmark (v1 spent as regression, v2 frozen) and research wave 1. Details: CHANGELOG.md, `docs/EXECUTION_SECURITY.md`, `benchmarks/README.md`, `research/2026-10-19-competitive/README.md`.
+
+## C1 — first competitive checkpoint (next)
+Integrity and evaluation work with no user-facing capability, from research wave 1 (backlog items 2–6): stable mutant fingerprints; a typed mutation run in the report schema; a baseline (no-Skill) arm, seeded bad responses and dormancy cases for the semantic evaluation; a second labeler for confirmation set v2; Python mock no-op assertions as tautologies. Each with its acceptance test; evals only with an agreed budget.
+
 ## After 0.7.2 — evidence-backed capability growth (planned)
+The 0.8.0 entries of research wave 1's backlog (`research/2026-10-19-competitive/README.md`, items 7–15) map onto M3b, M4, M5, M6 and M7 below.
 Each milestone is its own checkpoint with acceptance criteria, positive and negative tests, evals where agent judgment is involved, documentation and its own commit. 0.7.2 is the baseline. Nothing here is claimed until it is implemented and qualified; comparisons with other tools are reported as executed (same revision, environment, budget and scope) or as documentary, never mixed, and no superiority is claimed without matching evidence.
 - **M1 — Competitive capability audit:** research test-quality auditors and agent skills, test-smell detectors, mutation tools (Stryker, PIT, mutmut, Cosmic Ray, cargo-mutants and others), test generators, test-selection and flaky-test tooling, result analysis (ReportPortal, Allure), and integration/E2E tools (Playwright, Cypress, Pact, Testcontainers, axe-core). Output: a dated technical comparison that separates demonstrated capability from claims, with licenses, maintenance and fit, plus the shared contracts to extend (no parallel models).
 - **M2 — Advanced test intelligence:** deeper oracle analysis (self-referential oracles, unobserved side effects, mocks that hide defects), targeted pseudo-mutation as an explicit hypothesis distinct from executed mutation, distinct contribution beyond textual similarity.

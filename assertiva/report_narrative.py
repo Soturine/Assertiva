@@ -133,6 +133,12 @@ NARRATIVE: list[tuple[str, str]] = [
      "otherwise): a mutant's named killers are a lower bound, not exclusive detection",
      "o relatório não mostra que todos os testes detectores foram registrados (as ferramentas param no primeiro teste que "
      "falha, salvo configuração em contrário): os detectores nomeados de um mutante são um limite inferior, não detecção exclusiva"),
+    ("mutation evidence from {tool}: {n} mutants evaluated (executed by Assertiva on a copy of this state)",
+     "evidência de mutação de {tool}: {n} mutantes avaliados (executados pelo Assertiva numa cópia deste estado)"),
+    ("mutation evidence from {tool}: {n} mutants evaluated (ingested, tied to this state by its sources and tests)",
+     "evidência de mutação de {tool}: {n} mutantes avaliados (ingerida, vinculada a este estado por seus códigos e testes)"),
+    ("mutation report from {tool} that cannot be tied to this state: its {n} results are leads, not this state's evidence",
+     "relatório de mutação de {tool} que não pode ser vinculado a este estado: seus {n} resultados são pistas, não evidência deste estado"),
     ("mutation targets were given without --execute: no mutant was run",
      "alvos de mutação foram informados sem --execute: nenhum mutante foi executado"),
     ("{tool} stopped before finishing ({detail}); unfinished mutants are UNKNOWN",

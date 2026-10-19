@@ -25,7 +25,7 @@ REPORT_VERSION = "1"
 _SEVERITY = {
     "CI_TEST_EXECUTION_GAP": "high", "LOCAL_CHECK_NOT_OBSERVED_IN_CI": "high", "HIGH_COVERAGE_WEAK_ORACLE": "high",
     "SUITE_SMOKE_DOMINANT": "high", "MUTATION_SURVIVORS": "high", "MUTATION_REPORT_UNREADABLE": "medium",
-    "MUTATION_REPORT_SOURCE_MISMATCH": "medium",
+    "MUTATION_REPORT_SOURCE_MISMATCH": "medium", "MUTATION_REPORT_UNTIED": "info",
     "ARTIFACT_QUALIFICATION_FAILED": "high", "PROJECT_LINK_ESCAPES_ROOT": "high", "BROKEN_PROJECT_LINK": "medium",
     "NESTED_REPOSITORY": "info", "DECLARED_CHECK_FAILED": "high", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
@@ -50,6 +50,7 @@ _RECOMMENDATION = {
     "NATIVE_TESTS_FAILING": "Triage failing tests before trusting any other metric in this report.",
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
     "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
+    "MUTATION_REPORT_UNTIED": "Run the mutation tool through the engine (--execute --mutate FILE), or import a report that includes the source it mutated and the tests it ran.",
     "ARTIFACT_QUALIFICATION_FAILED": "Fix packaging (included packages, package data, metadata) so the installed artifact passes the same tests as the source tree.",
     "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "Assert the machine code/field the error contract carries, as the other tests for the same error do.",
     "STATE_AFTER_REJECTION_NOT_EVIDENCED": "After the expected rejection, assert that no partial write or forbidden side effect happened.",
@@ -110,6 +111,9 @@ def _mutation_summary(run) -> dict:
         "tool": run.tool, "tool_version": run.tool_version, "source": run.source, "error": run.error,
         "per_mutant": run.per_mutant, "matches_state": run.matches_state, "counts": dict(run.counts),
         "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:50]],
+        # where the evidence came from and how much it can decide
+        "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,
+        "reused": run.reused, "incremental": run.incremental,
         "limitations": list(run.limitations),
     }
 
@@ -251,10 +255,14 @@ def audit_model(
         for name, value in (run.metadata.get("matrix") or {}).items():
             if value != "EXECUTED":
                 not_evidenced.append(f"{run.adapter_id} {name}: {value.lower().replace('_', ' ')}, not executed")
-    usable_mutation = [run for run in current.mutation if run.error is None and run.matches_state is not False]
-    if usable_mutation:
-        observed.append("ingested mutation report(s): " + ", ".join(f"{r.tool or 'unknown tool'} ({r.evaluated} evaluated)" for r in usable_mutation))
-    else:
+    tied = [run for run in current.mutation if run.error is None and run.matches_state is True]
+    untied = [run for run in current.mutation if run.error is None and run.matches_state is None]
+    for run in tied:
+        how = "executed by Assertiva on a copy of this state" if run.orchestrated else "ingested, tied to this state by its sources and tests"
+        observed.append(f"mutation evidence from {run.tool or 'an unknown tool'}: {run.evaluated} mutants evaluated ({how})")
+    for run in untied:
+        not_evidenced.append(f"mutation report from {run.tool or 'an unknown tool'} that cannot be tied to this state: its {run.evaluated} results are leads, not this state's evidence")
+    if not tied:
         not_evidenced.append("mutation / negative-control strength")
     for a in current.artifacts:
         verified = ", ".join(f"{c.name} {c.status.value}" for c in a.checks)

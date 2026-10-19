@@ -557,10 +557,10 @@ def _scope(report: dict) -> list[dict]:
         if post:  # a heuristic signal: shown with its inspected area, never as a confirmed fact
             detail = _join([detail, pair_of("scope.negative.post", n=post)], (" · ", " · "))
         rows.append({"area": "negative", "level": "INSPECTED", "detail": detail, "href": "#negative-paths"})
-    usable = [m for m in state.get("mutation", []) if not m["error"] and m["matches_state"] is not False]
+    usable = [m for m in state.get("mutation", []) if not m["error"] and m["matches_state"] is True]  # tied to this state
     killed, survived = _metric(state, "negative_controls_killed"), _metric(state, "negative_controls_survived")
     if usable:
-        rows.append({"area": "fault", "level": "INGESTED",
+        rows.append({"area": "fault", "level": "EXECUTED" if all(m.get("orchestrated") for m in usable) else "INGESTED",
                      "detail": pair_of("scope.mutation", n=sum(m["evaluated"] or 0 for m in usable), m=_num(_metric(state, "mutation_survived") or 0)),
                      "href": "#mutation-evidence"})
     elif killed is not None or survived is not None:

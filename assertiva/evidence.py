@@ -318,7 +318,9 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         add("negative_controls_killed", sum(r.outcome is ControlOutcome.KILLED for r in valid), MetricDirection.HIGHER_IS_BETTER)
         add("negative_controls_survived", sum(r.outcome is ControlOutcome.SURVIVED for r in valid), MetricDirection.LOWER_IS_BETTER)
         add("negative_controls_invalid", len(state.negative_controls) - len(valid), MetricDirection.LOWER_IS_BETTER)
-    usable = [run for run in state.mutation if run.error is None and run.matches_state is not False]
+    # only runs tied to this state (the source they mutated and the tests they ran match it) measure it; an
+    # untied report stays visible in the report as a lead, never as this state's numbers
+    usable = [run for run in state.mutation if run.error is None and run.matches_state is True]
     if usable:
         tier = "E0"
         add("mutation_evaluated", sum(r.evaluated for r in usable), MetricDirection.CONTEXTUAL, tier=tier)

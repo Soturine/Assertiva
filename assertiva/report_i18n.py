@@ -1310,6 +1310,16 @@ FINDINGS: dict[str, dict] = {
         why=("Its results do not describe the audited code.", "Seus resultados não descrevem o código auditado."),
         close=("A mutation report generated for the audited revision is ingested.", "Um relatório de mutação gerado para a revisão auditada é ingerido."),
         rec=("Regenerate the mutation report for the audited revision.", "Gere novamente o relatório de mutação para a revisão auditada.")),
+    "MUTATION_REPORT_UNTIED": F(
+        category="mutation", tier="E2",
+        title=("Mutation report not tied to this state", "Relatório de mutação não vinculado a este estado"),
+        summary=("A mutation report cannot be tied to the audited code and tests; its results are leads, not this state's evidence.",
+                 "Um relatório de mutação não pode ser vinculado ao código e aos testes auditados; seus resultados são pistas, não evidência deste estado."),
+        why=("Without the source it mutated and the tests it ran, its kills and survivors may describe other code or other tests.",
+             "Sem o código que mutou e os testes que executou, suas mortes e sobrevivências podem descrever outro código ou outros testes."),
+        close=("Mutation evidence tied to the audited state is available.", "Há evidência de mutação vinculada ao estado auditado."),
+        rec=("Run the mutation tool through the engine (--execute --mutate FILE), or import a report that includes the source it mutated and the tests it ran.",
+             "Execute a ferramenta de mutação pelo engine (--execute --mutate ARQUIVO) ou importe um relatório que inclua o código que mutou e os testes que executou.")),
     "COVERAGE_REPORT_UNREADABLE": F(
         category="coverage", tier="E1",
         title=("Coverage report unreadable", "Relatório de cobertura ilegível"),

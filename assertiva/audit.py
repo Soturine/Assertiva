@@ -209,6 +209,11 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
             findings.append(Finding("MUTATION_REPORT_UNREADABLE", "A mutation report could not be read; it provides no evidence.", {"source": run.source, "error": run.error}))
         elif run.matches_state is False:
             findings.append(Finding("MUTATION_REPORT_SOURCE_MISMATCH", "A mutation report was produced for different source than the audited project.", {"source": run.source, "limitations": run.limitations}))
+        elif run.matches_state is not True:
+            findings.append(Finding("MUTATION_REPORT_UNTIED", "A mutation report cannot be tied to the audited code and tests; its results are leads, not this state's evidence.",
+                                    {"tool": run.tool, "source": run.source, "evaluated": run.evaluated,
+                                     "survived": run.count(MutantStatus.SURVIVED), "no_coverage": run.count(MutantStatus.NO_COVERAGE),
+                                     "survivors": [mutant_label(m) for m in run.survivors()[:20]], "limitations": run.limitations}))
         elif run.count(MutantStatus.SURVIVED) or run.count(MutantStatus.NO_COVERAGE):
             findings.append(
                 Finding(

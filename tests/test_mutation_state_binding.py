@@ -72,3 +72,19 @@ def test_an_untied_report_never_decides_a_retirement(tmp_path):
     change = CandidateTestChange(change_id="tests/test_old.py", path="tests/test_old.py", kind=CandidateChangeKind.RETIRE_CANDIDATE, reason="r")
     failures, unknown, passed = _retirement([change], baseline)
     assert not passed and any("cannot be tied" in u for u in unknown)  # 0.7.2: passed
+
+
+def test_an_untied_report_is_a_lead_in_the_audit_never_this_states_numbers(tmp_path):
+    from assertiva.audit import run_audit
+
+    write(tmp_path / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(tmp_path / "tests" / "test_calc.py", "from calc import add\n\ndef test_add():\n    assert add(1, 2) == 3\n")
+    pit = write(tmp_path.parent / "pit-mutations.xml",
+                "<mutations><mutation detected='false' status='SURVIVED'><sourceFile>Calc.java</sourceFile><mutatedClass>a.Calc</mutatedClass>"
+                "<mutatedMethod>add</mutatedMethod><lineNumber>2</lineNumber><mutator>M</mutator></mutation></mutations>")
+    report = run_audit(tmp_path, mutation_reports=[pit])
+    codes = {f["code"] for f in report["findings"]}
+    assert "MUTATION_REPORT_UNTIED" in codes and "MUTATION_SURVIVORS" not in codes  # 0.8.0: survivors claimed for this state
+    names = set(report["states"]["current"]["metrics"])
+    assert not {n for n in names if n.startswith("mutation_")}
+    assert any("cannot be tied to this state" in item for item in report["claim_boundary"]["not_evidenced"])

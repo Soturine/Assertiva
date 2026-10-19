@@ -6,6 +6,21 @@ In progress on `release/0.8.0`. Compatible with 0.7.2: report fields and metrics
 
 The first part below was prepared as a 0.7.3 stabilization release and folded into 0.8.0 without being published (commits `2d301b6`…`6d49565`, also on branch `release/0.7.3`); the functional work of 0.8.0 follows under its own headings.
 
+### Proof of protection
+- **Mutation testing executed by the engine (first integration):** `audit --execute --mutate FILE` and `improve --mutate FILE` run Cosmic Ray (Python projects tested with pytest) on a disposable copy of each measured state, with a configuration and test command Assertiva writes; the tool must already be installed in the project's environment (otherwise BLOCKED, never installed), the suite must pass before any mutant runs, a plan over 300 mutants is refused. The run is tied to its state by the sources and tests it saw. `cosmic-ray dump` files can also be imported (as leads). Other ecosystems keep report ingestion; the dispatcher explains when no integrated tool fits.
+- **improve proves the protection a candidate adds:** the same breaks executed on the baseline and on the candidate — negative controls and the same mutants of the same tool and targets — give `candidate_qualification.protection`: gained (missed by the baseline, detected by the candidate, with the detecting test when the evidence names one), lost (the reverse: fails the fault-sensitivity check with `PROTECTION_LOST`) and still undetected. Imported or untied reports are never compared. The improve page shows a "Protection the candidate adds" panel (EN, pt-BR).
+- **A reproducible end-to-end flow:** `tests/fixtures/protection-demo` and `docs/PROOF_OF_PROTECTION.md`: the audit finds a weak oracle and 20 of 24 mutants the suite misses; a strengthened test in the candidate workspace; qualification gains 21 breaks (20 mutants and a negative control detected by the new threshold test) and loses none, the project unchanged; a weakening candidate fails with what it lost. Run through the CLI by `tests/test_proof_of_protection.py` (CI installs cosmic-ray, pinned).
+
+### Evidence integrity
+- A mutation report is tied to a state only when the source it mutated and the tests it ran both match it (StrykerJS writes both). 0.7.2 compared only the production source, so a report produced before the candidate's tests were written matched the candidate and credited kills to tests that did not exist, and reports without sources (PIT, mutmut) passed the fault-sensitivity check and decided retirements. An untied report is now a lead that neither passes nor fails the check and never decides a retirement or a protection difference.
+
+### Test intelligence
+- Python mock checks that cannot fail are false-green candidates (`NO_OP_ASSERTION`): an uncalled `m.assert_called_once` and `called_*` misspellings the mock answers with a truthy attribute.
+- An expected value computed by the code under test just before the assertion (`expected = total(cart)`; `assert total(cart) == expected`) is a `SELF_REFERENTIAL_ORACLE` false-green candidate; the same call before and after an action stays a state check (found by running the rule on this repository's suite).
+
+### Agent-led guidance
+- SKILL.md: a blocked operation is reported, never retried through another shell, tool or agent; the opening sentence, dispositions and counts must agree, and what is protected is said next to what is not; a strengthened test is credited by the same break run on both states, not by passing or coverage. References: `--mutate` and the protection delta, when a mutation report is tied, static vs executed mutation claims, the witness of a survivor, characterization vs contract oracles. From research wave 1.
+
 ### Stabilization (formerly 0.7.3)
 
 #### Security (re-audit of execution, provisioning and services; see docs/EXECUTION_SECURITY.md)

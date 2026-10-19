@@ -257,7 +257,7 @@ def _parser() -> argparse.ArgumentParser:
                        help="with --execute: run the project's native mutation tool on FILE in a disposable copy (repeatable; "
                             "Cosmic Ray for Python tests under pytest, unittest or Django; StrykerJS for Jest or Vitest; "
                             "each installed in the project, never by Assertiva)")
-    audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker"],
+    audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                        help="with --mutate: the mutation tool to use when several apply to the project")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
     audit.add_argument("--provision", action="store_true",
@@ -281,7 +281,7 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--mutate", action="append", metavar="FILE",
                          help="run the project's native mutation tool on FILE for the baseline and the candidate, each in a "
                               "disposable copy, and report the protection the candidate gains or loses (repeatable)")
-    improve.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker"],
+    improve.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                          help="with --mutate: the mutation tool to use when several apply to the project")
     improve.add_argument("--coverage-report", action="append", metavar="STATE=PATH", help="coverage report for baseline or candidate")
     improve.add_argument("--run-check", action="append", metavar="CHECK_ID", help="authorize running a discovered delivery check in the candidate copy")

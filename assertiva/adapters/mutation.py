@@ -8,13 +8,14 @@ Supported (see research/2026-10-05-mutation-report-formats.md):
   cannot distinguish pending from killed (research/2026-10-19-competitive/mutation.md).
 
 ``run_mutation_tool`` runs one native tool on a copy of a state, chosen by capability (``mutation_tools``): Cosmic Ray
-for Python tests under the declared runner, StrykerJS for Jest/Vitest projects. The run is tied to that state by the
-sources and tests it saw.
+for Python tests under the declared runner, StrykerJS for Jest/Vitest projects, PIT for Maven builds that declare
+it. The run is tied to that state by the sources and tests it saw.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
@@ -98,13 +99,19 @@ def _pit(root: ET.Element, run: MutationRun) -> MutationRun:
             parts = owner.split(".")
             if killer and len(parts) > 1:
                 run.test_locations[killer] = "/".join(parts[:-1] if parts[-1][:1].islower() else parts)
+            method = re.search(r"\[(?:method|test-template):([^(\]]+)", killer)  # a JUnit Platform unique id
+            if method and len(parts) > 1:
+                run.test_names[killer] = f"{parts[-1]}.{method.group(1)}"
         line = text("lineNumber")
+        indexes = ",".join((i.text or "").strip() for i in node.iter("index"))
         run.mutants.append(
             MutantRecord(
                 mutant_id=f"{cls}:{text('mutatedMethod')}:{line}:{text('mutator')}:{index}", status=_PIT.get(native, S.UNKNOWN),
                 native_status=native, path=f"{package}{source_file}" if source_file else None,
                 line=int(line) if line and line.isdigit() else None, operator=text("mutator"),
                 description=text("description"), killed_by=tuple(t for t in (killers or "").split("|") if t),
+                # the same bytecode instruction mutated the same way, whatever position PIT lists it in
+                stable_id=f"{cls}:{text('mutatedMethod')}{text('methodDescription') or ''}:{line}:{text('mutator')}:{indexes}",
             )
         )
     if root.get("partial") == "true":
@@ -192,7 +199,7 @@ def load_mutation_report(path: str | Path) -> MutationRun:
 # Integrated tools, in the order they are listed. Each module gives ``KEY`` and ``TOOL``, ``describe(root, python,
 # origin)`` (does it apply, can it run here, with which runner, why) and ``execute(state_root, python, targets, origin,
 # option)``; adding a tool is adding its module here, nothing in the engine changes.
-MUTATION_ADAPTERS = ("cosmic_ray", "stryker")
+MUTATION_ADAPTERS = ("cosmic_ray", "stryker", "pit")
 
 
 def _adapters():

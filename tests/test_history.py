@@ -160,5 +160,37 @@ def test_audit_records_history_and_reports_a_consistent_failure(calc_project):
     assert history["enabled"] and history["states_recorded"] == 2
     [entry] = [e for e in history["invocations"] if e["invocation_id"].endswith("test_broken")]
     assert entry["stability"] == "CONSISTENT_FAILURE" and entry["fingerprint_occurrences"] == 2
+    assert entry["novelty"] == "RECURRING" and entry["origin"] == "UNKNOWN"  # an assertion: product or expectation
+    write(calc_project / "tests" / "test_raises.py", "from calc import add\n\ndef test_raises():\n    assert add(None, 1)\n")
+    report = run_audit(calc_project, execute=True, python=sys.executable)
+    [entry] = [e for e in report["history"]["invocations"] if e["invocation_id"].endswith("test_raises")]
+    assert entry["novelty"] == "NO_HISTORY" and entry["origin"] == "PRODUCT", entry
     assert "History" in render_html(report)
     assert json.dumps(report)  # serializable
+
+
+def test_a_failure_says_whether_it_is_new_recurring_or_changed_and_where_it_last_passed(store):
+    bug = "E       TypeError: bad operand\nshop/cart.py:2: TypeError"
+    store.record("audit", "current", "rev1", None, [run(Outcome.PASSED)])
+    first = store.record("audit", "current", "rev2", None, [run(Outcome.FAILED, bug)])
+    [entry] = summarize(store, first, "rev2", [run(Outcome.FAILED, bug)])["invocations"]
+    assert entry["novelty"] == "NEW_FAILURE" and entry["passed_before_at"] == "rev1"  # a regression since rev1
+    assert entry["origin"] == "PRODUCT" and entry["origin_basis"].startswith("INFERRED")
+    again = store.record("audit", "current", "rev3", None, [run(Outcome.FAILED, bug)])
+    [entry] = summarize(store, again, "rev3", [run(Outcome.FAILED, bug)])["invocations"]
+    assert entry["novelty"] == "RECURRING" and "passed_before_at" not in entry
+    other = "E   AssertionError: assert 3 == 4\ntests/test_a.py:7: AssertionError"
+    changed = store.record("audit", "current", "rev4", None, [run(Outcome.FAILED, other)])
+    [entry] = summarize(store, changed, "rev4", [run(Outcome.FAILED, other)])["invocations"]
+    assert entry["novelty"] == "CHANGED_FAILURE" and entry["origin"] == "UNKNOWN"
+    only = store.record("audit", "current", "rev9", None, [run(Outcome.FAILED, bug, test="tests/test_a.py::test_new")])
+    [entry] = summarize(store, only, "rev9", [run(Outcome.FAILED, bug, test="tests/test_a.py::test_new")])["invocations"]
+    assert entry["novelty"] == "NO_HISTORY"
+
+
+def test_failures_of_one_run_are_grouped_by_raise_site(store):
+    bug = "E       TypeError: bad operand {}\nshop/cart.py:2: TypeError"
+    runs = [run(Outcome.FAILED, bug.format(n), test=f"tests/test_a.py::test_{n}") for n in range(3)]
+    state = store.record("audit", "current", "rev1", None, runs)
+    [group] = summarize(store, state, "rev1", runs)["failure_clusters"]
+    assert group["count"] == 3 and group["raised_at"] == "shop/cart.py:2"

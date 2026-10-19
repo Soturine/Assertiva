@@ -2002,16 +2002,29 @@ def _history(r: _R) -> str:
     rows = "".join(
         f'<tr><th scope="row"><code>{_e(e["invocation_id"])}</code></th><td {r.label_attr("hist.stability")}>{r.pill(e["stability"])}</td>'
         f'<td {r.label_attr("finding.evidence")} class="raw-text" lang="en">{_e(e["note"])}</td>'
-        f'<td {r.label_attr("hist.signature")}><code>{_e(e["failure_signature"] or "")}</code></td></tr>'
+        f'<td {r.label_attr("hist.signature")}><code>{_e(e["failure_signature"] or "")}</code></td>'
+        f'<td {r.label_attr("hist.failure")}>{_failure_cell(r, e)}</td></tr>'
         for e in history["invocations"]
     )
     table = (f'<div class="table-wrap"><table class="responsive"><caption>{r.t("hist.caption")}</caption><thead><tr><th scope="col">{r.t("hist.invocation")}</th>'
              f'<th scope="col">{r.t("hist.stability")}</th><th scope="col">{r.t("finding.evidence")}</th><th scope="col">{r.t("hist.signature")}</th>'
-             f'</tr></thead><tbody>{rows}</tbody></table></div>') if rows else r.t("hist.none", tag="p", cls="empty")
+             f'<th scope="col">{r.t("hist.failure")}</th></tr></thead><tbody>{rows}</tbody></table></div>') if rows else r.t("hist.none", tag="p", cls="empty")
     timings = [f'{t["invocation_id"]}: p50 {t["p50"]}s' + (f', p95 {t["p95"]}s' if t["p95"] is not None else "") + f' ({t["samples"]})' for t in history["durations"]]
-    body = (f'{table}<div class="cols"><div><h4>{r.t("hist.durations")}</h4>{r.items(timings, "hist.durations.none", kind="code")}</div></div>'
+    groups = [f'{g["exception"]} @ {g["raised_at"]}: {g["count"]} — {", ".join(g["invocations"][:5])}'
+              for g in history.get("failure_clusters") or []]
+    body = (f'{table}<div class="cols"><div><h4>{r.t("hist.durations")}</h4>{r.items(timings, "hist.durations.none", kind="code")}</div>'
+            f'<div><h4>{r.t("hist.clusters")}</h4>{r.items(groups, "hist.clusters.none", kind="code")}</div></div>'
             + (r.items(history["limitations"]) if history["limitations"] else ""))
     return _panel(r, "history", "hist.title", r.t("hist.states", n=history["states_recorded"]), body)
+
+
+def _failure_cell(r: _R, entry: dict) -> str:
+    """Novelty from history and the inferred origin of a failing invocation; empty for non-failures."""
+    if not entry.get("novelty"):
+        return ""
+    since = f' · {r.t("hist.passed_before", rev=entry["passed_before_at"])}' if entry.get("passed_before_at") else ""
+    return (f'<code>{_e(entry["novelty"])}</code> · <code>{_e(entry.get("origin") or "UNKNOWN")}</code>{since}'
+            f'<p class="muted raw-text" lang="en">{_e(entry.get("origin_basis") or "")}</p>')
 
 
 def _artifact_summary(report: dict) -> Pair | None:

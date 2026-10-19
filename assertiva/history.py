@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path, PurePath
 
+from .failures import clusters as failure_clusters, origin as failure_origin
 from .models import Outcome, RunEvidence
 from .process import redact
 
@@ -297,6 +298,23 @@ def record_state(root, workflow: str, state: str, revision: str, vcs_revision: s
         store.close()
 
 
+def novelty(history: list[Observation], state_id: int, current_fingerprint: str | None) -> dict:
+    """Whether a failure of this state is new for its test: NEW_FAILURE (it only passed before), RECURRING (the same
+    failure fingerprint was recorded before), CHANGED_FAILURE (it failed before, differently) or NO_HISTORY; and the
+    last earlier revision where it passed, when it passed in the observation just before (a regression)."""
+    earlier = [o for o in history if o.state_id < state_id and o.outcome is not None]
+    if not earlier:
+        return {"novelty": "NO_HISTORY", "earlier_observations": 0}
+    failures = [o for o in earlier if o.outcome in _FAILING]
+    same = [o for o in failures if current_fingerprint and o.fingerprint == current_fingerprint]
+    kind = "RECURRING" if same else "CHANGED_FAILURE" if failures else "NEW_FAILURE"
+    out = {"novelty": kind, "earlier_observations": len(earlier), "earlier_failures": len(failures)}
+    last = earlier[-1]
+    if last.outcome in _PASSING:
+        out["passed_before_at"] = last.revision[:16]
+    return out
+
+
 def summarize(store: HistoryStore, state_id: int, revision: str, runs: list[RunEvidence], limit: int = 50) -> dict:
     """History evidence for the invocations of one recorded state (for reports)."""
     invocations = [inv for run in runs for inv in run.invocations]
@@ -311,14 +329,20 @@ def summarize(store: HistoryStore, state_id: int, revision: str, runs: list[RunE
             timings.append({"invocation_id": inv.invocation_id, **timing})
         if stability in (Stability.NO_INSTABILITY_OBSERVED, Stability.INSUFFICIENT_EVIDENCE) and not fp:
             continue
-        entries.append({
+        entry = {
             "invocation_id": inv.invocation_id, "stability": stability.value, "note": note, "observations": len(history),
             "fingerprint": fp[0] if fp else None, "failure_signature": fp[1] if fp else None,
             "fingerprint_occurrences": store.fingerprint_count(fp[0]) if fp else 0,
-        })
+        }
+        if fp:
+            cause, why = failure_origin(inv.message, inv.source_paths)
+            entry.update(novelty(history, state_id, fp[0]), origin=cause, origin_basis=f"INFERRED: {why}")
+        entries.append(entry)
     return {
         "enabled": True, "store": str(store.path), "states_recorded": store.state_count(), "previous_state": store.previous_state(state_id),
-        "invocations": entries[:limit], "durations": sorted(timings, key=lambda t: -(t["p95"] or t["p50"]))[:10],
+        "invocations": entries[:limit],
+        "failure_clusters": failure_clusters([(inv.invocation_id, inv.message) for inv in invocations
+                                              if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]), "durations": sorted(timings, key=lambda t: -(t["p95"] or t["p50"]))[:10],
         "limitations": ["history covers only runs recorded on this machine",
                         "a single failure is never called flaky; percentiles need enough samples"],
     }

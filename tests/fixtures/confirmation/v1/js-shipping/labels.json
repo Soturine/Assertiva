@@ -1,0 +1,17 @@
+{
+  "labeled_by": "the fixture's author, by reading each test, before any scoring run; labels say what a careful reviewer concludes, not what a tool reports",
+  "tests": {
+    "src/rates.test.js › rate for a heavy parcel": {"expect": [], "why": "exact value"},
+    "src/rates.test.js › rate swallows failures": {"expect": ["FALSE_GREEN"], "why": "the expectation is inside a try with an empty catch"},
+    "src/rates.test.js › quote only checked when present": {"expect": ["FALSE_GREEN"], "why": "the only expectation runs only when express is truthy"},
+    "src/rates.test.js › quote branches both checked": {"expect": [], "why": "look-alike: the else branch throws, so no path skips the check"},
+    "src/rates.test.js › label is defined": {"expect": ["WEAK_ORACLE"], "why": "toBeDefined for a computed label"},
+    "src/rates.test.js › label text": {"expect": [], "why": "exact value"},
+    "src/rates.test.js › rejects unknown zone with its code": {"expect": [], "why": "specific rejection, awaited"},
+    "src/rates.test.js › rejects unknown zone, any error": {"expect": ["WEAK_ORACLE"], "why": "any rejection passes"},
+    "src/rates.test.js › each@47": {"expect": ["DUPLICATE_CASES"], "why": "the literal row [{ kg: 1, zone: 'A' }, 5] appears twice"},
+    "src/rates.test.js › each@55": {"expect": ["WEAK_ORACLE"], "why": "rows are distinct (look-alike for duplicates), but the check is only 'greater than 0'"},
+    "src/rates.test.js › constant check": {"expect": ["FALSE_GREEN"], "why": "a constant compared with a constant"},
+    "src/rates.test.js › quote rejects silently": {"expect": ["FALSE_GREEN"], "why": "the rejection expectation is neither awaited nor returned"}
+  }
+}

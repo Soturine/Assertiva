@@ -489,7 +489,7 @@ def test_jvm_ui_and_doubles_map_to_the_same_boundaries(tmp_path):
 
 
 def test_same_body_over_different_parameter_tables_is_not_redundant(tmp_path):
-    # found by the confirmation benchmark (tests/fixtures/confirmation/kt-thermostat); reproduced here so that the
+    # found by the confirmation benchmark (tests/fixtures/confirmation/v1/kt-thermostat); reproduced here so that the
     # confirmation set is not used to calibrate the rule
     write(tmp_path / "tests" / "test_tables.py",
           "import pytest\n\n"

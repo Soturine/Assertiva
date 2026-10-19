@@ -1,0 +1,63 @@
+{
+  "labeled_by": "the fixture's author, by reading each test, before any scoring run; labels say what a careful reviewer concludes, not what a tool reports",
+  "frozen": "2026-10-19; see benchmarks/confirmation-v2.sha256",
+  "tests": {
+    "src/tickets.test.js › prices a seat": {
+      "expect": [],
+      "why": "exact value"
+    },
+    "src/tickets.test.js › rethrows unexpected errors": {
+      "expect": [],
+      "why": "look-alike: the catch rethrows, nothing is swallowed"
+    },
+    "src/tickets.test.js › reservation exists": {
+      "expect": [
+        "WEAK_ORACLE"
+      ],
+      "why": "toBeTruthy for a computed reservation"
+    },
+    "src/tickets.test.js › cancel notifies the gateway": {
+      "expect": [],
+      "why": "the interaction with its arguments is the contract"
+    },
+    "src/tickets.test.js › rejects a sold seat, any error": {
+      "expect": [
+        "WEAK_ORACLE"
+      ],
+      "why": "any thrown error passes"
+    },
+    "src/tickets.test.js › rejects a sold seat with its error": {
+      "expect": [],
+      "why": "specific error type"
+    },
+    "src/tickets.test.js › waits for the reservation worker": {
+      "expect": [
+        "SMELL"
+      ],
+      "why": "fixed wait stands in for waiting on the worker"
+    },
+    "src/tickets.test.js › debounces repeated holds": {
+      "expect": [],
+      "why": "look-alike: elapsed time is the behavior under test"
+    },
+    "src/tickets.test.js › skips itself in CI": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "returns before the only expectation whenever CI is set: green in CI without checking"
+    },
+    "src/tickets.test.js › arithmetic sanity": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "constant arithmetic compared with a constant"
+    },
+    "src/tickets.test.js › each@57": {
+      "expect": [
+        "DUPLICATE_CASES",
+        "WEAK_ORACLE"
+      ],
+      "why": "the literal row [1, [2]] appears twice, and the check is only 'greater than 0'"
+    }
+  }
+}

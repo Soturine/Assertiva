@@ -1,0 +1,70 @@
+{
+  "labeled_by": "the fixture's author, by reading each test, before any scoring run; labels say what a careful reviewer concludes, not what a tool reports",
+  "frozen": "2026-10-19; see benchmarks/confirmation-v2.sha256",
+  "tests": {
+    "tests/test_parking.py::FeeTest::test_fee_exact": {
+      "expect": [],
+      "why": "exact value"
+    },
+    "tests/test_parking.py::FeeTest::test_fee_hides_failures": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "the assertion's own failure is caught and ignored"
+    },
+    "tests/test_parking.py::FeeTest::test_fee_when_charged": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "the only assertion runs only when the fee is truthy"
+    },
+    "tests/test_parking.py::FeeTest::test_fee_both_paths_checked": {
+      "expect": [],
+      "why": "look-alike: the else branch fails"
+    },
+    "tests/test_parking.py::FeeTest::test_fee_is_truthy": {
+      "expect": [
+        "WEAK_ORACLE"
+      ],
+      "why": "assertTrue on a computed amount: any non-zero fee passes"
+    },
+    "tests/test_parking.py::FeeTest::test_negative_minutes_rejected_with_reason": {
+      "expect": [],
+      "why": "specific error and message"
+    },
+    "tests/test_parking.py::FeeTest::test_negative_rate_rejected_somehow": {
+      "expect": [
+        "WEAK_ORACLE"
+      ],
+      "why": "any Exception passes"
+    },
+    "tests/test_parking.py::FeeTest::test_exit_gate_after_payment": {
+      "expect": [
+        "SMELL"
+      ],
+      "why": "fixed sleep stands in for waiting on the gate"
+    },
+    "tests/test_parking.py::FeeTest::test_grace_period_expires": {
+      "expect": [],
+      "why": "look-alike: elapsed time is the behavior under test"
+    },
+    "tests/test_parking.py::FeeTest::test_rate_copy_1": {
+      "expect": [
+        "REDUNDANCY"
+      ],
+      "why": "same body as test_rate_copy_2"
+    },
+    "tests/test_parking.py::FeeTest::test_rate_copy_2": {
+      "expect": [
+        "REDUNDANCY"
+      ],
+      "why": "same body as test_rate_copy_1"
+    },
+    "tests/test_parking.py::FeeTest::test_grace_matches_itself": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "a value compared with itself"
+    }
+  }
+}

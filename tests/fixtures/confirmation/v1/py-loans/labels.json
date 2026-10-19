@@ -1,0 +1,21 @@
+{
+  "labeled_by": "the fixture's author, by reading each test, before any scoring run; labels say what a careful reviewer concludes, not what a tool reports",
+  "tests": {
+    "tests/test_loans.py::test_fine_for_late_return": {"expect": [], "why": "exact value"},
+    "tests/test_loans.py::test_fine_ignores_errors": {"expect": ["FALSE_GREEN"], "why": "the assertion is inside a try whose except passes"},
+    "tests/test_loans.py::test_renew_when_allowed": {"expect": ["FALSE_GREEN"], "why": "the only assertion runs only when renewals is truthy"},
+    "tests/test_loans.py::test_due_date_matches_itself": {"expect": ["FALSE_GREEN"], "why": "a value compared with itself"},
+    "tests/test_loans.py::test_renew_limit_raises_specific_error": {"expect": [], "why": "specific error type and message"},
+    "tests/test_loans.py::test_due_date_exists": {"expect": ["WEAK_ORACLE"], "why": "only 'is not None' for a computed date"},
+    "tests/test_loans.py::test_platform_specific_due_date": {"expect": [], "why": "look-alike: the condition skips; the assertion is unconditional after it"},
+    "tests/test_loans.py::test_each_fine_tier": {"expect": [], "why": "look-alike: assertion inside a loop over literal cases, always reached"},
+    "tests/test_loans.py::test_fine_rows": {"expect": ["DUPLICATE_CASES"], "why": "the literal row (1, 50) appears twice"},
+    "tests/test_loans.py::test_fine_grid": {"expect": [], "why": "look-alike: stacked tables multiply; values repeat across tables, not within one"},
+    "tests/test_loans.py::test_reminder_waits_for_worker": {"expect": ["SMELL"], "why": "fixed sleep stands in for waiting on the worker"},
+    "tests/test_loans.py::test_hold_expires_after_ttl": {"expect": [], "why": "look-alike: elapsed time is the behavior under test"},
+    "tests/test_loans.py::test_fine_copy_a": {"expect": ["REDUNDANCY"], "why": "same body as test_fine_copy_b"},
+    "tests/test_loans.py::test_fine_copy_b": {"expect": ["REDUNDANCY"], "why": "same body as test_fine_copy_a"},
+    "tests/test_loans.py::test_fine_other_input": {"expect": [], "why": "look-alike: same expected value, different input"},
+    "tests/test_loans.py::test_notify_runs_in_background": {"expect": ["FALSE_GREEN"], "why": "the task is never awaited and the only assertion is a constant"}
+  }
+}

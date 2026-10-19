@@ -1,0 +1,52 @@
+{
+  "labeled_by": "the fixture's author, by reading each test, before any scoring run; labels say what a careful reviewer concludes, not what a tool reports",
+  "frozen": "2026-10-19; see benchmarks/confirmation-v2.sha256",
+  "tests": {
+    "src/test/kotlin/demo/LibraryTest.kt::holdQueuePosition": {
+      "expect": [],
+      "why": "exact value"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::holdIgnoresFailures": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "runCatching swallows the assertion's failure"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::holdsNotEmpty": {
+      "expect": [
+        "WEAK_ORACLE"
+      ],
+      "why": "only non-emptiness of a computed list"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::rejectsClosedBranch": {
+      "expect": [],
+      "why": "specific exception type"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::rejectsSomehow": {
+      "expect": [
+        "WEAK_ORACLE"
+      ],
+      "why": "any Throwable passes"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::renewalCheckedEitherWay": {
+      "expect": [],
+      "why": "look-alike: the else branch fails"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::loanDays": {
+      "expect": [
+        "DUPLICATE_CASES"
+      ],
+      "why": "the text-block row '1, 7' appears twice"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::holdTimeoutReleasesSeat": {
+      "expect": [],
+      "why": "look-alike: elapsed time is the behavior under test"
+    },
+    "src/test/kotlin/demo/LibraryTest.kt::constantCheck": {
+      "expect": [
+        "FALSE_GREEN"
+      ],
+      "why": "a constant compared with a constant"
+    }
+  }
+}

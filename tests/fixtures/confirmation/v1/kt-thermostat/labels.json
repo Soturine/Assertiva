@@ -1,0 +1,16 @@
+{
+  "labeled_by": "the fixture's author, by reading each test, before any scoring run; labels say what a careful reviewer concludes, not what a tool reports",
+  "tests": {
+    "src/test/kotlin/demo/ThermostatTest.kt::heatsBelowTarget": {"expect": [], "why": "exact value"},
+    "src/test/kotlin/demo/ThermostatTest.kt::ignoresSensorFailure": {"expect": ["FALSE_GREEN"], "why": "the assertion is inside a try with an empty catch"},
+    "src/test/kotlin/demo/ThermostatTest.kt::coolsOnlySometimes": {"expect": ["FALSE_GREEN"], "why": "the only assertion runs only when cooling is supported"},
+    "src/test/kotlin/demo/ThermostatTest.kt::modeExists": {"expect": ["WEAK_ORACLE"], "why": "assertNotNull for a computed mode"},
+    "src/test/kotlin/demo/ThermostatTest.kt::rejectsAbsurdTarget": {"expect": [], "why": "specific exception type"},
+    "src/test/kotlin/demo/ThermostatTest.kt::rejectsAnything": {"expect": ["WEAK_ORACLE"], "why": "any Exception passes"},
+    "src/test/kotlin/demo/ThermostatTest.kt::modeTable": {"expect": ["DUPLICATE_CASES"], "why": "the row \"18.0, HEAT\" appears twice"},
+    "src/test/kotlin/demo/ThermostatTest.kt::modeExtremes": {"expect": [], "why": "look-alike: the repeated strings are nullValues settings, not rows"},
+    "src/test/kotlin/demo/ThermostatTest.kt::selfComparison": {"expect": ["FALSE_GREEN"], "why": "a value compared with itself"},
+    "src/test/kotlin/demo/ThermostatTest.kt::waitsForSensor": {"expect": ["SMELL"], "why": "fixed sleep stands in for waiting on the sensor"},
+    "src/test/kotlin/demo/ThermostatTest.kt::debounceWindowElapses": {"expect": [], "why": "look-alike: elapsed time is the behavior under test"}
+  }
+}

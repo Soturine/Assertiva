@@ -555,3 +555,21 @@ def test_an_assert_on_a_tuple_cannot_fail_and_a_parenthesised_compare_can(tmp_pa
     facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
     assert "TAUTOLOGY" in facts["test_tuple"].smells
     assert "TAUTOLOGY" not in facts["test_parenthesised"].smells and "TAUTOLOGY" not in facts["test_compares_a_tuple"].smells
+
+
+def test_mock_checks_that_cannot_fail_are_false_greens_and_real_ones_are_not(tmp_path):
+    # research wave 1: an uncalled mock assertion and a `called_*` misspelling check nothing
+    write(tmp_path / "tests" / "test_m.py",
+          "from unittest import mock\n\n"
+          "def test_uncalled():\n    m = mock.Mock()\n    run(m)\n    m.assert_called_once\n\n\n"
+          "def test_misspelled_statement():\n    m = mock.Mock()\n    run(m)\n    m.called_once_with(1)\n\n\n"
+          "def test_misspelled_assert():\n    m = mock.Mock()\n    run(m)\n    assert m.called_once_with(1)\n\n\n"
+          "def test_called_flag():\n    m = mock.Mock()\n    run(m)\n    assert m.called\n\n\n"
+          "def test_real_check():\n    m = mock.Mock()\n    run(m)\n    m.assert_called_once_with(1)\n")
+    facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
+    for name in ("test_uncalled", "test_misspelled_statement", "test_misspelled_assert"):
+        assert "NO_OP_ASSERTION" in facts[name].smells, name
+    for name in ("test_called_flag", "test_real_check"):
+        assert "NO_OP_ASSERTION" not in facts[name].smells, name
+    found = [c for c in candidates(list(facts.values())) if c.kind == "FALSE_GREEN" and c.detail["pattern"] == "NO_OP_ASSERTION"]
+    assert len(found) == 1 and len(found[0].tests) == 3

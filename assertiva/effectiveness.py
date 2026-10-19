@@ -24,6 +24,8 @@ FALSE_GREEN_SMELLS = {
     "UNAWAITED_ASYNC": "asynchronous work is started but never awaited, so its failure cannot fail the test",
     "ACTION_WITHOUT_CHECK": "a user action is performed and nothing checks what it did",
     "SNAPSHOT_ONLY": "the only oracle is a snapshot, which an update accepts without review",
+    "NO_OP_ASSERTION": "a mock check is referenced but never called, or misspelled so that the mock answers it with a new "
+                       "attribute: it checks nothing",
 }
 SMELL_NOTES = {
     "SLEEP": "a fixed sleep stands in for synchronization (slow, and flaky when the wait is too short)",

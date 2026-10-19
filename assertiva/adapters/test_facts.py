@@ -220,6 +220,8 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
     asserts, signature, doubles, smells = [], [], [], []
     boundaries, simulated, surfaces = set(), set(), set()
     for item in ast.walk(node):
+        if _mock_no_op(item):
+            smells.append("NO_OP_ASSERTION")
         if isinstance(item, ast.Assert):
             asserts.append(item)
             signature.append(ast.unparse(item.test))
@@ -344,6 +346,25 @@ def _literal_row(value, expr_name) -> bool:
     except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
         return False
     return True
+
+
+_MOCK_ASSERTS = frozenset({"assert_called", "assert_called_once", "assert_not_called", "assert_called_with",
+                           "assert_called_once_with", "assert_any_call", "assert_has_calls", "assert_awaited",
+                           "assert_awaited_once", "assert_awaited_with", "assert_awaited_once_with", "assert_any_await",
+                           "assert_has_awaits", "assert_not_awaited"})
+
+
+def _mock_no_op(item) -> bool:
+    """A mock check that cannot fail: an assertion method referenced but not called (`m.assert_called_once`), or a
+    misspelled one (`m.called_once_with(...)`) that a Mock answers with a new, always-truthy attribute. Python's own
+    guard only rejects misspellings that start like `assert`, so `called_*` passes silently."""
+    def misspelled(expr) -> bool:
+        target = expr.func if isinstance(expr, ast.Call) else expr
+        return isinstance(target, ast.Attribute) and target.attr.startswith("called_")
+    if isinstance(item, ast.Expr):
+        value = item.value
+        return (isinstance(value, ast.Attribute) and value.attr in _MOCK_ASSERTS) or misspelled(value)
+    return isinstance(item, ast.Assert) and misspelled(item.test)
 
 
 def _checks(statements) -> bool:

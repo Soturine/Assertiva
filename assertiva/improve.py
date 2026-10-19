@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .adapters import runner_adapters
 from .adapters.coverage_reports import load_coverage_report
-from .adapters.mutation import load_mutation_report
+from .adapters.mutation import load_mutation_report, run_mutation_tool
 from .candidate import (
     CandidateChangeKind,
     CandidateQualification,
@@ -95,6 +96,57 @@ class QualificationResult:
     timings: list[dict] = field(default_factory=list)
     budget: list[BudgetDecision] = field(default_factory=list)
     history: dict | None = None
+    protection: dict = field(default_factory=dict)
+
+
+_DETECTED = (MutantStatus.KILLED, MutantStatus.TIMEOUT)
+_UNDETECTED = (MutantStatus.SURVIVED, MutantStatus.NO_COVERAGE)
+
+
+def protection_delta(baseline: StateEvidence, candidate: StateEvidence, baseline_controls, changes) -> dict:
+    """What the candidate detects that the baseline did not, and what it no longer detects, from evidence executed on
+    both states: the same deliberate breaks (negative controls) and the same mutants of the same tool and targets,
+    each run by Assertiva on a copy of that state. Reports imported for one state only, or that cannot be tied to
+    both, prove nothing about a difference and are not compared."""
+    out = {"gained": [], "lost": [], "still_undetected": [], "compared": [], "not_compared": []}
+    changed = [c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE]
+    before = {r.control_id: r for r in baseline_controls}
+    for after in candidate.negative_controls:
+        prior = before.get(after.control_id)
+        if prior is None or ControlOutcome.INVALID in (prior.outcome, after.outcome):
+            continue
+        out["compared"].append(f"negative control {after.control_id}")
+        entry = {"kind": "negative_control", "id": after.control_id, "claim": after.claim}
+        if prior.outcome is ControlOutcome.SURVIVED and after.outcome is ControlOutcome.KILLED:
+            out["gained"].append({**entry, "detected_by": after.detail.removeprefix("detected by ")})
+        elif prior.outcome is ControlOutcome.KILLED and after.outcome is ControlOutcome.SURVIVED:
+            out["lost"].append(entry)
+        elif after.outcome is ControlOutcome.SURVIVED:
+            out["still_undetected"].append(entry)
+    pairs = {(r.tool, r.targets): r for r in baseline.mutation if r.orchestrated and r.matches_state is True and not r.error}
+    for after in candidate.mutation:
+        key = (after.tool, after.targets)
+        prior = pairs.get(key)
+        if not (after.orchestrated and after.matches_state is True and not after.error and prior):
+            if after.orchestrated or prior:
+                out["not_compared"].append(f"{after.tool} on {', '.join(after.targets) or after.source}: not executed and tied on both states")
+            continue
+        out["compared"].append(f"{after.tool} {after.tool_version or ''} on {', '.join(after.targets)}".replace("  ", " "))
+        old = {m.mutant_id: m for m in prior.mutants}
+        for m in after.mutants:
+            if m.mutant_id not in old:
+                continue
+            entry = {"kind": "mutant", "id": m.mutant_id, "label": mutant_label(m), "tool": after.tool}
+            was, now = old[m.mutant_id].status, m.status
+            if was in _UNDETECTED and now in _DETECTED:
+                # the tool names no killing test: the candidate's suite detects it, and these are the tests it changed
+                out["gained"].append({**entry, "detected_by": "the candidate's tests (per-test killers not recorded); changed: "
+                                      + ", ".join(changed)})
+            elif was in _DETECTED and now in _UNDETECTED:
+                out["lost"].append(entry)
+            elif now in _UNDETECTED:
+                out["still_undetected"].append(entry)
+    return out
 
 
 @dataclass
@@ -344,6 +396,14 @@ def _mutation_stage(candidate: StateEvidence, changes: list[CandidateTestChange]
         limitations += [r.detail for r in invalid]
     if controls and not survived and not invalid:
         passed.append(f"{len(controls)} negative controls killed")
+    if baseline is not None:
+        delta = protection_delta(baseline, candidate, baseline.negative_controls, changes)
+        if delta["lost"]:  # the baseline detected these and the candidate does not: protection removed
+            failures.append(f"PROTECTION_LOST: {len(delta['lost'])} break(s) the baseline detected are no longer detected: "
+                            + ", ".join(e.get("label", e["id"]) for e in delta["lost"][:5]))
+        if delta["gained"]:
+            passed.append(f"protection gained: {len(delta['gained'])} break(s) the baseline missed are detected by the candidate: "
+                          + ", ".join(e.get("label", e["id"]) for e in delta["gained"][:5]))
     blocked = [run for run in runs if run.error]
     for run in runs:
         limitations += [f"{run.source}: {item}" for item in run.limitations]
@@ -555,8 +615,10 @@ def qualify_candidate(
     authorized_checks: set[str] | None = None,
     stability_reruns: int = MAX_STABILITY_RERUNS,
     coverage_reports: dict[str, str | Path] | None = None,
+    mutation_targets: list[str] | None = None,
 ) -> QualificationResult:
-    """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state."""
+    """mutation_reports maps "baseline"/"candidate" to an existing mutation-tool report for that state;
+    mutation_targets names files the project's native mutation tool mutates on both states (executed here)."""
     controls = list(negative_controls or [])
     reports = dict(mutation_reports or {})
     unknown_states = set(reports) - {"baseline", "candidate"}
@@ -583,6 +645,11 @@ def qualify_candidate(
             attach_mutation(baseline, load_mutation_report(reports["baseline"]), session.baseline_copy)
         if "candidate" in reports:
             attach_mutation(candidate, load_mutation_report(reports["candidate"]), session.workspace)
+        if mutation_targets:
+            python = session.python or sys.executable
+            for state, tree, name in ((baseline, session.baseline_copy, "baseline"), (candidate, session.workspace, "candidate")):
+                run = timed(f"{name}-mutation", lambda tree=tree: run_mutation_tool(tree, python, list(mutation_targets)))
+                attach_mutation(state, run, tree)
         for state_name, report in (coverage_reports or {}).items():
             {"baseline": baseline, "candidate": candidate}[state_name].coverage.append(load_coverage_report(report))
         deltas = compare_states(baseline, candidate)
@@ -605,7 +672,8 @@ def qualify_candidate(
         reruns=reruns, qualification={s.stage.value: s.status.value for s in q.stages},
         coverage=_coverage_counts(candidate), artifacts=_artifact_identity(candidate),
     )
-    result = QualificationResult(q, baseline, candidate, baseline_controls, stability, timings, budget, history)
+    result = QualificationResult(q, baseline, candidate, baseline_controls, stability, timings, budget, history,
+                                 protection_delta(baseline, candidate, baseline_controls, changes))
     (session.directory / "qualification.json").write_text(json.dumps(to_jsonable(result), indent=2), encoding="utf-8")
     return result
 

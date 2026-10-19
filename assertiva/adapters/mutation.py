@@ -3,8 +3,12 @@
 Supported (see research/2026-10-05-mutation-report-formats.md):
 - mutation-testing-elements JSON (Stryker family and other producers of that schema): per mutant;
 - PIT ``mutations.xml``: per mutant;
-- mutmut ``mutmut-cicd-stats.json``: aggregate counts only.
-Cosmic Ray's ``cr-xml`` is deliberately unsupported: it cannot distinguish pending from killed.
+- mutmut ``mutmut-cicd-stats.json``: aggregate counts only;
+- Cosmic Ray ``cosmic-ray dump`` (JSON lines): per mutant, no killing tests. Its ``cr-xml`` stays unsupported: it
+  cannot distinguish pending from killed (research/2026-10-19-competitive/mutation.md).
+
+``run_mutation_tool`` runs a native tool on a copy of a state (``adapters/cosmic_ray.py`` for Python projects that
+use pytest); the run is tied to that state by the sources and tests it saw.
 """
 
 from __future__ import annotations
@@ -111,6 +115,39 @@ def _pit(root: ET.Element, run: MutationRun) -> MutationRun:
     return _counted(run)
 
 
+def cosmic_ray_dump(text: str) -> list[MutantRecord]:
+    """Mutants from ``cosmic-ray dump`` (one ``[work_item, result]`` JSON array per line; ``result`` is null while
+    pending). The identity is the file, operator and occurrence, so the same mutant has the same id in two runs."""
+    out = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        item, result = json.loads(line)
+        for mutation in item.get("mutations") or []:
+            path, operator, occurrence = str(mutation.get("module_path", "")).replace("\\", "/"), mutation.get("operator_name"), mutation.get("occurrence")
+            if result is None:
+                status, native = S.UNKNOWN, "pending"
+            elif result.get("worker_outcome") != "normal":
+                native = str(result.get("worker_outcome"))
+                status = {"no-test": S.NO_COVERAGE, "skipped": S.IGNORED}.get(native, S.ERROR)
+            else:
+                native = str(result.get("test_outcome"))
+                status = {"killed": S.TIMEOUT if result.get("output") == "timeout" else S.KILLED,
+                          "survived": S.SURVIVED, "incompetent": S.ERROR}.get(native, S.UNKNOWN)
+            start = mutation.get("start_pos") or [None]
+            out.append(MutantRecord(mutant_id=f"{path}:{operator}:{occurrence}", status=status, native_status=native, path=path,
+                                    line=start[0], operator=operator, description=mutation.get("definition_name")))
+    return out
+
+
+def _cosmic_ray(text: str, run: MutationRun) -> MutationRun:
+    run.tool = "Cosmic Ray"
+    run.mutants = cosmic_ray_dump(text)
+    run.limitations += ["Cosmic Ray runs the whole test command for each mutant and records no killing test: per-test contribution is unknown",
+                        _NO_REVISION]
+    return _counted(run)
+
+
 def _mutmut_stats(data: dict, run: MutationRun) -> MutationRun:
     run.tool, run.per_mutant = "mutmut", False
     run.limitations += ["aggregate counts only: no per-mutant identity, location or killing test", _NO_REVISION]
@@ -134,6 +171,9 @@ def load_mutation_report(path: str | Path) -> MutationRun:
             if root.tag != "mutations":
                 raise ValueError(f"unsupported XML report root <{root.tag}>")
             return _pit(root, run)
+        first = text.lstrip().split("\n", 1)[0]
+        if first.startswith("[") and '"job_id"' in first:  # `cosmic-ray dump`: one JSON array per line
+            return _cosmic_ray(text, run)
         data = json.loads(text)
         if isinstance(data, dict) and "schemaVersion" in data and isinstance(data.get("files"), dict):
             return _mutation_testing_elements(data, run)
@@ -142,3 +182,17 @@ def load_mutation_report(path: str | Path) -> MutationRun:
         raise ValueError("unsupported mutation report format")
     except (OSError, ValueError, KeyError, TypeError, AttributeError, ET.ParseError) as exc:
         return MutationRun(source=str(path), error=f"{type(exc).__name__}: {exc}"[:300])
+
+
+def run_mutation_tool(state_root: str | Path, python: str, targets: list[str]) -> MutationRun:
+    """Run the native mutation tool that fits the project on a copy of ``state_root``; a project no integrated tool
+    supports yet gets an explained error, never a result."""
+    from assertiva.adapters import cosmic_ray
+    from assertiva.adapters.python_discovery import python_runners, test_files
+
+    root = Path(state_root)
+    # a Python project with tests its runner selection would run with pytest (the default runner for Python tests)
+    if test_files(root) and "pytest" in python_runners(root):
+        return cosmic_ray.run(root, python, targets, test_paths=[])
+    return MutationRun(source="mutation tool", error="no integrated mutation tool runs this project's tests yet "
+                       "(0.8.0 runs Cosmic Ray for Python projects tested with pytest); import a report with --mutation-report")

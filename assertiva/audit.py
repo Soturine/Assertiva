@@ -7,6 +7,7 @@ tests is opt-in and always happens in a disposable copy of the project.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from .adapters import artifact_adapters, runner_adapters, static_providers
@@ -278,6 +279,7 @@ def run_audit(
     run_checks: list[str] | tuple = (),
     ci_runs: list[str | Path] | tuple = (),
     provision: bool = False,
+    mutation_targets: list[str] | tuple = (),
 ) -> dict:
     root = Path(root).resolve()
     started = _now()
@@ -354,6 +356,12 @@ def run_audit(
                                         {"source": summary.source, "error": summary.error}))
         for report in mutation_reports:
             attach_mutation(current, load_mutation_report(report), root)
+        if mutation_targets and execute:  # the native tool runs on a copy; the run is tied to this state by what it saw
+            from .adapters.mutation import run_mutation_tool
+
+            attach_mutation(current, run_mutation_tool(root, python or sys.executable, list(mutation_targets)), root)
+        elif mutation_targets:
+            limitations.append("mutation targets were given without --execute: no mutant was run")
         findings.extend(_mutation_findings(current))
         effectiveness = _effectiveness(root, current)
         findings.extend(_effectiveness_findings(effectiveness))

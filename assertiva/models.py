@@ -69,6 +69,8 @@ class MutationRun:
     # how each format says it); None when it does not.
     killers_complete: bool | None = None
     reused: int = 0  # mutants whose result the tool carried over from an earlier run instead of executing
+    orchestrated: bool = False  # Assertiva ran the tool itself on a copy of the measured state (not an imported report)
+    targets: tuple[str, ...] = ()  # the files an orchestrated run mutated
     incremental: bool | None = None  # the tool ran in a mode that may carry results over without marking them
 
     def count(self, status: MutantStatus) -> int:

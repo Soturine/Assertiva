@@ -90,7 +90,7 @@ def _audit(args: argparse.Namespace) -> int:
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
                        junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since,
                        ci_runs=args.ci_run or [], provision=args.provision,
-                       run_checks=args.run_check or [])
+                       run_checks=args.run_check or [], mutation_targets=args.mutate or [])
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -173,7 +173,7 @@ def _improve_in(args: argparse.Namespace, root: Path) -> int:
 
     result = qualify_candidate(
         session, _controls(args.negative_controls), _state_reports(args.mutation_report), set(args.run_check or ()),
-        coverage_reports=_state_reports(args.coverage_report),
+        coverage_reports=_state_reports(args.coverage_report), mutation_targets=args.mutate or None,
     )
     report = improve_report(session, result)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
@@ -251,6 +251,9 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--changed-since", metavar="REV", help="select tests impacted by changes since REV (widened when impact is not proven); "
                                                               "with --execute, only the selected set runs")
     audit.add_argument("--mutation-report", action="append", help="existing mutation-tool report to ingest (repeatable)")
+    audit.add_argument("--mutate", action="append", metavar="FILE",
+                       help="with --execute: run the project's native mutation tool on FILE in a disposable copy (repeatable; "
+                            "Cosmic Ray for Python projects tested with pytest, installed in the project's environment)")
     audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
     audit.add_argument("--provision", action="store_true",
                        help="with --execute: prepare what the tests need in isolation (interpreter environment, dependencies, JDK, "
@@ -270,6 +273,9 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--approved-by", help="name recorded with the approval (default: current user)")
     improve.add_argument("--negative-controls", help="JSON list of deliberate behavior-breaking edits to challenge the tests")
     improve.add_argument("--mutation-report", action="append", metavar="STATE=PATH", help="mutation-tool report for baseline or candidate")
+    improve.add_argument("--mutate", action="append", metavar="FILE",
+                         help="run the project's native mutation tool on FILE for the baseline and the candidate, each in a "
+                              "disposable copy, and report the protection the candidate gains or loses (repeatable)")
     improve.add_argument("--coverage-report", action="append", metavar="STATE=PATH", help="coverage report for baseline or candidate")
     improve.add_argument("--run-check", action="append", metavar="CHECK_ID", help="authorize running a discovered delivery check in the candidate copy")
     improve.add_argument("--discard", action="store_true", help="drop the candidate session without touching the project")

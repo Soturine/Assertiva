@@ -103,7 +103,7 @@ def test_pit_proves_the_protection_a_strengthened_junit_test_adds(tmp_path, caps
     audit = _run(capsys, "audit", str(root), "--execute", "--mutate", target)
     [run] = audit["states"]["current"]["mutation"]
     assert run["error"] is None, run["error"]
-    assert run["tool"] == "PIT" and run["matches_state"] is True and run["killers_complete"] is True
+    assert run["tool"] == "PIT" and run["tool_version"] == "1.30.0" and run["matches_state"] is True and run["killers_complete"] is True
     assert run["counts"].get("SURVIVED", 0) > 0 and run["config"]["selected"] == "pit" and run["config"]["offline"] is True
 
     workspace = Path(_run(capsys, "improve", str(root))["candidate_workspace"])

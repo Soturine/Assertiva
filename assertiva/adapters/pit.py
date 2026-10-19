@@ -36,18 +36,23 @@ def _local(tag: str) -> str:
     return _NS.sub("", tag)
 
 
-def _declares_plugin(pom: Path) -> bool:
+def _plugin(pom: Path) -> dict | None:
+    """The pom's declaration of the PIT Maven plugin (groupId, artifactId, version as written), or None."""
     try:
         root = ET.parse(pom).getroot()
     except (OSError, ET.ParseError):
-        return False
+        return None
     for plugin in root.iter():
         if _local(plugin.tag) != "plugin":
             continue
         fields = {_local(child.tag): (child.text or "").strip() for child in plugin}
         if fields.get("groupId") == "org.pitest" and fields.get("artifactId") == "pitest-maven":
-            return True
-    return False
+            return fields
+    return None
+
+
+def _declares_plugin(pom: Path) -> bool:
+    return _plugin(pom) is not None
 
 
 def build(root: Path) -> str | None:
@@ -177,8 +182,11 @@ def run(state_root: str | Path, targets: list[str], timeout_s: float = 3600.0) -
                             parsed.test_locations[killer] = f"{test_root}/{location}{suffix}"
             if not executed.ok:
                 result.limitations.append(f"{TOOL} exited with an error ({executed.summary()}); results it did not finish are UNKNOWN")
-            for field in ("mutants", "counts", "test_locations", "test_names", "killers_complete", "tool_version"):
+            for field in ("mutants", "counts", "test_locations", "test_names", "killers_complete"):
                 setattr(result, field, getattr(parsed, field))
+            declared = (_plugin(copy / "pom.xml") or {}).get("version") or ""
+            # the report carries no version; the pom's literal plugin version is the one Maven resolved offline
+            result.tool_version = declared if re.fullmatch(r"[\w.-]+", declared) else None
             result.limitations += [x for x in parsed.limitations if "does not record which revision" not in x]
             result.sources = {t: (copy / t).read_text(encoding="utf-8") for t in targets}
             result.test_sources = {p.relative_to(copy).as_posix(): p.read_text(encoding="utf-8", errors="replace")

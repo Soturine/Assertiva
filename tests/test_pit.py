@@ -87,6 +87,7 @@ def _run(capsys, *args) -> dict:
     return json.loads(capsys.readouterr().out)
 
 
+@pytest.mark.integration
 @pytest.mark.jvm
 def test_pit_proves_the_protection_a_strengthened_junit_test_adds(tmp_path, capsys):
     _maven_ready()

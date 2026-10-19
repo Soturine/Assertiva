@@ -1,7 +1,7 @@
 # Execution security: boundaries, fixes and residual risks
 
 What protects the user and the audited project when Assertiva runs project code, prepares environments or starts
-services; what the 0.7.3 re-audit fixed; and the risks this version does not eliminate. The claim boundary in
+services; what the 0.8.0 re-audit fixed; and the risks this version does not eliminate. The claim boundary in
 `STATUS.md` and the consent rules in `references/ENGINE.md` stay canonical; this page records the security review
 behind them. Re-audited on 2026-10-19 against `v0.7.2` (`8de5a24`): `assertiva/process.py`, `assertiva/environment.py`,
 `assertiva/workspace.py` (copies and links, read only), `assertiva/adapters/provisioning.py`, `assertiva/adapters/services.py`,
@@ -20,7 +20,7 @@ behind them. Re-audited on 2026-10-19 against `v0.7.2` (`8de5a24`): `assertiva/p
 | A disposable database is the run's own | pid file, SCRAM-SHA-256 login in which the server proves it holds the generated password, reported data directory and port | `tests/test_services.py` |
 | Timeouts end the whole process tree | own process group/session; `taskkill /T` on Windows, `killpg` on POSIX | `tests/test_execution_integrity.py` |
 
-## Fixed in 0.7.3
+## Fixed in 0.8.0 (stabilization part, prepared as 0.7.3)
 
 - **A project value ran as probe code.** The artifact adapter checked whether the build backend is importable with
   `python -c "import <backend>"`, the backend name read from the project's `pyproject.toml`. A value such as

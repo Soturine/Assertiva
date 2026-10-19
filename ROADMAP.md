@@ -108,16 +108,29 @@ Started with what the 0.6.0 dogfood exposed (evidence integrity, execution safet
 
 Milestones may reopen when new evidence exposes reusable gaps.
 
-## 0.7.3 — stabilization (in qualification)
-No new capability. Security re-audit fixes, evidence-integrity fixes found by the audit and by the competitive research (negative controls, mutation completeness and reuse, retirement, Playwright outcomes, imported Surefire reruns, parameter rows, counts), documentation brought up to date, a transfer evaluation, a confirmation benchmark (v1 spent as regression, v2 frozen) and research wave 1. Details: CHANGELOG.md, `docs/EXECUTION_SECURITY.md`, `benchmarks/README.md`, `research/2026-10-19-competitive/README.md`.
+## Versions (since 2026-10-19)
 
-## C1 — first competitive checkpoint (next)
-Integrity and evaluation work with no user-facing capability, from research wave 1 (backlog items 2–6): stable mutant fingerprints; a typed mutation run in the report schema; a baseline (no-Skill) arm, seeded bad responses and dormancy cases for the semantic evaluation; a second labeler for confirmation set v2; Python mock no-op assertions as tautologies. Each with its acceptance test; evals only with an agreed budget.
+The roadmap is organized by versions with perceptible functional progress. The 0.7.3 stabilization was not published on its own: its work (security re-audit, evidence-integrity fixes, documentation, transfer evaluation, benchmark sets, research wave 1) is the first part of 0.8.0, on branch `release/0.8.0` (the branch `release/0.7.3` keeps its history unchanged). The milestones M1–M10 below are kept for history and mapped onto versions.
 
-## After 0.7.2 — evidence-backed capability growth (planned)
-The 0.8.0 entries of research wave 1's backlog (`research/2026-10-19-competitive/README.md`, items 7–15) map onto M3b, M4, M5, M6 and M7 below.
+- **0.7.2 — last stable release.**
+- **0.8.0 — Intelligence & Proof of Protection** (in progress): the former 0.7.3 fixes; evidence integrity for mutation reports that cannot be tied to the analyzed state; deeper oracle and mock analysis; a first executable integration with a mature native mutation tool (orchestrated in disposable copies, not reimplemented); `improve` showing the protection a strengthened test adds (what survived on the baseline and is detected by the candidate, and by which test); one reproducible end-to-end flow — audit, a gap found, a test improved, the gain proven; agent-led practices from research wave 1. Covers M1 (done), parts of M2, M3b and M4.
+- **0.8.1 — Advanced Mutation & Improve:** more mutation tools; per-test contribution and exclusive protection proven with complete killer matrices; contract-driven creation and strengthening of tests; before/after qualification; deeper path, contract and redundancy analysis; fixes found while building them. Rest of M2, M3b, M4.
+- **0.9.0 — Continuous Assurance:** selection and risk (M5), failure intelligence and history (M6), contracts, E2E and accessibility results (M7), portable results in and out.
+- **1.0.0 — competitive maturity:** ecosystem coverage (M8), the competitive qualification lab with executed comparisons (M9), release qualification (M10), a stable CLI and report contract.
+
+## Gap policy (since 2026-10-19)
+
+A new finding is classified by criticality, impact, reproducibility and relation to the version in progress; it does not reopen completed scope or open a maintenance release by itself.
+- **Blocking:** a reproduced security problem, evidence-integrity defect or proven loss of protection blocks publishing the affected functionality until fixed.
+- **Important, not blocking:** goes to the backlog of the milestone it belongs to and is fixed there.
+- **Optional:** improvements without demonstrated benefit, refactors for their own sake and speculative gaps never block progress.
+- Never turn UNKNOWN into PASS, and never ignore a critical risk, to make a release.
+
+A version is ready when its committed functionality is implemented and integrated, its acceptance criteria pass, no known critical defect invalidates what it claims, regression and applicable security checks are qualified, reports keep the proven apart from the unknown, non-blocking limitations are documented, benchmarks and evals claim no more than their evidence, and commits are organized by stage. Absence of all gaps is not required. Targeted checks run during development and widen with impact; the full qualification (suites on Windows and Linux, benchmarks, evals with an agreed budget) runs at the release milestone, and publishing waits for the owner's authorization.
+
+## Milestones M1–M10 (2026-10-09 plan, kept for history; mapped to versions above)
 Each milestone is its own checkpoint with acceptance criteria, positive and negative tests, evals where agent judgment is involved, documentation and its own commit. 0.7.2 is the baseline. Nothing here is claimed until it is implemented and qualified; comparisons with other tools are reported as executed (same revision, environment, budget and scope) or as documentary, never mixed, and no superiority is claimed without matching evidence.
-- **M1 — Competitive capability audit:** research test-quality auditors and agent skills, test-smell detectors, mutation tools (Stryker, PIT, mutmut, Cosmic Ray, cargo-mutants and others), test generators, test-selection and flaky-test tooling, result analysis (ReportPortal, Allure), and integration/E2E tools (Playwright, Cypress, Pact, Testcontainers, axe-core). Output: a dated technical comparison that separates demonstrated capability from claims, with licenses, maintenance and fit, plus the shared contracts to extend (no parallel models).
+- **M1 — Competitive capability audit:** done as research wave 1 (`research/2026-10-19-competitive/`).
 - **M2 — Advanced test intelligence:** deeper oracle analysis (self-referential oracles, unobserved side effects, mocks that hide defects), targeted pseudo-mutation as an explicit hypothesis distinct from executed mutation, distinct contribution beyond textual similarity.
 - **M3b — Intelligent test improvement:** contract-driven creation and strengthening of tests in improve (partitions, limits, invariants, right level, project style), each change compiled, run and challenged by negative controls or mutants; no reward for test count; production code untouched without specific authorization.
 - **M4 — Mutation integration:** orchestration of native mutation tools per ecosystem with cost controls (targeted, incremental); executed vs detected vs survived vs no-coverage vs equivalent/inconclusive vs blocked, with tool, version, configuration, revision and killing tests.

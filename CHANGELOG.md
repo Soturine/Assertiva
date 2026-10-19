@@ -1,10 +1,14 @@
 # Changelog
 
-## [Unreleased] — 0.7.3 — Stabilization and evidence integrity
+## [Unreleased] — 0.8.0 — Intelligence & Proof of Protection
 
-A stabilization release: no new capability. Compatible with 0.7.2 (report fields and metrics are only added; existing ones keep their meaning).
+In progress on `release/0.8.0`. Compatible with 0.7.2: report fields and metrics are only added; existing ones keep their meaning.
 
-### Security (re-audit of execution, provisioning and services; see docs/EXECUTION_SECURITY.md)
+The first part below was prepared as a 0.7.3 stabilization release and folded into 0.8.0 without being published (commits `2d301b6`…`6d49565`, also on branch `release/0.7.3`); the functional work of 0.8.0 follows under its own headings.
+
+### Stabilization (formerly 0.7.3)
+
+#### Security (re-audit of execution, provisioning and services; see docs/EXECUTION_SECURITY.md)
 - A value from the audited project's `pyproject.toml` (`build-backend`) was interpolated into `python -c "import …"` and could run code outside the disposable copy during `audit --execute`. Module probes now take the name as an argument, refuse anything that is not a module name without running it, and never search their start directory.
 - Interpreter probes (version, installed distributions, `-m venv`) started in the user's working directory, where a project's `json.py` or `platform.py` would shadow the standard library; they now start in an empty directory.
 - The provisioning plan names the package sources the project's requirement files declare (`--index-url`, `--extra-index-url`, `--find-links`, `--trusted-host`; credentials redacted) instead of always "PyPI".
@@ -12,7 +16,7 @@ A stabilization release: no new capability. Compatible with 0.7.2 (report fields
 - Command output is digested in chunks and only its tail is read, so a test that prints gigabytes cannot exhaust memory; digests and tails are unchanged.
 - Residual risks that this version does not remove (no sandbox, shared tool caches, publisher checksums, processes leaving their group, disk use of output) are recorded.
 
-### Test effectiveness
+#### Test effectiveness
 - Parameter rows: stacked `parametrize` tables multiply and are no longer joined into one table (0.7.2 reported their values as repeated rows); `test.each` rows are the table's top-level elements (nested arrays were taken as rows); commented-out rows and `@CsvSource` settings (`nullValues`, …) are not rows; `@CsvSource` text blocks and strings with commas or parentheses are read.
 - Repetition is kept apart from redundancy: identical literal rows are a CONFIRMED fact (`detail.repetition: IDENTICAL_LITERAL_ROWS`); rows written alike but computed at run time are INFERRED (`IDENTICAL_ROW_EXPRESSIONS`); `detail.redundancy` is always INFERRED; same-body candidates carry `IDENTICAL_BODY`.
 - Counts say what they count: `false_green_candidates` (unchanged: one per test and pattern) is now labeled as signals, next to the new `false_green_tests` (distinct tests); `redundancy_candidates` (groups) next to `redundancy_tests`; the summary adds `affected_tests` per kind and `tests_in_redundancy_candidates`.
@@ -20,28 +24,28 @@ A stabilization release: no new capability. Compatible with 0.7.2 (report fields
 - Redundancy: tests with the same body over different parameter tables test different inputs and are no longer nominated (found by the confirmation benchmark, reproduced in the calibration tests).
 - `assert (check, "message")` (a non-empty tuple, always true) is a tautology; 0.7.2 counted it as a value oracle. `ASSERTION_ROULETTE` and `MYSTERY_GUEST`, listed as engine smells but never produced by any extractor, are removed from the engine (the agent's guidance still names them).
 
-### Fault-sensitivity evidence
+#### Fault-sensitivity evidence
 - Negative controls: the selected tests run on the same copy before the break; only a test that passed there and fails after it detects the control. A test that already failed (broken, flaky or blocked by its environment) made 0.7.2 report the control as KILLED. A control none of whose tests passed before is INVALID. Each control now runs its tests twice.
 - Mutation reports say whether every detecting test was recorded (`killers_complete`: Stryker-family `config.disableBail`, PIT `killingTests` vs `killingTest`; unknown when the report does not say) and how many results were carried over from an earlier run (`statusReason`), or whether the tool ran incrementally. Tools stop at the first failing test by default, so a named killer is a lower bound.
 - Retiring tests: removing the only *named* detector of a mutant fails only when the report records every detecting test; otherwise the retirement is not proven (unknown). Detected mutants that name no detecting test, and carried-over results, also leave a retirement unproven; 0.7.2 skipped them and could report that the retired tests detect nothing the others miss. `mutation_sensitivity` states when "exclusive" means "the only named detector". A mutation report with carried-over or incremental results leaves the FAULT_SENSITIVITY check UNKNOWN instead of passing it.
 
-### Runner evidence
+#### Runner evidence
 - Playwright: a test Playwright reports as `skipped` although it was expected to run (the run stopped early, a serial predecessor failed) or whose only results were interrupted is NOT_RUN, not skipped by its author; a `flaky` test is a pass only when it was expected to pass (an expected failure that passed once is XFAILED, a test skipped after a failed attempt is SKIPPED). Checked against Playwright's `computeTestCaseOutcome`.
 - JUnit XML imported with `--junit-xml` (and Gradle's reports) recognizes Surefire's `flakyFailure`/`flakyError` (a pass after failed attempts) and `rerunFailure`/`rerunError` (failed in every attempt), as the Maven adapter already did; attempts are set only when those elements say how many ran.
 
-### Evaluation and benchmarks
+#### Evaluation and benchmarks
 - Semantic Skill evaluation (`evals/results/2026-10-19-stabilization/`): the five 0.7.2 effectiveness cases re-run after the evidence-ladder change, plus a new transfer case in another ecosystem (`GREEN_CI_UNSELECTED_INTEGRATION`, TypeScript/Vitest/GitHub Actions): 6 PASS, n = 1, model aliases only; 569,141 tokens within the agreed ceiling.
 - `benchmarks/effectiveness.py` scores the effectiveness candidates against human labels on a confirmation set (`tests/fixtures/confirmation/`: Python, JavaScript, Kotlin; real defects and correct look-alikes), with precision, recall, cost and an unchanged-tree check. v1 found the redundancy defect above and is now spent for that rule; `benchmarks/README.md` records the protocol and the competitive benchmark design (prepared, not executed).
 
-### Qualification of `a5a9a46` (local; GitHub Actions unavailable for billing, so no CI run is evidence here)
+#### Qualification of `a5a9a46` (local; GitHub Actions unavailable for billing, so no CI run is evidence here)
 - Windows 11, Python 3.12.10, real tools (Django 6.1.2 with coverage, Node 24, Jest/Vitest fixtures, Playwright Chromium headless shell 1243, provisioned Temurin JDK, Gradle and portable PostgreSQL): full suite 875 passed; the one failure was the Django venv missing coverage.py (the CI installs both), and `tests/test_django.py` then passed (5). Not run on Windows: 2 POSIX-only tests and 3 Maven tests (no Maven; the CI runs Maven on Linux only).
 - Linux (Docker, Debian bookworm, from a fresh clone at the same commit): Python 3.12.15 — repository validation, fast/core 739, integration and artifact 132 (the 5 skipped there are the provisioning tests run next), wheel build and installed-CLI smoke, provisioning and PostgreSQL 43, Gradle 14, real Playwright 2; Python 3.11.17 — fast/core 739 and the installed wheel; Temurin 21 + Maven 3.9.16 — the 3 real Maven tests; runtime self-qualification — the installed wheel audited this repository with `--execute` (739 invocations PASS, wheel PASS, tree unchanged).
 - Not run anywhere: Android local tests with an SDK (`ASSERTIVA_RUN_ANDROID`), and GitHub Actions itself.
 
-### Research
+#### Research
 - `research/2026-10-19-competitive/`: six source-level cluster reports (mutation, smells and oracles, testing agents and skills, selection and flakiness, E2E/contracts/accessibility, reporting) with commit SHAs and citations, consolidated with the claims verified before acting on them, integrate/adapt/build/reject decisions and a backlog for C1 and 0.8.0. No external tool was executed.
 
-### Documentation and process
+#### Documentation and process
 - STATUS.md: current limitations that were no longer true (Gradle unsupported, no JavaScript oracle signals, CI on Linux only, static inventory ignoring `testpaths`) corrected; dated findings moved to "Historical findings (dated)" with what changed since.
 - ROADMAP.md: strict TDD for every item replaced by evidence-driven development with validation proportional to risk (the previous rule is kept for history); M2 lines annotated with what M3 added.
 - Tests: the real-Playwright fixture requires the Chromium revision its Playwright expects; an older browser in the cache made the precondition pass and the tests fail.

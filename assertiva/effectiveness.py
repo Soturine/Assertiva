@@ -60,6 +60,9 @@ class TestFacts:
     parameters: tuple[str, ...] = ()  # parameter rows as written, when visible
     parameter_expressions: tuple[str, ...] = ()  # the rows among them whose values are computed when the test runs
     component: str = ""  # the nearest directory with its own manifest: tests of different components test different subjects
+    # where the expected values visibly come from: PROPERTY, SCHEMA (a contract the test states) or SNAPSHOT,
+    # GOLDEN_FILE, APPROVAL (recorded output: characterization). A literal expected value shows neither.
+    basis_signals: tuple[str, ...] = ()
 
 
 @dataclass
@@ -230,6 +233,28 @@ def mutation_contribution(runs) -> dict:
     }
 
 
+CONTRACT_SIGNALS = frozenset({"PROPERTY", "SCHEMA"})
+CHARACTERIZATION_SIGNALS = frozenset({"SNAPSHOT", "GOLDEN_FILE", "APPROVAL"})
+
+
+def oracle_basis(facts: list[TestFacts]) -> dict:
+    """Which tests state a contract and which pin recorded output, as far as the code shows it. A literal expected value
+    (``assert total == 1500``) may come from a specification or from what the code returned when the test was written:
+    only its origin settles that, so such tests are UNDETERMINED, never counted as contracts."""
+    contract = [f.test_id for f in facts if CONTRACT_SIGNALS & set(f.basis_signals)]
+    pinned = [f.test_id for f in facts if CHARACTERIZATION_SIGNALS & set(f.basis_signals)]
+    both = set(contract) & set(pinned)
+    undetermined = [f.test_id for f in facts if f.oracles and not set(f.basis_signals) & (CONTRACT_SIGNALS | CHARACTERIZATION_SIGNALS)]
+    return {
+        "contract": len(contract), "characterization": len(pinned), "both": len(both), "undetermined": len(undetermined),
+        "signals": dict(Counter(s for f in facts for s in f.basis_signals)),
+        "characterization_tests": [t for t in pinned if t not in both][:MAX_LISTED],
+        "note": "characterization pins today's behavior, bugs included, and fails on any change; a contract states what must "
+                "hold. Literal expected values are undetermined: read where the value comes from (a requirement, a "
+                "calculation, or the code's own output)",
+    }
+
+
 def summarize(facts: list[TestFacts], limitations: dict[str, list[str]], mutation_runs=()) -> dict:
     """The effectiveness view of a project: per dimension, per language, the candidates; never a single score."""
     found = candidates(facts)
@@ -238,7 +263,8 @@ def summarize(facts: list[TestFacts], limitations: dict[str, list[str]], mutatio
     no_oracle = [f.test_id for f in facts if not f.oracles]
     dimensions = {
         "oracle_strength": {"oracles": dict(oracles), "without_explicit_oracle": len(no_oracle),
-                            "note": "no explicit oracle can still be a valid contract (must not raise, a guard double): read the test"},
+                            "note": "no explicit oracle can still be a valid contract (must not raise, a guard double): read the test",
+                            "oracle_basis": oracle_basis(facts)},
         "behavioral_surfaces": dict(Counter(s for f in facts for s in f.surfaces)),
         "negative_and_boundary_paths": {"error_expectations": sum(bool({"SPECIFIC_ERROR", "BROAD_ERROR"} & set(f.oracles)) for f in facts),
                                         "broad": sum("BROAD_ERROR" in f.oracles for f in facts)},

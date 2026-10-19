@@ -156,6 +156,20 @@ def _expected_from_same_call(text: str, clean: str, start: int, actual: tuple[in
     return name in sides and value in sides and len(re.findall(rf"\b{name}\s*=[^=]", clean)) == 1
 
 
+_BASIS = (
+    ("PROPERTY", re.compile(r"@(?:hypothesis\.)?given\b|\bfc\.(?:assert|property|asyncProperty)\s*\(|@Property\b|@ForAll\b|\bcheckAll\b|\bforAll\s*[({<]")),
+    ("SCHEMA", re.compile(r"\bjsonschema\.validate\s*\(|\bvalidate\(\s*instance\s*=|toMatchSchema\s*\(|toMatchJsonSchema\s*\(|matchesJsonSchema|JsonSchemaValidator")),
+    ("SNAPSHOT", re.compile(r"toMatch(?:Inline)?Snapshot\s*\(|toThrowErrorMatchingSnapshot|toHaveScreenshot\s*\(|expectSelfie\s*\(|assert_match_snapshot\s*\(")),
+    ("GOLDEN_FILE", re.compile(r"(?i)[\w./-]*(?:golden|approved|expected)[\w./-]*\.(?:json|txt|xml|html|csv|ya?ml|out)\b")),
+    ("APPROVAL", re.compile(r"\bApprovals\.verify\w*\s*\(|\bverify_(?:as_json|all|file|xml|html)\s*\(")),
+)
+
+
+def _basis_signals(text: str) -> tuple[str, ...]:
+    """Where a test's expected values visibly come from (see ``TestFacts.basis_signals``), read from its source."""
+    return tuple(name for name, pattern in _BASIS if pattern.search(text))
+
+
 def _js_assertion_smells(text: str, clean: str) -> list[str]:
     """Assertions that cannot fail in Jest/Vitest-style `expect`: no matcher (`expect(x)` alone), a matcher named but
     not called (`expect(spy).toHaveBeenCalled`), the same expression on both sides, and an expected value computed by
@@ -314,6 +328,10 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
     parents = {child: parent for parent in ast.walk(node) for child in ast.iter_child_nodes(parent)}
     asserts, signature, doubles, smells = [], [], [], []
     boundaries, simulated, surfaces = set(), set(), set()
+    basis = _basis_signals(ast.unparse(node))
+    # a snapshot fixture (syrupy, snapshottest) is a parameter; a local variable named snapshot is not one
+    if "snapshot" in {a.arg for a in node.args.args} and re.search(r"==\s*snapshot\b|\bsnapshot\.assert_match\s*\(", ast.unparse(node)):
+        basis = (*basis, "SNAPSHOT")
     if _self_referential(node):
         smells.append("SELF_REFERENTIAL_ORACLE")
     for item in ast.walk(node):
@@ -411,7 +429,7 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
     parameters, expressions = _python_rows(node, _expr_name)
     return TestFacts(test_id=test_id, path=rel, language="python", oracles=oracles, assertions=len(asserts), doubles=tuple(doubles),
                      boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)), surfaces=tuple(sorted(surfaces)),
-                     smells=tuple(dict.fromkeys(smells)), declared_level=_level(rel, markers),
+                     smells=tuple(dict.fromkeys(smells)), declared_level=_level(rel, markers), basis_signals=basis,
                      oracle_signature=" ; ".join(sorted(_norm(s) for s in signature)), parameters=tuple(parameters),
                      parameter_expressions=tuple(expressions), body_signature=_python_body(node))
 
@@ -663,13 +681,13 @@ def _js_test(test_id, rel, body, body_clean, file_doubles, level, msw, retries) 
     return TestFacts(test_id=test_id, path=rel, language="javascript", oracles=tuple(dict.fromkeys(oracles)), assertions=len(signature),
                      doubles=tuple(doubles), boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)),
                      surfaces=tuple(sorted(surfaces)), smells=tuple(dict.fromkeys(smells)), declared_level=level,
-                     oracle_signature=" ; ".join(sorted(signature)), body_signature=_norm(body))
+                     oracle_signature=" ; ".join(sorted(signature)), body_signature=_norm(body), basis_signals=_basis_signals(body))
 
 
 # --- Kotlin / Java -----------------------------------------------------------------------------
 
 _JVM_FILE = re.compile(r"/src/[A-Za-z]*[Tt]est[A-Za-z]*/.+\.(kt|java)$")
-_JVM_TEST = re.compile(r"@(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b(?:\([^)]*\))?[\s\S]*?\b(?:fun|void)\s+`?(?P<name>[^\s(`]+)`?\s*\(", re.M)
+_JVM_TEST = re.compile(r"@(?:Test|ParameterizedTest|RepeatedTest|TestFactory|Property)\b(?:\([^)]*\))?[\s\S]*?\b(?:fun|void)\s+`?(?P<name>[^\s(`]+)`?\s*\(", re.M)
 _KOTEST = re.compile(r"""(?:\b(?:test|should|it|scenario|then)\(\s*"(?P<a>[^"]+)"\s*\)|^\s*"(?P<b>[^"]+)"\s*)\s*\{""", re.M)
 _JVM_ASSERT = re.compile(r"\b(assert\w*|should\w*|verify|coVerify|fail|check|expectThat|expect|isEqualTo|containsExactly)\b\s*[({<]")
 _JVM_ORACLES = [
@@ -730,16 +748,16 @@ def _jvm_facts(root: Path) -> list[TestFacts]:
                 if span is None:
                     continue
                 body, body_clean = text[span[0]:span[1]], clean[span[0]:span[1]]
-            found.append((f"{rel}::{name}", body, body_clean, _csv_rows(text, clean, m.start(), m.end())))
+            found.append((f"{rel}::{name}", body, body_clean, _csv_rows(text, clean, m.start(), m.end()), text[m.start():m.end()]))
         if "io.kotest" in text:
             for m in _KOTEST.finditer(clean):
                 label = (m.group("a") or m.group("b") or "").strip()
                 span = _block(clean, m.end() - 1)
                 if span is None or not label:
                     continue
-                found.append((f"{rel}::{label}", text[span[0]:span[1]], clean[span[0]:span[1]], ()))
-        for test_id, body, body_clean, rows in found:
-            out.append(_jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instrumented, robolectric))
+                found.append((f"{rel}::{label}", text[span[0]:span[1]], clean[span[0]:span[1]], (), ""))
+        for test_id, body, body_clean, rows, header in found:
+            out.append(_jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instrumented, robolectric, header))
     return out
 
 
@@ -771,7 +789,7 @@ def _csv_rows(text: str, clean: str, start: int, end: int) -> tuple[str, ...]:
     return tuple(rows)
 
 
-def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instrumented, robolectric) -> TestFacts:
+def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instrumented, robolectric, header="") -> TestFacts:
     oracles, signature, smells = [], [], []
     for statement in re.findall(r"[^\n;]*(?:assert|should|verify|check\(|isEqualTo|containsExactly|fail\(|andExpect)[^\n;]*", body):
         for pattern, oracle in _JVM_ORACLES:
@@ -833,7 +851,8 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
     return TestFacts(test_id=test_id, path=rel, language="jvm", oracles=tuple(dict.fromkeys(oracles)), assertions=len(signature),
                      doubles=tuple(doubles), boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)),
                      surfaces=tuple(sorted(surfaces)), smells=tuple(dict.fromkeys(smells)), declared_level=level,
-                     oracle_signature=" ; ".join(sorted(signature)), parameters=rows, body_signature=_norm(body))
+                     oracle_signature=" ; ".join(sorted(signature)), parameters=rows, body_signature=_norm(body),
+                     basis_signals=_basis_signals(header + body))
 
 
 def collect(root: str | Path) -> tuple[list[TestFacts], dict[str, list[str]]]:

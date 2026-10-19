@@ -683,3 +683,37 @@ def test_jvm_assertions_that_cannot_fail_are_false_green_candidates(tmp_path):
     assert "SELF_REFERENTIAL_ORACLE" in smells["fromTheSameCall"]
     for name in ("sound", "hamcrest", "chainedNextLine", "different"):
         assert not smells[name] & {"NO_OP_ASSERTION", "TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"}, (name, smells[name])
+
+
+def test_oracle_basis_separates_stated_contracts_from_recorded_output_and_leaves_literals_undetermined(tmp_path):
+    from conftest import write
+
+    from assertiva.effectiveness import oracle_basis
+
+    write(tmp_path / "tests" / "test_rates.py", (
+        "from hypothesis import given, strategies as st\n"
+        "import jsonschema\n\n"
+        "@given(st.integers(min_value=0))\n"
+        "def test_discount_never_exceeds_total(total):\n    assert discount(total) <= total\n\n"
+        "def test_payload_matches_the_schema():\n    jsonschema.validate(payload(), SCHEMA)\n    assert payload()['id']\n\n"
+        "def test_report_matches_snapshot(snapshot):\n    assert render() == snapshot\n\n"
+        "def test_report_matches_golden():\n    assert render() == open('tests/data/report.golden.txt').read()\n\n"
+        "def test_member_discount():\n    assert discount(15000) == 1500\n\n"
+        "def test_state_is_restored():\n    snapshot = store.dump()\n    store.reset()\n    assert store.dump() == snapshot\n"))
+    write(tmp_path / "web" / "src" / "view.test.js", (
+        "test('renders', () => { expect(render()).toMatchSnapshot(); });\n"
+        "test('never negative', () => { fc.assert(fc.property(fc.nat(), (n) => discount(n) >= 0)); });\n"))
+    write(tmp_path / "jvm" / "src" / "test" / "kotlin" / "RateTest.kt", (
+        "class RateTest {\n"
+        "    @Property fun neverNegative(@ForAll n: Int) { assertThat(rate(n)).isGreaterThanOrEqualTo(0) }\n"
+        "    @Test fun approved() { Approvals.verify(report()) }\n}\n"))
+    facts, _ = collect(tmp_path)
+    by_name = {f.test_id.replace(" › ", "::").split("::")[-1]: set(f.basis_signals) for f in facts}
+    assert by_name["test_discount_never_exceeds_total"] == {"PROPERTY"} and by_name["test_payload_matches_the_schema"] == {"SCHEMA"}
+    assert by_name["test_report_matches_snapshot"] == {"SNAPSHOT"} and by_name["test_report_matches_golden"] == {"GOLDEN_FILE"}
+    assert by_name["renders"] == {"SNAPSHOT"} and by_name["never negative"] == {"PROPERTY"}
+    assert by_name["neverNegative"] == {"PROPERTY"} and by_name["approved"] == {"APPROVAL"}
+    assert by_name["test_member_discount"] == set() and by_name["test_state_is_restored"] == set()  # a variable named snapshot
+    view = oracle_basis(facts)
+    assert view["contract"] == 4 and view["characterization"] == 4 and view["undetermined"] >= 2
+    assert "undetermined" in view["note"]

@@ -289,8 +289,10 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
         "negative_paths_without_contract_detail": MetricDirection.LOWER_IS_BETTER,
         "negative_paths_with_state_after_rejection": MetricDirection.HIGHER_IS_BETTER,
         "false_green_candidates": MetricDirection.LOWER_IS_BETTER,
+        "false_green_tests": MetricDirection.LOWER_IS_BETTER,
         "fidelity_mismatches": MetricDirection.LOWER_IS_BETTER,
         "redundancy_candidates": MetricDirection.LOWER_IS_BETTER,
+        "redundancy_tests": MetricDirection.LOWER_IS_BETTER,
         # more distinct checks is better only when they check something new; contextual, never a goal by itself
         "distinct_oracle_signatures": MetricDirection.CONTEXTUAL,
     }

@@ -21,6 +21,7 @@ from assertiva.improve import _mutation_stage, _owned_by, _retirement
 from assertiva.models import MutantRecord, MutantStatus, MutationRun
 from assertiva.report_html import render_html
 
+from conftest import write
 from test_report import assert_schema_shape
 
 MATRIX = Path(__file__).parent / "fixtures" / "effectiveness-matrix"
@@ -199,7 +200,9 @@ def test_effectiveness_metrics_compare_states_without_a_score(matrix):
     _, summary = matrix
     values = metrics(summary)
     assert values["false_green_candidates"] == 9 and values["fidelity_mismatches"] == 3 and values["redundancy_candidates"] == 3
-    assert set(values) == {"false_green_candidates", "fidelity_mismatches", "redundancy_candidates", "distinct_oracle_signatures"}
+    assert values["false_green_tests"] == 9 and values["redundancy_tests"] == 6  # one pattern per matrix test; pairs of copies
+    assert set(values) == {"false_green_candidates", "false_green_tests", "fidelity_mismatches", "redundancy_candidates",
+                           "redundancy_tests", "distinct_oracle_signatures"}
 
 
 def test_audit_reports_effectiveness_with_findings_panel_and_schema():
@@ -398,3 +401,103 @@ def test_fixture_projects_inside_test_directories_are_inputs_not_tests(tmp_path)
     assert [_name(f.test_id) for f in facts] == ["own"]  # found by the self-audit: seeded defects were counted
     assert any("fixture projects" in limit for limit in limits["javascript"])
     assert collect(MATRIX)[0]  # a fixture audited as its own project is still read
+
+
+# --- parameter rows: structural repetition (a fact of the source) apart from inferred redundancy -----------------
+
+def _duplicates(root):
+    facts, limits = collect(root)
+    return [c for c in summarize(facts, limits)["candidates"] if c["kind"] == "DUPLICATE_CASES"]
+
+
+def test_stacked_parametrize_tables_multiply_and_are_not_repeated_rows(tmp_path):
+    write(tmp_path / "tests" / "test_grid.py",
+          "import pytest\n\n"
+          "@pytest.mark.parametrize('width', [1, 2])\n"
+          "@pytest.mark.parametrize('height', [1, 2])\n"
+          "def test_area(width, height):\n    assert width * height > 0\n")
+    assert _duplicates(tmp_path) == []  # 0.7.2 joined both tables and reported 1 and 2 as repeated rows
+
+
+def test_a_repeated_literal_row_is_confirmed_structure_and_inferred_redundancy(tmp_path):
+    write(tmp_path / "tests" / "test_rows.py",
+          "import pytest\n\n"
+          "@pytest.mark.parametrize('price, expected', [(1, 1), (4, 4), (1, 1)])\n"
+          "def test_rows(price, expected):\n    assert price == expected\n\n"
+          "@pytest.mark.parametrize('user', [make_user(), make_user()])\n"
+          "def test_users(user):\n    assert user.active\n")
+    found = {_name(c["tests"][0]): c for c in _duplicates(tmp_path)}
+    assert found["test_rows"]["basis"] == "CONFIRMED"
+    assert found["test_rows"]["detail"]["repetition"] == "IDENTICAL_LITERAL_ROWS" and found["test_rows"]["detail"]["redundancy"] == "INFERRED"
+    assert found["test_users"]["basis"] == "INFERRED"  # written alike, computed at run time: values may differ
+    assert found["test_users"]["detail"]["repetition"] == "IDENTICAL_ROW_EXPRESSIONS"
+
+
+def test_each_rows_are_top_level_elements_and_comments_are_not_rows(tmp_path):
+    write(tmp_path / "src" / "rows.test.js",
+          "test.each([[[1], 1], [[1], 2]])('distinct %j', (p, e) => {\n  expect(f(p)).toBe(e)\n})\n"
+          "test.each([\n  [2, 2],\n  // [2, 2],\n  [3, 3],\n])('commented %j', (p, e) => {\n  expect(f(p)).toBe(e)\n})\n"
+          "test.each([[{ a: [1] }, 1], [{ a: [1] }, 1]])('repeated %j', (p, e) => {\n  expect(f(p)).toBe(e)\n})\n"
+          "test.each([[make(), 1], [make(), 1]])('computed %j', (p, e) => {\n  expect(f(p)).toBe(e)\n})\n")
+    found = {c["tests"][0].rsplit("@", 1)[-1]: c for c in _duplicates(tmp_path)}
+    assert set(found) == {"11", "14"}  # the lines of the repeated and the computed tables only
+    assert found["11"]["basis"] == "CONFIRMED" and found["11"]["detail"]["rows"] == ["[{ a: [1] }, 1]"]
+    assert found["14"]["basis"] == "INFERRED"
+
+
+def test_csv_source_rows_are_its_values_not_comments_or_settings(tmp_path):
+    write(tmp_path / "src" / "test" / "kotlin" / "RowsTest.kt",
+          "import org.junit.jupiter.params.ParameterizedTest\nimport org.junit.jupiter.params.provider.CsvSource\n\n"
+          "class RowsTest {\n"
+          "    @ParameterizedTest\n"
+          "    @CsvSource(value = [\"f(1), 1\", \"f(2), 2\" /* , \"f(2), 2\" */], nullValues = [\"N/A\", \"N/A\"])\n"
+          "    fun distinct(call: String, expected: Int) {\n        assertEquals(expected, run(call))\n    }\n\n"
+          "    @ParameterizedTest\n"
+          "    @CsvSource(textBlock = \"\"\"\n        1, 1\n        # 1, 1\n        2, 2\n        1, 1\n    \"\"\")\n"
+          "    fun repeated(price: Int, expected: Int) {\n        assertEquals(expected, price)\n    }\n}\n")
+    facts, _ = collect(tmp_path)
+    rows = {_name(f.test_id): f.parameters for f in facts}
+    assert rows["distinct"] == ("f(1), 1", "f(2), 2")
+    assert rows["repeated"] == ("1, 1", "2, 2", "1, 1")
+    assert [(_name(c["tests"][0]), c["basis"]) for c in _duplicates(tmp_path)] == [("repeated", "CONFIRMED")]
+
+
+def test_metrics_count_signals_and_distinct_tests_apart():
+    both = _facts("a", smells=("SWALLOWED_EXCEPTION", "CONDITIONAL_ASSERTION"), body_signature="a")
+    one = _facts("b", smells=("TAUTOLOGY",), body_signature="b")
+    values = metrics(summarize([both, one], {}))
+    assert values["false_green_candidates"] == 3  # (test, pattern) pairs, as in 0.7.2
+    assert values["false_green_tests"] == 2  # the tests behind them, each once
+
+
+# --- characterization of the Kotlin/Java facts simplified in 0.7.3 (same output as 0.7.2) ------------------------
+
+def test_jvm_ui_and_doubles_map_to_the_same_boundaries(tmp_path):
+    write(tmp_path / "app" / "src" / "test" / "kotlin" / "ScreenTest.kt",
+          "class ScreenTest {\n"
+          "    @Test\n    fun showsTotal() {\n        composeTestRule.onNodeWithText(\"Total\").assertIsDisplayed()\n    }\n"
+          "    @Test\n    fun loads() {\n        val api = mockk<PriceApi>()\n        val repo = mockk<PriceRepository>()\n"
+          "        val c = mockk<Clock>()\n        val s = mockk<PriceService>()\n        assertEquals(3, load(api, repo, c, s))\n    }\n}\n")
+    write(tmp_path / "app" / "src" / "androidTest" / "kotlin" / "ScreenDeviceTest.kt",
+          "class ScreenDeviceTest {\n    @Test\n    fun showsTotalOnDevice() {\n"
+          "        composeTestRule.onNodeWithText(\"Total\").assertIsDisplayed()\n    }\n}\n")
+    facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
+    assert facts["showsTotal"].boundaries == ("DEVICE",) and facts["showsTotal"].simulated == ("DEVICE",)
+    assert facts["showsTotalOnDevice"].boundaries == ("DEVICE",) and facts["showsTotalOnDevice"].simulated == ()
+    assert facts["loads"].simulated == ("DATABASE", "HTTP") and facts["loads"].boundaries == ("DATABASE", "HTTP")
+    assert "EXCESSIVE_MOCKING" in facts["loads"].smells
+
+
+def test_same_body_over_different_parameter_tables_is_not_redundant(tmp_path):
+    # found by the confirmation benchmark (tests/fixtures/confirmation/kt-thermostat); reproduced here so that the
+    # confirmation set is not used to calibrate the rule
+    write(tmp_path / "tests" / "test_tables.py",
+          "import pytest\n\n"
+          "@pytest.mark.parametrize('n, expected', [(1, 2), (2, 4)])\n"
+          "def test_small(n, expected):\n    assert double(n) == expected\n\n"
+          "@pytest.mark.parametrize('n, expected', [(100, 200), (-1, -2)])\n"
+          "def test_edges(n, expected):\n    assert double(n) == expected\n\n"
+          "@pytest.mark.parametrize('n, expected', [(1, 2), (2, 4)])\n"
+          "def test_small_again(n, expected):\n    assert double(n) == expected\n")
+    found = [c for c in candidates(collect(tmp_path)[0]) if c.kind == "REDUNDANCY"]
+    assert [sorted(_name(t) for t in c.tests) for c in found] == [["test_small", "test_small_again"]]

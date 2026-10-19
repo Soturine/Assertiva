@@ -4,7 +4,9 @@ Adapters translate a language's tests into ``TestFacts`` (what is asserted and h
 doubles, which boundaries are crossed or simulated, what is observed, which smells appear, the declared level).
 The rules below read only facts, so `status == 400` in one framework and in another, or a broad expected error
 in any language, are judged alike. Results are candidates with their basis, never verdicts and never a score:
-INFERRED (a static pattern), CONFIRMED (an execution or mutation showed it), UNKNOWN (cannot be decided here).
+INFERRED (a static pattern), CONFIRMED (an execution or mutation showed it, or the fact is structural in the source:
+identical literal parameter rows are a repetition, while what that repetition costs stays inferred), UNKNOWN
+(cannot be decided here).
 Similarity only nominates candidates for review; nothing is ever removed because of it.
 """
 
@@ -53,7 +55,8 @@ class TestFacts:
     declared_level: str | None = None  # UNIT, INTEGRATION, FUNCTIONAL, CONTRACT, E2E (from paths, markers, annotations, tooling)
     oracle_signature: str = ""  # normalized asserted expressions (same text = same check)
     body_signature: str = ""  # normalized body (copies)
-    parameters: tuple[str, ...] = ()  # literal parameter rows, when visible
+    parameters: tuple[str, ...] = ()  # parameter rows as written, when visible
+    parameter_expressions: tuple[str, ...] = ()  # the rows among them whose values are computed when the test runs
     component: str = ""  # the nearest directory with its own manifest: tests of different components test different subjects
 
 
@@ -109,10 +112,11 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
         signatures: dict[tuple, list[TestFacts]] = defaultdict(list)
         for f in group:
             # the same body (setup, call, checks) with the same boundaries and fidelity: same assertions after a
-            # different setup test different inputs and are never nominated
+            # different setup test different inputs and are never nominated, and parameter rows are setup too
             if f.body_signature and f.oracles:
-                signatures[(f.component, f.body_signature, tuple(sorted(f.boundaries)), tuple(sorted(f.simulated)), f.declared_level)].append(f)
-        for (_, _, boundaries, simulated, level), same in signatures.items():
+                signatures[(f.component, f.body_signature, tuple(sorted(f.boundaries)), tuple(sorted(f.simulated)), f.declared_level,
+                            tuple(sorted(f.parameters)))].append(f)
+        for (_, _, boundaries, simulated, level, _), same in signatures.items():
             if len(same) > 1:
                 out.append(Candidate("REDUNDANCY", _ids(same),
                                      f"{len(same)} test(s) have the same body (setup, call and checks) with the same boundaries and fidelity",
@@ -120,15 +124,31 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
                                      "matrices can still make them distinct: check how they run)",
                                      "per-test mutation kills (killedBy) or a negative control: does each one detect something the others miss?",
                                      "review together; consolidate only after the candidate shows equal regression, coverage and mutation results",
-                                     language=language, detail={"boundaries": list(boundaries), "simulated": list(simulated), "level": level}))
+                                     language=language, detail={"boundaries": list(boundaries), "simulated": list(simulated), "level": level,
+                                                                "repetition": "IDENTICAL_BODY", "redundancy": "INFERRED"}))
         for f in group:
             rows = Counter(f.parameters)
-            duplicated = [row for row, n in rows.items() if n > 1]
-            if duplicated:
-                out.append(Candidate("DUPLICATE_CASES", [f.test_id], f"the parameter rows {duplicated[:5]} appear more than once",
-                                     "a repeated row runs the same partition again and adds no evidence",
+            computed = set(f.parameter_expressions)
+            literal = [row for row, n in rows.items() if n > 1 and row not in computed]
+            expressions = [row for row, n in rows.items() if n > 1 and row in computed]
+            if literal:
+                # the repetition is a fact of the source; that it adds nothing is the inference (state, order or time
+                # can make a second run of the same input meaningful)
+                out.append(Candidate("DUPLICATE_CASES", [f.test_id], f"the literal parameter rows {literal[:5]} appear more than once in the table",
+                                     "the same fixed input runs again; unless the test depends on shared state, order or time, "
+                                     "the repeated row adds no evidence",
                                      "the parameter table", "remove the repeated rows or replace them with a partition not yet covered",
-                                     basis="CONFIRMED", language=language))
+                                     basis="CONFIRMED", language=language,
+                                     detail={"repetition": "IDENTICAL_LITERAL_ROWS", "rows": literal[:MAX_LISTED],
+                                             "redundancy": "INFERRED", "computed_rows": expressions[:MAX_LISTED]}))
+            elif expressions:
+                out.append(Candidate("DUPLICATE_CASES", [f.test_id], f"the parameter rows {expressions[:5]} are written the same way more than once",
+                                     "rows written alike but computed when the test runs may still produce different values "
+                                     "(factories, counters, random or time-dependent data)",
+                                     "the values each row produces (the runner's parameter ids) and the code that builds them",
+                                     "if the rows produce the same values, remove the repeats or replace them with a partition not yet covered",
+                                     language=language,
+                                     detail={"repetition": "IDENTICAL_ROW_EXPRESSIONS", "rows": expressions[:MAX_LISTED], "redundancy": "INFERRED"}))
         smells = Counter(s for f in group for s in f.smells if s in SMELL_NOTES)
         for smell, count in sorted(smells.items()):
             hit = [f for f in group if smell in f.smells]
@@ -186,6 +206,7 @@ def summarize(facts: list[TestFacts], limitations: dict[str, list[str]], mutatio
         "double_fidelity": {"tests_with_doubles": sum(bool(f.doubles) for f in facts),
                             "most_replaced": Counter(d for f in facts for d in f.doubles).most_common(5)},
         "distinct_contribution": {"redundancy_candidates": sum(c.kind == "REDUNDANCY" for c in found),
+                                  "tests_in_redundancy_candidates": len({t for c in found if c.kind == "REDUNDANCY" for t in c.tests}),
                                   "distinct_oracle_signatures": len({f.oracle_signature for f in facts if f.oracle_signature})},
         "mutation_sensitivity": mutation_contribution(mutation_runs),
         "determinism": {s: sum(s in f.smells for f in facts) for s in ("SLEEP", "FIXED_WAIT", "RETRY", "UNAWAITED_ASYNC")},
@@ -196,17 +217,24 @@ def summarize(facts: list[TestFacts], limitations: dict[str, list[str]], mutatio
         "dimensions": dimensions,
         # each candidate lists up to MAX_LISTED tests and counts all of them, so a review can state its scope
         "candidates": [{**c.__dict__, "tests": c.tests[:MAX_LISTED], "count": len(c.tests)} for c in found],
+        # a test can carry several patterns and appear in several candidates: signals count (test, pattern) pairs,
+        # affected tests count each test once per kind (computed before the lists are shortened)
+        "affected_tests": {kind: len({t for c in found if c.kind == kind for t in c.tests}) for kind in sorted({c.kind for c in found})},
         "note": "candidates are leads with their basis; none is a verdict, and no score combines them",
     }
 
 
 def metrics(summary: dict) -> dict[str, int]:
     """Counts that can be compared between states (baseline vs candidate); fewer candidates is better only when
-    the same tests were analyzed, which the comparison states."""
+    the same tests were analyzed, which the comparison states. ``false_green_candidates`` counts signals (a test
+    with two patterns counts twice, as in 0.7.2); ``false_green_tests`` counts the distinct tests behind them."""
     kinds = Counter(c["kind"] for c in summary.get("candidates", []))
+    affected = summary.get("affected_tests", {})
     return {
         "false_green_candidates": sum(c.get("count", len(c["tests"])) for c in summary.get("candidates", []) if c["kind"] == "FALSE_GREEN"),
+        "false_green_tests": affected.get("FALSE_GREEN", 0),
         "fidelity_mismatches": sum(c.get("count", len(c["tests"])) for c in summary.get("candidates", []) if c["kind"] == "FIDELITY_MISMATCH"),
         "redundancy_candidates": kinds.get("REDUNDANCY", 0),
+        "redundancy_tests": affected.get("REDUNDANCY", 0),
         "distinct_oracle_signatures": summary.get("dimensions", {}).get("distinct_contribution", {}).get("distinct_oracle_signatures", 0),
     }

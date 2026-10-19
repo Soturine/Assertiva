@@ -884,9 +884,13 @@ METRICS: dict[str, tuple[str, str]] = {
     "mutation_no_coverage": ("Mutants without coverage", "Mutantes sem cobertura"),
     "artifact_qualified": ("Artifact qualified (1 = yes, 0 = no)", "Artefato qualificado (1 = sim, 0 = não)"),
     # candidates found by static patterns: counts of leads to review, never confirmed defects
-    "false_green_candidates": ("False-green candidates (static, unconfirmed)", "Candidatos a falso verde (estático, não confirmado)"),
-    "fidelity_mismatches": ("Fidelity-mismatch candidates (static, unconfirmed)", "Candidatos a fidelidade divergente (estático, não confirmado)"),
-    "redundancy_candidates": ("Redundancy candidates (static, unconfirmed)", "Candidatos a redundância (estático, não confirmado)"),
+    # signals count (test, pattern) pairs and groups; "tests" count each affected test once
+    "false_green_candidates": ("False-green signals, one per test and pattern (static, unconfirmed)",
+                               "Sinais de falso verde, um por teste e padrão (estático, não confirmado)"),
+    "false_green_tests": ("Tests with false-green signals (static, unconfirmed)", "Testes com sinais de falso verde (estático, não confirmado)"),
+    "fidelity_mismatches": ("Tests with fidelity-mismatch signals (static, unconfirmed)", "Testes com sinais de fidelidade divergente (estático, não confirmado)"),
+    "redundancy_candidates": ("Redundancy candidate groups (static, unconfirmed)", "Grupos candidatos a redundância (estático, não confirmado)"),
+    "redundancy_tests": ("Tests in redundancy candidate groups (static, unconfirmed)", "Testes em grupos candidatos a redundância (estático, não confirmado)"),
     "distinct_oracle_signatures": ("Distinct assertion signatures", "Assinaturas de asserção distintas"),
 }
 
@@ -900,7 +904,8 @@ METRIC_GROUPS: dict[str, str] = {
     **{k: "fault" for k in ("negative_controls_killed", "negative_controls_survived", "negative_controls_invalid", "mutation_evaluated",
                             "mutation_killed", "mutation_survived", "mutation_no_coverage")},
     "artifact_qualified": "artifact",
-    **{k: "static" for k in ("false_green_candidates", "fidelity_mismatches", "redundancy_candidates", "distinct_oracle_signatures")},
+    **{k: "static" for k in ("false_green_candidates", "false_green_tests", "fidelity_mismatches", "redundancy_candidates",
+                             "redundancy_tests", "distinct_oracle_signatures")},
 }
 
 # Finding catalog by stable code. `summary`/`rec` English texts equal the engine's fixed texts and act as guards:

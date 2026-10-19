@@ -69,8 +69,9 @@ def _norm(text: str) -> str:
 
 # --- shared lexical helpers --------------------------------------------------------------------
 
-def _strip_strings_and_comments(text: str) -> str:
-    """Same length, with string contents and comments blanked, so braces inside them are not counted."""
+def _strip_strings_and_comments(text: str, strings: bool = True) -> str:
+    """Same length, with string contents and comments blanked, so braces inside them are not counted (``strings=False``
+    blanks only the comments: what the code says, without the text a reader commented out)."""
     out, i, n = list(text), 0, len(text)
     while i < n:
         c = text[i]
@@ -88,11 +89,42 @@ def _strip_strings_and_comments(text: str) -> str:
             j = i + 1
             while j < n and text[j] != c:
                 j += 2 if text[j] == "\\" else 1
-            out[i + 1:j] = " " * max(0, j - i - 1)
+            if strings:
+                out[i + 1:j] = " " * max(0, j - i - 1)
             i = j + 1
         else:
             i += 1
     return "".join(out)
+
+
+def _top_level_items(clean: str, start: int, end: int) -> list[tuple[int, int]]:
+    """Spans of the comma-separated items between ``start`` and ``end`` at bracket depth 0 (strings and comments
+    already blanked in ``clean``), so a row that holds arrays or objects stays one row."""
+    spans, depth, begin = [], 0, start
+    for i in range(start, end):
+        ch = clean[i]
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            spans.append((begin, i))
+            begin = i + 1
+    spans.append((begin, end))
+    return [(a, b) for a, b in spans if clean[a:b].strip()]
+
+
+_JS_LITERAL_WORDS = re.compile(r"\b(true|false|null|undefined|NaN|Infinity)\b")
+
+
+def _js_row_is_literal(row_clean: str, row_text: str) -> bool:
+    """A row written only with literals (numbers, strings, arrays, objects of literals): its values are fixed by the
+    source. Anything that calls, names a variable or interpolates is computed when the test runs."""
+    if "${" in row_text:
+        return False
+    keys_removed = re.sub(r"[A-Za-z_$][\w$]*\s*:", ":", row_clean)  # object keys are not values
+    numbers_removed = re.sub(r"\b0[xXoObB][0-9a-fA-F_]+n?\b|\.?\b\d[\d_]*(\.\d*)?([eE][+-]?\d+)?n?\b", " ", keys_removed)
+    return not re.search(r"[A-Za-z_$(]", _JS_LITERAL_WORDS.sub(" ", numbers_removed))
 
 
 def _block(clean: str, start: int) -> tuple[int, int] | None:
@@ -268,24 +300,48 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
     _, _, unobserved = negative_path_evidence(node)
     if unobserved:
         smells.append("UNAWAITED_ASYNC")
-    if len([d for d in doubles if "patch" in d or d]) >= 4:
+    if len([d for d in doubles if d]) >= 4:
         smells.append("EXCESSIVE_MOCKING")
     if oracles == ("SNAPSHOT",):
         smells.append("SNAPSHOT_ONLY")
     if not oracles and "BROWSER" in boundaries and re.search(r"\.click\(", ast.unparse(node)):
         smells.append("ACTION_WITHOUT_CHECK")
     markers = " ".join(ast.unparse(d) for d in getattr(node, "decorator_list", []))
-    parameters = []
-    for deco in getattr(node, "decorator_list", []):
-        if isinstance(deco, ast.Call) and (_expr_name(deco.func) or "").endswith("parametrize") and len(deco.args) >= 2:
-            values = deco.args[1]
-            if isinstance(values, (ast.List, ast.Tuple)):
-                parameters += [ast.unparse(v) for v in values.elts]
+    parameters, expressions = _python_rows(node, _expr_name)
     return TestFacts(test_id=test_id, path=rel, language="python", oracles=oracles, assertions=len(asserts), doubles=tuple(doubles),
                      boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)), surfaces=tuple(sorted(surfaces)),
                      smells=tuple(dict.fromkeys(smells)), declared_level=_level(rel, markers),
                      oracle_signature=" ; ".join(sorted(_norm(s) for s in signature)), parameters=tuple(parameters),
-                     body_signature=_python_body(node))
+                     parameter_expressions=tuple(expressions), body_signature=_python_body(node))
+
+
+def _python_rows(node, expr_name) -> tuple[list[str], list[str]]:
+    """Literal rows of each ``parametrize`` table, and those of them computed when the test runs. Stacked tables
+    multiply into a product (each row of one meets every row of the other), so with more than one table a row is
+    identified by its argument names: the same value under different names is not a repetition."""
+    tables = [deco for deco in getattr(node, "decorator_list", [])
+              if isinstance(deco, ast.Call) and (expr_name(deco.func) or "").endswith("parametrize") and len(deco.args) >= 2
+              and isinstance(deco.args[1], (ast.List, ast.Tuple))]
+    rows, expressions = [], []
+    for deco in tables:
+        prefix = f"{ast.unparse(deco.args[0])}=" if len(tables) > 1 else ""
+        for value in deco.args[1].elts:
+            row = prefix + ast.unparse(value)
+            rows.append(row)
+            if not _literal_row(value, expr_name):
+                expressions.append(row)
+    return rows, expressions
+
+
+def _literal_row(value, expr_name) -> bool:
+    """Whether a parameter row is fixed by the source (literals, or ``pytest.param`` of literals)."""
+    if isinstance(value, ast.Call) and (expr_name(value.func) or "").split(".")[-1] == "param":
+        return all(_literal_row(arg, expr_name) for arg in value.args)
+    try:
+        ast.literal_eval(value)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return False
+    return True
 
 
 def _checks(statements) -> bool:
@@ -377,7 +433,8 @@ def _javascript_facts(root: Path) -> list[TestFacts]:
                 continue
             body, body_clean = text[span[0]:span[1]], clean[span[0]:span[1]]
             out.append(_js_test(f"{rel} › {name}", rel, body, body_clean, file_doubles, file_level, msw, retries))
-        for match in _JS_EACH.finditer(clean):  # literal rows of test.each([...])
+        uncommented = None
+        for match in _JS_EACH.finditer(clean):  # the rows of test.each([...]): its top-level elements
             start = match.end() - 1
             depth, end = 0, None
             for i in range(start, len(clean)):
@@ -387,10 +444,14 @@ def _javascript_facts(root: Path) -> list[TestFacts]:
                     break
             if end is None:
                 continue
-            rows = [_norm(r) for r in re.findall(r"\[[^\[\]]*\]|\{[^{}]*\}", text[start + 1:end])]
+            uncommented = uncommented or _strip_strings_and_comments(text, strings=False)
+            spans = [(a, b) for a, b in _top_level_items(clean, start + 1, end) if clean[a:b].strip()[:1] in "[{"]
+            rows = [_norm(uncommented[a:b]) for a, b in spans]
+            expressions = [row for row, (a, b) in zip(rows, spans) if not _js_row_is_literal(clean[a:b], text[a:b])]
             if rows:
                 out.append(TestFacts(test_id=f"{rel} › each@{text.count(chr(10), 0, start) + 1}", path=rel, language="javascript",
-                                     oracles=("VALUE",), parameters=tuple(rows), declared_level=file_level))
+                                     oracles=("VALUE",), parameters=tuple(rows), parameter_expressions=tuple(expressions),
+                                     declared_level=file_level))
     return out
 
 
@@ -520,9 +581,7 @@ def _jvm_facts(root: Path) -> list[TestFacts]:
                 if span is None:
                     continue
                 body, body_clean = text[span[0]:span[1]], clean[span[0]:span[1]]
-            params = re.findall(r"@CsvSource\(\s*\{?([^)}]*)", text[m.start():m.end()])  # only this test's own annotations
-            rows = tuple(_norm(r) for group in params for r in re.findall(r"\"([^\"]*)\"", group))
-            found.append((f"{rel}::{name}", body, body_clean, rows))
+            found.append((f"{rel}::{name}", body, body_clean, _csv_rows(text, clean, m.start(), m.end())))
         if "io.kotest" in text:
             for m in _KOTEST.finditer(clean):
                 label = (m.group("a") or m.group("b") or "").strip()
@@ -533,6 +592,34 @@ def _jvm_facts(root: Path) -> list[TestFacts]:
         for test_id, body, body_clean, rows in found:
             out.append(_jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instrumented, robolectric))
     return out
+
+
+def _csv_rows(text: str, clean: str, start: int, end: int) -> tuple[str, ...]:
+    """Rows of the ``@CsvSource`` among this test's own annotations: its string literals (a comma or parenthesis inside
+    a row stays in it, a commented-out row is not a row) or the lines of its text block (``#`` lines are comments)."""
+    rows: list[str] = []
+    for m in re.finditer(r"@CsvSource\s*\(", clean[start:end]):
+        open_at = start + m.end() - 1
+        depth, close = 0, None
+        for i in range(open_at, len(clean)):
+            depth += {"(": 1, ")": -1}.get(clean[i], 0)
+            if depth == 0:
+                close = i
+                break
+        if close is None:
+            continue
+        for a, b in _top_level_items(clean, open_at + 1, close):
+            attribute = re.match(r"\s*(\w+)\s*=", clean[a:b])
+            if attribute and attribute.group(1) not in ("value", "textBlock"):
+                continue  # delimiter, nullValues, emptyValue…: settings, not rows
+            block = re.search(r'"""(.*?)"""', text[a:b], re.S)
+            if block:
+                rows += [_norm(line) for line in block.group(1).splitlines() if line.strip() and not line.strip().startswith("#")]
+                continue
+            for literal in re.finditer(r'"((?:[^"\\]|\\.)*)"', text[a:b]):
+                if clean[a + literal.start()] == '"':  # the quote is code, not inside a comment
+                    rows.append(_norm(literal.group(1)))
+    return tuple(rows)
 
 
 def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instrumented, robolectric) -> TestFacts:
@@ -554,7 +641,7 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
         boundaries.add("DEVICE")
         simulated.add("DEVICE")  # Robolectric simulates the Android framework on the JVM
     if re.search(r"onNode|composeTestRule|onView\(", body):
-        boundaries.add("BROWSER" if False else "DEVICE")
+        boundaries.add("DEVICE")
         if not instrumented:
             simulated.add("DEVICE")
     if re.search(r"MockWebServer|WireMock|MockEngine", body):
@@ -565,7 +652,9 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
     if re.search(r"inMemoryDatabaseBuilder|Repository|EntityManager|jdbcTemplate|\.save\(", body):
         boundaries.add("DATABASE")
     if any(re.search(r"repo|dao|api|client|service|gateway", d, re.I) for d in doubles):
-        simulated.update(b for b in ("HTTP", "DATABASE") if any(re.search(k, d, re.I) for d in doubles for k in ((r"api|client|gateway",) if b == "HTTP" else (r"repo|dao",))))
+        for boundary, names in (("HTTP", r"api|client|gateway"), ("DATABASE", r"repo|dao")):
+            if any(re.search(names, d, re.I) for d in doubles):
+                simulated.add(boundary)
         boundaries.update(simulated)
     for statement in signature:
         if re.search(r"status|isOk\(\)|is4xx|is5xx", statement):
@@ -590,6 +679,7 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
         smells.append("ACTION_WITHOUT_CHECK")
     if len(doubles) >= 4:
         smells.append("EXCESSIVE_MOCKING")
+    # CSV rows are string literals: their values are fixed by the source, so no row is computed at run time
     return TestFacts(test_id=test_id, path=rel, language="jvm", oracles=tuple(dict.fromkeys(oracles)), assertions=len(signature),
                      doubles=tuple(doubles), boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)),
                      surfaces=tuple(sorted(surfaces)), smells=tuple(dict.fromkeys(smells)), declared_level=level,

@@ -1,7 +1,7 @@
 """End to end, through the CLI: an audit finds a gap, a strengthened test is written in the candidate workspace, and
 qualification proves what it now protects — the same deliberate break and the same mutants of a native tool, executed
 on the baseline and on the candidate. The project is never changed. Needs an interpreter with pytest and Cosmic Ray
-(ASSERTIVA_MUTATION_PYTHON); with ASSERTIVA_REQUIRE_MUTATION=1 a missing one fails instead of skipping.
+(this interpreter, or ASSERTIVA_MUTATION_PYTHON); with ASSERTIVA_REQUIRE_MUTATION=1 a missing one fails instead of skipping.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -23,10 +24,10 @@ DEMO = Path(__file__).parent / "fixtures" / "protection-demo"
 
 
 def _python() -> str:
-    python = os.environ.get("ASSERTIVA_MUTATION_PYTHON")
-    ok = bool(python) and subprocess.run([python, "-c", "import cosmic_ray, pytest"], capture_output=True).returncode == 0
+    python = os.environ.get("ASSERTIVA_MUTATION_PYTHON") or sys.executable
+    ok = subprocess.run([python, "-c", "import cosmic_ray, pytest"], capture_output=True).returncode == 0
     if not ok:
-        reason = "needs ASSERTIVA_MUTATION_PYTHON: an interpreter with pytest and cosmic-ray installed"
+        reason = "needs an interpreter with pytest and cosmic-ray (this one, or ASSERTIVA_MUTATION_PYTHON)"
         if os.environ.get("ASSERTIVA_REQUIRE_MUTATION"):
             pytest.fail(reason)
         pytest.skip(reason)

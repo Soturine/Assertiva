@@ -96,3 +96,50 @@ def test_protection_compares_only_breaks_executed_and_tied_on_both_states():
     assert untied["gained"] == [] and untied["not_compared"]  # an untied baseline proves no difference
     imported = protection_delta(_state("baseline", [S.SURVIVED], orchestrated=False), _state("candidate", [S.KILLED], orchestrated=False), [], change)
     assert imported["gained"] == [] and imported["compared"] == []
+
+
+def _junction_or_symlink(target, link):
+    """A directory link the current user can create: a junction on Windows, a symlink elsewhere."""
+    import os
+
+    if os.name == "nt":
+        import _winapi
+
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        os.symlink(target, link, target_is_directory=True)
+
+
+def test_a_target_reached_through_a_link_is_refused_before_anything_runs(tmp_path, monkeypatch):
+    # 0.8.0 reproduction: a target under a directory junction to outside the project was rewritten 16 times by the
+    # tool during one run (restored only because the tool restores files after each mutant)
+    outside = tmp_path / "outside"
+    write(outside / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(outside / "deep" / "more.py", "x = 1\n")
+    project = tmp_path / "project"
+    write(project / "pkg" / "own.py", "y = 2\n")
+    _junction_or_symlink(outside, project / "lib")
+    _junction_or_symlink(outside / "deep", project / "pkg" / "deep")
+    ran = []
+    monkeypatch.setattr(cosmic_ray, "run_command", lambda *a, **k: ran.append(a))
+    for target in ("lib/calc.py", "pkg/deep/more.py"):
+        result = cosmic_ray.run(project, sys.executable, [target], test_paths=[])
+        assert result.error and "is a link" in result.error and not result.mutants, target
+    assert ran == []  # refused before the suite, the planner or the tool ran
+    assert cosmic_ray.unsafe_target(project, "pkg/own.py") is None
+
+
+def test_a_link_that_appears_only_in_the_copy_is_refused_too(tmp_path, monkeypatch):
+    write(tmp_path / "project" / "calc.py", "def add(a, b):\n    return a + b\n")
+    monkeypatch.setattr(cosmic_ray, "module_available", lambda python, module: True)
+    real = cosmic_ray.unsafe_target
+    calls = []
+
+    def copy_is_linked(root, target):
+        calls.append(root)
+        return real(root, target) if len(calls) == 1 else "calc.py is a link: a write through it can reach outside the copy"
+
+    monkeypatch.setattr(cosmic_ray, "unsafe_target", copy_is_linked)
+    monkeypatch.setattr(cosmic_ray, "run_command", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not run")))
+    result = cosmic_ray.run(tmp_path / "project", sys.executable, ["calc.py"], test_paths=[])
+    assert "not plain files in the copy" in result.error

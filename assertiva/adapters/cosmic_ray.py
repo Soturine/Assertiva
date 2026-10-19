@@ -42,6 +42,30 @@ def _version(python: str, cwd: Path) -> str | None:
     return probe.stdout.strip() or None if probe.ok else None
 
 
+def unsafe_target(root: Path, target: str) -> str | None:
+    """Why the tool must not write ``target`` under ``root``, or None. The tool rewrites the file in place, so every
+    component from the root to the file must be a real directory or file (no symlink or junction: a link in a copy
+    can point back outside it, and a write through it changes the outside), and the resolved file must lie under the
+    resolved root. Checked on the project and again on the copy the tool runs in."""
+    from assertiva.workspace import is_link
+
+    rel = Path(target)
+    if rel.is_absolute() or ".." in rel.parts or not rel.parts or rel.suffix != ".py":
+        return "not a Python file path relative to the project"
+    current = root
+    for part in rel.parts:
+        current = current / part
+        if is_link(current):
+            return f"{current.relative_to(root).as_posix()} is a link: a write through it can reach outside the copy"
+    if not current.is_file():
+        return "not a file in the project"
+    try:
+        current.resolve().relative_to(root.resolve())
+    except ValueError:
+        return "resolves outside the project"
+    return None
+
+
 def run(state_root: str | Path, python: str, targets: list[str], test_paths: list[str], timeout_s: float = 60.0,
         budget_s: float = 3600.0) -> MutationRun:
     """Mutate ``targets`` (files relative to ``state_root``) and run the project's pytest for each mutant."""
@@ -55,9 +79,10 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
     if refusal:
         result.error = refusal
         return result
-    bad = [t for t in targets if Path(t).is_absolute() or ".." in Path(t).parts or not (state_root / t).is_file() or Path(t).suffix != ".py"]
+    bad = {t: reason for t in targets if (reason := unsafe_target(state_root, t))}
     if not targets or bad:
-        result.error = f"mutation targets must be Python files inside the project: {bad or 'none given'}"
+        result.error = ("mutation targets must be Python files inside the project, reached without links: "
+                        + ("; ".join(f"{t}: {why}" for t, why in bad.items()) or "none given"))
         return result
     if not module_available(python, "cosmic_ray"):
         result.error = (f"{TOOL} is not installed in {python}; Assertiva does not install it "
@@ -67,6 +92,10 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
         tmp = Path(tmp)
         copy = snapshot(state_root, tmp / "state")
         try:
+            in_copy = {t: reason for t in targets if (reason := unsafe_target(copy, t))}
+            if in_copy:  # the copy must hold the targets as plain files too, or nothing is mutated
+                result.error = "mutation targets are not plain files in the copy: " + "; ".join(f"{t}: {why}" for t, why in in_copy.items())
+                return result
             test_command = [_posix(python), "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider", *test_paths]
             baseline = run_command(test_command, copy, timeout_s=budget_s)
             if not baseline.ok:

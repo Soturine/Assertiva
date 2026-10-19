@@ -234,14 +234,32 @@ def _interpreter_identity(python: str) -> tuple:
         return ()
 
 
+@contextmanager
+def probe_directory():
+    """An empty directory to start interpreter probes in. ``python -c`` puts its working directory first on sys.path,
+    so a probe started where the user stands (often the project) would import the project's own modules (a
+    ``json.py``, ``platform.py``…) outside any disposable copy."""
+    with tempfile.TemporaryDirectory(prefix="assertiva-probe-") as path:
+        yield Path(path)
+
+
+_MODULE_NAME = re.compile(r"[A-Za-z_]\w*(\.[A-Za-z_]\w*)*")
+# the module arrives as an argument, never as code; the start directory is not searched
+_IMPORT_PROBE = "import importlib, os, sys\nsys.path[:] = [p for p in sys.path if p not in ('', os.getcwd())]\nimportlib.import_module(sys.argv[1])"
+
+
 def module_available(python: str, module: str) -> bool:
-    """Whether ``module`` imports in interpreter ``python`` (cached only within a run)."""
+    """Whether ``module`` imports in interpreter ``python`` (cached only within a run). A name that is not a module
+    name (a value read from a project) is refused without running anything."""
+    if not _MODULE_NAME.fullmatch(module or ""):
+        return False
     key = (str(python), _interpreter_identity(str(python)), module)
     cache = _SCOPES[-1] if _SCOPES else None
     if cache is not None and key in cache:
         return cache[key]
     env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME"}}
-    available = run_command([str(python), "-c", f"import {module}"], Path.cwd(), env=env, timeout_s=60).ok
+    with probe_directory() as cwd:
+        available = run_command([str(python), "-c", _IMPORT_PROBE, module], cwd, env=env, timeout_s=60).ok
     if cache is not None:
         cache[key] = available
     return available
@@ -310,12 +328,21 @@ def run_command(command: list[str], cwd: str | Path, env: dict | None = None, ti
                     proc.wait(timeout=30)
                 except subprocess.TimeoutExpired:
                     pass
-            out_file.seek(0)
-            err_file.seek(0)
-            out, err = out_file.read(), err_file.read()
+            # the digest covers everything, read in chunks; only the tail is held in memory (a test that prints
+            # gigabytes must not exhaust the auditor's memory)
+            digest = hashlib.sha256()
+            tails = []
+            for index, handle in enumerate((out_file, err_file)):
+                if index:
+                    digest.update(b"|")
+                handle.seek(0)
+                while chunk := handle.read(1 << 20):
+                    digest.update(chunk)
+                handle.seek(max(0, handle.tell() - (output_limit * 4 + 4)))  # UTF-8: at most 4 bytes per character
+                tails.append(handle.read())
     if proc is not None:
-        result.output_sha256 = hashlib.sha256((out or b"") + b"|" + (err or b"")).hexdigest()
-        result.stdout, result.stderr = _tail(out, output_limit), _tail(err, output_limit)
+        result.output_sha256 = digest.hexdigest()
+        result.stdout, result.stderr = _tail(tails[0], output_limit), _tail(tails[1], output_limit)
         if not result.timed_out:
             result.returncode = proc.returncode
             if proc.returncode < 0 and os.name != "nt":

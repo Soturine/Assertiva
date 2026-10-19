@@ -210,7 +210,9 @@ def prepare_service(step: Step, prepared: Prepared) -> None:
     data = cluster / "pg"
     password = secrets.token_urlsafe(18)
     pwfile = cluster / "pg-password"
-    pwfile.write_text(password, encoding="utf-8")
+    descriptor = os.open(pwfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)  # other local users cannot read it
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(password)
     created = run_command([str(bin_dir / f"initdb{exe}"), "-D", str(data), "-U", "assertiva", "--pwfile", str(pwfile),
                            "-A", "scram-sha-256", "-E", "UTF8", "--no-instructions"], Path.cwd(), timeout_s=300)
     pwfile.unlink(missing_ok=True)

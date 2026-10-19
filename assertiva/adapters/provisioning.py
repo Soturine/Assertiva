@@ -30,7 +30,7 @@ import tomllib
 from pathlib import Path
 
 from assertiva.environment import Prepared, ProvisioningError, Step, download, extract, published_sha256, tools_dir
-from assertiva.process import run_command
+from assertiva.process import probe_directory, run_command
 
 _LOCKFILES = {"uv.lock": "uv", "poetry.lock": "Poetry", "pdm.lock": "PDM", "Pipfile.lock": "Pipenv"}
 _NODE_LOCKS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "yarn.lock": "Yarn", "pnpm-lock.yaml": "pnpm", "bun.lockb": "Bun"}
@@ -113,9 +113,27 @@ def python_requirements(root: Path) -> tuple[list[str], list[str], list[Path]]:
     return names, specs, []
 
 
+_INDEX_OPTION = re.compile(r"^\s*(--index-url|-i|--extra-index-url|--find-links|-f|--trusted-host)(?:\s*=\s*|\s+)(\S+)")
+
+
+def declared_sources(files: list[Path]) -> list[str]:
+    """Where the project's requirement files tell pip to download from (index, extra index, find-links) or to trust
+    without TLS verification; pip honors them, so the plan must name them instead of PyPI. Credentials are redacted."""
+    from assertiva.process import redact
+
+    out = []
+    for path in files:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if match := _INDEX_OPTION.match(line):
+                option = {"-i": "--index-url", "-f": "--find-links"}.get(match.group(1), match.group(1))
+                out.append(f"{option} {redact(match.group(2))} ({path.name})")
+    return list(dict.fromkeys(out))
+
+
 def _probe(python: str) -> dict | None:
     script = "import json, platform, sys; print(json.dumps({'version': platform.python_version(), 'executable': sys.executable}))"
-    result = run_command([python, "-c", script], Path.cwd(), timeout_s=60)
+    with probe_directory() as cwd:  # never where the user stands: its modules would shadow the standard library
+        result = run_command([python, "-c", script], cwd, timeout_s=60)
     try:
         return json.loads(result.stdout.strip().splitlines()[-1]) if result.ok else None
     except (ValueError, IndexError):
@@ -160,7 +178,8 @@ def candidate_interpreters(given: str | None) -> list[str]:
 def _missing(python: str, names: list[str]) -> list[str]:
     script = ("import importlib.metadata as m, json, sys\nout = []\nfor n in json.loads(sys.argv[1]):\n"
               "    try:\n        m.version(n)\n    except m.PackageNotFoundError:\n        out.append(n)\nprint(json.dumps(out))")
-    result = run_command([python, "-c", script, json.dumps(names)], Path.cwd(), timeout_s=60)
+    with probe_directory() as cwd:
+        result = run_command([python, "-c", script, json.dumps(names)], cwd, timeout_s=60)
     try:
         return json.loads(result.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):
@@ -208,11 +227,17 @@ def _python_plan(root: Path, given: str | None, runner_needs: list[str], prepare
     instrument = ["coverage"] if "coverage" not in {n.lower() for n in names} else []
     if instrument:
         divergences.append("coverage.py is added to the prepared environment by Assertiva to measure coverage; the project does not declare it")
+    sources = declared_sources(files)
+    if sources:
+        divergences.append("the project's requirement files direct pip beyond PyPI: " + "; ".join(sources))
     return [Step("python-env", "python", f"create a virtual environment with Python {compatible['version']} and install "
                  + (", ".join(missing[:8]) + ("…" if len(missing) > 8 else "") if missing else "nothing"),
                  ("interpreter " + (current or {}).get("version", "none") + f" does not satisfy {spec}; " if compatible is not current else "")
                  + (f"{len(missing)} declared distributions are not installed" if missing else "all distributions present"),
-                 downloads=["PyPI (pip)"] if missing else [], runs_third_party_code=bool(missing), divergences=divergences,
+                 # an --index-url replaces PyPI; extra indexes and find-links add to it
+                 downloads=([] if any(s.startswith("--index-url") for s in sources) else ["PyPI (pip)"])
+                 + [f"declared by the project: {s}" for s in sources] if missing else [],
+                 runs_third_party_code=bool(missing), divergences=divergences,
                  detail=json.dumps({"root": str(root), "base": compatible["executable"],
                                     "install": [*(install if files else [*install, *runner, *runner_needs]), *instrument],
                                     "missing": missing}))]
@@ -221,7 +246,8 @@ def _python_plan(root: Path, given: str | None, runner_needs: list[str], prepare
 def _prepare_python(step: Step, prepared: Prepared) -> None:
     data = json.loads(step.detail)
     venv = prepared.workspace / "env" / "py"
-    created = run_command([data["base"], "-m", "venv", str(venv)], Path.cwd(), timeout_s=300)
+    with probe_directory() as cwd:  # `-m venv` searches the start directory first, like any `-m`
+        created = run_command([data["base"], "-m", "venv", str(venv)], cwd, timeout_s=300)
     if not created.ok:
         hint = (f"; the path ({len(str(venv))} characters) may exceed the Windows 260-character limit: a shorter ASSERTIVA_HOME helps"
                 if os.name == "nt" and len(str(venv)) > 120 else "")

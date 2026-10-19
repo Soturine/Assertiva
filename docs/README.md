@@ -5,6 +5,7 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 ## Start here
 
 - [Architecture](ARCHITECTURE.md) — layers, records, trust model and execution boundaries.
+- [Execution Security](EXECUTION_SECURITY.md) — boundaries that hold when project code runs, what each security review fixed, and the residual risks still open.
 - [Quality Model](QUALITY_MODEL.md) — what makes test evidence meaningful.
 - [Determinism and Evidence Tiers](DETERMINISM_AND_EVIDENCE_TIERS.md) — E0–E4 provenance/authority model.
 - [Evidence Contract](EVIDENCE_CONTRACT.md) — compact evidence and claim discipline.

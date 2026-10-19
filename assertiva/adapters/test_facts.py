@@ -225,6 +225,8 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
             signature.append(ast.unparse(item.test))
             if isinstance(item.test, ast.Constant) and item.test.value:
                 smells.append("TAUTOLOGY")
+            if isinstance(item.test, ast.Tuple) and item.test.elts:  # `assert (check, "message")`: a non-empty tuple is always true
+                smells.append("TAUTOLOGY")
             if isinstance(item.test, ast.Compare) and len(item.test.comparators) == 1 and ast.dump(item.test.left) == ast.dump(item.test.comparators[0]):
                 smells.append("TAUTOLOGY")
         elif isinstance(item, ast.Call):

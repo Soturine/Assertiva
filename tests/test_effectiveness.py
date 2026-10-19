@@ -542,3 +542,14 @@ def test_carried_over_mutation_results_never_pass_the_stage_alone():
     fresh = StateEvidence(label="candidate", observed_in="copy")
     fresh.mutation = [_run(_mutant("m1", "tests/test_a.py::test_a"))]
     assert _mutation_stage(fresh).status is StageStatus.PASS
+
+
+def test_an_assert_on_a_tuple_cannot_fail_and_a_parenthesised_compare_can(tmp_path):
+    # found by the 0.7.3 research (Python warns "assertion is always true"); 0.7.2 counted it as a value oracle
+    write(tmp_path / "tests" / "test_t.py",
+          'def test_tuple():\n    assert (total(2) == 4, "doubles")\n\n\n'
+          'def test_parenthesised():\n    assert (total(2) == 4)\n\n\n'
+          'def test_compares_a_tuple():\n    assert pair() == (1, 2)\n')
+    facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
+    assert "TAUTOLOGY" in facts["test_tuple"].smells
+    assert "TAUTOLOGY" not in facts["test_parenthesised"].smells and "TAUTOLOGY" not in facts["test_compares_a_tuple"].smells

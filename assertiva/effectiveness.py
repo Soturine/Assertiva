@@ -30,8 +30,6 @@ SMELL_NOTES = {
     "FIXED_WAIT": "a fixed wait stands in for waiting on a condition",
     "RETRY": "retries are configured: a pass may hide intermittent failures",
     "EXCESSIVE_MOCKING": "many collaborators are replaced: the test may verify the doubles more than the code",
-    "ASSERTION_ROULETTE": "many unlabeled assertions: a failure is hard to diagnose",
-    "MYSTERY_GUEST": "the test reads an external file or resource the reader cannot see",
 }
 DIMENSIONS = ("oracle_strength", "behavioral_surfaces", "negative_and_boundary_paths", "fidelity", "double_fidelity",
               "distinct_contribution", "mutation_sensitivity", "determinism", "maintainability")

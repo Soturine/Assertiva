@@ -166,7 +166,7 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
 
 def _test_label(run, test_id: str) -> str:
     """A detecting test as people know it: its name and file when the report gives them, otherwise the tool's id
-    prefixed by the tool (ids such as StrykerJS's "2" are only unique within one report)."""
+    prefixed by the tool (numeric ids such as "2" are only unique within one report)."""
     name, where = run.test_names.get(test_id), run.test_locations.get(test_id)
     if name:
         return f"{name} ({where})" if where else name

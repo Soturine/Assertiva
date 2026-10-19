@@ -71,6 +71,17 @@ class MutationRun:
     reused: int = 0  # mutants whose result the tool carried over from an earlier run instead of executing
     orchestrated: bool = False  # Assertiva ran the tool itself on a copy of the measured state (not an imported report)
     targets: tuple[str, ...] = ()  # the files an orchestrated run mutated
+    config: dict = field(default_factory=dict)  # how an orchestrated run was configured (timeout, test command, …)
+
+    @property
+    def inputs_digest(self) -> str | None:
+        """sha256 over the mutated sources and the tests the run saw (None when the report carries neither)."""
+        import hashlib
+        import json
+
+        if not (self.sources or self.test_sources):
+            return None
+        return hashlib.sha256(json.dumps([sorted(self.sources.items()), sorted(self.test_sources.items())]).encode()).hexdigest()
     incremental: bool | None = None  # the tool ran in a mode that may carry results over without marking them
 
     def count(self, status: MutantStatus) -> int:

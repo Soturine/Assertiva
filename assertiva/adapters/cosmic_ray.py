@@ -102,6 +102,8 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
                 result.error = f"the tests do not pass on this state before mutation ({baseline.summary()}); no mutant was run"
                 return result
             config, db = tmp / "mutation.toml", tmp / "session.sqlite"
+            result.config = {"timeout_s": float(timeout_s), "test_command": [_posix(part) for part in test_command[1:]],
+                             "distributor": "local", "operators": "Cosmic Ray defaults", "max_mutants": MAX_MUTANTS}
             config.write_text(
                 "[cosmic-ray]\n"
                 f"module-path = {json.dumps([_posix(t) for t in targets])}\n"

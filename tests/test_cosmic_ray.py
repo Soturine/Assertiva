@@ -168,3 +168,12 @@ def test_an_executed_run_with_errored_mutants_does_not_pass_globally():
     candidate.mutation[0].counts = {"KILLED": 1, "ERROR": 20}
     result = _mutation_stage(candidate)
     assert result.status is StageStatus.UNKNOWN and "ended in error" in result.summary  # 0.8.0: PASS, "all 1 evaluated"
+
+
+def test_the_inputs_digest_changes_with_the_mutated_code_or_the_tests():
+    from assertiva.models import MutationRun
+
+    a = MutationRun(source="r", sources={"calc.py": "x"}, test_sources={"tests/t.py": "y"})
+    assert a.inputs_digest == MutationRun(source="other", sources={"calc.py": "x"}, test_sources={"tests/t.py": "y"}).inputs_digest
+    assert a.inputs_digest != MutationRun(source="r", sources={"calc.py": "x"}, test_sources={"tests/t.py": "z"}).inputs_digest
+    assert MutationRun(source="r").inputs_digest is None

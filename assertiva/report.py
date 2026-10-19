@@ -113,7 +113,7 @@ def _mutation_summary(run) -> dict:
         "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:50]],
         # where the evidence came from and how much it can decide
         "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,
-        "reused": run.reused, "incremental": run.incremental,
+        "reused": run.reused, "incremental": run.incremental, "config": dict(run.config), "inputs_digest": run.inputs_digest,
         "limitations": list(run.limitations),
     }
 

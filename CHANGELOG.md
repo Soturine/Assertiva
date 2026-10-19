@@ -19,7 +19,7 @@ The first part below was prepared as a 0.7.3 stabilization release and folded in
 - An expected value computed by the code under test just before the assertion (`expected = total(cart)`; `assert total(cart) == expected`) is a `SELF_REFERENTIAL_ORACLE` false-green candidate; the same call before and after an action stays a state check (found by running the rule on this repository's suite).
 
 ### Agent-led guidance
-- SKILL.md: a blocked operation is reported, never retried through another shell, tool or agent; the opening sentence, dispositions and counts must agree, and what is protected is said next to what is not; a strengthened test is credited by the same break run on both states, not by passing or coverage. References: `--mutate` and the protection delta, when a mutation report is tied, static vs executed mutation claims, the witness of a survivor, characterization vs contract oracles. From research wave 1.
+- SKILL.md: a blocked operation is reported, never retried through another shell, tool or agent; the opening sentence, dispositions and counts must agree, and what is protected is said next to what is not; a strengthened test is credited by the same break run on both states, not by passing or coverage. References: `--mutate` and the protection delta, when a mutation report is tied, static vs executed mutation claims, the witness of a survivor, characterization vs contract oracles. From research wave 1. **Not semantically evaluated:** agent evaluation rounds are deferred to 1.0 (ROADMAP), so these guidance changes are untested against an agent; the engine evidence they point to is tested.
 
 ### Stabilization (formerly 0.7.3)
 

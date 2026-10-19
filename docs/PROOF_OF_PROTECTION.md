@@ -66,7 +66,34 @@ A candidate that weakens the tests instead (only the existence check left) fails
   baseline's passed, on the same code, both runs executed by Assertiva.
 - Cosmic Ray runs the whole test command per mutant and records no killing test, so a gained mutant is attributed to
   "the candidate's tests" and the changed files, not to one test; negative controls do name the detecting test.
-  Per-test contribution with complete killer matrices is 0.8.1 work.
+  StrykerJS and PIT record every detecting test (below), so their gains are attributed to the named tests.
 - Mutants outside the named files, equivalent mutants and behaviors no operator changes are not covered; a mutant the
   candidate still misses keeps the check from passing.
 - An imported mutation report proves no difference: only runs executed and tied on both states are compared.
+
+## The same flow on JavaScript and Java (0.9.0)
+
+The same pricing rule, with the same weak test, in two more stacks. `--mutate` chooses the tool that fits each
+project (StrykerJS for a Jest project, PIT for a Maven build that declares it); the project's installed tool is used,
+never one Assertiva installs. Both tools record every detecting test, so each gained mutant names the tests that
+detect it. Run by `tests/test_mutation_tools.py` and `tests/test_pit.py` (CI java job); numbers observed on
+2026-10-19.
+
+| | `tests/fixtures/js-stryker` (StrykerJS 10.0.0, Jest) | `tests/fixtures/java-pit` (PIT 1.30.0, JUnit 5, Maven offline) |
+| --- | --- | --- |
+| Weak test | `expect(discountCents(15000, true)).toBeDefined()` | `assertTrue(Pricing.discountCents(15000, true) >= 0)` |
+| Baseline | 4 detected, 6 survived | 1 detected, 4 survived |
+| Candidate (`strengthened/`) | 10 detected | 5 detected |
+| Protection | 6 gained, 0 lost, 0 still undetected | 4 gained, 0 lost, 0 still undetected |
+| Detected by | `the threshold is inclusive`, with `member gets a discount` and `the discount rounds down to whole cents` on some | `PricingTest.theThresholdIsInclusive`, with `PricingTest.memberGetsADiscount` on some |
+
+```
+assertiva audit <project> --execute --mutate src/pricing.js
+assertiva improve <project>                      # write the stronger test in the candidate workspace
+assertiva improve <project> --mutate src/pricing.js
+```
+
+The audit also lists, for each survivor of a run tied to the state, the original line and the change
+(`survivor_sites`), and the effectiveness view's mutation contribution names, per test, the mutants it detects; with
+these complete matrices it also shows which tests detect only mutants another test detects (`subsumed`). That is
+evidence on the known mutants, not a reason to remove a test.

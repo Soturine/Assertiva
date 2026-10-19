@@ -16,6 +16,14 @@ In progress on `release/0.9.0`, by checkpoints; it includes the scope first plan
 - **Stable mutant identity:** a mutant is identified by what was changed where, not by the tool's per-run number, so the same mutant is compared across baseline and candidate; colliding identities are not compared. Detecting tests are shown by name and file.
 - Real runs: StrykerJS 10.0.0 with Jest and PIT 1.30.0 with JUnit 5, each showing the protection a strengthened test adds, attributed to the named test; Cosmic Ray 8.7.0 under unittest (test) and Django 6.1.2 (local run). mutmut 3.8.0 evaluated on Linux and not integrated (ROADMAP).
 
+### Test intelligence and improvement (CP3)
+- **Per-test contribution from complete killer matrices:** detecting tests are named by name and file and mutants by their stable identity (numeric test ids of different reports are no longer merged). With complete matrices from runs tied to the state, the effectiveness view lists tests that detect only mutants another test also detects (`subsumed`) and tests with identical detection: evidence on known mutants, never a removal recommendation.
+- **Survivor sites:** each survivor of a tied run shows the original line the run saw and the change, the material for a witness (`survivor_sites` in the report; shown in the mutation table).
+- **JS/TS and JVM assertions that cannot fail:** `expect(x)` without a matcher, a matcher named but never called, the same expression on both sides and an expected value computed by the same call just before (Jest/Vitest); `assertEquals`/`assertSame` with identical sides (JUnit 4 and 5 orders), AssertJ/Truth `assertThat(x).isEqualTo(x)` and a bare one-argument `assertThat(x)` (Kotlin/Java). Calibrated on the 250 test files shipped in the fixtures' `node_modules`: 44 signals, all in zod 4.6.7's own tests and all genuine (such as `expect(z.number().minValue).toBeNull;`), none in sound tests.
+- **Oracle basis:** contract signals (property-based tests with Hypothesis, fast-check, jqwik or Kotest; schema validation) are kept apart from characterization (snapshots, golden files, approval tests); literal expected values stay undetermined. jqwik `@Property` methods are recognized as tests.
+- **Complete improvement flows in three stacks:** the protection walk-through now runs on JavaScript (StrykerJS: 6 gained, 0 lost) and Java (PIT: 4 gained, 0 lost) as well as Python, each gain attributed to the named tests (`docs/PROOF_OF_PROTECTION.md`). PIT runs record the plugin version the pom declares.
+- Agent reference (`references/TEST_QUALITY.md`) explains survivor sites, oracle basis and subsumption. **Not semantically evaluated.**
+
 ## [Unreleased] — 0.8.0 — Intelligence & Proof of Protection
 
 In progress on `release/0.8.0`. Compatible with 0.7.2: report fields and metrics are only added; existing ones keep their meaning.

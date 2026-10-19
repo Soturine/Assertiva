@@ -99,3 +99,9 @@ The engine's test-effectiveness candidates are leads; these cases check that the
 - [An intentionally simple test and a shallow one](cases/SIMPLE_TEST_VS_SHALLOW_TEST.md)
 - [Two identical-looking tests and a request to remove duplicates](cases/REDUNDANCY_NOT_BY_SIMILARITY.md)
 - [The same integration claim, simulated, in two languages](cases/FIDELITY_ACROSS_LANGUAGES.md)
+
+## Transfer checks (0.7.3)
+
+A guidance change validated on one case can fit that case's structure without changing the reasoning. These cases ask the same kind of question in another ecosystem and surface, with their own rubric written before any run.
+
+- [A green CI run on the same commit, with the integration tests outside it](cases/GREEN_CI_UNSELECTED_INTEGRATION.md)

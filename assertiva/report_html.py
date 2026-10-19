@@ -1379,12 +1379,17 @@ def _protection(r: _R, q: dict) -> str:
     if not p.get("compared"):
         return ""
     rows = []
-    for key, status, label in (("lost", "FAIL", "prot.lost"), ("gained", "PASS", "prot.gained"), ("still_undetected", "UNKNOWN", "prot.still")):
+    for key, status, label in (("lost", "FAIL", "prot.lost"), ("gained", "PASS", "prot.gained"), ("still_undetected", "UNKNOWN", "prot.still"),
+                               ("not_comparable", "UNKNOWN", "prot.notcomparable")):
         for e in p.get(key) or []:
             claim = f"<br>{_e(e['claim'])}" if e.get("claim") else ""
+            if e.get("attribution") == "SUITE":  # the tool names no detecting test: the suite detects it, files are context
+                by = r.t("prot.suite", files=_e(", ".join(e.get("changed_files") or [])))
+            else:
+                by = _e(e.get("detected_by") or e.get("reason") or "")
             rows.append(f'<tr><th scope="row"><code>{_e(e.get("label") or e["id"])}</code>{claim}</th>'
                         f'<td {r.label_attr("prot.change")}>{r.pill(status)} {r.t(label)}</td>'
-                        f'<td {r.label_attr("prot.by")}>{_e(e.get("detected_by") or "")}</td></tr>')
+                        f'<td {r.label_attr("prot.by")}>{by}</td></tr>')
     rows = "".join(rows)
     summary = r.t("prot.summary", gained=len(p.get("gained") or []), lost=len(p.get("lost") or []), still=len(p.get("still_undetected") or []))
     body = (f'<p class="muted">{r.t("prot.compared", what=_e("; ".join(p["compared"])))}</p>'

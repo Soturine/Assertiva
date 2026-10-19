@@ -107,18 +107,25 @@ def protection_delta(baseline: StateEvidence, candidate: StateEvidence, baseline
     """What the candidate detects that the baseline did not, and what it no longer detects, from evidence executed on
     both states: the same deliberate breaks (negative controls) and the same mutants of the same tool and targets,
     each run by Assertiva on a copy of that state. Reports imported for one state only, or that cannot be tied to
-    both, prove nothing about a difference and are not compared."""
-    out = {"gained": [], "lost": [], "still_undetected": [], "compared": [], "not_compared": []}
+    both, prove nothing about a difference and are not compared.
+
+    Attribution is kept apart from protection: ``attribution`` is TEST when the evidence names the detecting test
+    (``detected_by``), SUITE when the tool records no killing test — then the candidate's suite detects the break,
+    and the changed test files are listed as context (``changed_files``), never as its detectors."""
+    out = {"gained": [], "lost": [], "still_undetected": [], "not_comparable": [], "compared": [], "not_compared": []}
     changed = [c.path for c in changes if c.kind is not CandidateChangeKind.RETIRE_CANDIDATE]
     before = {r.control_id: r for r in baseline_controls}
     for after in candidate.negative_controls:
         prior = before.get(after.control_id)
-        if prior is None or ControlOutcome.INVALID in (prior.outcome, after.outcome):
+        entry = {"kind": "negative_control", "id": after.control_id, "claim": after.claim}
+        if prior is None:
+            continue
+        if ControlOutcome.INVALID in (prior.outcome, after.outcome):
+            out["not_comparable"].append({**entry, "reason": "the control was invalid on one of the states"})
             continue
         out["compared"].append(f"negative control {after.control_id}")
-        entry = {"kind": "negative_control", "id": after.control_id, "claim": after.claim}
         if prior.outcome is ControlOutcome.SURVIVED and after.outcome is ControlOutcome.KILLED:
-            out["gained"].append({**entry, "detected_by": after.detail.removeprefix("detected by ")})
+            out["gained"].append({**entry, "attribution": "TEST", "detected_by": after.detail.removeprefix("detected by ")})
         elif prior.outcome is ControlOutcome.KILLED and after.outcome is ControlOutcome.SURVIVED:
             out["lost"].append(entry)
         elif after.outcome is ControlOutcome.SURVIVED:
@@ -127,21 +134,27 @@ def protection_delta(baseline: StateEvidence, candidate: StateEvidence, baseline
     for after in candidate.mutation:
         key = (after.tool, after.targets)
         prior = pairs.get(key)
+        where = f"{after.tool} on {', '.join(after.targets) or after.source}"
         if not (after.orchestrated and after.matches_state is True and not after.error and prior):
             if after.orchestrated or prior:
-                out["not_compared"].append(f"{after.tool} on {', '.join(after.targets) or after.source}: not executed and tied on both states")
+                out["not_compared"].append(f"{where}: not executed and tied on both states")
+            continue
+        if prior.sources != after.sources:  # mutant identities are positions in the mutated code: only equal code compares
+            out["not_compared"].append(f"{where}: the mutated code differs between the states, so its mutants are not the same")
             continue
         out["compared"].append(f"{after.tool} {after.tool_version or ''} on {', '.join(after.targets)}".replace("  ", " "))
         old = {m.mutant_id: m for m in prior.mutants}
         for m in after.mutants:
-            if m.mutant_id not in old:
-                continue
             entry = {"kind": "mutant", "id": m.mutant_id, "label": mutant_label(m), "tool": after.tool}
-            was, now = old[m.mutant_id].status, m.status
-            if was in _UNDETECTED and now in _DETECTED:
-                # the tool names no killing test: the candidate's suite detects it, and these are the tests it changed
-                out["gained"].append({**entry, "detected_by": "the candidate's tests (per-test killers not recorded); changed: "
-                                      + ", ".join(changed)})
+            was = old[m.mutant_id].status if m.mutant_id in old else None
+            now = m.status
+            if was not in _DETECTED + _UNDETECTED or now not in _DETECTED + _UNDETECTED:
+                out["not_comparable"].append({**entry, "reason": f"{(was.value if was else 'absent')} on the baseline, {now.value} on the candidate"})
+            elif was in _UNDETECTED and now in _DETECTED:
+                if m.killed_by:  # a named killer detects it, even when the report may not name every detector
+                    out["gained"].append({**entry, "attribution": "TEST", "detected_by": ", ".join(m.killed_by)})
+                else:
+                    out["gained"].append({**entry, "attribution": "SUITE", "changed_files": changed})
             elif was in _DETECTED and now in _UNDETECTED:
                 out["lost"].append(entry)
             elif now in _UNDETECTED:
@@ -427,6 +440,12 @@ def _mutation_stage(candidate: StateEvidence, changes: list[CandidateTestChange]
             failures.append(f"MUTATION_NO_COVERAGE ({tool}): {run.count(MutantStatus.NO_COVERAGE)} mutants not covered by any test")
         if run.count(MutantStatus.UNKNOWN):
             unknown.append(f"{tool}: {run.count(MutantStatus.UNKNOWN)} mutants with unknown/pending status")
+        if run.orchestrated and run.count(MutantStatus.ERROR):
+            # the suite passed before mutation, so a mutant that ended in error is a run the harness could not complete
+            unknown.append(f"{tool}: {run.count(MutantStatus.ERROR)} mutant run(s) ended in error and were not evaluated")
+        not_evaluated = {s.value.lower(): run.count(s) for s in (MutantStatus.IGNORED, MutantStatus.EQUIVALENT) if run.count(s)}
+        if not_evaluated:
+            limitations.append(f"{tool}: not evaluated: " + ", ".join(f"{n} {s}" for s, n in not_evaluated.items()))
         if run.reused:
             unknown.append(f"{tool}: {run.reused} mutant result(s) carried over from an earlier run, not executed in this one")
         elif run.incremental:

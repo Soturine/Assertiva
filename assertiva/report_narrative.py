@@ -139,6 +139,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "evidência de mutação de {tool}: {n} mutantes avaliados (ingerida, vinculada a este estado por seus códigos e testes)"),
     ("mutation report from {tool} that cannot be tied to this state: its {n} results are leads, not this state's evidence",
      "relatório de mutação de {tool} que não pode ser vinculado a este estado: seus {n} resultados são pistas, não evidência deste estado"),
+    ("{tool}: not evaluated: {detail}", "{tool}: não avaliados: {detail}"),
+    ("{tool}: {n} mutant run(s) ended in error and were not evaluated", "{tool}: {n} execução(ões) de mutante terminaram em erro e não foram avaliadas"),
     ("mutation targets were given without --execute: no mutant was run",
      "alvos de mutação foram informados sem --execute: nenhum mutante foi executado"),
     ("{tool} stopped before finishing ({detail}); unfinished mutants are UNKNOWN",

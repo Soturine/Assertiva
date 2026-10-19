@@ -143,3 +143,28 @@ def test_a_link_that_appears_only_in_the_copy_is_refused_too(tmp_path, monkeypat
     monkeypatch.setattr(cosmic_ray, "run_command", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not run")))
     result = cosmic_ray.run(tmp_path / "project", sys.executable, ["calc.py"], test_paths=[])
     assert "not plain files in the copy" in result.error
+
+
+def test_suite_level_detection_never_names_changed_files_as_detectors_and_unequal_code_is_not_compared():
+    from assertiva.candidate import CandidateChangeKind, CandidateTestChange
+    from assertiva.improve import protection_delta
+
+    change = [CandidateTestChange(change_id="tests/test_calc.py", path="tests/test_calc.py", kind=CandidateChangeKind.MODIFY, reason="r")]
+    baseline, candidate = _state("baseline", [S.SURVIVED, S.SURVIVED]), _state("candidate", [S.KILLED, S.ERROR])
+    delta = protection_delta(baseline, candidate, [], change)
+    [gain] = delta["gained"]
+    assert gain["attribution"] == "SUITE" and "detected_by" not in gain and gain["changed_files"] == ["tests/test_calc.py"]
+    assert [e["id"] for e in delta["not_comparable"]] == ["calc.py:op:1"]  # an error is not a detection or a miss
+    baseline.mutation[0].sources, candidate.mutation[0].sources = {"calc.py": "a"}, {"calc.py": "b"}
+    shifted = protection_delta(baseline, candidate, [], change)
+    assert shifted["gained"] == [] and "mutated code differs" in shifted["not_compared"][0]
+
+
+def test_an_executed_run_with_errored_mutants_does_not_pass_globally():
+    from assertiva.candidate import StageStatus
+    from assertiva.improve import _mutation_stage
+
+    candidate = _state("candidate", [S.KILLED] + [S.ERROR] * 20)
+    candidate.mutation[0].counts = {"KILLED": 1, "ERROR": 20}
+    result = _mutation_stage(candidate)
+    assert result.status is StageStatus.UNKNOWN and "ended in error" in result.summary  # 0.8.0: PASS, "all 1 evaluated"

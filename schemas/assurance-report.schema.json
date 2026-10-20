@@ -202,6 +202,11 @@
       },
       "additionalProperties": false
     },
+    "exported": {
+      "type": "object",
+      "description": "Portable result files written beside this report, by kind (ctrf: the engine's executed runs as CTRF JSON); the file name once written, the data before.",
+      "additionalProperties": {"type": ["string", "object"]}
+    },
     "findings": {
       "type": "array",
       "items": {

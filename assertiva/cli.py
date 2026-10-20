@@ -259,7 +259,9 @@ def _parser() -> argparse.ArgumentParser:
                             "each installed in the project, never by Assertiva)")
     audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                        help="with --mutate: the mutation tool to use when several apply to the project")
-    audit.add_argument("--junit-xml", action="append", help="existing JUnit XML results to ingest as portable evidence (repeatable)")
+    audit.add_argument("--junit-xml", "--test-results", dest="junit_xml", action="append", metavar="PATH",
+                       help="existing test results to ingest as portable evidence: JUnit XML, CTRF JSON or an Allure "
+                            "results directory, recognized by shape (repeatable)")
     audit.add_argument("--provision", action="store_true",
                        help="with --execute: prepare what the tests need in isolation (interpreter environment, dependencies, JDK, "
                             "build tool, a disposable local database); downloads and runs installers outside the project")

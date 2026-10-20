@@ -12,7 +12,8 @@ from pathlib import Path
 
 from .adapters import artifact_adapters, runner_adapters, static_providers
 from .adapters.coverage_reports import load_coverage_report
-from .adapters.junit import load_junit
+from .adapters.junit import load_junit  # noqa: F401  (kept for callers importing it from here)
+from .adapters.portable_results import load_results, to_ctrf
 from .adapters.mutation import load_mutation_report
 from .config import ProjectConfig, load_config
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label, runnable_copy
@@ -371,7 +372,7 @@ def run_audit(
         findings.extend(declared_findings)
         if not current.runs:
             current.runs.extend(reproduced_runs)
-        current.runs.extend(load_junit(report) for report in junit_reports)
+        current.runs.extend(load_results(report) for report in junit_reports)
         if current.runs:
             findings.extend(_native_findings(current, static_total, tuple(runs_reported)))
             if any(run.invocations for run in current.runs):  # native collection found tests: the static "none" is contradicted
@@ -429,6 +430,9 @@ def run_audit(
     report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
     report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
     report["test_selection"] = selection_summary(selection)
+    executed = [run for run in current.runs if run.mode == "execute" and run.invocations]
+    if executed:  # portable results out: written beside the report by write_report, never into the project
+        report["exported"] = {"ctrf": to_ctrf(executed, "assertiva", f"assertiva {report['provenance']['assertiva_version']}")}
     report["delivery"] = {"matrix": {"declared": declared, "ci": covered}, "artifact_lineage": lineage}
     report["review_candidates"] = review
     report["declared_checks"] = reproduced

@@ -1,0 +1,1 @@
+{"uuid": "cd99c013-6ddf-4639-8682-c4b71c86036b", "children": ["4f5792bc-ae28-482a-b5fd-351453f7c84e"], "befores": [{"name": "ctrf_json_metadata", "status": "passed", "start": 1792496632903, "stop": 1792496632903}], "afters": [{"name": "ctrf_json_metadata::<lambda>", "start": 1792496632905}], "start": 1792496632903, "stop": 1792496632905}

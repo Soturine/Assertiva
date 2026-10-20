@@ -1,0 +1,140 @@
+{
+    "reportFormat": "CTRF",
+    "specVersion": "1.0.0",
+    "reportId": "45d41d1a-14f7-447b-b0a3-023bf7da25d4",
+    "timestamp": "2026-10-20T11:43:52.914618+00:00",
+    "generatedBy": "pytest",
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "9.1.1"
+        },
+        "summary": {
+            "tests": 6,
+            "passed": 4,
+            "failed": 1,
+            "skipped": 1,
+            "pending": 0,
+            "other": 0,
+            "flaky": 1,
+            "suites": 1,
+            "start": 1792496632846,
+            "stop": 1792496632914,
+            "duration": 68
+        },
+        "environment": {
+            "osPlatform": "win32",
+            "osRelease": "11",
+            "osVersion": "10.0.26200"
+        },
+        "tests": [
+            {
+                "name": "tests/test_shop.py::test_total_passes",
+                "status": "passed",
+                "duration": 0,
+                "start": 1792496632858,
+                "stop": 1792496632858,
+                "suite": [
+                    "tests/test_shop.py"
+                ],
+                "retries": 0,
+                "filePath": "tests\\test_shop.py"
+            },
+            {
+                "name": "tests/test_shop.py::test_discount_fails",
+                "status": "failed",
+                "rawStatus": "call_failed",
+                "duration": 3,
+                "start": 1792496632893,
+                "stop": 1792496632896,
+                "suite": [
+                    "tests/test_shop.py"
+                ],
+                "retries": 1,
+                "retryAttempts": [
+                    {
+                        "attempt": 1,
+                        "status": "failed",
+                        "duration": 34,
+                        "start": 1792496632858,
+                        "stop": 1792496632892,
+                        "message": "assert 1500 == 1400\n +  where 1500 = round((15000 * 0.1))",
+                        "trace": "def test_discount_fails():\n>       assert round(15000 * 0.1) == 1400\nE       assert 1500 == 1400\nE        +  where 1500 = round((15000 * 0.1))\n\ntests\\test_shop.py:12: AssertionError"
+                    }
+                ],
+                "filePath": "tests\\test_shop.py",
+                "trace": "def test_discount_fails():\n>       assert round(15000 * 0.1) == 1400\nE       assert 1500 == 1400\nE        +  where 1500 = round((15000 * 0.1))\n\ntests\\test_shop.py:12: AssertionError",
+                "message": "assert 1500 == 1400\n +  where 1500 = round((15000 * 0.1))"
+            },
+            {
+                "name": "tests/test_shop.py::test_coupon_skipped",
+                "status": "skipped",
+                "duration": 0,
+                "start": 1792496632897,
+                "stop": 1792496632897,
+                "suite": [
+                    "tests/test_shop.py"
+                ],
+                "retries": 0,
+                "filePath": "tests\\test_shop.py",
+                "message": "coupons are not decided yet"
+            },
+            {
+                "name": "tests/test_shop.py::test_rounding[100-10]",
+                "status": "passed",
+                "duration": 4,
+                "start": 1792496632898,
+                "stop": 1792496632902,
+                "suite": [
+                    "tests/test_shop.py"
+                ],
+                "retries": 0,
+                "filePath": "tests\\test_shop.py",
+                "parameters": {
+                    "cents": 100,
+                    "expected": 10
+                }
+            },
+            {
+                "name": "tests/test_shop.py::test_rounding[5-0]",
+                "status": "passed",
+                "duration": 2,
+                "start": 1792496632903,
+                "stop": 1792496632905,
+                "suite": [
+                    "tests/test_shop.py"
+                ],
+                "retries": 0,
+                "filePath": "tests\\test_shop.py",
+                "parameters": {
+                    "cents": 5,
+                    "expected": 0
+                }
+            },
+            {
+                "name": "tests/test_shop.py::test_flaky_then_passes",
+                "status": "passed",
+                "duration": 3,
+                "start": 1792496632910,
+                "stop": 1792496632913,
+                "suite": [
+                    "tests/test_shop.py"
+                ],
+                "retries": 1,
+                "retryAttempts": [
+                    {
+                        "attempt": 1,
+                        "status": "failed",
+                        "duration": 3,
+                        "start": 1792496632906,
+                        "stop": 1792496632909,
+                        "message": "assert False",
+                        "trace": "def test_flaky_then_passes():\n        marker = Path(os.environ[\"FLAKY_MARKER\"])\n        seen = marker.exists()\n        marker.write_text(\"x\")\n>       assert seen\nE       assert False\n\ntests\\test_shop.py:29: AssertionError"
+                    }
+                ],
+                "flaky": true,
+                "filePath": "tests\\test_shop.py"
+            }
+        ]
+    }
+}

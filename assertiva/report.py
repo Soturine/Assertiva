@@ -381,6 +381,10 @@ def execution_budget(level: str, decisions) -> dict:
 
 def write_report(report: dict, directory: Path, name: str) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
+    for kind, data in list((report.get("exported") or {}).items()):  # e.g. audit.ctrf.json: results other tools read
+        if isinstance(data, dict):
+            (directory / f"{name}.{kind}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+            report["exported"][kind] = f"{name}.{kind}.json"
     (directory / f"{name}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     target = directory / f"{name}.html"
     target.write_text(render_html(report), encoding="utf-8")

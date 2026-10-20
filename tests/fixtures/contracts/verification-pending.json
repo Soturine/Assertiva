@@ -1,0 +1,85 @@
+{
+  "errors": [],
+  "interactionResults": [
+    {
+      "consumer": "orders-web",
+      "description": "a member discount",
+      "duration": "2ms",
+      "mismatch": {
+        "interactionId": "",
+        "mismatches": [
+          {
+            "actual": "\"1500\"",
+            "expected": "1500",
+            "mismatch": "Expected '1500' (String) to be an integer",
+            "path": "$.discount",
+            "type": "BodyMismatch"
+          }
+        ],
+        "type": "mismatches"
+      },
+      "pending": true,
+      "provider": "pricing-api",
+      "providerStates": [
+        "a member order of 150.00"
+      ],
+      "result": "Error"
+    },
+    {
+      "consumer": "orders-web",
+      "description": "an unknown order",
+      "duration": "15ms",
+      "pending": false,
+      "provider": "pricing-api",
+      "providerStates": [
+        "no order 999"
+      ],
+      "result": "OK"
+    }
+  ],
+  "notices": [],
+  "output": [
+    "\nVerifying a pact between \u001b[1morders-web\u001b[0m and \u001b[1mpricing-api\u001b[0m",
+    "",
+    "  a member discount (0s loading, 2ms verification) \u001b[33m[PENDING]\u001b[0m",
+    "     Given a member order of 150.00",
+    "    returns a response which",
+    "      has status code \u001b[1m200\u001b[0m (\u001b[32mOK\u001b[0m)",
+    "      includes headers",
+    "        \"\u001b[1mContent-Type\u001b[0m\" with value \"\u001b[1mapplication/json\u001b[0m\" (\u001b[32mOK\u001b[0m)",
+    "      has a matching body (\u001b[31mFAILED\u001b[0m)",
+    "",
+    "  an unknown order (0s loading, 15ms verification)",
+    "     Given no order 999",
+    "    returns a response which",
+    "      has status code \u001b[1m404\u001b[0m (\u001b[32mOK\u001b[0m)",
+    "      has a matching body (\u001b[32mOK\u001b[0m)",
+    "",
+    "\nPending Failures:\n",
+    "1) Verifying a pact between orders-web and pricing-api Given a member order of 150.00 - a member discount",
+    "    1.1) has a matching body",
+    "           \u001b[1m$.discount\u001b[0m -> Expected '1500' (String) to be an integer",
+    "",
+    "\nThere were 1 non-fatal pact failures on pending pacts or interactions (see docs.pact.io/pending for more information)\n",
+    ""
+  ],
+  "pendingErrors": [
+    {
+      "interaction": "Verifying a pact between orders-web and pricing-api Given a member order of 150.00 - a member discount",
+      "mismatch": {
+        "interactionId": "",
+        "mismatches": [
+          {
+            "actual": "\"1500\"",
+            "expected": "1500",
+            "mismatch": "Expected '1500' (String) to be an integer",
+            "path": "$.discount",
+            "type": "BodyMismatch"
+          }
+        ],
+        "type": "mismatches"
+      }
+    }
+  ],
+  "result": true
+}

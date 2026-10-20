@@ -207,6 +207,11 @@
       "description": "Automated accessibility results read by the engine, per report: pages, violations, items needing review, rule counts and the claim boundary (no violation is not proof of accessibility).",
       "items": {"type": "object"}
     },
+    "contracts": {
+      "type": "array",
+      "description": "Consumer-driven contract evidence read by the engine: contract files (NOT_VERIFIED, or EMPTY without interactions) and provider verification results (VERIFIED, FAILED, PENDING_FAILURES, EMPTY), each with its interactions.",
+      "items": {"type": "object"}
+    },
     "exported": {
       "type": "object",
       "description": "Portable result files written beside this report, by kind (ctrf: the engine's executed runs as CTRF JSON); the file name once written, the data before.",

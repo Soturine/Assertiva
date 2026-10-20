@@ -1,0 +1,12 @@
+{
+  "errors": [],
+  "interactionResults": [],
+  "notices": [],
+  "output": [
+    "\nVerifying a pact between \u001b[1mreports-job\u001b[0m and \u001b[1mpricing-api\u001b[0m",
+    "\u001b[33mWARNING: Pact file has no interactions\u001b[0m",
+    ""
+  ],
+  "pendingErrors": [],
+  "result": true
+}

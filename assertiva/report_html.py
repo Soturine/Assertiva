@@ -1310,7 +1310,7 @@ def _snapshot(r: _R) -> str:
 
 def _evidence_area(r: _R) -> str:
     panels = (_metrics_panel(r) + _effectiveness(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
-              + _delivery(r) + _selection(r) + _history(r) + _accessibility(r))
+              + _delivery(r) + _selection(r) + _history(r) + _contracts(r) + _accessibility(r))
     return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><p class="eyebrow">{r.icon("doc", "ic")}{r.t("evidence.eyebrow")}</p>'
             f'<h2 id="h-evidence">{r.t("evidence.title")}</h2>{r.t("evidence.lead", tag="p", cls="lead")}</div>{_snapshot(r)}'
             f'<div class="sub-head panels-head"><h3>{r.t("ev.records")}</h3>{r.t("ev.records.lead", tag="p", cls="lead")}</div>'
@@ -2016,6 +2016,28 @@ def _history(r: _R) -> str:
             f'<div><h4>{r.t("hist.clusters")}</h4>{r.items(groups, "hist.clusters.none", kind="code")}</div></div>'
             + (r.items(history["limitations"]) if history["limitations"] else ""))
     return _panel(r, "history", "hist.title", r.t("hist.states", n=history["states_recorded"]), body)
+
+
+def _contracts(r: _R) -> str:
+    """Contract files and provider verifications, with the status that says what they prove."""
+    items = r.report.get("contracts") or []
+    if not items:
+        return ""
+    rows = []
+    for item in items:
+        if item.get("error"):
+            counts = _e(item["error"])
+        elif item["kind"] == "verification":
+            counts = f'{item["interactions"]} ({item["verified"]} / {item["failed"]} / {item["pending_failed"]})'
+        else:
+            counts = f'{item["interactions"]} · {_e(item.get("consumer"))} → {_e(item.get("provider"))}'
+        rows.append(f'<tr><th scope="row"><code>{_e(item["source"])}</code></th>'
+                    f'<td {r.label_attr("contracts.status")}><code>{_e(item.get("status") or "UNKNOWN")}</code></td>'
+                    f'<td {r.label_attr("contracts.interactions")}>{counts}</td></tr>')
+    table = (f'<div class="table-wrap"><table class="responsive"><caption>{r.t("contracts.caption")}</caption><thead><tr>'
+             f'<th scope="col">{r.t("contracts.item")}</th><th scope="col">{r.t("contracts.status")}</th>'
+             f'<th scope="col">{r.t("contracts.interactions")}</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+    return _panel(r, "contracts", "contracts.title", r.t("contracts.summary", n=len(items)), table + r.t("contracts.claim", tag="p", cls="muted"))
 
 
 def _accessibility(r: _R) -> str:

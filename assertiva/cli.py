@@ -54,7 +54,7 @@ def _emit(payload: dict, output: str, lines: list[str]) -> None:
         print("\n".join(lines))
 
 
-_MEASUREMENT = ("execute", "changed_since", "coverage_report", "mutation_report", "junit_xml", "run_check", "accessibility_report")
+_MEASUREMENT = ("execute", "changed_since", "coverage_report", "mutation_report", "junit_xml", "run_check", "accessibility_report", "contract")
 
 
 def _attach(root: Path, directory: Path, args: argparse.Namespace) -> int:
@@ -89,7 +89,7 @@ def _audit(args: argparse.Namespace) -> int:
         return _attach(root, directory, args)
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
                        junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since,
-                       accessibility_reports=args.accessibility_report or [],
+                       accessibility_reports=args.accessibility_report or [], contract_reports=args.contract or [],
                        ci_runs=args.ci_run or [], provision=args.provision,
                        run_checks=args.run_check or [], mutation_targets=args.mutate or [],
                        mutation_tool=args.mutation_tool)
@@ -260,6 +260,9 @@ def _parser() -> argparse.ArgumentParser:
                             "each installed in the project, never by Assertiva)")
     audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                        help="with --mutate: the mutation tool to use when several apply to the project")
+    audit.add_argument("--contract", action="append", metavar="PATH",
+                       help="a Pact contract file or a provider verification result (JSON) to ingest (repeatable); an empty "
+                            "or pending-only verification is never counted as verified")
     audit.add_argument("--accessibility-report", action="append", metavar="PATH",
                        help="existing axe-core JSON results to ingest (repeatable); no violation is never proof of accessibility")
     audit.add_argument("--junit-xml", "--test-results", dest="junit_xml", action="append", metavar="PATH",

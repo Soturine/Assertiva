@@ -717,3 +717,31 @@ def test_oracle_basis_separates_stated_contracts_from_recorded_output_and_leaves
     view = oracle_basis(facts)
     assert view["contract"] == 4 and view["characterization"] == 4 and view["undetermined"] >= 2
     assert "undetermined" in view["note"]
+
+
+def test_each_boundary_is_placed_on_the_fidelity_ladder(tmp_path):
+    from conftest import write
+
+    from assertiva.effectiveness import fidelity_ladder
+
+    write(tmp_path / "tests" / "test_py.py", (
+        "import responses\nfrom unittest import mock\n\n"
+        "def test_double():\n    with mock.patch('shop.api_client.get') as get:\n        get.return_value = 1\n        assert pay() == 1\n\n"
+        "@responses.activate\ndef test_intercepted():\n    responses.add(responses.GET, 'https://x', json={})\n    assert requests.get('https://x').ok\n\n"
+        "def test_in_process(client):\n    assert client.get('/orders').status_code == 200\n\n"
+        "def test_disposable():\n    with PostgresContainer('postgres:17') as pg:\n        assert repository.save(1)\n"))
+    write(tmp_path / "web" / "src" / "a.test.js", (
+        "test('simulated dom', () => { render(App); expect(screen.getByText('Hi')).toBeTruthy(); });\n"
+        "test('real browser', async () => { await page.goto('/'); await expect(page.locator('h1')).toHaveText('Hi'); });\n"))
+    write(tmp_path / "app" / "src" / "test" / "kotlin" / "ApiTest.kt", (
+        "class ApiTest {\n    @Test fun fakeServer() { val server = MockWebServer(); server.enqueue(r); assertEquals(1, call()) }\n}\n"))
+    facts, _ = collect(tmp_path)
+    rungs = {f.test_id.replace(" › ", "::").split("::")[-1]: set(f.rungs) for f in facts}
+    assert "NETWORK:DOUBLE" in rungs["test_double"]
+    assert "NETWORK:INTERCEPTED" in rungs["test_intercepted"]
+    assert rungs["test_in_process"] == {"HTTP:IN_PROCESS"}
+    assert "DATABASE:DISPOSABLE_REAL" in rungs["test_disposable"]
+    assert rungs["simulated dom"] == {"BROWSER:SIMULATOR"} and rungs["real browser"] == {"BROWSER:REAL"}
+    assert rungs["fakeServer"] == {"HTTP:SIMULATOR"}
+    ladder = fidelity_ladder(facts)
+    assert ladder["boundaries"]["BROWSER"] == {"SIMULATOR": 1, "REAL": 1} and "not that the run reached it" in ladder["note"]

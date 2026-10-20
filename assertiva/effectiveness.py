@@ -63,6 +63,8 @@ class TestFacts:
     # where the expected values visibly come from: PROPERTY, SCHEMA (a contract the test states) or SNAPSHOT,
     # GOLDEN_FILE, APPROVAL (recorded output: characterization). A literal expected value shows neither.
     basis_signals: tuple[str, ...] = ()
+    # how close to the real thing each boundary is exercised, "BOUNDARY:RUNG" (see LADDER)
+    rungs: tuple[str, ...] = ()
 
 
 @dataclass
@@ -233,6 +235,23 @@ def mutation_contribution(runs) -> dict:
     }
 
 
+# from furthest to closest to production: a replaced collaborator, requests caught at the boundary, a fake
+# implementation of it, the real code in the same process, a real service made for the test, the real thing
+LADDER = ("DOUBLE", "INTERCEPTED", "SIMULATOR", "IN_PROCESS", "DISPOSABLE_REAL", "REAL")
+
+
+def fidelity_ladder(facts: list[TestFacts]) -> dict:
+    """Per boundary, how many tests reach each rung (a test counts once per boundary, at the rung its code shows)."""
+    ladder: dict[str, Counter] = defaultdict(Counter)
+    for f in facts:
+        for item in f.rungs:
+            boundary, rung = item.split(":", 1)
+            ladder[boundary][rung] += 1
+    return {"rungs": list(LADDER), "boundaries": {b: {r: c[r] for r in LADDER if c[r]} for b, c in sorted(ladder.items())},
+            "note": "read from test code: a rung says how the boundary is exercised, not that the run reached it (a browser "
+                    "test that was not executed proves nothing); REAL for a device means an emulator or a device"}
+
+
 CONTRACT_SIGNALS = frozenset({"PROPERTY", "SCHEMA"})
 CHARACTERIZATION_SIGNALS = frozenset({"SNAPSHOT", "GOLDEN_FILE", "APPROVAL"})
 
@@ -268,7 +287,8 @@ def summarize(facts: list[TestFacts], limitations: dict[str, list[str]], mutatio
         "behavioral_surfaces": dict(Counter(s for f in facts for s in f.surfaces)),
         "negative_and_boundary_paths": {"error_expectations": sum(bool({"SPECIFIC_ERROR", "BROAD_ERROR"} & set(f.oracles)) for f in facts),
                                         "broad": sum("BROAD_ERROR" in f.oracles for f in facts)},
-        "fidelity": {"declared_levels": dict(Counter(f.declared_level or "UNDECLARED" for f in facts)),
+        "fidelity": {"ladder": fidelity_ladder(facts),
+                     "declared_levels": dict(Counter(f.declared_level or "UNDECLARED" for f in facts)),
                      "boundaries_crossed": dict(Counter(b for f in facts for b in set(f.boundaries) - set(f.simulated))),
                      "boundaries_simulated": dict(Counter(b for f in facts for b in f.simulated))},
         "double_fidelity": {"tests_with_doubles": sum(bool(f.doubles) for f in facts),

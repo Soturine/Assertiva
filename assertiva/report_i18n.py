@@ -390,6 +390,8 @@ UI: dict[str, tuple[str, str]] = {
     "eff.crossed": ("Boundaries crossed", "Limites atravessados"),
     "eff.simulated": ("Boundaries simulated", "Limites simulados"),
     "eff.exclusive": ("Only detector of a mutant", "Único detector de um mutante"),
+    "eff.ladder": ("Fidelity ladder per boundary (double → intercepted → simulator → in process → disposable real → real)",
+                   "Escada de fidelidade por fronteira (dublê → interceptado → simulador → no processo → real descartável → real)"),
     "eff.oracle_basis": ("Where expected values come from (contract / characterization / undetermined)",
                          "Origem dos valores esperados (contrato / caracterização / indeterminado)"),
     "eff.subsumed": ("Detects only mutants another test detects (known mutants; never a reason to remove alone)",

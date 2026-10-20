@@ -165,6 +165,36 @@ _BASIS = (
 )
 
 
+_DISPOSABLE = re.compile(r"[Tt]estcontainers|(?:Generic|Postgres|PostgreSQL|MySql|MySQL|MariaDB|Redis|Mongo|MongoDB|Kafka|LocalStack|Neo4j|Elasticsearch)Container\b|@Container\b|docker_compose|DockerCompose")
+_INTERCEPT = re.compile(r"responses\.(?:activate|add)|respx\.|requests_mock|httpretty|\bnock\(|setupServer\(|setupWorker\(|"
+                        r"\bpage\.route\(|\bcy\.intercept\(|msw")
+_SIMULATOR = re.compile(r"MockWebServer|WireMock|MockEngine|:memory:|\bH2\b|jdbc:h2|inMemoryDatabaseBuilder|mongomock|fakeredis|"
+                        r"\bmoto\b|mock_aws|@mock_|Robolectric|jsdom|happy-dom|\brender\(|\bmount\(")
+_IN_PROCESS = re.compile(r"\bclient\.(?:get|post|put|patch|delete)\(|\bself\.client\.|TestClient\(|request\(\s*app\b|supertest|"
+                         r"mockMvc|MockMvc|webTestClient|test_client\(")
+
+
+def _rungs(text: str, boundaries, simulated) -> tuple[str, ...]:
+    """Each boundary with the rung its code shows (``effectiveness.LADDER``): a disposable real service wins over a
+    simulated one, interception over a plain double; a crossed boundary is IN_PROCESS for framework test clients."""
+    out = []
+    for boundary in sorted(boundaries):
+        if boundary in ("BROWSER", "DEVICE"):
+            rung = "SIMULATOR" if boundary in simulated else "REAL"
+        elif _DISPOSABLE.search(text):
+            rung = "DISPOSABLE_REAL"
+        elif boundary in simulated:
+            rung = "INTERCEPTED" if _INTERCEPT.search(text) else "SIMULATOR" if _SIMULATOR.search(text) else "DOUBLE"
+        elif boundary in ("HTTP", "NETWORK") and _IN_PROCESS.search(text):
+            rung = "IN_PROCESS"
+        elif boundary == "DATABASE" and _SIMULATOR.search(text):
+            rung = "SIMULATOR"
+        else:
+            rung = "REAL"
+        out.append(f"{boundary}:{rung}")
+    return tuple(out)
+
+
 def _basis_signals(text: str) -> tuple[str, ...]:
     """Where a test's expected values visibly come from (see ``TestFacts.basis_signals``), read from its source."""
     return tuple(name for name, pattern in _BASIS if pattern.search(text))
@@ -430,6 +460,7 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
     return TestFacts(test_id=test_id, path=rel, language="python", oracles=oracles, assertions=len(asserts), doubles=tuple(doubles),
                      boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)), surfaces=tuple(sorted(surfaces)),
                      smells=tuple(dict.fromkeys(smells)), declared_level=_level(rel, markers), basis_signals=basis,
+                     rungs=_rungs(ast.unparse(node), boundaries, simulated),
                      oracle_signature=" ; ".join(sorted(_norm(s) for s in signature)), parameters=tuple(parameters),
                      parameter_expressions=tuple(expressions), body_signature=_python_body(node))
 
@@ -681,7 +712,8 @@ def _js_test(test_id, rel, body, body_clean, file_doubles, level, msw, retries) 
     return TestFacts(test_id=test_id, path=rel, language="javascript", oracles=tuple(dict.fromkeys(oracles)), assertions=len(signature),
                      doubles=tuple(doubles), boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)),
                      surfaces=tuple(sorted(surfaces)), smells=tuple(dict.fromkeys(smells)), declared_level=level,
-                     oracle_signature=" ; ".join(sorted(signature)), body_signature=_norm(body), basis_signals=_basis_signals(body))
+                     oracle_signature=" ; ".join(sorted(signature)), body_signature=_norm(body), basis_signals=_basis_signals(body),
+                     rungs=_rungs(body, boundaries, simulated | ({"HTTP"} if msw else set())))
 
 
 # --- Kotlin / Java -----------------------------------------------------------------------------
@@ -852,7 +884,7 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
                      doubles=tuple(doubles), boundaries=tuple(sorted(boundaries)), simulated=tuple(sorted(simulated)),
                      surfaces=tuple(sorted(surfaces)), smells=tuple(dict.fromkeys(smells)), declared_level=level,
                      oracle_signature=" ; ".join(sorted(signature)), parameters=rows, body_signature=_norm(body),
-                     basis_signals=_basis_signals(header + body))
+                     basis_signals=_basis_signals(header + body), rungs=_rungs(body, boundaries, simulated))
 
 
 def collect(root: str | Path) -> tuple[list[TestFacts], dict[str, list[str]]]:

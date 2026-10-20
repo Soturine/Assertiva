@@ -1841,6 +1841,9 @@ def _effectiveness(r: _R) -> str:
              ("eff.levels", ", ".join(f"{k} {v}" for k, v in sorted((fidelity.get("declared_levels") or {}).items())) or "—"),
              ("eff.crossed", ", ".join(f"{k} {v}" for k, v in sorted((fidelity.get("boundaries_crossed") or {}).items())) or "—"),
              ("eff.simulated", ", ".join(f"{k} {v}" for k, v in sorted((fidelity.get("boundaries_simulated") or {}).items())) or "—")]
+    ladder = (fidelity.get("ladder") or {}).get("boundaries") or {}
+    if ladder:
+        facts.append(("eff.ladder", "; ".join(f"{b}: " + ", ".join(f"{k} {v}" for k, v in rungs.items()) for b, rungs in ladder.items())))
     basis = (dims.get("oracle_strength") or {}).get("oracle_basis")
     if basis:
         facts.append(("eff.oracle_basis", f'{basis["contract"]} / {basis["characterization"]} / {basis["undetermined"]}'))

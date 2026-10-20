@@ -16,6 +16,38 @@ Assertiva audits whether a test suite provides meaningful evidence, selects the 
 
 *The Assurance Report from a real `assertiva audit --execute` run on [`tests/fixtures/django-site`](tests/fixtures/django-site): one self-contained, offline HTML page (English / Brazilian Portuguese, light / dark).*
 
+> **Assertiva v0.9.0** — Advanced Test Intelligence & Continuous Assurance. It is distributed as its [GitHub Release](https://github.com/Soturine/Assertiva/releases/tag/v0.9.0) (wheel and sdist, with SHA-256 checksums) and from this repository's source. It is **not** published on PyPI or in any Skill marketplace. Python 3.11 or newer.
+
+## Quick start
+
+```bash
+# 1. Install. From a clone of this repository, or from the wheel attached to the GitHub Release:
+python -m pip install -e .
+python -m pip install assertiva-0.9.0-py3-none-any.whl      # alternative: the release wheel
+assertiva --version                                          # assertiva 0.9.0
+
+# 2. First audit: static. It reads the project, runs nothing and changes nothing.
+assertiva audit path/to/project
+
+# 3. Run the tests too. They run in a disposable copy, with the project's own runner.
+#    --python names the project's interpreter (default: the one running Assertiva).
+assertiva audit path/to/project --execute
+
+# The last line names the report. audit.html is the page to open in a browser; audit.json holds the same evidence.
+
+# 4. Would the tests catch a real defect? Mutation testing, run by the engine on a disposable copy
+#    (the tool, e.g. Cosmic Ray, StrykerJS or PIT, must already be installed in the project):
+assertiva audit path/to/project --execute --mutate src/pricing.py
+
+# 5. Improve. The first call measures the baseline and prints a candidate workspace; write test changes there.
+assertiva improve path/to/project
+assertiva improve path/to/project                            # qualifies them; the project is still untouched
+assertiva improve path/to/project --approve <change-id>      # your decision: only approved changes are applied
+assertiva improve path/to/project --discard                  # or drop the candidate
+```
+
+A reproducible end-to-end example, with the numbers observed, is in [Proof of Protection](docs/PROOF_OF_PROTECTION.md). For how the agent uses all of this, see [SKILL.md](SKILL.md).
+
 ## Why
 
 Modern coding agents can generate, modify, run, and even "fix" tests very quickly. That creates a new failure mode: implementation, tests, and validation can all share the same wrong assumption while CI remains green.
@@ -103,7 +135,7 @@ The model is designed to accommodate ecosystems such as pytest, JUnit, Jest, Vit
 
 With the owner's consent, `--execute --provision` prepares what the tests need outside the project (a virtual environment, `npm ci`, a JDK and Gradle, a disposable PostgreSQL) and removes it afterwards. Every audit also reports test effectiveness — likely false greens, weak oracles, fidelity mismatches, redundancy and smells — from one model shared by Python, JavaScript/TypeScript and Kotlin/Java, as leads the agent confirms or rejects.
 
-**Not implemented yet:** .NET (xUnit/NUnit/MSTest), Go, Rust, PHP and other ecosystems; Android instrumented tests and non-JVM Kotlin Multiplatform targets are listed, not run. They degrade conservatively and explicitly to CUSTOM/UNKNOWN evidence, never to "0 tests" and never by silently inventing flags. See [STATUS.md](STATUS.md).
+**Not implemented yet:** .NET (xUnit/NUnit/MSTest), Go, Rust, PHP and other ecosystems; Android instrumented tests and non-JVM Kotlin Multiplatform targets are listed, not run. They degrade conservatively and explicitly to CUSTOM/UNKNOWN evidence, never to "0 tests" and never by silently inventing flags. Engine-run mutation testing covers Python, JavaScript/TypeScript (Jest, Vitest) and Maven; PIT through Gradle is import-only, and other ecosystems are planned for 1.0. Assertiva is not distributed through PyPI or any marketplace. See [STATUS.md](STATUS.md) and [ROADMAP.md](ROADMAP.md).
 
 ## Test Evidence Graph
 
@@ -141,27 +173,50 @@ The HTML Assurance Report is the main product surface: one self-contained, offli
 
 There is no aggregate score. Candidate metrics are never presented as already applied. Assertiva's own presentation and generated narrative are localized; raw technical or external evidence (commands, paths, tool output) stays in its original language. Original tests stay untouched in the project until human approval; retirement candidates are never auto-deleted or silently commented out. Details: [User Experience and Reporting](docs/USER_EXPERIENCE_AND_REPORTING.md).
 
+### Isolation, approval and limits
+
+- **Static by default.** `assertiva audit` reads files; it runs nothing. Tests run only with `--execute`, with the project's own declared runner, in a disposable copy of the project (installed dependency directories such as `node_modules` are linked into the copy, never copied).
+- **Read-only guard.** Every project file is fingerprinted before and after an audit; if any changed, the command exits 3.
+- **Not a sandbox.** Project code runs with your user's permissions and network. Run it only on projects whose tests you would run yourself. [Execution Security](docs/EXECUTION_SECURITY.md) lists what is enforced and the residual risks.
+- **Consent is yours, never the repository's.** Preparing environments needs your `--provision` flag (or `provision = true` in your consent file); reproducing a discovered CI or hook step needs `--run-check`; migrations, containers and unknown commands also need the exact command authorized in `<ASSERTIVA_HOME>/consent.toml`, outside every project. Deploy and publish commands never run.
+- **Improve changes nothing until you approve.** Candidate changes are written only in the candidate workspace; applying needs `--approve` with the change ids, refuses if the project or the candidate changed since qualification, and is verified afterwards.
+- **A tool Assertiva needs is never installed for you.** A missing test runner or mutation tool makes that step BLOCKED with the reason; BLOCKED is never a pass.
+
+### Mutation testing: run by the engine, or imported
+
+| | Run by Assertiva (`--mutate FILE`) | Imported (`--mutation-report`) |
+|---|---|---|
+| Tools | Cosmic Ray (Python tests under pytest, unittest or Django), StrykerJS (Jest or Vitest), PIT (Maven builds that declare `pitest-maven`) | Stryker-family JSON, PIT `mutations.xml`, Cosmic Ray `dump`, mutmut stats (counts only) |
+| Choice | by what the project uses; `--mutation-tool` picks one when several apply; never all of them | the report's own tool |
+| Where | a disposable copy of the measured state, with a configuration Assertiva writes | wherever it was produced |
+| Tied to the state | yes: the sources it mutated and the tests it ran are recorded from the copy | only if the report shows both the source and the tests it ran and they match; otherwise it is a lead |
+| In `improve` | the same mutants run on the baseline and on the candidate: protection gained and lost | compared only when tied on both states |
+| Limits | the suite must pass first; Cosmic Ray refuses more than 300 planned mutants; StrykerJS and PIT run every mutant of the named files; a run that did not finish never passes; PIT through Gradle is import-only | what the report records |
+
+Negative controls (deliberate, hand-made breaks of behavior) are a separate instrument and are named as such in the report.
+
 ### Skill, engine and evaluation
 
 | Surface | What you get |
 |---|---|
-| `/assertiva` | the auditing agent: reads code, tests and CI, decides what evidence the question needs, runs the engine when it helps, reconciles engine findings with what it finds, and attaches its assessment to the engine's report |
-| `/assertiva` without the engine installed | the same investigation from what the agent can read and run safely; no engine evidence and no HTML report |
-| `assertiva audit` / `assertiva improve` | the deterministic engine directly |
+| `/assertiva` with the engine installed | the auditing agent: reads code, tests and CI, decides what evidence the question needs, runs the engine when it helps, reconciles engine findings with what it finds, and attaches its assessment to the engine's report |
+| `/assertiva` without the engine | the same investigation from what the agent can read and run safely in a copy; no engine evidence and no HTML report, and it says so |
+| `assertiva audit` / `assertiva improve` (the CLI, no agent) | the deterministic engine on its own: evidence, report and the approval flow, without an agent's judgment |
 | [`evals/semantic.py`](evals/semantic.py) | evaluation/benchmark of the Skill itself; its PASS/FAIL/REVIEW verdicts are never part of a normal audit |
 
-How the agent works, its boundaries and its claim classes live in [SKILL.md](SKILL.md) and its [references](references/).
+The Skill is this repository's `SKILL.md` and its [references](references/); put or link that directory where your agent loads skills. How the agent works, its boundaries and its claim classes live in [SKILL.md](SKILL.md). The engine is optional for the Skill and independent of it. The Skill's guidance is checked by deterministic tests of the engine it points to, not by behavioral evaluation with agents: that evaluation is planned for 1.0 (see [ROADMAP.md](ROADMAP.md)).
 
 ## Current status
 
-`audit` and `improve` work end to end. Runners: pytest, unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe) and Gradle, with JUnit XML, mutation reports and coverage reports (coverage.py, istanbul, LCOV, Cobertura, JaCoCo) as portable evidence; unrecognized ecosystems report UNKNOWN rather than "0 tests". Milestone status and exact claim boundaries live in [STATUS.md](STATUS.md).
+`audit` and `improve` work end to end. Runners: pytest, unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe) and Gradle, with JUnit XML, CTRF and Allure results, mutation reports, coverage reports (coverage.py, istanbul, LCOV, Cobertura, JaCoCo), Pact contracts and verifications and axe-core results as portable evidence; unrecognized ecosystems report UNKNOWN rather than "0 tests". Milestone status and exact claim boundaries live in [STATUS.md](STATUS.md).
 
 ```bash
-python -m pip install -e .
-
 # Read-only audit (static); --execute also runs tests and qualifies the built artifact, in disposable copies.
 assertiva audit .
-assertiva audit . --execute --coverage-report coverage.xml --mutation-report mutation.json --junit-xml results.xml
+assertiva audit . --execute --coverage-report coverage.xml --mutation-report mutation.json --test-results results.xml
+assertiva audit . --execute --mutate src/pricing.py [--mutation-tool cosmic-ray|stryker|pit]   # mutation testing run by the engine
+assertiva audit . --execute --ctrf                 # also write the executed runs as CTRF JSON beside the report
+assertiva audit . --contract verification.json --accessibility-report axe.json   # Pact and axe-core results to ingest
 assertiva audit . --changed-since main --execute   # impact-based selection, widened when impact is not proven
 assertiva audit . --run-check <CHECK_ID>           # reproduce a declared check (e.g. the CI test step) in a disposable copy
 assertiva audit . --assessment assessment.json    # attach the auditing agent's assessment to the last run's report
@@ -169,14 +224,14 @@ assertiva audit . --assessment assessment.json    # attach the auditing agent's 
 # Improve: one command, called again at each step.
 assertiva improve .                      # measure baseline, create the candidate workspace
 #   ...write candidate changes in the printed workspace...
-assertiva improve . --negative-controls controls.json \
-                    --mutation-report baseline=base.json --mutation-report candidate=cand.json \
+assertiva improve . --negative-controls controls.json --mutate src/pricing.py \
                     --run-check <CHECK_ID>               # qualify; the project is still untouched
+#   (or compare reports: --mutation-report baseline=base.json --mutation-report candidate=cand.json)
 assertiva improve . --approve tests/test_new.py          # apply only the approved changes, then verify
 assertiva improve . --discard                            # or drop the candidate
 ```
 
-Developing Assertiva itself: `pytest -m "not integration and not artifact"` gives fast feedback (~25 s); `pytest -n auto` runs everything (every suite runs in CI on every commit; real browser and JVM runs in their own jobs).
+Developing Assertiva itself: `pytest -m "not integration and not artifact"` gives fast feedback (about a minute); `pytest -n auto` runs everything (every suite runs in CI on every commit; real browser and JVM runs in their own jobs).
 
 **One run, one canonical page.** `assertiva audit` writes `audit.html` + `audit.json`; `assertiva improve` writes `improve.html` + `improve.json`, with baseline, candidate and applied inside the same page. Reports, execution traces and history live under `ASSERTIVA_HOME` (default `~/.assertiva`), outside the project; `--report-dir` chooses another directory outside the project. Several HTML files exist only when several independent runs do (one per project or scenario, as in dogfooding); a single run is never split across pages. `--python` selects the project's interpreter.
 
@@ -185,9 +240,9 @@ Developing Assertiva itself: `pytest -m "not integration and not artifact"` give
 What runs today:
 - runtime-enforced read-only audit (exit code 3 if any project file changed);
 - isolated candidate (Git worktree or copy), ADD / MODIFY / RETIRE_CANDIDATE change sets, explicit approval by change id, stale-baseline refusal, post-apply verification;
-- five qualification pillars — execution (native discovery, candidate tests), behavioral assurance (original regression against the candidate, coverage/oracle deltas, negative-path depth), fault sensitivity (negative controls, ingested mutation reports), delivery fidelity (pipeline-equivalent reproduction: discovered → authorized → executed; built/installed artifact qualification) and stability and cost; preview deployment is reported as not evidenced, never run against production;
-- impact-based test selection (`--changed-since`): a revision-scoped impact graph (Python), conservative widening, fixture-level `conftest.py` granularity and monorepo components; a green selected set is reported as a selected-set claim;
-- a local, optional history (stability across runs, duration percentiles with enough samples, deterministic failure fingerprints);
+- five qualification pillars — execution (native discovery, candidate tests), behavioral assurance (original regression against the candidate, coverage/oracle deltas, negative-path depth), fault sensitivity (negative controls, mutation runs the engine executes on both states, ingested mutation reports), delivery fidelity (pipeline-equivalent reproduction: discovered → authorized → executed; built/installed artifact qualification) and stability and cost; preview deployment is reported as not evidenced, never run against production;
+- impact-based test selection (`--changed-since`): a revision-scoped impact graph (Python), conservative widening, fixture-level `conftest.py` granularity and monorepo components; comment- and formatting-only changes select nothing, dependency-file changes list what changed and widen, a project can declare which tests a data file affects, and the selection comes with a history-based order; a green selected set is reported as a selected-set claim;
+- a local, optional history (stability across runs, duration percentiles with enough samples, deterministic failure fingerprints, and for each failure an inferred origin, whether it is new, recurring or a regression, and a probe for order dependence);
 - delivery intelligence from GitHub Actions, Azure Pipelines, GitLab CI and Jenkins configuration: declared vs selected runtimes and browser projects, artifact lineage, review candidates;
 - one canonical, decision-first Assurance Report per run (English and Brazilian Portuguese) with baseline/candidate/applied states, Evidence Delta, remaining unknowns and "What does green prove?" — no aggregate score.
 

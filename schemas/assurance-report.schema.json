@@ -202,6 +202,11 @@
       },
       "additionalProperties": false
     },
+    "accessibility": {
+      "type": "array",
+      "description": "Automated accessibility results read by the engine, per report: pages, violations, items needing review, rule counts and the claim boundary (no violation is not proof of accessibility).",
+      "items": {"type": "object"}
+    },
     "exported": {
       "type": "object",
       "description": "Portable result files written beside this report, by kind (ctrf: the engine's executed runs as CTRF JSON); the file name once written, the data before.",

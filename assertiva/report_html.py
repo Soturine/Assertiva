@@ -1310,7 +1310,7 @@ def _snapshot(r: _R) -> str:
 
 def _evidence_area(r: _R) -> str:
     panels = (_metrics_panel(r) + _effectiveness(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
-              + _delivery(r) + _selection(r) + _history(r))
+              + _delivery(r) + _selection(r) + _history(r) + _accessibility(r))
     return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><p class="eyebrow">{r.icon("doc", "ic")}{r.t("evidence.eyebrow")}</p>'
             f'<h2 id="h-evidence">{r.t("evidence.title")}</h2>{r.t("evidence.lead", tag="p", cls="lead")}</div>{_snapshot(r)}'
             f'<div class="sub-head panels-head"><h3>{r.t("ev.records")}</h3>{r.t("ev.records.lead", tag="p", cls="lead")}</div>'
@@ -2016,6 +2016,29 @@ def _history(r: _R) -> str:
             f'<div><h4>{r.t("hist.clusters")}</h4>{r.items(groups, "hist.clusters.none", kind="code")}</div></div>'
             + (r.items(history["limitations"]) if history["limitations"] else ""))
     return _panel(r, "history", "hist.title", r.t("hist.states", n=history["states_recorded"]), body)
+
+
+def _accessibility(r: _R) -> str:
+    """Pages an automated accessibility engine checked: violations, items it could not decide, and the claim boundary."""
+    reports = r.report.get("accessibility") or []
+    if not reports:
+        return ""
+    rows = []
+    for report in reports:
+        if report.get("error"):
+            rows.append(f'<tr><th scope="row"><code>{_e(report["source"])}</code></th><td colspan="3" class="raw-text" lang="en">{_e(report["error"])}</td></tr>')
+        for page in report.get("pages") or []:
+            violations = [f'{v["rule"]} ({v["impact"]}, {v["nodes"]})' for v in page["violations"]]
+            review = [f'{v["rule"]} ({v["nodes"]})' for v in page["needs_review"]]
+            rows.append(f'<tr><th scope="row"><code>{_e(page["url"] or page["source"])}</code></th>'
+                        f'<td {r.label_attr("a11y.violations")}>{r.items(violations, "a11y.none", kind="code")}</td>'
+                        f'<td {r.label_attr("a11y.review")}>{r.items(review, "a11y.none", kind="code")}</td>'
+                        f'<td {r.label_attr("a11y.engine")}><code>{_e(page["engine"])} {_e(page["engine_version"])}</code> · {page["passed_rules"]}</td></tr>')
+    table = (f'<div class="table-wrap"><table class="responsive"><caption>{r.t("a11y.caption")}</caption><thead><tr>'
+             f'<th scope="col">{r.t("a11y.page")}</th><th scope="col">{r.t("a11y.violations")}</th><th scope="col">{r.t("a11y.review")}</th>'
+             f'<th scope="col">{r.t("a11y.engine")}</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+    pages = sum(len(report.get("pages") or []) for report in reports)
+    return _panel(r, "accessibility", "a11y.title", r.t("a11y.summary", n=pages), table + r.t("a11y.claim", tag="p", cls="muted"))
 
 
 def _failure_cell(r: _R, entry: dict) -> str:

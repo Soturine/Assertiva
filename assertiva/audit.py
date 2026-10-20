@@ -14,6 +14,7 @@ from .adapters import artifact_adapters, runner_adapters, static_providers
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.junit import load_junit  # noqa: F401  (kept for callers importing it from here)
 from .adapters.portable_results import load_results, to_ctrf
+from .adapters.accessibility import findings as accessibility_findings, load_accessibility
 from .adapters.mutation import load_mutation_report
 from .config import ProjectConfig, load_config
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label, runnable_copy
@@ -302,6 +303,7 @@ def run_audit(
     mutation_reports: list[str | Path] | tuple = (),
     junit_reports: list[str | Path] | tuple = (),
     coverage_reports: list[str | Path] | tuple = (),
+    accessibility_reports: list[str | Path] | tuple = (),
     changed_since: str | None = None,
     run_checks: list[str] | tuple = (),
     ci_runs: list[str | Path] | tuple = (),
@@ -373,6 +375,9 @@ def run_audit(
         if not current.runs:
             current.runs.extend(reproduced_runs)
         current.runs.extend(load_results(report) for report in junit_reports)
+        accessibility = [load_accessibility(report) for report in accessibility_reports]
+        for result in accessibility:
+            findings.extend(accessibility_findings(result))
         if current.runs:
             findings.extend(_native_findings(current, static_total, tuple(runs_reported)))
             if any(run.invocations for run in current.runs):  # native collection found tests: the static "none" is contradicted
@@ -430,6 +435,8 @@ def run_audit(
     report = audit_model(root, baseline, findings, current, surface, limitations, [a.adapter_id for a in adapters], status)
     report["execution_budget"] = execution_budget("execute" if execute and adapters else "static", current.budget)
     report["test_selection"] = selection_summary(selection)
+    if accessibility_reports:
+        report["accessibility"] = accessibility
     executed = [run for run in current.runs if run.mode == "execute" and run.invocations]
     if executed:  # portable results out: written beside the report by write_report, never into the project
         report["exported"] = {"ctrf": to_ctrf(executed, "assertiva", f"assertiva {report['provenance']['assertiva_version']}")}

@@ -24,6 +24,11 @@ In progress on `release/0.9.0`, by checkpoints; it includes the scope first plan
 - **Complete improvement flows in three stacks:** the protection walk-through now runs on JavaScript (StrykerJS: 6 gained, 0 lost) and Java (PIT: 4 gained, 0 lost) as well as Python, each gain attributed to the named tests (`docs/PROOF_OF_PROTECTION.md`). PIT runs record the plugin version the pom declares.
 - Agent reference (`references/TEST_QUALITY.md`) explains survivor sites, oracle basis and subsumption. **Not semantically evaluated.**
 
+### Selection, risk and failure intelligence (CP4)
+- **Order dependence (fix):** improve's stability reruns run the relevant tests alone, so a failure caused by state an earlier, unchanged test left behind passed when rerun and was reported as unstable. Such failures now get one bounded repeat of the full run: failing again the same way gives `ORDER_DEPENDENT_SUSPECT` (the stability check fails and says so). Reproduced with a shared registry filled by another test file.
+- **Failure origin, novelty and clusters:** each failing invocation in history carries an inferred origin (infrastructure, test code, product, or UNKNOWN for an assertion that did not hold), its novelty (new failure with the revision where it last passed, recurring, changed, no history), and failures raised at the same site with the same exception type are grouped. Shown in the History panel.
+- **Selection:** cosmetic changes (same normalized form) select nothing and are listed; dependency file changes list the packages that changed and widen to their component or the full suite; `.assertiva.toml [[impact.map]]` declares tests for files no adapter relates (marked declared, never proven); `--changed-since` carries a history-based priority order. The matched experiment adds a string-literal defect, a declared-map project and a cosmetic change; no defect is missed.
+
 ## [Unreleased] — 0.8.0 — Intelligence & Proof of Protection
 
 In progress on `release/0.8.0`. Compatible with 0.7.2: report fields and metrics are only added; existing ones keep their meaning.

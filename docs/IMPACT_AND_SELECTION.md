@@ -38,6 +38,22 @@ Combining independent sources can improve recall.
 - Every selected test carries its reason, weakest evidence tier and proof path; every unselected test says why; widening triggers, unknown dependencies and the fallback are recorded.
 - Runners select through an optional adapter capability; a runner that cannot select runs its full suite and the report says so.
 
+### Change kinds and declarations (0.9.0)
+
+- **Cosmetic changes:** a modified file whose normalized form is the same at both revisions selects nothing and is listed under `cosmetic`. Python compares syntax trees (comments and formatting vanish; docstrings count, since doctests read them); JavaScript/TypeScript, Java, Kotlin and other brace languages compare the text without comments and with spaces collapsed inside each line (line breaks kept). Other files are never called cosmetic. When every change is cosmetic the selection is empty and says so; tests reaching an unknown relation are still added.
+- **Dependency changes:** lockfiles (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `uv.lock`, `Pipfile.lock`, `Gemfile.lock`, `go.sum`, `Cargo.lock`, `gradle.lockfile`, `composer.lock`, …) and `requirements*.txt`/`constraints*.txt` widen with trigger `DEPENDENCY_CHANGE` to their component and its dependents, or to the full suite, and `dependency_changes` lists what changed (`requests 2.31.0 -> 2.32.3`, `+urllib3 2.2.1`) for the formats read (npm lock, poetry/uv lock, requirements).
+- **Declared impact maps:** a project can declare which tests a file no adapter relates affects (data, templates, SQL):
+
+  ```toml
+  [[impact.map]]
+  changes = "data/*.json"
+  tests = ["tests/test_tax.py"]
+  ```
+
+  The declared tests carry trigger `DECLARED_MAP` and the reason "declared by the project … not a proven path"; the confidence is `BOUNDED_BY_UNKNOWNS`. For a file no adapter relates, the declaration stands in for the full-suite widening; for a mapped file it only adds tests.
+- **Priority:** with history, `test_selection.priority` orders the selected test files: those that failed in their last recorded run, then those that failed before, then by median duration (fastest first). It orders; it never removes a test.
+- The matched experiment (`tests/test_selection_experiment.py`) covers these: a string-literal defect is not cosmetic and is caught, a declared map still catches its data-file defect, and a comments-and-formatting change selects none of the changed files' tests while the full suite stays green.
+
 ## Monorepo affected set (implemented, M2)
 
 `assertiva/components.py` models components (workspace/package/module), declared `depends_on` and `affected_by_change`. Only explicit layouts are read: npm `package.json` workspaces and `pyproject.toml` projects in subdirectories (PEP 503-normalized dependency names). Maven/Gradle modules, pnpm and other layouts are not read yet.

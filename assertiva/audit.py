@@ -272,6 +272,27 @@ def _declared_checks(root: Path, surface, requested, adapters, python: str | Non
 
 
 @scoped
+def _priority(root: Path, tests: list[str]) -> list[dict]:
+    """The selected tests in the order history suggests (see ``selection.prioritize``); empty without history."""
+    import sqlite3
+
+    from .history import HistoryError, HistoryStore
+    from .selection import prioritize
+
+    try:
+        store = HistoryStore.for_project(root)
+    except HistoryError:
+        return []
+    if store is None:
+        return []
+    try:
+        return prioritize(tests, store.file_observations(tests))
+    except sqlite3.Error:  # history never fails the audit
+        return []
+    finally:
+        store.close()
+
+
 def run_audit(
     root: str | Path,
     coverage_json: str | Path | None = None,
@@ -311,6 +332,7 @@ def run_audit(
         adapters = runner_adapters(root, python)
         if changed_since:
             selection = select_changes(root, changed_since)
+            selection.priority = _priority(root, sorted(selection.selected))
         if not adapters:
             findings.append(
                 Finding(

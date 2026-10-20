@@ -394,4 +394,5 @@ def selection_summary(selection) -> dict | None:
     data["full"] = selection.full
     data["counts"] = {"selected": len(selection.selected), "not_selected": len(selection.not_selected),
                       "mapped": len(selection.selected) + len(selection.not_selected)}
+    data["priority"] = list(getattr(selection, "priority", []) or [])
     return data

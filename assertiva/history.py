@@ -273,6 +273,25 @@ class HistoryStore:
                 "coverage": json.loads(row[3]) if row[3] else None, "qualification": json.loads(row[4]) if row[4] else None,
                 "artifacts": json.loads(row[5]) if row[5] else []}
 
+    def file_observations(self, files) -> dict[str, list[Observation]]:
+        """Per test file, one observation per recorded state (oldest first): FAILED when any of its invocations failed
+        on the first attempt, the summed duration; for ordering a selection, which works on files."""
+        out: dict[str, list[Observation]] = {}
+        for path in dict.fromkeys(files):
+            rows = self.db.execute(
+                "SELECT s.id, s.revision, r.environment, i.outcome, i.duration_s FROM invocations i JOIN runs r ON r.id = i.run_id"
+                " JOIN states s ON s.id = r.state_id WHERE i.attempt = 1 AND (i.invocation_id = ? OR i.invocation_id LIKE ?)"
+                " ORDER BY s.id", (path, path.replace("%", "") + "::%")).fetchall()
+            states: dict[int, list] = {}
+            for state, revision, environment, outcome, duration in rows:
+                states.setdefault(state, []).append((revision, environment, outcome, duration))
+            out[path] = [Observation(state, items[0][0], items[0][1],
+                                     "FAILED" if any(o in _FAILING for _, _, o, _ in items) else items[0][2],
+                                     sum(d for *_, d in items if d is not None) if any(d is not None for *_, d in items) else None,
+                                     None, None)
+                         for state, items in states.items()]
+        return out
+
     def fingerprint_count(self, value: str) -> int:
         return self.db.execute("SELECT COUNT(*) FROM invocations WHERE fingerprint = ?", (value,)).fetchone()[0]
 

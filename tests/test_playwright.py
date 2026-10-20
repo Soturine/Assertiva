@@ -44,6 +44,10 @@ def test_chromium_run_outcomes_retries_and_attachments():
     kinds = {(a["name"], a["attempt"]) for a in run.metadata["attachments"][retried.invocation_id]}
     assert {("screenshot", 0), ("trace", 1)} <= kinds
     assert all(not os.path.isabs(a["path"]) for a in run.metadata["attachments"][retried.invocation_id] if a["path"])
+    # what ran, and the evidence a failure or a retried pass left (a trace replays it)
+    assert run.metadata["context"]["playwright_version"] == "1.63.0" and run.metadata["context"]["retries"]["chromium"] == 1
+    assert run.metadata["failure_evidence"] == {retried.invocation_id: ["error-context", "screenshot", "trace"]}
+    assert not any("left no trace" in lim for lim in run.limitations)
 
 
 def test_declared_selected_executed_matrix():
@@ -236,3 +240,20 @@ def test_skipped_and_flaky_keep_what_playwright_folds_into_them(expected, status
     assert inv.outcome is outcome
     if status == "flaky" and outcome is not Outcome.PASSED:
         assert "passed after" not in (inv.message or "")
+
+
+def test_a_failure_without_a_trace_is_named_as_not_replayable():
+    data = json.loads((FIXTURES / "playwright-json" / "chromium.json").read_text(encoding="utf-8"))
+
+    def strip(suite):
+        for spec in suite.get("specs") or []:
+            for test in spec.get("tests") or []:
+                for result in test.get("results") or []:
+                    result["attachments"] = [a for a in result.get("attachments") or [] if a.get("name") != "trace"]
+        for child in suite.get("suites") or []:
+            strip(child)
+
+    for suite in data["suites"]:
+        strip(suite)
+    run = parse_playwright_results(data, "<ROOT>")
+    assert any("left no trace to replay" in lim for lim in run.limitations)

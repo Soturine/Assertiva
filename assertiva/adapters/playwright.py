@@ -211,6 +211,19 @@ def parse_playwright_results(data: dict | str, root: str | Path) -> RunEvidence:
     for suite in suites:
         walk(suite, ())
     run.metadata["attachments"] = attachments
+    config = data.get("config") or {}
+    run.metadata["context"] = {  # what the run executed with, as the report states it
+        "playwright_version": config.get("version"), "workers": config.get("workers"), "shard": config.get("shard"),
+        "retries": {p.get("name"): p.get("retries") for p in projects}, "web_server_declared": bool(config.get("webServer")),
+    }
+    # a failure or a pass after failed attempts with no trace cannot be replayed: say which evidence each one left
+    troubled = [inv for inv in run.invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR) or inv.invocation_id in retried]
+    evidence = {inv.invocation_id: sorted({a["name"] for a in attachments.get(inv.invocation_id, []) if a.get("name")})
+                for inv in troubled}
+    run.metadata["failure_evidence"] = evidence
+    blind = [iid for iid, kinds in evidence.items() if "trace" not in kinds]
+    if blind:
+        run.limitations.append(f"{len(blind)} failing or retried test(s) left no trace to replay: " + ", ".join(blind[:3]))
     matrix = {f"project {name}": value for name, value in state.items()}
     for engine in _ENGINES:
         states = [value for name, value in state.items() if _engine(name) == engine]

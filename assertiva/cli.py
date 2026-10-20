@@ -258,7 +258,7 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--mutate", action="append", metavar="FILE",
                        help="with --execute: run the project's native mutation tool on FILE in a disposable copy (repeatable; "
                             "Cosmic Ray for Python tests under pytest, unittest or Django; StrykerJS for Jest or Vitest; "
-                            "each installed in the project, never by Assertiva)")
+                            "PIT for a Maven build that declares it; each installed in the project, never by Assertiva)")
     audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                        help="with --mutate: the mutation tool to use when several apply to the project")
     audit.add_argument("--ctrf", action="store_true",

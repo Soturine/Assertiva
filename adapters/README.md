@@ -56,8 +56,18 @@ Instrumented Android tests, iOS, JS, Wasm and Native targets are listed per modu
 
 Test effectiveness (every audit) reads tests in Python (syntax tree), JavaScript/TypeScript and Kotlin/Java (lexically) into one shared model; the extractors' limits are stated in each report.
 
+## Mutation tools (run by the engine)
+
+| Tool | Applies when | Needs | Detecting tests |
+| --- | --- | --- | --- |
+| Cosmic Ray (`adapters/cosmic_ray.py`) | Python tests under a declared pytest, unittest or Django runner | `cosmic-ray` in the project's interpreter | not recorded |
+| StrykerJS (`adapters/stryker.py`) | a `package.json` project tested with Jest or Vitest | `@stryker-mutator/core` and its runner plugin in `node_modules` | every one |
+| PIT (`adapters/pit.py`) | a Maven build that declares `pitest-maven` | the plugin in the local Maven repository (Maven runs offline) | every one |
+
+A mutation adapter is one module with a `KEY` and `TOOL`, `describe(root, python, origin)` (does it apply, can it run here, with which runner, and why) and `execute(...)` (run on a disposable copy, return a `MutationRun`), listed in `MUTATION_ADAPTERS` in `assertiva/adapters/mutation.py`. Selection, evidence, the protection comparison and the report do not change when one is added; the core modules name no tool (a contract test enforces it). The user picks with `--mutation-tool` when several apply; a missing tool is BLOCKED with the reason, never a pass.
+
 Absent support is a limitation of Assertiva, not a failure of the audited project: it is reported as UNKNOWN or NOT_RUN.
 
-Executable reference adapters today: pytest (native + static), unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe, JaCoCo, build surface), Gradle (JUnit XML, JaCoCo/Kover), Python packaging, GitHub Actions, Azure Pipelines, GitLab CI, Jenkins (through one shared CI normalization in `ci_common.py`), pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats) and JUnit XML. See `STATUS.md` for their exact claim boundaries.
+Executable reference adapters today: pytest (native + static), unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe, JaCoCo, build surface), Gradle (JUnit XML, JaCoCo/Kover), Python packaging, GitHub Actions, Azure Pipelines, GitLab CI, Jenkins (through one shared CI normalization in `ci_common.py`), pre-commit, package.json scripts, mutation reports (mutation-testing-elements, PIT, mutmut stats, Cosmic Ray dump), JUnit XML, CTRF, Allure, Pact contracts and verifications, axe-core results, and three mutation tools the engine runs (below). See `STATUS.md` for their exact claim boundaries.
 
 First-party support is incremental. The absence of a dedicated adapter does not make a project unsupported: preserve observed commands and declared checks generically, mark unknown capabilities honestly, and avoid guessing semantics.

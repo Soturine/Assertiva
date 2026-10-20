@@ -82,6 +82,8 @@ A step that did not happen leaves the next ones unknown; it does not make the ea
 
 Fixed lines:
 - UNKNOWN is never PASS; skipped or not-run is never counted as passed.
+- Name the unit of every count. A unittest method that loops over `subTest` cases is one test and several invocations; the engine reports the cases as invocations of the declaring test, so say which you are counting when the two differ.
+- A break you made yourself (a hand-edited mutant, a negative control, a run in your own copy) is something you observed, not engine-executed evidence. Keep its command, revision, environment and output so it can be rerun, and never present it as the engine's mutation run (`--mutate`) or label it `ENGINE_EXECUTED`; the engine's own `--negative-controls` are a separate instrument.
 - Test count and coverage are diagnostics, never quality scores; give no aggregate score, grade or overall risk rating — say what is protected and what is not.
 - A CI run proves a revision only with confirmed identity (its head SHA equals `git rev-parse HEAD`); a dirty working tree is never proven by any run.
 - Never claim executed tests, pipeline equivalence or engine output you did not observe; never present candidate evidence as current-project evidence.

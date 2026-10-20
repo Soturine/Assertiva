@@ -42,7 +42,12 @@ behind them. Re-audited on 2026-10-19 against `v0.7.2` (`8de5a24`): `assertiva/p
 
 Each fix has a test that fails on 0.7.2 (`tests/test_probe_boundaries.py`; the password-file test runs on POSIX only).
 
-## Residual risks (not eliminated in 0.7.3)
+## Fixed in 0.9.0
+
+- **A mutation target reached through a link could be written outside its copy.** Mutation tools rewrite source files in place. A target whose path crossed a symlink or a Windows junction inside the copy could point back to the project or elsewhere, and the tool wrote through it (reproduced: a file outside the copy was written 16 times). Every component from the root to the target must now be a real directory or file, and the resolved file must lie under the root, checked on the project and again on the copy the tool runs in (`tests/test_cosmic_ray.py`, `tests/test_mutation_tools.py`, `tests/test_pit.py`).
+- Mutation tools (Cosmic Ray, StrykerJS, PIT through Maven) run project code under the same boundaries as test runners, and are the same "no sandbox" case below. They are never installed by Assertiva; Maven runs offline; their reports are written outside the copy.
+
+## Residual risks (stated for 0.7.3; none of them was removed by 0.8.0 or 0.9.0)
 
 Stated here so that no report or answer implies more isolation than exists. "Not verified" means no test exercises it.
 

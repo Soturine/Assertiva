@@ -274,6 +274,8 @@ NARRATIVE: list[tuple[str, str]] = [
     ("{label}: {status:st}: {detail}", "{label}: {status:st}: {detail}"),
     ("absence of observed instability is not proof of stability", "a ausência de instabilidade observada não prova estabilidade"),
     ("order dependence was not measured", "a dependência de ordem não foi medida"),
+    ("{count} result(s) have an unknown status; the run is not a pass while they are unknown",
+     "{count} resultado(s) têm status desconhecido; a execução não é aprovada enquanto forem desconhecidos"),
     ("{count} failing or retried test(s) left no trace to replay: {tests}",
      "{count} teste(s) com falha ou repetido(s) não deixaram trace para reproduzir: {tests}"),
     ("no coverage, fixture graph or declaration provenance is available from portable results",

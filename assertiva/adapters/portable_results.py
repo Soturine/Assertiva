@@ -33,8 +33,20 @@ def _scrub(text) -> str | None:
 
 
 def _status(run: RunEvidence) -> RunEvidence:
-    outcomes = {inv.outcome for inv in run.invocations}
-    run.status = StageStatus.FAIL if outcomes & {Outcome.FAILED, Outcome.ERROR} else StageStatus.PASS if run.invocations else StageStatus.UNKNOWN
+    """FAIL when a test failed; PASS only when every result is known and some test ran; otherwise UNKNOWN (an empty
+    report, only skipped or not-run tests, or a result whose status is unknown, which could hide a failure)."""
+    outcomes = [inv.outcome for inv in run.invocations]
+    unknown = sum(o is None for o in outcomes)
+    if any(o in (Outcome.FAILED, Outcome.ERROR) for o in outcomes):
+        run.status = StageStatus.FAIL
+    elif not outcomes or (not unknown and all(o in (Outcome.SKIPPED, Outcome.NOT_RUN) for o in outcomes)):
+        run.status = StageStatus.UNKNOWN
+        run.limitations.append("no test was executed; this is not evidence of a passing suite")
+    elif unknown:
+        run.status = StageStatus.UNKNOWN
+        run.limitations.append(f"{unknown} result(s) have an unknown status; the run is not a pass while they are unknown")
+    else:
+        run.status = StageStatus.PASS
     return run
 
 

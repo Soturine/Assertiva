@@ -95,3 +95,26 @@ def test_audit_imports_portable_results_and_exports_its_own_run_as_ctrf(calc_pro
     names = {t["name"] for t in exported["results"]["tests"]}
     assert "tests/test_calc.py::test_add_value" in names and not any(n.startswith("tests/test_shop.py") for n in names)
     assert not (calc_project / "audit.ctrf.json").exists()  # never written into the audited project
+
+
+@pytest.mark.parametrize(("tests", "status", "why"), [
+    ([{"name": "t", "status": "other"}], "UNKNOWN", "unknown"),
+    ([{"name": "a", "status": "passed"}, {"name": "t", "status": "other"}], "UNKNOWN", "unknown"),
+    ([], "UNKNOWN", "no test was executed"),
+    ([{"name": "s", "status": "skipped"}, {"name": "p", "status": "pending"}], "UNKNOWN", "no test was executed"),
+    ([{"name": "a", "status": "passed"}, {"name": "t", "status": "other"}, {"name": "f", "status": "failed"}], "FAIL", None),
+    ([{"name": "a", "status": "passed"}, {"name": "s", "status": "skipped"}], "PASS", None),
+])
+def test_a_run_passes_only_when_every_result_is_known_and_something_ran(tmp_path, tests, status, why):
+    (tmp_path / "r.json").write_text(json.dumps({"results": {"tool": {"name": "x"}, "tests": tests}}), encoding="utf-8")
+    run = load_ctrf(tmp_path / "r.json")
+    assert run.status.value == status
+    if why:
+        assert any(why in limit for limit in run.limitations), run.limitations
+
+
+def test_allure_results_with_unknown_statuses_do_not_pass(tmp_path):
+    result = json.loads(next((FIXTURES / "allure-results").glob("*-result.json")).read_text(encoding="utf-8"))
+    result.update(status="unknown", historyId="h1")
+    (tmp_path / "a-result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert load_allure(tmp_path).status.value == "UNKNOWN"

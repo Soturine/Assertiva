@@ -21,6 +21,10 @@ Record the relevant subset of these independent dimensions:
 - lifecycle: setup/teardown/reset strategy and failure cleanup;
 - artifact capability: structured result, trace, screenshot, video, network log, DB/log/metric evidence.
 
+## Fidelity ladder in the engine (0.9.0)
+
+The effectiveness view places each boundary a test touches on one ladder, read from the test's code: `DOUBLE` (a mock replaces the collaborator) → `INTERCEPTED` (requests caught at the boundary: responses, respx, msw, `page.route`, `cy.intercept`) → `SIMULATOR` (a fake implementation: jsdom/happy-dom, Robolectric, MockWebServer/WireMock, in-memory databases, moto) → `IN_PROCESS` (framework test clients, MockMvc, supertest) → `DISPOSABLE_REAL` (Testcontainers) → `REAL` (a real browser engine, a device or emulator, a crossed boundary). A rung says how a test is written to exercise the boundary, not that the run reached it: a browser test that was not executed proves nothing.
+
 ## Fidelity claim
 
 Fidelity is always relative to a claim.

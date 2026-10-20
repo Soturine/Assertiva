@@ -1,8 +1,18 @@
 # Status
 
-## Current milestone: M3 — Productization & Empirical Validation: IN PROGRESS (partial)
+## Release state
 
-M0 (foundation and contracts), M1 (executable audit + improve vertical slice) and M2 (scale, cross-stack, impact & selection, history, delivery; closed 2026-10-06, version 0.5.0) are complete. M3 is in progress: evidence integrity and execution safety, native unittest and Django; the rest of M3 is open (ROADMAP.md). ROADMAP.md lists exactly what exists and what was explicitly not required (.NET, Go, Rust). 0.7.2 adds Gradle, consented provisioning with a disposable PostgreSQL, provider CI runs and cross-language test effectiveness. 0.8.0 (in progress, not released) starts with the stabilization work prepared as 0.7.3: fixes from a security re-audit ([docs/EXECUTION_SECURITY.md](docs/EXECUTION_SECURITY.md)), structural repetition kept apart from inferred redundancy in effectiveness candidates, signal counts kept apart from affected-test counts, and this page brought up to date.
+| Version | State | Where |
+| --- | --- | --- |
+| **0.7.2** | the latest **published** release (tag `v0.7.2`, `main`) | GitHub Release |
+| **0.8.0** — Intelligence & Proof of Protection | qualified on its branch (`5fe2124`, 2026-10-19), **not published**; its work is part of 0.9.0 | `release/0.8.0` |
+| **0.9.0** — Advanced Test Intelligence & Continuous Assurance | **prepared**: version declared, implemented and qualified on its branch (CHANGELOG has the qualification record); **not published** — merge, tag and GitHub Release wait for the owner's authorization | `release/0.9.0` |
+
+This page describes the code on `release/0.9.0`. What 0.7.2 users have is the 0.7.2 section of the CHANGELOG; the items marked 0.8.0 or 0.9.0 below are not in a published release yet.
+
+## Milestones (history)
+
+M0 (foundation and contracts), M1 (executable audit + improve vertical slice) and M2 (scale, cross-stack, impact & selection, history, delivery; closed 2026-10-06, version 0.5.0) are complete. M3 is in progress: evidence integrity and execution safety, native unittest and Django; the rest of M3 is open (ROADMAP.md). ROADMAP.md lists exactly what exists and what was explicitly not required (.NET, Go, Rust). 0.7.2 adds Gradle, consented provisioning with a disposable PostgreSQL, provider CI runs and cross-language test effectiveness. 0.8.0 (qualified, not published) starts with the stabilization work prepared as 0.7.3: fixes from a security re-audit ([docs/EXECUTION_SECURITY.md](docs/EXECUTION_SECURITY.md)), structural repetition kept apart from inferred redundancy in effectiveness candidates, signal counts kept apart from affected-test counts, and this page brought up to date. 0.9.0 (prepared, not published; it folds in the scope first planned for 0.8.1) adds mutation testing chosen by capability, failure and selection intelligence, contracts, accessibility and portable results. The milestone plan M1–M10 is kept in ROADMAP.md for history; versions, not milestones, now mark progress.
 
 Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations. Contract tests drive measurement, qualification and the report with fake adapters (a runner with non-pytest ids, a non-wheel artifact, coverage from another source), and fail if a core module names a tool or parses a runner's id syntax.
 

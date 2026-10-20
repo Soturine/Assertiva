@@ -4,6 +4,25 @@
 
 Prepared on `release/0.9.0` (checkpoints CP1–CP7; `pyproject.toml` declares 0.9.0); it includes the scope first planned for 0.8.1 and builds on the unpublished 0.8.0. Compatible with 0.8.0: report fields and options are only added. Publication (merge to `main`, tag, GitHub Release) waits for the owner's authorization.
 
+### Qualification of `0cac223` (CP7, 2026-10-20)
+Every result below is for commit `0cac223` (version 0.9.0 declared). Counts are per environment and are not added across them.
+
+| Check | Environment | Result |
+| --- | --- | --- |
+| Full suite, every real tool required (Django 6.1.2, Cosmic Ray 8.7.0, StrykerJS 10.0.0, Jest, Vitest, Playwright Chromium, provisioned JDK, Gradle and PostgreSQL) | Windows 11, Python 3.12.10 | PASS: 951 passed, 6 skipped (2 POSIX-only, 4 Maven/PIT: no Maven on this host, run on Linux below) |
+| Validation, fast/core, integration and artifact (mutation, JS and Django required), wheel build and installed-CLI smoke, provisioning and PostgreSQL, Gradle, Playwright | Linux (Docker, Debian bookworm), Python 3.12.15, Node 24 | PASS: 801 fast; 145 integration/artifact (5 skips by design: Gradle and services run in their own steps); 43 services; 14 Gradle; 2 browser |
+| Fast/core suite and installed wheel on the minimum Python | Linux, Python 3.11.17 | PASS: 801 passed |
+| JVM: Maven Surefire/Failsafe/JaCoCo and real PIT 1.30.0 runs (offline) | Linux, Temurin 21.0.12, Maven 3.9.16 | PASS: 4 passed (1 Django test skipped there: no Django in that image; run above) |
+| Runtime self-qualification: the installed 0.9.0 wheel audits this repository with `--execute` and qualifies its own wheel | Linux, Python 3.12.15 | PASS: 801 invocations PASS, `assertiva-0.9.0-py3-none-any.whl` PASS, tree unchanged |
+| GitHub Actions (push) | 7 jobs | PASS: run 39419803150, all jobs success |
+| GitHub Actions (dispatch, with runtime self-qualification) | 8 jobs | PASS: run 39421501457, all 8 jobs success, runtime self-qualification included |
+| Frozen benchmarks (no tuning) | static | v1 regression: precision 1.0, recall 0.958 (unchanged); v2 frozen: precision 1.0, recall 0.70 (unchanged); the new JS/JVM rules add no false positive |
+| Selection vs full suite (controlled defects) | Windows | single project: 11 defects, 0 missed, 6 narrowed to 29–71 % of the test files, 5 widened to the full suite with their trigger; monorepo, declared-map and cosmetic cases pass |
+| Real mutation testing | Windows and Linux | Cosmic Ray (pytest, unittest; Django by a local run), StrykerJS (Jest), PIT (Maven): each with a strengthened test gaining protection and none lost |
+| Security and isolation | all of the above | read-only invariant and link/junction refusals in the suites; no project file written by any run |
+
+NOT_RUN: semantic evaluation of the Skill with separate agents (deferred to 1.0; the Skill and reference changes of 0.9.0 are not semantically evaluated), Android tests with an SDK, StrykerJS with Vitest (Jest only), PIT through Gradle (blocked by design, report import only), the Pact Broker. Found and fixed during qualification: the CTRF export broke the one-report-per-run contract (now `--ctrf`).
+
 ### Security and evidence integrity (CP1)
 - A mutation target reached through a symlink or junction is never rewritten: every component from the project root to the file is checked on the project and again on the copy the tool runs in (a link in a copy could point back outside it).
 - One meaning of a tied mutation run across metrics, findings and the report; errored mutants, attribution (the named detecting test vs the changed files as context) and comparability (identical mutated sources only) in the protection delta; an executed run records its configuration and a digest of the sources and tests it saw.

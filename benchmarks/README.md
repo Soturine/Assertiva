@@ -55,6 +55,7 @@ turn the confirmation set into a tuning target.
 
 | 2026-10-19 | 0.7.3 working tree | **v2** (frozen at creation): py-parking, js-tickets, kt-library (32 tests, 20 labeled pairs) | 1.0 | 0.70 | baseline at freeze: 14 tp, 0 fp, 6 fn (FALSE_GREEN 3, WEAK_ORACLE 3); no rule was changed after it |
 | 2026-10-19 | 0.8.0 `c72d655` (new Python rules: no-op mock checks, self-referential oracles) | v1 (regression) and v2 (frozen, unchanged) | v1 1.0 / v2 1.0 | v1 0.958 / v2 0.70 | no new false positive; no recall change on v2, which has no case of either new pattern (their evidence is the calibration tests and the run on this repository's suite) |
+| 2026-10-20 | 0.9.0 `c78d152` (JS/TS and JVM no-op, tautology and self-referential rules; oracle basis; fidelity ladder) | v1 (regression) and v2 (frozen, unchanged) | v1 1.0 / v2 1.0 | v1 0.958 / v2 0.70 | no new false positive and no recall change; the new rules' evidence is the calibration tests and 250 third-party test files (44 genuine signals, all in zod 4.6.7's own tests) |
 
 Both sets were written and labeled by the same person who changed the rules in 0.7.3, after reading those rules;
 v2 uses idioms v1 does not (unittest assertions, Jest `describe`/`it`, Kotlin `runCatching`, text blocks) but it is

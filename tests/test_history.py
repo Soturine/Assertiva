@@ -194,3 +194,21 @@ def test_failures_of_one_run_are_grouped_by_raise_site(store):
     state = store.record("audit", "current", "rev1", None, runs)
     [group] = summarize(store, state, "rev1", runs)["failure_clusters"]
     assert group["count"] == 3 and group["raised_at"] == "shop/cart.py:2"
+
+
+@pytest.mark.integration
+def test_a_changed_since_selection_runs_last_failures_first(git_calc_project):
+    from assertiva.audit import run_audit
+    from conftest import git, write
+
+    root = git_calc_project
+    write(root / "tests" / "test_other.py", "from calc import add\n\ndef test_other():\n    assert add(0, 0) == 0\n")
+    write(root / "tests" / "test_broken.py", "from calc import add\n\ndef test_broken():\n    assert add(1, 1) == 3\n")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "more tests")
+    run_audit(root, execute=True, python=sys.executable)  # history: test_broken failed
+    write(root / "calc.py", "def add(a, b):\n    return b + a\n")
+    report = run_audit(root, execute=False, changed_since="HEAD")
+    priority = report["test_selection"]["priority"]
+    assert priority[0] == {"test": "tests/test_broken.py", "reason": "failed in its last recorded run"}
+    assert {row["test"] for row in priority} == set(report["test_selection"]["selected"])

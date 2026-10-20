@@ -26,7 +26,7 @@
 | `… --coverage-report F` / `--test-results F` (alias `--junit-xml`) / `--mutation-report F` | ingests existing tool output (coverage.py, istanbul, LCOV, Cobertura, JaCoCo; JUnit XML, CTRF JSON or an Allure results directory, recognized by shape; Stryker-family JSON, PIT, mutmut, Cosmic Ray dump) — including output you produced in your own copy. Imported results are EXTERNAL_UNVERIFIED: their revision is not checked | reading a file |
 | `… --contract F` | a Pact contract file (NOT_VERIFIED alone; EMPTY without interactions) or a provider verification result: VERIFIED only when every checked interaction matched and none was pending; FAILED names the mismatches; EMPTY and PENDING_FAILURES are reported although the tool says success | reading a file |
 | `… --accessibility-report F` | axe-core JSON: per page, violations (findings, severity from impact) and items the engine could not decide (needs review, never passes). No violation is never proof of accessibility | reading a file |
-| an audit that ran tests | writes its runs as CTRF JSON beside the report (`audit.ctrf.json`, listed under `exported`), for tools that read CTRF | — |
+| `… --execute --ctrf` | also writes the executed runs as CTRF JSON beside the report (`audit.ctrf.json`, listed under `exported`), for tools that read CTRF | — |
 
 Optional `.assertiva.toml` (the project's file; never write it during an audit) only describes the project: `[tests] runners` and `timeout_s` when detection cannot know. Consent is never read from a project: commands with effects and withheld variables are allowed only in `<ASSERTIVA_HOME>/consent.toml` (`[[project]]` with `root`, `authorize`, `env`), which only the user writes.
 

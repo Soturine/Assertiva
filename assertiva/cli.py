@@ -90,6 +90,7 @@ def _audit(args: argparse.Namespace) -> int:
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
                        junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since,
                        accessibility_reports=args.accessibility_report or [], contract_reports=args.contract or [],
+                       export_ctrf=args.ctrf,
                        ci_runs=args.ci_run or [], provision=args.provision,
                        run_checks=args.run_check or [], mutation_targets=args.mutate or [],
                        mutation_tool=args.mutation_tool)
@@ -260,6 +261,8 @@ def _parser() -> argparse.ArgumentParser:
                             "each installed in the project, never by Assertiva)")
     audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                        help="with --mutate: the mutation tool to use when several apply to the project")
+    audit.add_argument("--ctrf", action="store_true",
+                       help="also write the executed runs as CTRF JSON beside the report (audit.ctrf.json)")
     audit.add_argument("--contract", action="append", metavar="PATH",
                        help="a Pact contract file or a provider verification result (JSON) to ingest (repeatable); an empty "
                             "or pending-only verification is never counted as verified")

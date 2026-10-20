@@ -306,6 +306,7 @@ def run_audit(
     coverage_reports: list[str | Path] | tuple = (),
     accessibility_reports: list[str | Path] | tuple = (),
     contract_reports: list[str | Path] | tuple = (),
+    export_ctrf: bool = False,
     changed_since: str | None = None,
     run_checks: list[str] | tuple = (),
     ci_runs: list[str | Path] | tuple = (),
@@ -445,7 +446,7 @@ def run_audit(
     if contract_reports:
         report["contracts"] = contracts
     executed = [run for run in current.runs if run.mode == "execute" and run.invocations]
-    if executed:  # portable results out: written beside the report by write_report, never into the project
+    if executed and export_ctrf:  # portable results out, on request: beside the report (write_report), never in the project
         report["exported"] = {"ctrf": to_ctrf(executed, "assertiva", f"assertiva {report['provenance']['assertiva_version']}")}
     report["delivery"] = {"matrix": {"declared": declared, "ci": covered}, "artifact_lineage": lineage}
     report["review_candidates"] = review

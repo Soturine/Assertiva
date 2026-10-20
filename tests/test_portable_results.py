@@ -85,7 +85,7 @@ def test_audit_imports_portable_results_and_exports_its_own_run_as_ctrf(calc_pro
     out = tmp_path / "reports"
     capsys.readouterr()
     cli.main(["audit", str(calc_project), "--execute", "--python", sys.executable, "--report-dir", str(out),
-              "--test-results", str(FIXTURES / "ctrf-report.json"), "--output", "json"])
+              "--test-results", str(FIXTURES / "ctrf-report.json"), "--ctrf", "--output", "json"])
     report = json.loads(capsys.readouterr().out)
     adapters = [run["adapter"] for run in report["states"]["current"]["runs"]]
     [imported] = [r for r in report["states"]["current"]["runs"] if r["adapter"] == "ctrf"]

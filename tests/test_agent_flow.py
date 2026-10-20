@@ -38,7 +38,7 @@ def test_audit_history_failure_explanation_selection_and_approval(tmp_path, caps
     reports = tmp_path / "reports"
 
     # 1-4: the audit observes a green suite and names the weak oracle as a lead, not a verdict
-    first = _run(capsys, "audit", str(root), "--execute", "--python", sys.executable, "--report-dir", str(reports))
+    first = _run(capsys, "audit", str(root), "--execute", "--python", sys.executable, "--report-dir", str(reports), "--ctrf")
     assert first["history"]["enabled"] and first["exported"] == {"ctrf": "audit.ctrf.json"}
     assert any(f["code"].startswith("WEAK_ORACLE") for f in first["findings"])
     boundary = first["claim_boundary"]

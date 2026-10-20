@@ -41,8 +41,10 @@ _JVM_FRAME = re.compile(r"\bat [\w.$]+\(([\w$]+\.(?:java|kt)):(\d+)\)")
 
 def _test_file(path: str, test_paths: set[str]) -> bool:
     norm = path.replace("\\", "/")
-    if any(norm.endswith(p) or p.endswith(norm) for p in test_paths if p):
-        return True
+    # whole path components only: "tests/test_pricing.py" ends with the characters of "pricing.py", not with that file
+    for test_path in (p.replace("\\", "/") for p in test_paths if p):
+        if norm == test_path or norm.endswith("/" + test_path) or test_path.endswith("/" + norm):
+            return True
     name = norm.rsplit("/", 1)[-1]
     return bool(re.search(r"(^test_|_test\.py$|\.(?:test|spec)\.[cm]?[jt]sx?$|Tests?\.(?:java|kt)$|IT\.(?:java|kt)$)", name)
                 or "/tests/" in f"/{norm}" or "/__tests__/" in f"/{norm}" or "/src/test/" in f"/{norm}")

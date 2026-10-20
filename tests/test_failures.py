@@ -57,3 +57,10 @@ def test_failures_cluster_by_raise_site_not_by_message_text():
                       "basis": "INFERRED: same exception type raised at the same place"}]
     # the same words at different sites are different causes
     assert clusters([("a", PY_ASSERTION), ("b", PY_ASSERTION.replace(":7:", ":17:"))]) == []
+
+
+def test_a_product_file_whose_name_ends_a_test_files_name_is_still_product():
+    # found end to end: pricing.py and tests/test_pricing.py share the characters "pricing.py"
+    text = ("E           TypeError: unsupported operand type(s) for //: 'int' and 'NoneType'\n\npricing.py:6: TypeError")
+    assert origin(text, ["tests/test_pricing.py"])[0] == PRODUCT
+    assert origin(text.replace("pricing.py:6", "tests/test_pricing.py:6"), ["tests/test_pricing.py"])[0] != PRODUCT

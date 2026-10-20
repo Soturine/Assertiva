@@ -24,6 +24,11 @@ In progress on `release/0.9.0`, by checkpoints; it includes the scope first plan
 - **Complete improvement flows in three stacks:** the protection walk-through now runs on JavaScript (StrykerJS: 6 gained, 0 lost) and Java (PIT: 4 gained, 0 lost) as well as Python, each gain attributed to the named tests (`docs/PROOF_OF_PROTECTION.md`). PIT runs record the plugin version the pom declares.
 - Agent reference (`references/TEST_QUALITY.md`) explains survivor sites, oracle basis and subsumption. **Not semantically evaluated.**
 
+### Integration and the agent's flow (CP6)
+- `tests/test_agent_flow.py` runs the investigation through the CLI on one reproducible project: a recorded audit with its claim boundary and CTRF export, a later product break explained as a new failure with the revision where it last passed and a PRODUCT origin, a change-based selection that runs it first, and nothing applied without approval; with `tests/test_proof_of_protection.py` (mutation, improvement, protection gained) it covers the ten steps of the 0.9.0 plan.
+- Fix found by it: a product file whose name ends a test file's name (`pricing.py`, `tests/test_pricing.py`) was taken for test code, so a product exception was reported as UNKNOWN; paths now match on whole components.
+- SKILL.md's evidence table points to the 0.9.0 evidence (tool chosen by capability, failure history, contracts, accessibility, ordered change selection); README lists it. **Not semantically evaluated.**
+
 ### Contracts, browser, accessibility and portable results (CP5)
 - **Portable results:** `audit --test-results PATH` (alias of `--junit-xml`) reads JUnit XML, CTRF JSON and Allure result directories by shape; CTRF retries and flaky flags and Allure's declaration/invocation identity and retries are kept; unknown statuses stay unknown; host names, threads and absolute paths are never copied. An audit that ran tests writes them as CTRF beside the report (`exported`).
 - **Contracts (Pact):** `audit --contract PATH` reads contract files and provider verification results. Two real runs report success without verifying everything (an empty contract; a failing pending interaction): they are EMPTY and PENDING_FAILURES here, never VERIFIED; failures name their mismatches; a contract alone is NOT_VERIFIED.

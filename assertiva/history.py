@@ -52,6 +52,8 @@ CREATE INDEX invocations_by_id ON invocations(invocation_id);
 
 class Stability(str, Enum):
     OBSERVED_UNSTABLE_CURRENT_RUN = "OBSERVED_UNSTABLE_CURRENT_RUN"  # failed and passed within this run (reruns/retries)
+    # failed in the full run, passed when rerun alone, failed the same way when the full run was repeated
+    ORDER_DEPENDENT_SUSPECT = "ORDER_DEPENDENT_SUSPECT"
     HISTORICALLY_FLAKY = "HISTORICALLY_FLAKY"  # same revision and environment: repeated failures and passes
     CONSISTENT_FAILURE = "CONSISTENT_FAILURE"
     ENVIRONMENT_SPECIFIC = "ENVIRONMENT_SPECIFIC"  # same revision fails in one environment, passes in another

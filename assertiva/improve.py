@@ -558,6 +558,7 @@ def _artifact_identity(state: StateEvidence) -> list[dict]:
 
 MAX_STABILITY_INVOCATIONS = 50
 MAX_STABILITY_RERUNS = 2
+ORDER_PROBE_MAX_S = 300.0  # the full run is repeated once only when it took at most this long
 
 
 def _stability(session: ImproveSession, changes, candidate: StateEvidence, reruns: int) -> StabilityEvidence:
@@ -591,23 +592,73 @@ def _stability(session: ImproveSession, changes, candidate: StateEvidence, rerun
         finally:
             remove_tree(copy)
     evidence.attempts = 1 + reruns
+    probes = _order_probe(session, adapters, candidate, first, later, evidence)
     for iid in selected:
         attempts = [first[iid], *later[iid]]
         outcomes = tuple(inv.outcome for inv in attempts)
-        evidence.records.append(StabilityRecord(iid, outcomes, tuple(inv.duration_s for inv in attempts), classify_attempts(outcomes).value))
+        verdict, probe = classify_attempts(outcomes).value, probes.get(iid)
+        if probe and probe.startswith("failed again"):
+            verdict = Stability.ORDER_DEPENDENT_SUSPECT.value
+        evidence.records.append(StabilityRecord(iid, outcomes, tuple(inv.duration_s for inv in attempts), verdict, probe))
         evidence.messages[iid] = tuple(inv.message for inv in attempts)
     return evidence
+
+
+def _order_probe(session: ImproveSession, adapters, candidate: StateEvidence, first, later, evidence) -> dict[str, str]:
+    """For failures of the full run that passed every time they were rerun alone: repeat the full run once (bounded by
+    ORDER_PROBE_MAX_S). Failing again with the same failure fingerprint in suite order points to order dependence (a
+    test before it leaves state behind); passing points to intermittency. One probe suggests, it does not prove."""
+    from .history import fingerprint
+
+    failing = (Outcome.FAILED, Outcome.ERROR)
+    suspects = [iid for iid, attempts in later.items()
+                if first[iid].outcome in failing and attempts and all(a.outcome not in failing for a in attempts)]
+    if not suspects:
+        return {}
+    wall = sum(run.wall_clock_s or 0 for run in candidate.runs)
+    if wall > ORDER_PROBE_MAX_S:
+        evidence.limitations.append(f"order dependence not probed: the full run took {wall:.0f}s (budget {ORDER_PROBE_MAX_S:.0f}s)")
+        return {}
+    found: dict[str, object] = {}
+    copy = runnable_copy(session.workspace, adapters, session.root)
+    try:
+        for adapter in adapters:
+            run = adapter.run(copy)
+            evidence.commands.append(" ".join(run.command))
+            found.update({inv.invocation_id: inv for inv in run.invocations if inv.invocation_id in suspects})
+    finally:
+        remove_tree(copy)
+    out = {}
+    for iid in suspects:
+        again = found.get(iid)
+        before = fingerprint(first[iid].message)
+        if again is None:
+            out[iid] = "not seen when the full run was repeated"
+        elif again.outcome in failing and before and fingerprint(again.message) == before:
+            out[iid] = "failed again the same way when the full run was repeated, and passed every time alone: order dependence suspected"
+        elif again.outcome in failing:
+            out[iid] = "failed again differently when the full run was repeated"
+        else:
+            out[iid] = "passed when the full run was repeated: intermittent rather than order dependent (one probe)"
+    return out
 
 
 def _stability_stage(stability: StabilityEvidence, deltas) -> CheckResult:
     stage = QualificationCheck.STABILITY_AND_COST
     wall = next((d for d in deltas if d.name == "wall_clock_s"), None)
     cost = f"wall clock {wall.baseline}s -> {wall.candidate}s ({wall.state.value})" if wall else "wall clock unknown"
-    bounds = ("absence of observed instability is not proof of stability", "order dependence was not measured", *stability.limitations)
+    probed = any(r.probe for r in stability.records)
+    bounds = ("absence of observed instability is not proof of stability",
+              "order dependence probed only for failures that passed when rerun alone" if probed else "order dependence was not measured",
+              *stability.limitations)
     if not stability.records:
         return _stage(stage, StageStatus.NOT_RUN, f"no relevant invocation was rerun; {cost}", *bounds)
     unstable = Stability.OBSERVED_UNSTABLE_CURRENT_RUN.value
-    by = {v: [r for r in stability.records if r.verdict == v] for v in (unstable, "INSUFFICIENT_EVIDENCE", "CONSISTENT_FAILURE")}
+    order = Stability.ORDER_DEPENDENT_SUSPECT.value
+    by = {v: [r for r in stability.records if r.verdict == v] for v in (unstable, order, "INSUFFICIENT_EVIDENCE", "CONSISTENT_FAILURE")}
+    if by[order]:
+        shown = ", ".join(r.invocation_id for r in by[order][:5])
+        return _stage(stage, StageStatus.FAIL, f"{order}: {shown} (fails in suite order, passes alone); {cost}", *bounds)
     if by[unstable]:
         shown = ", ".join(f"{r.invocation_id} ({'/'.join(o.value if o else '?' for o in r.outcomes)})" for r in by[unstable][:5])
         return _stage(stage, StageStatus.FAIL, f"{unstable}: {shown}; {cost}", *bounds)

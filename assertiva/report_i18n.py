@@ -763,6 +763,7 @@ UI: dict[str, tuple[str, str]] = {
     "st.CONSISTENT_FAILURE": ("Consistent failure", "Falha consistente"),
     "st.HISTORICALLY_FLAKY": ("Historically flaky", "Historicamente instável"),
     "st.OBSERVED_UNSTABLE_CURRENT_RUN": ("Unstable in this run", "Instável nesta execução"),
+    "st.ORDER_DEPENDENT_SUSPECT": ("Order dependence suspected", "Suspeita de dependência de ordem"),
     "st.ENVIRONMENT_SPECIFIC": ("Environment-specific", "Específico do ambiente"),
     "st.NO_INSTABILITY_OBSERVED": ("No instability observed", "Nenhuma instabilidade observada"),
     "st.INSUFFICIENT_EVIDENCE": ("Insufficient evidence", "Evidência insuficiente"),

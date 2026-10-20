@@ -142,6 +142,7 @@ class StabilityRecord:
     outcomes: tuple["Outcome | None", ...]  # first execution first; never replaced by later ones
     durations_s: tuple[float | None, ...]
     verdict: str  # history.Stability value for this run's attempts
+    probe: str | None = None  # what the bounded rerun of the full run showed, for failures that passed when rerun alone
 
 
 @dataclass

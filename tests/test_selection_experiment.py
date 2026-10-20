@@ -60,7 +60,13 @@ DEFECTS = {
     "dynamic import": {"plugins/express.py": "FEE = 7\n"},
     "data file": {"data/rates.json": '{"standard": 0.2}\n'},
     "renamed module": {"money.py": None, "currency.py": SHOP["money.py"]},
+    # looks like an edit to a string, which a comment-only check must not call cosmetic
+    "string literal": {"tax.py": SHOP["tax.py"].replace("['standard']", "['standard ']")},
 }
+
+# the project declares what the data file affects; the declaration must still catch the defect
+SHOP_DECLARED = {**SHOP, ".assertiva.toml": '[[impact.map]]\nchanges = "data/*.json"\ntests = ["tests/test_tax.py"]\n'}
+DECLARED_DEFECTS = {"data file declared": {"data/rates.json": '{"standard": 0.2}\n'}}
 
 MONO = {
     ".gitignore": IGNORE,
@@ -148,10 +154,22 @@ def run_experiment(tmp_path: Path, files: dict, defects: dict) -> list[dict]:
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize(("files", "defects"), [(SHOP, DEFECTS), (MONO, MONO_DEFECTS)], ids=["single-project", "monorepo"])
+@pytest.mark.parametrize(("files", "defects"), [(SHOP, DEFECTS), (MONO, MONO_DEFECTS), (SHOP_DECLARED, DECLARED_DEFECTS)],
+                         ids=["single-project", "monorepo", "declared-map"])
 def test_selected_plus_widening_misses_no_controlled_defect(tmp_path, files, defects):
     rows = run_experiment(tmp_path, files, defects)
     print(json.dumps(rows, indent=1))
     assert all(row["full_detected"] for row in rows), [r["defect"] for r in rows if not r["full_detected"]]  # every defect is real
     assert [row["defect"] for row in rows if row["miss"]] == []
     assert any(row["selection_ratio"] < 1.0 for row in rows)  # selection actually narrows somewhere
+
+
+@pytest.mark.integration
+def test_cosmetic_changes_select_nothing_while_the_full_suite_stays_green(tmp_path):
+    edits = {"money.py": "# money helpers\ndef cents(amount):\n    return round(amount * 100)  # to cents\n",
+             "cart.py": SHOP["cart.py"].replace("def checkout(items, tier):", "def checkout(items,  tier):")}
+    rows = run_experiment(tmp_path, SHOP, {"comments and formatting": edits})
+    [row] = rows
+    # nothing for the cosmetic files; tests that reach an unknown relation are added whenever anything changes
+    assert row["full_detected"] == [] and row["selection_ratio"] < 1.0
+    assert not {"tests/test_money.py", "tests/test_cart.py", "tests/test_pricing.py"} & set(row["selected"]), row

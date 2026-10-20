@@ -307,3 +307,64 @@ def test_conftest_units_are_compared_against_the_base_revision(tmp_path):
     from assertiva.selection import select_changes
 
     assert set(select_changes(root, "HEAD").selected) == {"tests/test_clock.py", "tests/test_dynamic.py"}
+
+
+def _committed(root):
+    git = ["git", "-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"]
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "base"]):
+        subprocess.run([*git, *args], cwd=root, check=True, capture_output=True)
+    return root
+
+
+def test_a_comment_or_formatting_change_selects_nothing_and_is_recorded(tmp_path):
+    from assertiva.selection import select_changes
+
+    root = _committed(project(tmp_path, {**BASE, "web/price.js": "export const price = (a) => a * 2;\n"}))
+    write(root / "calc.py", "# adds two numbers\ndef add(a,  b):\n\n    return a + b  # the sum\n")
+    write(root / "web/price.js", "// doubles\nexport const price = (a) =>   a * 2;\n")
+    selection = select_changes(root, "HEAD")
+    assert set(selection.cosmetic) == {"calc.py", "web/price.js"}
+    assert not selection.full and not selection.selected and not selection.widening
+    assert any("every change is cosmetic" in limit for limit in selection.limitations)
+    write(root / "calc.py", "def add(a, b):\n    return a - b\n")  # a behavioral change is never cosmetic
+    selection = select_changes(root, "HEAD")
+    assert "calc.py" not in selection.cosmetic and set(selection.selected) == ALL
+    write(root / "calc.py", 'def add(a, b):\n    """Adds."""\n    return a + b\n')  # docstrings are behavior (doctest)
+    assert "calc.py" not in select_changes(root, "HEAD").cosmetic
+
+
+def test_a_dependency_file_change_lists_the_packages_and_widens(tmp_path):
+    from assertiva.selection import select_changes
+
+    root = _committed(project(tmp_path, {**BASE, "requirements.txt": "requests==2.31.0\nidna==3.6\n"}))
+    write(root / "requirements.txt", "requests==2.32.3\nidna==3.6\nurllib3==2.2.1\n")
+    selection = select_changes(root, "HEAD")
+    assert selection.dependency_changes["requirements.txt"] == ["requests 2.31.0 -> 2.32.3", "+urllib3 2.2.1"]
+    assert Trigger.DEPENDENCY_CHANGE in triggers(selection) and selection.full
+
+
+def test_a_declared_map_selects_the_named_tests_for_files_no_adapter_relates(tmp_path):
+    from assertiva.selection import select_changes
+
+    files = {**BASE, "data/rates.json": '{"standard": 0.1}\n',
+             ".assertiva.toml": '[[impact.map]]\nchanges = "data/*.json"\ntests = ["tests/test_calc.py"]\n'}
+    root = _committed(project(tmp_path, files))
+    write(root / "data/rates.json", '{"standard": 0.2}\n')
+    selection = select_changes(root, "HEAD")
+    assert set(selection.selected) == {"tests/test_calc.py"} and not selection.full
+    assert selection.selected["tests/test_calc.py"][0].trigger is Trigger.DECLARED_MAP
+    assert selection.confidence is Confidence.BOUNDED_BY_UNKNOWNS  # declared, not proven
+    (root / ".assertiva.toml").unlink()  # without the declaration the change is unmapped: the full suite
+    assert select_changes(root, "HEAD").full
+
+
+def test_history_orders_the_selection_and_never_drops_a_test():
+    from types import SimpleNamespace as O
+
+    from assertiva.selection import prioritize
+
+    history = {"a": [O(outcome="PASSED", duration_s=2.0)], "b": [O(outcome="FAILED", duration_s=1.0)],
+               "c": [O(outcome="FAILED", duration_s=1.0), O(outcome="PASSED", duration_s=0.5)], "d": [O(outcome="PASSED", duration_s=0.1)]}
+    order = prioritize(["a", "b", "c", "d", "e"], history)
+    assert [row["test"] for row in order] == ["b", "c", "d", "a", "e"]
+    assert order[0]["reason"] == "failed in its last recorded run" and order[-1]["reason"] == "no recorded history"

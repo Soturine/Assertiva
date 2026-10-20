@@ -6,6 +6,10 @@
     runners = ["unittest"]  # when detection cannot know: pytest, unittest, django, jest, vitest, playwright, maven, gradle
     timeout_s = 1800        # per test run (default 900; Maven 1200)
 
+    [[impact.map]]          # files no adapter relates to tests (data, templates, SQL): which tests they affect
+    changes = "data/*.json"
+    tests = ["tests/test_tax.py"]
+
 Consent to effects outside the disposable copy is the user's, in `<ASSERTIVA_HOME>/consent.toml`, outside every
 project: a cloned repository cannot authorize its own commands or unlock the user's credentials.
 
@@ -26,7 +30,7 @@ from pathlib import Path
 
 FILE = ".assertiva.toml"
 CONSENT = "consent.toml"
-_KNOWN = {"tests": {"runners", "timeout_s"}}
+_KNOWN = {"tests": {"runners", "timeout_s"}, "impact": {"map"}}
 RUNNERS = ("pytest", "unittest", "django", "jest", "vitest", "playwright", "maven", "gradle")
 
 
@@ -37,6 +41,7 @@ class ProjectConfig:
     env: tuple[str, ...] = ()
     runners: tuple[str, ...] = ()  # empty: detect from the project
     timeout_s: float | None = None
+    impact_map: tuple[tuple[str, tuple[str, ...]], ...] = ()  # (changed-file glob, test globs) declared by the project
     provision: bool = False  # the user consented to preparing environments for this project (downloads, installers)
     problems: tuple[str, ...] = field(default=())
 
@@ -84,10 +89,24 @@ def load_config(root: str | Path) -> ProjectConfig:
     if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0):
         problems.append("tests.timeout_s must be a positive number; ignored")
         timeout = None
+    impact = data.get("impact") or {}
+    rules = []
+    if not isinstance(impact, dict):
+        problems.append("[impact] must be a table; ignored")
+        impact = {}
+    problems += [f"unknown key impact.{key} ignored" for key in impact if key not in _KNOWN["impact"]]
+    for index, rule in enumerate(impact.get("map") or []):
+        changes = rule.get("changes") if isinstance(rule, dict) else None
+        tests = _strings(rule.get("tests", []), f"impact.map[{index}].tests", problems) if isinstance(rule, dict) else ()
+        if not isinstance(changes, str) or not changes.strip() or not tests:
+            problems.append(f"impact.map[{index}] needs a changes glob and a list of test globs; ignored")
+            continue
+        rules.append((changes.strip(), tests))
     return ProjectConfig(
         source=source, authorize=authorize, env=env, provision=provision,
         runners=tuple(name for name in runners if name in RUNNERS),
         timeout_s=float(timeout) if timeout is not None else None,
+        impact_map=tuple(rules),
         problems=tuple(problems + consent_problems),
     )
 

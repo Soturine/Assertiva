@@ -30,6 +30,8 @@ class Trigger(str, Enum):
     NO_TEST_NODES = "NO_TEST_NODES"
     CHANGES_UNKNOWN = "CHANGES_UNKNOWN"
     COMPONENT_DEPENDENCY = "COMPONENT_DEPENDENCY"
+    DEPENDENCY_CHANGE = "DEPENDENCY_CHANGE"  # a lockfile or requirements file: installed code may change under any test
+    DECLARED_MAP = "DECLARED_MAP"  # tests the project declares for a changed file (.assertiva.toml [impact]); not proven
 
 
 class Confidence(str, Enum):
@@ -75,6 +77,9 @@ class TestSelection:
     unknown_dependencies: list[UnknownRelation] = field(default_factory=list)
     widening: list[Widening] = field(default_factory=list)
     affected_components: dict[str, str] = field(default_factory=dict)
+    cosmetic: dict[str, str] = field(default_factory=dict)  # changed files whose normalized form did not change
+    dependency_changes: dict[str, list[str]] = field(default_factory=dict)  # dependency file -> packages changed
+    priority: list[dict] = field(default_factory=list)  # suggested order of the selected tests, from history (never a filter)
     fallback: str | None = None
     confidence: Confidence = Confidence.FULL_SUITE
     limitations: list[str] = field(default_factory=list)
@@ -100,10 +105,19 @@ def select_tests(
     must_run: set[str] | frozenset = frozenset(),
     components=None,
     previous_units: dict[str, dict[str, str]] | None = None,
+    cosmetic: dict[str, str] | None = None,
+    dependency_changes: dict[str, list[str]] | None = None,
+    declared_map: tuple | list = (),
 ) -> TestSelection:
-    """Select tests for ``changes``; ``components`` (a component graph) adds declared cross-component impact."""
+    """Select tests for ``changes``; ``components`` (a component graph) adds declared cross-component impact.
+    ``cosmetic`` changes (same normalized form) select nothing and are recorded; a ``dependency_changes`` file widens
+    to its component (or the full suite); ``declared_map`` rules ((changed glob, test globs), from the project) add
+    the tests the project names for a change, and stand in for "unmapped" only for files no adapter relates."""
+    from fnmatch import fnmatch
+
     selection = TestSelection(revision=revision, base=base, graph_revision=graph.revision, git_revision=graph.git_revision,
-                              changes=list(changes), limitations=[CLAIM, *graph.limitations])
+                              changes=list(changes), limitations=[CLAIM, *graph.limitations],
+                              cosmetic=dict(cosmetic or {}), dependency_changes=dict(dependency_changes or {}))
 
     def add(test: str, reason: SelectionReason) -> None:
         reasons = selection.selected.setdefault(test, [])
@@ -147,6 +161,29 @@ def select_tests(
                     widen(Trigger.NO_PROVEN_PATH, old, "nothing at this revision still refers to the deleted file; its impact is not proven")
                 continue
         path = change.path
+        if path in selection.cosmetic:
+            continue  # recorded: comments or formatting only, the code that runs is the same
+        if path in selection.dependency_changes:
+            owner = components.owner(path) if components is not None else None
+            listed = ", ".join(selection.dependency_changes[path][:8])
+            scoped = [t for name in ([owner.name, *components.dependents(owner.name)] if owner is not None else [])
+                      for t in tests_in(components.components[name])]
+            if scoped:
+                for test in scoped:
+                    add(test, SelectionReason(f"dependencies of component {owner.name} changed ({listed})", None, (), Trigger.DEPENDENCY_CHANGE))
+                widen(Trigger.DEPENDENCY_CHANGE, path, f"dependencies changed ({listed}); widened to component {owner.name} and its dependents", full=False)
+            else:
+                widen(Trigger.DEPENDENCY_CHANGE, path, f"dependencies changed ({listed}): installed code may change under any test")
+            continue
+        declared = [tests for pattern, tests in declared_map if fnmatch(path, pattern)]
+        if declared:
+            for test in sorted(graph.tests):
+                if any(fnmatch(test.split("::", 1)[0], glob) for globs in declared for glob in globs):
+                    add(test, SelectionReason(f"declared by the project for {path} (.assertiva.toml [impact]); not a proven path",
+                                              None, (), Trigger.DECLARED_MAP))
+            widen(Trigger.DECLARED_MAP, path, "the project declares which tests this file affects; the declaration is trusted, not proven", full=False)
+            if path not in graph.nodes:
+                continue
         if components is not None and path in components.workspace_files:
             widen(Trigger.CONFIGURATION, path, "workspace configuration affects every component")
             continue
@@ -229,6 +266,13 @@ def _changed_units(graph: ImpactGraph, previous: dict[str, dict[str, str]], chan
 
 
 def _finish(selection: TestSelection, graph: ImpactGraph) -> TestSelection:
+    if selection.changes and not selection.full and not selection.selected \
+            and all(c.path in selection.cosmetic for c in selection.changes):
+        # positive evidence, not a missing edge: both revisions have the same normalized form
+        selection.limitations.append("every change is cosmetic (comments or formatting): no test is selected for them; "
+                                     "the full suite stays the release gate")
+        selection.confidence = Confidence.PROVEN_PATHS
+        return selection
     if not selection.full and not selection.selected:
         selection.widening.append(Widening(Trigger.NO_PROVEN_PATH, None, True, "nothing was selected; that is never evidence that nothing needs to run"))
     if selection.full:
@@ -242,7 +286,9 @@ def _finish(selection: TestSelection, graph: ImpactGraph) -> TestSelection:
     else:
         selection.not_selected = {test: "no proven path from any changed file (E0–E3 edges at this revision)"
                                   for test in sorted(graph.tests - set(selection.selected))}
-        bounded = selection.unknown_dependencies or any(w.trigger is Trigger.COMPONENT_DEPENDENCY and w.path for w in selection.widening)
+        bounded = selection.unknown_dependencies or any(
+            (w.trigger is Trigger.COMPONENT_DEPENDENCY and w.path) or w.trigger in (Trigger.DECLARED_MAP, Trigger.DEPENDENCY_CHANGE)
+            for w in selection.widening)
         selection.confidence = Confidence.BOUNDED_BY_UNKNOWNS if bounded else Confidence.PROVEN_PATHS
     if graph.unknowns and selection.confidence is Confidence.PROVEN_PATHS:
         selection.limitations.append("unknown relations exist but no test reaches them statically")
@@ -266,16 +312,59 @@ def select_changes(root: str | Path, base: str, must_run: set[str] | frozenset =
                                   git_revision=graph.git_revision, limitations=[CLAIM])
         selection.widening.append(Widening(Trigger.CHANGES_UNKNOWN, None, True, str(exc)))
         return _finish(selection, graph)
-    previous_units = {}
+    from .adapters.change_digest import dependency_changes, is_dependency_file, normalized
+    from .config import load_config
+
+    previous_units, cosmetic, dependencies = {}, {}, {}
     for change in changes:
-        if change.status == "M" and change.path in graph.units:
-            text = _git(Path(root), "show", f"{base}:./{change.path}")
+        if change.status not in ("M", "A"):
+            continue
+        before = _git(Path(root), "show", f"{base}:./{change.path}") if change.status == "M" else None
+        try:
+            after = (Path(root) / change.path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            after = None
+        if is_dependency_file(change.path):
+            dependencies[change.path] = dependency_changes(change.path, before, after)
+            continue
+        if change.status != "M":
+            continue
+        form = normalized(change.path, before)
+        if form is not None and form == normalized(change.path, after):
+            cosmetic[change.path] = "only comments or formatting changed (same normalized form at both revisions)"
+            continue
+        if change.path in graph.units:
             for adapter in impact_adapters(root):
-                digests = adapter.unit_digests(change.path, text) if text is not None and hasattr(adapter, "unit_digests") else None
+                digests = adapter.unit_digests(change.path, before) if before is not None and hasattr(adapter, "unit_digests") else None
                 if digests is not None:
                     previous_units[change.path] = digests
     return select_tests(graph, changes, revision=graph.revision, base=base, must_run=must_run,
-                        components=components if components.components else None, previous_units=previous_units)
+                        components=components if components.components else None, previous_units=previous_units,
+                        cosmetic=cosmetic, dependency_changes=dependencies, declared_map=load_config(root).impact_map)
+
+
+def prioritize(tests, observations: dict) -> list[dict]:
+    """An order for running ``tests`` from recorded history (``observations``: test -> observations, oldest first, each
+    with ``outcome`` and ``duration_s``): tests that failed in their last recorded run, then tests that failed before,
+    then the rest by median duration (fastest first, unknown last). Ordering never removes a test from the run."""
+    import statistics
+
+    rows = []
+    for test in tests:
+        seen = [o for o in observations.get(test, []) if o.outcome is not None]
+        failing = [o for o in seen if o.outcome in ("FAILED", "ERROR")]
+        durations = [o.duration_s for o in seen if o.duration_s is not None]
+        median = statistics.median(durations) if durations else None
+        if seen and seen[-1].outcome in ("FAILED", "ERROR"):
+            rank, why = 0, "failed in its last recorded run"
+        elif failing:
+            rank, why = 1, f"failed {len(failing)} of {len(seen)} recorded runs"
+        elif median is not None:
+            rank, why = 2, f"median {median:.3f}s over {len(durations)} recorded runs"
+        else:
+            rank, why = 3, "no recorded history"
+        rows.append((rank, median if median is not None else float("inf"), test, why))
+    return [{"test": test, "reason": why} for rank, _, test, why in sorted(rows)]
 
 
 def changed_files(root: str | Path, base: str) -> list[FileChange]:

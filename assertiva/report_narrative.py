@@ -274,6 +274,9 @@ NARRATIVE: list[tuple[str, str]] = [
     ("{label}: {status:st}: {detail}", "{label}: {status:st}: {detail}"),
     ("absence of observed instability is not proof of stability", "a ausência de instabilidade observada não prova estabilidade"),
     ("order dependence was not measured", "a dependência de ordem não foi medida"),
+    ("every change is cosmetic (comments or formatting): no test is selected for them; the full suite stays the release gate",
+     "toda alteração é cosmética (comentários ou formatação): nenhum teste é selecionado por elas; a suíte completa continua "
+     "sendo o gate de release"),
     ("order dependence probed only for failures that passed when rerun alone",
      "dependência de ordem sondada apenas para falhas que passaram quando reexecutadas sozinhas"),
     ("order dependence not probed: the full run took {seconds}s (budget {budget}s)",

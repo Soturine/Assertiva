@@ -27,9 +27,11 @@ Work in a loop:
    | What do the tests need to run (runtime, dependencies, a database)? | `assertiva audit --execute` prepares it in a disposable workspace when the project's owner consented (`provision` in Assertiva's consent file, never the repository); what it cannot prepare is BLOCKED, never failed |
    | Do test doubles hide the boundary under test? | the doubles, the real collaborator and its contract |
    | What does CI run, on which revision? | workflow files (declared); provider runs with their head SHA |
-   | Would a real defect be caught? | mutation runs (`--execute --mutate FILE`), mutation reports, negative controls |
+   | Would a real defect be caught? | mutation runs (`--execute --mutate FILE`: the tool that fits the project, `--mutation-tool` when several do), mutation reports, negative controls; survivors come with the line they changed |
+   | Why did it fail, and is it new? | the history panel: inferred origin (product, test, infrastructure, or unknown for an assertion), new / recurring / regression since a revision, failures raised at the same place; improve probes order dependence |
+   | Does the provider honor its consumers, is the UI usable by assistive technology? | `--contract` (Pact contracts and verifications; an empty or pending-only run is not verified), `--accessibility-report` (axe-core; no violation is not accessibility) |
    | Does the shipped artifact behave like the source tree? | engine artifact qualification |
-   | What does this change affect? | `assertiva audit --changed-since REV` |
+   | What does this change affect, and what to run first? | `assertiva audit --changed-since REV`: proven paths, widening, cosmetic and dependency changes, project-declared maps, a history-based order |
 
    No instrument is mandatory and none comes first by default. Static inspection is cheap but cannot tell whether tests pass, what they execute or what CI runs; when the question needs that and you can get it safely, get it.
 3. **Correlate.** The important findings usually join facts no single tool sees:

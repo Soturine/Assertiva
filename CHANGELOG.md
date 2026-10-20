@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased] — 0.9.0 — Advanced Test Intelligence & Continuous Assurance
+## [0.9.0] — not yet published — Advanced Test Intelligence & Continuous Assurance
 
-In progress on `release/0.9.0`, by checkpoints; it includes the scope first planned for 0.8.1. Compatible with 0.8.0: report fields are only added.
+Prepared on `release/0.9.0` (checkpoints CP1–CP7; `pyproject.toml` declares 0.9.0); it includes the scope first planned for 0.8.1 and builds on the unpublished 0.8.0. Compatible with 0.8.0: report fields and options are only added. Publication (merge to `main`, tag, GitHub Release) waits for the owner's authorization.
 
 ### Security and evidence integrity (CP1)
 - A mutation target reached through a symlink or junction is never rewritten: every component from the project root to the file is checked on the project and again on the copy the tool runs in (a link in a copy could point back outside it).

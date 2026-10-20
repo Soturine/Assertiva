@@ -1,8 +1,16 @@
 # Changelog
 
-## [0.9.0] — not yet published — Advanced Test Intelligence & Continuous Assurance
+## [0.9.0] — 2026-10-20 — Advanced Test Intelligence & Continuous Assurance
 
-Prepared on `release/0.9.0` (checkpoints CP1–CP7; `pyproject.toml` declares 0.9.0); it includes the scope first planned for 0.8.1 and builds on the unpublished 0.8.0. Compatible with 0.8.0: report fields and options are only added. Publication (merge to `main`, tag, GitHub Release) waits for the owner's authorization.
+The first release since 0.7.2. It includes the work developed as 0.7.3, 0.8.0 and 0.8.1, which were never published on their own: their entries are kept below, marked as incorporated. The code was qualified at `32ce4d8` (see the qualification tables); the release commit differs from it in documentation only. Report fields and options are added; where a result's meaning became stricter, the entry says so (an untied mutation report is a lead; an imported run with unknown results is not a pass).
+
+### Highlights since 0.7.2
+- **Security and evidence integrity:** a mutation tool can no longer write through a link or junction to a file outside its copy (reproduced and fixed); a mutation report counts for a state only when it shows the sources it mutated and the tests it ran and both match; imported results with unknown statuses and mutation runs that did not finish never pass.
+- **Mutation testing run by the engine, chosen by capability:** Cosmic Ray (Python, under the declared pytest, unittest or Django runner), StrykerJS (Jest) and PIT (Maven), each on a disposable copy, each with a real positive and negative test; `improve` shows the protection a strengthened test gains or loses, attributed to the tests that detect each mutant when the tool names them.
+- **Test intelligence:** per-test contribution from complete killer matrices, survivors with the line they changed, false-green checks in JavaScript/TypeScript and Kotlin/Java, oracle basis (contract vs characterization), and a fidelity ladder per boundary.
+- **Continuous assurance:** failure origin, novelty and clusters, an order-dependence probe, and change-based selection that understands cosmetic changes, dependency files and project-declared maps, with a history-based order.
+- **Portable results:** CTRF and Allure in (CTRF out with `--ctrf`), Pact contracts and verifications, axe-core accessibility results; a run that verified nothing or only pending interactions is never counted as verified.
+- **Qualification:** Windows and Linux, Python 3.11 and 3.12, JVM, JavaScript, Playwright, PostgreSQL, real mutation tools and the runtime self-qualification of the installed wheel.
 
 ### Requalification of `32ce4d8` (2026-10-20, after the pre-publication fixes)
 An external review found that an imported CTRF/Allure run with unknown results could read as passing; checking further found that a mutation run that did not finish could pass the fault-sensitivity check, and that StrykerJS recorded a mutant limit it never applied. Fixed in `cd11c59` and `a4c3a6e` (see "Pre-publication fixes" below); STATUS was corrected in `32ce4d8`. Every result in this table is for `32ce4d8`; counts are per environment and are not added across them.
@@ -80,11 +88,11 @@ NOT_RUN: semantic evaluation of the Skill with separate agents (deferred to 1.0;
 - **Failure origin, novelty and clusters:** each failing invocation in history carries an inferred origin (infrastructure, test code, product, or UNKNOWN for an assertion that did not hold), its novelty (new failure with the revision where it last passed, recurring, changed, no history), and failures raised at the same site with the same exception type are grouped. Shown in the History panel.
 - **Selection:** cosmetic changes (same normalized form) select nothing and are listed; dependency file changes list the packages that changed and widen to their component or the full suite; `.assertiva.toml [[impact.map]]` declares tests for files no adapter relates (marked declared, never proven); `--changed-since` carries a history-based priority order. The matched experiment adds a string-literal defect, a declared-map project and a cosmetic change; no defect is missed.
 
-## [Unreleased] — 0.8.0 — Intelligence & Proof of Protection
+## 0.8.0 — Intelligence & Proof of Protection (not published on its own; included in 0.9.0)
 
-In progress on `release/0.8.0`. Compatible with 0.7.2: report fields and metrics are only added; existing ones keep their meaning.
+Qualified on `release/0.8.0` (`5fe2124`), never released separately; everything below is part of 0.9.0. Compatible with 0.7.2: report fields and metrics are only added; existing ones keep their meaning.
 
-The first part below was prepared as a 0.7.3 stabilization release and folded into 0.8.0 without being published (commits `2d301b6`…`6d49565`, also on branch `release/0.7.3`); the functional work of 0.8.0 follows under its own headings.
+The first part below was prepared as a 0.7.3 stabilization release and folded into 0.8.0 without being published (commits `2d301b6`…`6d49565`, also on branch `release/0.7.3`, which keeps that history; there is no 0.7.3 release, and no 0.8.1 release: its scope is in 0.9.0); the functional work of 0.8.0 follows under its own headings.
 
 ### Qualification of `5fe2124` (local; GitHub Actions unavailable for billing)
 - Windows 11, Python 3.12.10, real tools (Django 6.1.2 + coverage, Node 24, Jest/Vitest, Playwright Chromium 1243, provisioned JDK, Gradle and PostgreSQL, Cosmic Ray 8.7.0 required): full suite 890 passed; not run: 2 POSIX-only and 3 Maven tests (the CI runs Maven on Linux only).

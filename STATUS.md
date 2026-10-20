@@ -2,17 +2,19 @@
 
 ## Release state
 
-| Version | State | Where |
-| --- | --- | --- |
-| **0.7.2** | the latest **published** release (tag `v0.7.2`, `main`) | GitHub Release |
-| **0.8.0** — Intelligence & Proof of Protection | qualified on its branch (`5fe2124`, 2026-10-19), **not published**; its work is part of 0.9.0 | `release/0.8.0` |
-| **0.9.0** — Advanced Test Intelligence & Continuous Assurance | **prepared**: version declared, implemented and qualified on its branch, requalified at `32ce4d8` after the pre-publication fixes (CHANGELOG has the record); **not published** — merge, tag and GitHub Release wait for the owner's authorization | `release/0.9.0` |
+| Version | State |
+| --- | --- |
+| **0.9.0** — Advanced Test Intelligence & Continuous Assurance | **published 2026-10-20** as `v0.9.0` (GitHub Release); this page describes it. It includes the work of 0.7.3, 0.8.0 and 0.8.1 |
+| 0.8.1 | not a release: its scope (advanced mutation and improve) is in 0.9.0 |
+| 0.8.0 — Intelligence & Proof of Protection | qualified on `release/0.8.0` (`5fe2124`, 2026-10-19); **no independent release**; included in 0.9.0 |
+| 0.7.3 | **no independent release**: the stabilization work (`release/0.7.3` keeps its history) is part of 0.8.0 and therefore of 0.9.0 |
+| 0.7.2 | the previous published release (`v0.7.2`, 2026-10-09) |
 
-This page describes the code on `release/0.9.0`. What 0.7.2 users have is the 0.7.2 section of the CHANGELOG; the items marked 0.8.0 or 0.9.0 below are not in a published release yet.
+Items marked 0.7.x, 0.8.0 or 0.9.0 below say where a capability was introduced; all of them are in 0.9.0. Distribution is the GitHub Release (wheel and sdist with SHA-256 checksums) and the source; the package is not on PyPI and the Skill is in no marketplace.
 
 ## Milestones (history)
 
-M0 (foundation and contracts), M1 (executable audit + improve vertical slice) and M2 (scale, cross-stack, impact & selection, history, delivery; closed 2026-10-06, version 0.5.0) are complete. M3 is in progress: evidence integrity and execution safety, native unittest and Django; the rest of M3 is open (ROADMAP.md). ROADMAP.md lists exactly what exists and what was explicitly not required (.NET, Go, Rust). 0.7.2 adds Gradle, consented provisioning with a disposable PostgreSQL, provider CI runs and cross-language test effectiveness. 0.8.0 (qualified, not published) starts with the stabilization work prepared as 0.7.3: fixes from a security re-audit ([docs/EXECUTION_SECURITY.md](docs/EXECUTION_SECURITY.md)), structural repetition kept apart from inferred redundancy in effectiveness candidates, signal counts kept apart from affected-test counts, and this page brought up to date. 0.9.0 (prepared, not published; it folds in the scope first planned for 0.8.1) adds mutation testing chosen by capability, failure and selection intelligence, contracts, accessibility and portable results. The milestone plan M1–M10 is kept in ROADMAP.md for history; versions, not milestones, now mark progress.
+M0 (foundation and contracts), M1 (executable audit + improve vertical slice) and M2 (scale, cross-stack, impact & selection, history, delivery; closed 2026-10-06, version 0.5.0) are complete. M3 is in progress: evidence integrity and execution safety, native unittest and Django; the rest of M3 is open (ROADMAP.md). ROADMAP.md lists exactly what exists and what was explicitly not required (.NET, Go, Rust). 0.7.2 adds Gradle, consented provisioning with a disposable PostgreSQL, provider CI runs and cross-language test effectiveness. 0.8.0 (qualified on its branch, never released on its own) starts with the stabilization work prepared as 0.7.3: fixes from a security re-audit ([docs/EXECUTION_SECURITY.md](docs/EXECUTION_SECURITY.md)), structural repetition kept apart from inferred redundancy in effectiveness candidates, signal counts kept apart from affected-test counts, and this page brought up to date. 0.9.0 (published; it folds in the scope first planned for 0.8.1) adds mutation testing chosen by capability, failure and selection intelligence, contracts, accessibility and portable results. The milestone plan M1–M10 is kept in ROADMAP.md for history; versions, not milestones, now mark progress.
 
 Python/pytest, packaging, GitHub Actions and pre-commit are the first reference adapters, **not the architecture**. The core works on capabilities, normalized records, stages, provenance and limitations. Contract tests drive measurement, qualification and the report with fake adapters (a runner with non-pytest ids, a non-wheel artifact, coverage from another source), and fail if a core module names a tool or parses a runner's id syntax.
 
@@ -192,10 +194,10 @@ Tests are marked by what they run (unmarked = fast/core, `integration`, `artifac
 - Rollback / forbidden side-effect / idempotency evidence beyond static post-rejection assertions.
 - JUnit XML and mutation reports as *improve* candidate-state evidence for non-native runners (audit only today).
 - Authorized remote CI execution and non-production preview deployment.
-- Order dependence; failure clustering beyond identical deterministic fingerprints; runtime coverage mapping (E0) into the impact graph (a coverage report cannot prove its revision); impact graphs for languages other than Python (their changes widen to the full suite); subset execution for runners other than pytest.
+- Order dependence beyond one full-run probe (the polluting test is not searched for); failure clustering beyond identical fingerprints and same-site grouping; reproduction seeds; runtime coverage mapping (E0) into the impact graph (a coverage report cannot prove its revision); impact graphs for languages other than Python (their changes widen to the full suite); subset execution for runners other than pytest.
 
 ## PLANNED
-See [ROADMAP.md](ROADMAP.md): M3 (productization and empirical validation) is in progress; not implemented yet: .NET, Go, Rust, PHP; Android instrumented tests and non-JVM KMP targets (listed, not run); interpreter downloads.
+See [ROADMAP.md](ROADMAP.md): version 1.0.0 is the next step (ecosystem coverage, the competitive qualification lab, release qualification, a stable CLI and report contract); not implemented yet: .NET, Go, Rust, PHP; Android instrumented tests and non-JVM KMP targets (listed, not run); interpreter downloads.
 
 ## Claim boundary
 - Static inventory and negative-path dimensions are E3 signals, not runtime proof; a post-rejection assertion is not rollback proof.

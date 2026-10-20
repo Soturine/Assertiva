@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | **0.7.2** | the latest **published** release (tag `v0.7.2`, `main`) | GitHub Release |
 | **0.8.0** — Intelligence & Proof of Protection | qualified on its branch (`5fe2124`, 2026-10-19), **not published**; its work is part of 0.9.0 | `release/0.8.0` |
-| **0.9.0** — Advanced Test Intelligence & Continuous Assurance | **prepared**: version declared, implemented and qualified on its branch (CHANGELOG has the qualification record); **not published** — merge, tag and GitHub Release wait for the owner's authorization | `release/0.9.0` |
+| **0.9.0** — Advanced Test Intelligence & Continuous Assurance | **prepared**: version declared, implemented and qualified on its branch, requalified at `32ce4d8` after the pre-publication fixes (CHANGELOG has the record); **not published** — merge, tag and GitHub Release wait for the owner's authorization | `release/0.9.0` |
 
 This page describes the code on `release/0.9.0`. What 0.7.2 users have is the 0.7.2 section of the CHANGELOG; the items marked 0.8.0 or 0.9.0 below are not in a published release yet.
 

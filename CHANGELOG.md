@@ -4,7 +4,20 @@
 
 Prepared on `release/0.9.0` (checkpoints CP1–CP7; `pyproject.toml` declares 0.9.0); it includes the scope first planned for 0.8.1 and builds on the unpublished 0.8.0. Compatible with 0.8.0: report fields and options are only added. Publication (merge to `main`, tag, GitHub Release) waits for the owner's authorization.
 
-### Qualification of `0cac223` (CP7, 2026-10-20)
+### Requalification of `32ce4d8` (2026-10-20, after the pre-publication fixes)
+An external review found that an imported CTRF/Allure run with unknown results could read as passing; checking further found that a mutation run that did not finish could pass the fault-sensitivity check, and that StrykerJS recorded a mutant limit it never applied. Fixed in `cd11c59` and `a4c3a6e` (see "Pre-publication fixes" below); STATUS was corrected in `32ce4d8`. Every result in this table is for `32ce4d8`; counts are per environment and are not added across them.
+
+| Check | Environment | Result |
+| --- | --- | --- |
+| Full suite, every real tool required | Windows 11, Python 3.12.10 | PASS: 959 passed, 6 skipped (2 POSIX-only, 4 Maven/PIT, run on Linux below) |
+| Validation, fast/core, integration and artifact, wheel build and installed-CLI smoke, provisioning and PostgreSQL, Gradle, Playwright | Linux, Python 3.12.15, Node 24 | PASS: 809 fast; 145 integration/artifact (5 skips by design); 43 services; 14 Gradle; 2 browser |
+| Fast/core suite and installed wheel | Linux, Python 3.11.17 | PASS: 809 passed |
+| JVM with real PIT 1.30.0 | Linux, Temurin 21.0.12, Maven 3.9.16 | PASS: 4 passed (1 Django test skipped there) |
+| Runtime self-qualification | Linux, Python 3.12.15 | PASS: 809 invocations PASS, `assertiva-0.9.0-py3-none-any.whl` PASS, tree unchanged |
+| GitHub Actions | push (run 39427981285) and dispatch (run 39429290880) | PASS: 7 jobs on push; 8 on dispatch, runtime self-qualification included |
+| Frozen benchmarks | static | v1 1.0 / 0.958; v2 1.0 / 0.70 (unchanged, no tuning) |
+
+### Qualification of `0cac223` (CP7, 2026-10-20; superseded by the requalification above)
 Every result below is for commit `0cac223` (version 0.9.0 declared). Counts are per environment and are not added across them.
 
 | Check | Environment | Result |
@@ -22,6 +35,12 @@ Every result below is for commit `0cac223` (version 0.9.0 declared). Counts are 
 | Security and isolation | all of the above | read-only invariant and link/junction refusals in the suites; no project file written by any run |
 
 NOT_RUN: semantic evaluation of the Skill with separate agents (deferred to 1.0; the Skill and reference changes of 0.9.0 are not semantically evaluated), Android tests with an SDK, StrykerJS with Vitest (Jest only), PIT through Gradle (blocked by design, report import only), the Pact Broker. Found and fixed during qualification: the CTRF export broke the one-report-per-run contract (now `--ctrf`).
+
+### Pre-publication fixes
+- **Imported results (CTRF, Allure):** a run read as PASS whenever no test failed, so a report whose results all had an unknown status, a mix of passes and unknowns, or only skipped tests counted as passing. An imported run is now FAIL when a test failed, UNKNOWN for an empty report, only skipped or not-run tests or any unknown result (with the reason), and PASS only when every result is known and some test ran, as for JUnit XML and Jest.
+- **Unfinished mutation runs:** a run whose tool exited with an error, or a PIT report marked partial, listed only the mutants it reached, and a list of killed mutants passed the fault-sensitivity check. Runs now record `finished`; an unfinished run leaves the check UNKNOWN.
+- **Mutant limits:** Cosmic Ray refuses a plan over 300 mutants before running; StrykerJS and PIT run every mutant of the targets. The Stryker record no longer lists a limit it did not apply.
+- STATUS now opens with the release state: 0.7.2 published, 0.8.0 qualified and not published, 0.9.0 prepared.
 
 ### Security and evidence integrity (CP1)
 - A mutation target reached through a symlink or junction is never rewritten: every component from the project root to the file is checked on the project and again on the copy the tool runs in (a link in a copy could point back outside it).

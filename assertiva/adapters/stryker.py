@@ -20,7 +20,7 @@ from assertiva.process import execution_refusal, run_command
 
 TOOL = "StrykerJS"
 KEY = "stryker"
-MAX_MUTANTS = 300
+NOTICE_MUTANTS = 300  # above this a run is called large afterwards; StrykerJS has no option to cap it, so nothing is refused
 _RUNNERS = {"jest": "@stryker-mutator/jest-runner", "vitest": "@stryker-mutator/vitest-runner"}
 _JS_SUFFIXES = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".vue", ".svelte")
 
@@ -126,7 +126,7 @@ def run(state_root: str | Path, targets: list[str], origin: str | Path | None = 
             config_file.write_text(json.dumps(config, indent=2), encoding="utf-8")
             command = [node_executable(), str(copy / "node_modules" / "@stryker-mutator" / "core" / "bin" / "stryker.js"), "run", str(config_file)]
             result.config = {"test_runner": runner, "disableBail": True, "incremental": False, "concurrency": 2,
-                             "timeout_ms": 30000, "max_mutants": MAX_MUTANTS, "project_config": own.get("name")}
+                             "timeout_ms": 30000, "project_config": own.get("name")}
             if own.get("ignored"):
                 result.limitations.append(own["ignored"])
             executed = run_command(command, copy, timeout_s=timeout_s, output_limit=1 << 20)
@@ -144,10 +144,14 @@ def run(state_root: str | Path, targets: list[str], origin: str | Path | None = 
         setattr(result, field, getattr(parsed, field))
     result.limitations = [*result.limitations, *parsed.limitations, "mutants were executed by Assertiva on a disposable copy of this state",
                           "the project's installed node_modules was linked into the copy (not isolated; never copied)"]
-    if len(result.mutants) > MAX_MUTANTS:
-        result.limitations.append(f"{len(result.mutants)} mutants exceed the budget of {MAX_MUTANTS}; narrow the targets next time")
+    if len(result.mutants) > NOTICE_MUTANTS:
+        result.limitations.append(f"{len(result.mutants)} mutants ran, more than {NOTICE_MUTANTS} (not a limit: StrykerJS "
+                                  "runs every mutant of the targets); narrow the targets to shorten the run")
     if not executed.ok:
         result.limitations.append(f"{TOOL} exited with an error ({executed.summary()}); results it did not finish are UNKNOWN")
+        result.finished = False
+    else:
+        result.finished = True
     return result
 
 

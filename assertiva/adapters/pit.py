@@ -182,6 +182,7 @@ def run(state_root: str | Path, targets: list[str], timeout_s: float = 3600.0) -
                             parsed.test_locations[killer] = f"{test_root}/{location}{suffix}"
             if not executed.ok:
                 result.limitations.append(f"{TOOL} exited with an error ({executed.summary()}); results it did not finish are UNKNOWN")
+            result.finished = executed.ok and parsed.finished is not False
             for field in ("mutants", "counts", "test_locations", "test_names", "killers_complete"):
                 setattr(result, field, getattr(parsed, field))
             declared = (_plugin(copy / "pom.xml") or {}).get("version") or ""

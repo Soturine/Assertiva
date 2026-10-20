@@ -144,6 +144,9 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
             result.mutants = cosmic_ray_dump(dumped.stdout)
             if not executed.ok:
                 result.limitations.append(f"{TOOL} stopped before finishing ({executed.summary()}); unfinished mutants are UNKNOWN")
+                result.finished = False
+            else:
+                result.finished = True
             result.tool_version = _version(python, copy)
             # what the run saw: the mutated files and the tests, read from the copy before it is removed
             from assertiva.adapters.python_discovery import test_files

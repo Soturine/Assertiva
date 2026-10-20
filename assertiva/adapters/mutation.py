@@ -116,6 +116,7 @@ def _pit(root: ET.Element, run: MutationRun) -> MutationRun:
         )
     if root.get("partial") == "true":
         run.limitations.append("PIT reported a partial run")
+        run.finished = False
     # `killingTests` is written only with the full mutation matrix; `killingTest` names the first detector only
     if any(node.find("killingTests") is not None for node in root.iter("mutation")):
         run.killers_complete = True

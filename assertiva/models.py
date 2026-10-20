@@ -86,6 +86,9 @@ class MutationRun:
             return None
         return hashlib.sha256(json.dumps([sorted(self.sources.items()), sorted(self.test_sources.items())]).encode()).hexdigest()
     incremental: bool | None = None  # the tool ran in a mode that may carry results over without marking them
+    # False when the tool stopped before the end (an error exit, a report marked partial): the mutants it did not reach
+    # are missing from the report, so what it lists is not the whole run. None when the report does not say.
+    finished: bool | None = None
 
     def count(self, status: MutantStatus) -> int:
         return self.counts.get(status.value, 0)

@@ -117,3 +117,19 @@ def test_pit_proves_the_protection_a_strengthened_junit_test_adds(tmp_path, caps
 
     cli.main(["improve", str(root), "--discard"])
     assert tree_fingerprint(root) == before
+
+
+def test_a_run_that_did_not_finish_never_passes_the_fault_sensitivity_check(tmp_path):
+    from assertiva.evidence import StateEvidence
+    from assertiva.improve import _mutation_stage
+
+    partial = load_mutation_report(write(tmp_path / "partial.xml", _MATRIX.format(index=7).replace('partial="false"', 'partial="true"')))
+    assert partial.finished is False  # the mutants PIT did not reach are missing from the report
+    for finished, expected in ((False, "UNKNOWN"), (True, "PASS")):
+        run = load_mutation_report(write(tmp_path / "m.xml", _MATRIX.format(index=7)))
+        run.orchestrated, run.matches_state, run.finished = True, True, finished
+        state = StateEvidence(label="candidate", observed_in="copy")
+        state.mutation.append(run)
+        check = _mutation_stage(state, [], None)
+        assert check.status.value == expected, check.summary
+        assert ("did not finish" in check.summary) is (not finished)

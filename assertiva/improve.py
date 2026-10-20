@@ -450,6 +450,9 @@ def _mutation_stage(candidate: StateEvidence, changes: list[CandidateTestChange]
             failures.append(f"MUTATION_NO_COVERAGE ({tool}): {run.count(MutantStatus.NO_COVERAGE)} mutants not covered by any test")
         if run.count(MutantStatus.UNKNOWN):
             unknown.append(f"{tool}: {run.count(MutantStatus.UNKNOWN)} mutants with unknown/pending status")
+        if run.finished is False:
+            unknown.append(f"{tool}: the run did not finish; mutants it did not reach are missing from the report, so "
+                           "what it lists is not the whole run")
         if run.orchestrated and run.count(MutantStatus.ERROR):
             # the suite passed before mutation, so a mutant that ended in error is a run the harness could not complete
             unknown.append(f"{tool}: {run.count(MutantStatus.ERROR)} mutant run(s) ended in error and were not evaluated")

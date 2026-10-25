@@ -20,13 +20,29 @@
 | **TCC-A14 P2** | Portable manual mutation / negative-controls ingestion with strict provenance and artifact manifests without upgrading to engine-run mutations. | Ingest hand-curated `mutation_manifest` with source SHAs/patch hashes, runner exit code, killed/survived; reports `EXTERNAL_MANUAL`, no global score nor false engine claims. | mutation/evidence |
 | **TCC-A15 P2** | Semantic Skill evals on false-positive disposition and independent findings; measure agent-added bugs with ground truth separately from engine heuristics. | New structured evals + holdout tests, independent adjudication before broad claims; benchmark precision/recall per scope and false-green detection. | evals |
 
+## Android A1/A2 extensions — TCC PR #13 (all proposed, not implemented)
+
+See [the Android field report](2026-10-25-tcc-android-a1-a2-dogfood.md) and [the registered semantic eval](../evals/cases/TCC_ANDROID_GRADLE_COMPOSE_EVIDENCE_BOUNDARIES.md). These nine items extend A01–A15 without pretending that the 0.9.0 engine detected manual bugs.
+
+| ID / priority | Observed gap / proposed implementation | Positive and negative evidence needed | Owner |
+|---|---|---|---|
+| **TCC-A16 P0** | Windows Gradle runner: `./gradlew` gerou `[WinError 2]`, embora exista `gradlew.bat`; resolver executável segundo OS e cwd sem shell arbitrário. | Reproduzir BLOCKED antes; Windows `.bat` e Linux script passam fixture segura; wrapper ausente permanece BLOCKED; autorização/timeout/isolamento. | runner |
+| **TCC-A17 P1** | Kotlin/Compose: analisar `onNodeWithText`, `assertCountEquals(0)`, `assertIsEnabled` e encadeamento de seletor+assert; não rotular dois oráculos fortes como `EXISTENCE`. | 2 casos falsos são reclassificados, smoke fraco continua sinalizado; mutante de texto e permissão é detectado; helper não resolvido = UNKNOWN. | static-oracles |
+| **TCC-A18 P1** | Instrumentado Android: estado autenticado residual quebra smoke; modelar precondição, restauração assíncrona, lifecycle e limpeza. | Testes reproduzíveis em emulador signed-in/signed-out; independente do estado anterior; não inferir execução instrumentada a partir de Robolectric. | android-runner |
+| **TCC-A19 P1** | JUnit importado vs CI SAME_REVISION vs engine: não atribuir execução, proveniência e ambiente sem manifest/assinatura apropriados. | Fixture mesmo/outro SHA e XML sem origem; relatório preserva `EXTERNAL_IMPORTED`, `EXTERNAL_CI_VERIFIED`, `ENGINE_EXECUTED` distintos. | evidence |
+| **TCC-A20 P2** | Keystore e credenciais: código AndroidKeyStore não é teste do armazenamento real; CI JVM não executou criptografia instrumentada. | Caso sem teste físico informa lacuna; caso com dispositivo instrumentado armazena id/SHA/OS sem expor tokens; não inventa validação. | security |
+| **TCC-A21 P1** | Role→UI→backend: mapeamento `canActOnAlerts` pulado quando Compose recebe `canAct=false`; mutante A12 sobreviveu. | Fixture negativa permite viewer no mapper e teste forte detecta; servidor continua negando 403; diferenciador UI vs segurança back-end. | cross-layer |
+| **TCC-A22 P2** | Matriz de execução Gradle: `assembleDebug`, unit JVM, Robolectric, instrumented emulator e backend+MySQL live são modalidades diferentes. | Relatório registra 47 pass+1 local skip, CI live test selecionado, smoke local 1/1 e ausência de emulador no CI sem contagem inflada. | classification |
+| **TCC-A23 P2** | Mutação manual Android 16 selecionados (15 mortos, 1 sobrevivente, depois morto) sem score global nem execução pelo motor. | Before/after, hash do patch, runner, seleção e fonte do operador distintos; não publicar score sobre projeto inteiro. | mutation |
+| **TCC-A24 P2** | Segurança de sistemas assistivos: `ProtectionHealth` pode dizer operacional dentro dos sinais observáveis, mas FCM não configurado; evitar confundir saúde técnica com entrega do alerta. | Separa wearable, persistência no backend, provedor push e leitura humana; sem FCM = UNKNOWN/NOT_CONFIGURED, não proteção integral aprovada. | safety |
+
 ## Recommended implementation waves
 
-**Wave 1 (accuracy first):** A01, A02, A05, A08; reproduce false HIGH, correct evidence boundaries, test existing benchmarks and Windows/Linux. Strongest immediate value, without promising new ecosystems.
+**Wave 1 (accuracy first):** A01, A02, A05, A08, **A16, A17, A19**; reproduce false HIGH, correct evidence boundaries, test existing benchmarks and Windows/Linux. Strongest immediate value, without promising new ecosystems.
 
-**Wave 2 (meaningful ecosystem):** A03, A04, A06, A07 and A13; execute real Node built-in and PlatformIO native, plus independent MySQL/MQTT/firmware-boundary fixtures. Explicit opt-in for containers and hardware.
+**Wave 2 (meaningful ecosystem):** A03, A04, A06, A07, A13, **A18, A21, A22**; execute real Node built-in and PlatformIO native, plus independent MySQL/MQTT/firmware-boundary fixtures. Explicit opt-in for containers and hardware.
 
-**Wave 3 (test-quality depth):** A09, A10, A11, A12, A14 and A15; integrate more proof-oriented oracles, UI and mutation attribution. All outputs should preserve uncertainty and avoid inflation of "tests executed".
+**Wave 3 (test-quality depth):** A09, A10, A11, A12, A14, A15, **A20, A23, A24**; integrate more proof-oriented oracles, UI and mutation attribution. All outputs should preserve uncertainty and avoid inflation of "tests executed".
 
 ## Non-goals and safety
 

@@ -56,6 +56,11 @@ Each run preserves revision, agent, judge, tool permissions and results; infrast
 - [Selector survives non-behavioral refactor](cases/SELECTOR_SURVIVES_NONBEHAVIORAL_REFACTOR.md)
 - [Retry and timeout false repair](cases/RETRY_TIMEOUT_FALSE_REPAIR.md)
 
+## Field-study transfer cases (grader-ready; no completed evaluation)
+
+- [TCC multistack dogfood / CI and mutation provenance](cases/TCC_MULTISTACK_DOGFOOD_CLAIM_BOUNDARIES.md)
+- [TCC Android/Gradle/Compose oracle and evidence boundaries](cases/TCC_ANDROID_GRADLE_COMPOSE_EVIDENCE_BOUNDARIES.md)
+
 ## Skill ↔ engine and claim-category cases
 
 - [Engine unavailable: semantic-only audit](cases/ENGINE_UNAVAILABLE_SEMANTIC_ONLY.md)

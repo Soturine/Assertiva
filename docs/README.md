@@ -65,3 +65,9 @@ When documents overlap:
 4. `ROADMAP.md` governs planned work.
 5. Research records are dated evidence and may become stale.
 6. Eval cases test expected behavior; they do not create new product policy by themselves.
+
+## External dogfooding and known limitations
+
+- [TCC multi-stack field audit (dated evidence)](../research/2026-10-25-tcc-multistack-dogfood.md): actual engine vs operator executions, false positives, limitations and provenance.
+- [TCC improvement proposals](../research/2026-10-25-tcc-improvement-backlog.md): priorities and measurable acceptance tests; *not implemented*.
+- [Structured agent eval: TCC claim boundaries](../evals/cases/TCC_MULTISTACK_DOGFOOD_CLAIM_BOUNDARIES.md): grader-ready only, not evaluated.

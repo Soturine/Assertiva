@@ -270,3 +270,7 @@ Assertiva is not:
 Apache License 2.0 — see [LICENSE](LICENSE).
 
 Third-party material: the technology icons in the Assurance Report header are path data from [Simple Icons](https://simpleicons.org) 16.34.0, released under CC0 1.0 Universal (`assertiva/report_icons.py`); the marks belong to their owners and only name the technologies a project uses.
+
+### Real-world dogfood: ESP32 / Node.js / Python TCC (October 2026)
+
+Assertiva 0.9.0 was tested on [Soturine/tcc](https://github.com/Soturine/tcc), a mixed C++ firmware, Node/Express/MySQL/MQTT and Python research project. The audit found valuable **claim boundaries**: the engine ran two selected Python checks (4 HIL-log-checker and 12 MotionLab invocations), while the project's C++, Node and E2E suites ran separately under their native runners/CI. Two engine heuristic findings were adjudicated as false positives, and independently confirmed gaps included mocked integration tests and missing UI/physical LittleFS tests. The manually selected 22 mutants were **not** created/executed by Assertiva. This is **evidence and a [future improvement backlog](research/2026-10-25-tcc-improvement-backlog.md)**, not new adapter functionality, a complete mutation score or device qualification. [Full dogfood report](research/2026-10-25-tcc-multistack-dogfood.md).

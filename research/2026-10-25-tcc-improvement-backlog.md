@@ -1,0 +1,40 @@
+# TCC dogfood → Assertiva improvement backlog (2026-10-25)
+
+**Status: proposed and unimplemented.** Derived from [dated case study](2026-10-25-tcc-multistack-dogfood.md); source project [Soturine/tcc](https://github.com/Soturine/tcc). Avoid new adapter claims before implementation, tests, independent confirmation and run provenance. Version targeting requires maintainer decision; this is not a 0.9.1 or 1.0 release commitment.
+
+| ID / priority | Gap and concrete action | Acceptance evidence | Risk/owner |
+|---|---|---|---|
+| **TCC-A01 P0** | GitHub Actions discovery resolves `defaults.run.working-directory` at workflow/job/step with shell, expressions, nested paths and actual run path. Do not flag project-root CI gap when a job executes `unittest discover -s tests` inside `tools/research`. | Fixture reproduces false `CI_TEST_EXECUTION_GAP`, then removes it; negative fixture really omits tests; Windows path and monorepo cases; unaffected benchmarks. | GitHub Actions adapter; false HIGH |
+| **TCC-A02 P1** | Scope/denominator reconciliation across polyglot modules: static *definitions* vs native *invocations* vs executed *checks*. Root 0 unittest must not imply total project 0. | Engine reports `partial`, each root/language/runner and unobserved area; fixture with 60 static definitions, 16 executed invocations and 0 at root, without a false full-project execution claim. | discovery/effectiveness/report |
+| **TCC-A03 P1** | Support **Node.js built-in `node --test`**: native test discovery, names/counts, errors, skip, per-invocation evidence and source linkage. Recognize `npm test` if its actual script runs `node --test`. | Real disposable Node project plus missing test/failed test/skip and selected run; CI equivalence/working directory; no pretend PASS from a successful command without collection. | Node adapter |
+| **TCC-A04 P1** | Support **PlatformIO/Unity C++** test runner with project env identification and bench vs native distinction; compiler/build alone ≠ native/HIL execution. | Fixture `pio test -e native` yields 65-style invoked tests with successes/failures; unsupported installed tool stays BLOCKED; `pio run -e esp32dev` marked firmware build, not device execution. | PlatformIO adapter |
+| **TCC-A05 P1** | Calibration of positive validation tests with implicit "no exception" and sibling negative assertions. `WEAK_ORACLE_SIGNAL` must be evidence-aware, not simply remove all warnings. | Pair of valid-input acceptance + invalid-input `assertRaises` leads contextual/reduced claim, while genuinely weak no-assert test remains candidate; independent confirmation set not tuned to MotionLab names. | Python/static/oracles |
+| **TCC-A06 P1** | Stage-dependent integration fidelity. Detect `loadWithMocks`/require-cache injection or DB client patching despite script named `test:integration`; distinguish unit-with-doubles vs true disposable MySQL+Mosquitto E2E, and highlight `test:e2e:critical`. | Real fixture(s) in JS + Python or JVM, positive and negative controls; engine finding based on actual call/dependency not lexical "integration". | fidelity |
+| **TCC-A07 P1** | Built-in "unknown verification" mapping for recurring **PlatformIO**, Mosquitto security harness, Docker/MySQL smoke (without executing unauthorized containers or remote services). | Classified DECLARED/custom/build/test/infrastructure; effect and consent checked; no UNSUPPORTED falsely turned into pass; stable output in HTML/JSON. | verification surface |
+| **TCC-A08 P1** | Evidence taxonomy names `CI_VERIFIED`, `ENGINE_EXECUTED`, `PROJECT_RUNNER`, `AGENT_MANUAL_MUTATION`, `DEVICE_HIL_BLOCKED` separately; counting units shown per evidence/source. | Report never calls project-side 22 hand mutants "engine mutation", never calls four HIL log-checker tests device-HIL; synthetic negative check catches conflation. | schema/report/Skill |
+| **TCC-A09 P1** | Critical test-oracle gaps: tautological E2E assertion; mutation survivor on `reason_code`; persistence-level ACK and rollback. Seed real safety contracts and linked tests rather than a blanket rule that every conditional is broken. | Fixture with initially green invalid assertion, manual mutant and corrected check; no false positive on legitimate before/after recovery silence when full scenario has a later assertion. | contract/agent eval |
+| **TCC-A10 P2** | Run/step watchdog and teardown: unbounded MQTT publish waits, process-tree orphans and cancellation; platform differences CRLF/MSYS/paths. | Negative tests with stalled subprocess and bounded cleanup on Windows/Linux; trace signal/exit/time budget; never run destructive commands without consent. | runtime safety |
+| **TCC-A11 P2** | CI command graph dedup: detect `npm test` including `test:integration` including `test:mqtt`; repetitions are cost, not proof of different behavior. | Report distinct definitions, invocation repetitions, observed cost, risks and safe suggestions; no blanket removal of regression suites. | CI efficiency |
+| **TCC-A12 P2** | UI gap analysis: no frontend interaction tests despite `lint/build` green; key states `unknown` vs healthy, alert priority, access control. | Fixture of web app with no UI tests triggers *unverified UI behavior*, not a failed UI test; companion fixture with real browser asserts states/accessibility. | web assurance |
+| **TCC-A13 P2** | Native filesystem/hardware assurance honesty: `CriticalOutboxFsStore` excluded from host build, `tools/hil` merely validates logs; runtime device work remains BLOCKED. | Explicit mapping source path→compile target→native test target→HIL requirement; fixture distinguishes HIL log-verifier from actual device test. | firmware/HIL |
+| **TCC-A14 P2** | Portable manual mutation / negative-controls ingestion with strict provenance and artifact manifests without upgrading to engine-run mutations. | Ingest hand-curated `mutation_manifest` with source SHAs/patch hashes, runner exit code, killed/survived; reports `EXTERNAL_MANUAL`, no global score nor false engine claims. | mutation/evidence |
+| **TCC-A15 P2** | Semantic Skill evals on false-positive disposition and independent findings; measure agent-added bugs with ground truth separately from engine heuristics. | New structured evals + holdout tests, independent adjudication before broad claims; benchmark precision/recall per scope and false-green detection. | evals |
+
+## Recommended implementation waves
+
+**Wave 1 (accuracy first):** A01, A02, A05, A08; reproduce false HIGH, correct evidence boundaries, test existing benchmarks and Windows/Linux. Strongest immediate value, without promising new ecosystems.
+
+**Wave 2 (meaningful ecosystem):** A03, A04, A06, A07 and A13; execute real Node built-in and PlatformIO native, plus independent MySQL/MQTT/firmware-boundary fixtures. Explicit opt-in for containers and hardware.
+
+**Wave 3 (test-quality depth):** A09, A10, A11, A12, A14 and A15; integrate more proof-oriented oracles, UI and mutation attribution. All outputs should preserve uncertainty and avoid inflation of "tests executed".
+
+## Non-goals and safety
+
+- No source changes to TCC, no deployment to patients, no access to private staging/brokers, no automatic changes to Assertiva's published API without compatibility tests.
+- This record is a dogfood evaluation; do **not** call any item DONE because a Markdown case was written.
+- Do not embed local report ZIP, original personal paths, live credentials, participant IMU signals or published dataset files.
+- Agent cannot simply "count green" or apply `--approve` without human approval. Keep candidate workspace/isolation model and all existing regression and security gates.
+
+## Release evidence required
+
+For each adopted item: failure reproduction before fix, real positive+negative fixture, old/new comparison on same commit, Windows/Linux if relevant, frozen external confirmation, declared support matrix updated, complete regression suite, no silently weakened tests, isolated engine execution, no new false HIGH, risk/UX tradeoff and CI SHA. Apply version label only when owner selects milestone and full qualification passes.

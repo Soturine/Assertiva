@@ -28,3 +28,8 @@ Research records are dated evidence and benchmarks, not permanent Assertiva poli
 ## Rule
 
 When a mutable external tool changes, update or add a dated record instead of silently rewriting history. Promote only reusable, evidence-supported conclusions into canonical docs.
+
+## 2026-10-25 — Real-world multi-stack dogfood
+
+- [Soturine/tcc dogfood evidence](2026-10-25-tcc-multistack-dogfood.md) — Assertiva 0.9.0 static inventory and engine checks versus independent project/CI runs, manual mutation, false-positive dispositions and hardware limits; no release or new capability claimed.
+- [TCC-driven improvement backlog](2026-10-25-tcc-improvement-backlog.md) — prioritized reproduction cases, acceptance criteria and independent confirmation requirements for CI path scoping, Node/PlatformIO, fidelity, mutation attribution and UI/HIL assurance.

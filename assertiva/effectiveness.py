@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 
 # DETERMINISM: a call compared with the same call fails only if the code is nondeterministic, never on a wrong value
 WEAK_ORACLES = frozenset({"EXISTENCE", "TRUTHY", "STATUS_ONLY", "BROAD_ERROR", "DETERMINISM"})
-STRONG_ORACLES = frozenset({"VALUE", "SPECIFIC_ERROR", "INTERACTION", "GUARD", "HELPER", "STATE"})
 FALSE_GREEN_SMELLS = {
     "SWALLOWED_EXCEPTION": "an exception is caught and ignored, so the test passes whether or not the code fails",
     "CONDITIONAL_ASSERTION": "every assertion sits behind a condition, so a run where it is false asserts nothing",

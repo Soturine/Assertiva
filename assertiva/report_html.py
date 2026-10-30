@@ -591,8 +591,6 @@ def _scope(report: dict) -> list[dict]:
 
 
 _STRENGTH = {"VERIFIED": 4, "EXECUTED": 4, "FAILED": 4, "MEASURED": 3, "INGESTED": 3, "PARTIAL": 2, "INSPECTED": 2, "DECLARED": 1, "NOT_EVIDENCED": 0}
-_LEVEL_TONE = {"FAILED": "fail", "VERIFIED": "pass", "EXECUTED": "pass", "MEASURED": "info", "INGESTED": "info", "PARTIAL": "warn",
-               "INSPECTED": "info", "DECLARED": "muted", "NOT_EVIDENCED": "unknown"}
 
 
 # --- shared pieces ---------------------------------------------------------------------

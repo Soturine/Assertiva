@@ -1,0 +1,18 @@
+test_artifact.py: 2 failed, 23 passed in 232.61s (0:03:52)
+test_ci_working_directory.py: 4 failed, 3 passed in 0.27s
+test_dependencies.py: 1 error in 0.20s
+test_explain.py: 3 failed in 26.96s
+test_failure_headline.py: 1 failed, 1 passed in 0.22s
+test_failures.py: 6 failed, 6 passed in 0.16s
+test_gradle.py: 6 failed, 10 passed, 4 skipped in 0.30s
+test_manual_mutation.py: 1 error in 0.15s
+test_mutation_selection.py: 6 failed in 0.89s
+test_node_test.py: 1 error in 0.15s
+test_oracle_calibration.py: 8 failed in 0.23s
+test_platformio_classification.py: 13 failed, 1 passed in 0.17s
+test_portfolio.py: 1 error in 0.21s
+test_run_limits.py: 3 failed, 4 passed in 2.47s
+test_script_graph.py: 1 error in 0.18s
+test_semantic_eval.py: 1 error in 0.13s
+test_source_identity.py: 4 failed in 6.31s
+test_test_extras.py: 1 error in 0.16s

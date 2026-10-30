@@ -17,8 +17,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "docs" / "assurance" / "POST_DOGFOOD_GAP_MATRIX.json"
 VIEW = ROOT / "docs" / "assurance" / "POST_DOGFOOD_GAP_MATRIX.md"
-STATUSES = ("NEW", "REPRODUCED", "DUPLICATE_OF", "FIXED", "PARTIAL", "ACCEPTED_LIMITATION", "BLOCKED", "NOT_RUN",
-            "REJECTED_WITH_EVIDENCE")
+STATUSES = ("NEW", "REPRODUCED", "DUPLICATE_OF", "FIXED", "PARTIAL", "ALREADY_FIXED_VERIFIED", "ACCEPTED_LIMITATION",
+            "BLOCKED", "NOT_RUN", "REJECTED_WITH_EVIDENCE")
 INHERITED = ([f"TCC-A{i:02d}" for i in range(1, 25)] + [f"AX-E{i:02d}" for i in range(1, 7)]
              + [f"AG-{i:02d}" for i in range(1, 14)])
 FIELDS = ("id", "source", "pr_url", "revision_evidence", "failure_reproducer", "stack", "severity", "root_cause",
@@ -40,7 +40,9 @@ def problems(rows: list[dict]) -> list[str]:
             out.append(f"{rid}: {status} needs commit_fixed, test_before and test_after")
         if status == "DUPLICATE_OF" and not set(row.get("shared_root_cause_ids") or []) & set(ids):
             out.append(f"{rid}: DUPLICATE_OF needs the id it duplicates in shared_root_cause_ids")
-        if status in ("BLOCKED", "NOT_RUN", "ACCEPTED_LIMITATION", "REJECTED_WITH_EVIDENCE", "PARTIAL") and not row.get("limitations"):
+        if status == "ALREADY_FIXED_VERIFIED" and not row.get("test_before"):
+            out.append(f"{rid}: ALREADY_FIXED_VERIFIED needs the test that verifies it in test_before")
+        if status in ("NEW", "BLOCKED", "NOT_RUN", "ACCEPTED_LIMITATION", "REJECTED_WITH_EVIDENCE", "PARTIAL") and not row.get("limitations"):
             out.append(f"{rid}: {status} needs its reason in limitations")
     return out
 

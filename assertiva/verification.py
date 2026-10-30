@@ -77,12 +77,6 @@ class VerificationSurface:
     def by_origin(self, origin: VerificationOrigin) -> list[VerificationCheck]:
         return [check for check in self.checks if check.origin is origin]
 
-    def by_kind(self, kind: VerificationKind) -> list[VerificationCheck]:
-        return [check for check in self.checks if check.kind is kind]
-
-    def blocking(self) -> list[VerificationCheck]:
-        return [check for check in self.checks if check.gate is GateMode.BLOCKING]
-
     def ids(self) -> set[str]:
         return {check.check_id for check in self.checks}
 

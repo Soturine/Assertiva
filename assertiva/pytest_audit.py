@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import os
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, path_selected_by_ci
@@ -27,10 +29,6 @@ class PytestAssuranceReport:
     @property
     def smoke_ratio(self) -> float:
         return self.smoke_like_count / len(self.tests) if self.tests else 0.0
-
-    @property
-    def expected_error_count(self) -> int:
-        return sum("EXPECTED_ERROR_CONTRACT" in test.assertion_kinds for test in self.tests)
 
     def has_finding(self, code: str) -> bool:
         return any(f.code == code for f in self.findings)
@@ -294,28 +292,74 @@ def assertion_helpers(tree: ast.Module, path: Path | None = None, root: Path | N
     return scopes
 
 
+_SUPPORT_DIRS = frozenset({"tests", "test", "testing", "spec", "specs"})
+
+
+def _test_support(candidate: Path, root: Path) -> bool:
+    """Whether a module is test support (a helper module under a tests folder, conftest, a test file). Product modules
+    are not followed: a product function that asserts an invariant is not an oracle of the test that calls it."""
+    try:
+        parts = candidate.resolve().relative_to(root.resolve()).parts
+    except ValueError:
+        return False
+    return bool(_SUPPORT_DIRS & {p.lower() for p in parts[:-1]}) or parts[-1].startswith(("test", "conftest"))
+
+
 def _module_file(module: str, level: int, path: Path, root: Path) -> Path | None:
-    """The project file of an imported module (relative imports from the test's folder), or None."""
+    """The project's test-support file of an imported module (relative imports from the test's folder), or None."""
+    return _module_file_in(module, level, str(path.parent), str(root))
+
+
+@lru_cache(maxsize=4096)
+def _module_file_in(module: str, level: int, folder: str, root_text: str) -> Path | None:
+    root, parent = Path(root_text), Path(folder)
     parts = module.split(".") if module else []
-    bases = [path.parent.joinpath(*[".."] * (level - 1))] if level else [root, root / "src", path.parent]
+    bases = [parent.joinpath(*[".."] * (level - 1))] if level else [root, root / "src", parent]
     for base in bases:
         target = base.joinpath(*parts)
         for candidate in (target.with_suffix(".py"), target / "__init__.py"):
+            # cheap lexical checks first; resolving (slow on Windows) only for a file that may be test support
+            if not _test_support_lexical(candidate, root) or not candidate.is_file():
+                continue
             try:
-                resolved = candidate.resolve()
+                inside = candidate.resolve().is_relative_to(_resolved(root_text))
             except OSError:
                 continue
-            if candidate.is_file() and resolved.is_relative_to(root.resolve()):
+            if inside and _test_support(candidate, root):
                 return candidate
     return None
 
 
-def _asserting_functions(file: Path) -> frozenset[str]:
+@lru_cache(maxsize=64)
+def _resolved(root_text: str) -> Path:
+    return Path(root_text).resolve()
+
+
+def _test_support_lexical(candidate: Path, root: Path) -> bool:
     try:
-        tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
-    except (SyntaxError, UnicodeDecodeError, OSError):
+        parts = Path(os.path.normpath(candidate)).relative_to(os.path.normpath(root)).parts
+    except ValueError:
+        return False
+    return bool(_SUPPORT_DIRS & {p.lower() for p in parts[:-1]}) or parts[-1].startswith(("test", "conftest"))
+
+
+_ASSERTING: dict[tuple, frozenset[str]] = {}
+
+
+def _asserting_functions(file: Path) -> frozenset[str]:
+    """Module-level functions of ``file`` that assert; memoized per file content identity (path, size, mtime)."""
+    try:
+        stat = file.stat()
+    except OSError:
         return frozenset()
-    return assertion_helpers(tree)[None]
+    key = (str(file.resolve()), stat.st_size, stat.st_mtime_ns)
+    if key not in _ASSERTING:
+        try:
+            tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
+            _ASSERTING[key] = assertion_helpers(tree)[None]
+        except (SyntaxError, UnicodeDecodeError, OSError):
+            _ASSERTING[key] = frozenset()
+    return _ASSERTING[key]
 
 
 def imported_assertion_helpers(tree: ast.Module, path: Path, root: Path) -> frozenset[str]:

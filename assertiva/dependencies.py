@@ -24,8 +24,10 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-_REQ = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(\[[^\]]*\])?\s*([^;#]*)")
-_SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist", ".tox", "site-packages"}
+from .adapters.workspaces import REQUIREMENT_NAME
+
+# folders that hold environments, dependencies or build output, never the project's own source
+SKIPPED_DIRS = frozenset({".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist", ".tox", "site-packages"})
 _IMPORT_NAMES = {"pyyaml": "yaml", "pillow": "PIL", "beautifulsoup4": "bs4", "scikit-learn": "sklearn", "python-dateutil": "dateutil",
                  "opencv-python": "cv2", "attrs": "attr", "protobuf": "google", "pyjwt": "jwt", "python-dotenv": "dotenv"}
 
@@ -48,11 +50,11 @@ def _python_declared(root: Path) -> dict[str, dict]:
         groups.append((path.name, [l for l in lines if l.strip() and not l.strip().startswith(("#", "-"))]))
     for group, reqs in groups:
         for req in reqs if isinstance(reqs, list) else []:
-            match = _REQ.match(str(req))
+            match = REQUIREMENT_NAME.match(str(req))
             if match:
                 name = _norm(match.group(1))
                 entry = out.setdefault(name, {"ecosystem": "python", "name": match.group(1), "declared": [], "groups": []})
-                entry["declared"].append(match.group(3).strip() or "*")
+                entry["declared"].append(re.sub(r"^\s*\[[^\]]*\]", "", str(req)[match.end():]).split(";")[0].split("#")[0].strip() or "*")
                 entry["groups"].append(group)
     return out
 
@@ -141,7 +143,7 @@ def _satisfies_npm(version: str, spec: str) -> bool | None:
         return [int(n) for n in nums[:3]] + [0] * (3 - len(nums[:3]))
 
     spec = spec.strip()
-    if spec in ("*", "", "latest") and spec != "latest":
+    if spec in ("*", ""):
         return True
     if not re.fullmatch(r"[\^~]?\s*\d+(\.(\d+|x|\*))*(\.(\d+|x|\*))?|>=\s*\d+(\.\d+){0,2}", spec) or not re.match(r"\d", version):
         return None
@@ -168,7 +170,7 @@ def _python_usage(root: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]
     reached: dict[str, set[str]] = {}
     for path in sorted(root.rglob("*.py")):
         rel_parts = path.relative_to(root).parts
-        if _SKIP & set(rel_parts):
+        if SKIPPED_DIRS & set(rel_parts):
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))

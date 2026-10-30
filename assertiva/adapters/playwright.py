@@ -23,7 +23,7 @@ from assertiva.process import execution_refusal, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
-from .jest import node_executable
+from .jest import _relative, node_executable
 
 _CONFIGS = tuple(f"playwright.config.{ext}" for ext in ("ts", "js", "mjs", "cjs", "mts", "cts"))
 _ENGINES = {"chromium": ("chromium", "chrome", "edge"), "firefox": ("firefox",), "webkit": ("webkit", "safari")}
@@ -75,15 +75,6 @@ def _package(root: Path) -> dict:
         return json.loads((root / "package.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-
-
-def _relative(path: str, root: str) -> str:
-    if root == "<ROOT>":  # recorded fixtures
-        return path.replace("<ROOT>", "").lstrip("\\/").replace("\\", "/")
-    try:
-        return Path(os.path.relpath(os.path.realpath(path), os.path.realpath(root))).as_posix()
-    except ValueError:
-        return Path(path).as_posix()
 
 
 def _engine(project: str) -> str | None:

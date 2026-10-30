@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .dependencies import SKIPPED_DIRS
 from .workspace import capture_baseline, read_only_guard, state_dir
 
 
@@ -22,9 +23,6 @@ def _match(test: str, ids) -> list[str]:
     return exact or [i for i in ids if i.endswith(test) or i.endswith("::" + test) or test in i]
 
 
-_SKIP = {".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist", ".tox"}
-
-
 def _outside_scope(root: Path, test: str, inventoried: set[str]) -> str | None:
     """`file::name` of a Python test function the configured inventory does not include (outside testpaths)."""
     import ast
@@ -32,7 +30,7 @@ def _outside_scope(root: Path, test: str, inventoried: set[str]) -> str | None:
     name = test.split("::")[-1]
     for path in sorted(root.rglob("*.py")):
         rel = path.relative_to(root).as_posix()
-        if rel in inventoried or _SKIP & set(path.relative_to(root).parts) or not path.name.startswith("test"):
+        if rel in inventoried or SKIPPED_DIRS & set(path.relative_to(root).parts) or not path.name.startswith("test"):
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))

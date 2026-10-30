@@ -142,18 +142,6 @@ class _Project:
                 found += hit + [p for p in parents if self.has(p)]
         return list(dict.fromkeys(found))
 
-    def module_names(self, rel: str) -> set[str]:
-        path = PurePosixPath(rel)
-        parts = list(path.with_suffix("").parts)
-        if parts[-1] == "__init__":
-            parts = parts[:-1]
-        names = {".".join(parts)}
-        for root in self.roots(rel):
-            prefix = PurePosixPath(root).parts if root else ()
-            if tuple(parts[: len(prefix)]) == prefix and len(parts) > len(prefix):
-                names.add(".".join(parts[len(prefix):]))
-        return names
-
     def test_side(self, rel: str) -> bool:
         path = PurePosixPath(rel)
         return rel in self.tests or path.name == "conftest.py" or str(path.parent) in self.test_dirs \

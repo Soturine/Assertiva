@@ -19,7 +19,7 @@ from assertiva.components import Component, ComponentContribution
 _NPM_WORKSPACE_FILES = ("package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc")
 _NPM_DEP_KEYS = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies")
 _PY_WORKSPACE_FILES = ("pyproject.toml", "uv.lock", "poetry.lock", "setup.cfg", "requirements.txt", "constraints.txt")
-_PEP508_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
+REQUIREMENT_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")  # PEP 508 name
 
 
 def _json(path: Path) -> dict:
@@ -120,7 +120,7 @@ class PythonProjectsAdapter:
                 requirements += list(extra)
             depends, unknown = [], []
             for requirement in requirements:
-                match = _PEP508_NAME.match(str(requirement))
+                match = REQUIREMENT_NAME.match(str(requirement))
                 name = _pep503(match.group(1)) if match else None
                 if name in names and name != _pep503(project["name"]):
                     depends.append(name)

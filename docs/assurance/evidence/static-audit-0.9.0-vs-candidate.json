@@ -1,0 +1,138 @@
+[
+ {
+  "target": "Assertiva",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 15.88,
+  "findings": [
+   "STATE_AFTER_REJECTION_NOT_EVIDENCED",
+   "TEST_SMELL_SIGNALS",
+   "UNCLASSIFIED_VERIFICATION"
+  ],
+  "candidates": 1
+ },
+ {
+  "target": "Assertiva",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 30.14,
+  "findings": [
+   "STATE_AFTER_REJECTION_NOT_EVIDENCED",
+   "TEST_SMELL_SIGNALS",
+   "UNCLASSIFIED_VERIFICATION"
+  ],
+  "candidates": 1
+ },
+ {
+  "target": "py-parking",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 0.84,
+  "findings": [
+   "BROAD_ERROR_EXPECTATION_SIGNAL",
+   "CI_PYTEST_NOT_OBSERVED",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "TEST_SMELL_SIGNALS",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 6
+ },
+ {
+  "target": "py-parking",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 0.86,
+  "findings": [
+   "BROAD_ERROR_EXPECTATION_SIGNAL",
+   "CI_PYTEST_NOT_OBSERVED",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "TEST_SMELL_SIGNALS",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 6
+ },
+ {
+  "target": "js-tickets",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 0.6,
+  "findings": [
+   "ENVIRONMENT_NOT_PREPARED",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "TEST_SMELL_SIGNALS",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 3
+ },
+ {
+  "target": "js-tickets",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 0.62,
+  "findings": [
+   "ENVIRONMENT_NOT_PREPARED",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "TEST_SMELL_SIGNALS",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 3
+ },
+ {
+  "target": "kt-library",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 0.84,
+  "findings": [
+   "FALSE_GREEN_CANDIDATE",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 3
+ },
+ {
+  "target": "kt-library",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 0.77,
+  "findings": [
+   "FALSE_GREEN_CANDIDATE",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 3
+ },
+ {
+  "target": "PRIVATE_FILE_BOUNDARY",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 1.06,
+  "findings": [
+   "CI_PYTEST_NOT_OBSERVED",
+   "NO_DELIVERY_PIPELINE_OBSERVED"
+  ],
+  "candidates": 0
+ },
+ {
+  "target": "PRIVATE_FILE_BOUNDARY",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 1.14,
+  "findings": [
+   "CI_PYTEST_NOT_OBSERVED",
+   "NO_DELIVERY_PIPELINE_OBSERVED"
+  ],
+  "candidates": 0
+ }
+]

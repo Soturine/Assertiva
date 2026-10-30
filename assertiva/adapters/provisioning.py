@@ -32,9 +32,10 @@ from pathlib import Path
 from assertiva.environment import Prepared, ProvisioningError, Step, download, extract, published_sha256, tools_dir
 from assertiva.process import probe_directory, run_command
 
+from .workspaces import REQUIREMENT_NAME
+
 _LOCKFILES = {"uv.lock": "uv", "poetry.lock": "Poetry", "pdm.lock": "PDM", "Pipfile.lock": "Pipenv"}
 _NODE_LOCKS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "yarn.lock": "Yarn", "pnpm-lock.yaml": "pnpm", "bun.lockb": "Bun"}
-_REQ_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 _TEST_GROUPS = ("test", "tests", "testing", "dev")
 _JDK_DECLARED = (re.compile(r"JavaLanguageVersion\.of\(\s*(\d+)\s*\)"), re.compile(r"jvmToolchain\(\s*(\d+)\s*\)"),
                  re.compile(r"<maven\.compiler\.(?:release|source)>\s*(\d+)\s*<"), re.compile(r"<release>\s*(\d+)\s*</release>"))
@@ -100,7 +101,7 @@ def python_requirements(root: Path) -> tuple[list[str], list[str], list[Path]]:
                 continue
             if line.startswith((".", "/", "-e", "-r", "-c")) or "://" in line or "@" in line.split(";")[0] and " @ " in line:
                 names.append(UNVERIFIABLE)
-            elif (m := _REQ_NAME.match(line)) and not line.startswith("-"):
+            elif (m := REQUIREMENT_NAME.match(line)) and not line.startswith("-"):
                 names.append(m.group(1))
     if files:
         return list(dict.fromkeys(names)), [arg for path in files for arg in ("-r", str(path))], files
@@ -109,7 +110,7 @@ def python_requirements(root: Path) -> tuple[list[str], list[str], list[Path]]:
     for group in _TEST_GROUPS:
         specs += list((project.get("optional-dependencies") or {}).get(group) or [])
         specs += [s for s in (_pyproject(root).get("dependency-groups") or {}).get(group) or [] if isinstance(s, str)]
-    names = [m.group(1) for s in specs if (m := _REQ_NAME.match(s))]
+    names = [m.group(1) for s in specs if (m := REQUIREMENT_NAME.match(s))]
     return names, specs, []
 
 

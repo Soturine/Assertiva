@@ -233,3 +233,13 @@ class AlertScreenTest {
     assert got["noAlertsShown"].oracles == ("VALUE",)
     assert got["viewerCannotAct"].oracles == ("VALUE",)
     assert got["controlSmoke"].oracles == ("EXISTENCE",)  # the weak smoke stays weak
+
+
+def test_axe05_a_product_function_that_asserts_is_not_an_oracle_of_the_test(tmp_path):
+    # precision control (found while measuring cost on this repository): only test-support modules are followed
+    facts(tmp_path, '''from shop.checks import validate_total
+
+def test_calls_a_product_validator():
+    validate_total(3)
+''', {"shop/checks.py": "def validate_total(x):\n    assert x >= 0\n    return x\n"})
+    assert definitions(tmp_path)["test_calls_a_product_validator"].smoke_like

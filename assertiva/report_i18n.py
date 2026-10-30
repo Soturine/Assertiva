@@ -15,8 +15,6 @@ pt-BR glossary (use consistently):
 
 from __future__ import annotations
 
-LANGS = ("en", "pt-BR")
-
 # key -> (en, pt-BR). Keys ending in .one / .other are plural forms chosen by the `n` argument.
 UI: dict[str, tuple[str, str]] = {
     # chrome

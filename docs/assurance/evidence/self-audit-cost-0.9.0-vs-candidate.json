@@ -1,0 +1,26 @@
+[
+ {
+  "target": "Assertiva",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 16.78,
+  "findings": [
+   "STATE_AFTER_REJECTION_NOT_EVIDENCED",
+   "TEST_SMELL_SIGNALS",
+   "UNCLASSIFIED_VERIFICATION"
+  ],
+  "candidates": 1
+ },
+ {
+  "target": "Assertiva",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 19.73,
+  "findings": [
+   "STATE_AFTER_REJECTION_NOT_EVIDENCED",
+   "TEST_SMELL_SIGNALS",
+   "UNCLASSIFIED_VERIFICATION"
+  ],
+  "candidates": 1
+ }
+]

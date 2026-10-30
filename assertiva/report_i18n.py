@@ -1080,6 +1080,17 @@ FINDINGS: dict[str, dict] = {
                "Uma execução nativa do mesmo escopo não tem invocações com falha ou erro."),
         rec=("Triage failing tests before trusting any other metric in this report.",
              "Faça a triagem dos testes com falha antes de confiar em qualquer outra métrica deste relatório.")),
+    "NESTED_SCRIPT_REPETITION": F(
+        category="delivery", tier="E2",
+        title=("CI runs some scripts more than once", "O CI executa alguns scripts mais de uma vez"),
+        summary=("CI invokes package scripts that run the same script more than once through nested scripts; the repeats add cost, not distinct evidence.",
+                 "O CI invoca scripts do pacote que executam o mesmo script mais de uma vez por scripts aninhados; as repetições somam custo, não evidência distinta."),
+        why=("A repeated run of the same script is not a different check: counting it twice inflates the verification surface.",
+             "Uma execução repetida do mesmo script não é outra verificação: contá-la duas vezes infla a superfície de verificação."),
+        close=("Each script runs once per CI pipeline, or the repetition is intended and documented (flakiness probing).",
+               "Cada script roda uma vez por pipeline de CI, ou a repetição é intencional e documentada (sondagem de instabilidade)."),
+        rec=("Run each script once in CI (or call the leaf scripts directly); keep every gate, only drop the repeats.",
+             "Rode cada script uma vez no CI (ou chame os scripts folha diretamente); mantenha todos os gates, retire só as repetições.")),
     "SOURCE_IDENTITY_MISMATCH": F(
         category="execution", tier="E0",
         title=("The tests ran another copy of the code", "Os testes executaram outra cópia do código"),

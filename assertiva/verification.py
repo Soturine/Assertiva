@@ -135,6 +135,14 @@ def surface_findings(surface: VerificationSurface) -> list:
             )
         )
         return findings
+    from .adapters.package_scripts import repeated_scripts  # adapter knowledge: how scripts call each other
+
+    repeated = repeated_scripts(surface.checks, delivery)
+    if repeated:
+        findings.append(Finding(
+            "NESTED_SCRIPT_REPETITION",
+            "CI invokes package scripts that run the same script more than once through nested scripts; the repeats add cost, not distinct evidence.",
+            {"repeated": repeated, "basis": "DECLARED: package.json scripts and CI steps, not execution"}, severity="info"))
     missing = [check.check_id for check in local if not any(_covers(ci, check) for ci in delivery)]
     if missing:
         findings.append(

@@ -73,6 +73,9 @@ class MutationRun:
     killers_complete: bool | None = None
     reused: int = 0  # mutants whose result the tool carried over from an earlier run instead of executing
     orchestrated: bool = False  # Assertiva ran the tool itself on a copy of the measured state (not an imported report)
+    # who produced the mutants and ran them: ENGINE_EXECUTED (orchestrated), EXTERNAL_TOOL_REPORT (a tool's report read
+    # here) or OPERATOR_MANUAL (mutants a person wrote and ran, read from a manifest); None for older records
+    provenance: str | None = None
     targets: tuple[str, ...] = ()  # the files an orchestrated run mutated
     config: dict = field(default_factory=dict)  # how an orchestrated run was configured (timeout, test command, …)
 

@@ -133,6 +133,7 @@ def _mutation_summary(run) -> dict:
         "survivor_sites": survivor_sites(run),
         # where the evidence came from and how much it can decide
         "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,
+        "provenance": run.provenance or ("ENGINE_EXECUTED" if run.orchestrated else "EXTERNAL_TOOL_REPORT"),
         "reused": run.reused, "incremental": run.incremental, "finished": run.finished, "config": dict(run.config), "inputs_digest": run.inputs_digest,
         "limitations": list(run.limitations),
     }

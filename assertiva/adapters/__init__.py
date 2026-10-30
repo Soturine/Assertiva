@@ -5,6 +5,7 @@ The core asks adapters what they support; it never branches on a tool name.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 from assertiva.verification import SupportLevel
@@ -97,10 +98,44 @@ def component_adapters(root: str | Path) -> list:
     return [NpmWorkspacesAdapter(), PythonProjectsAdapter()]
 
 
+# A run-wide limit chosen by the caller (`--timeout-s`), never written into the audited project. Precedence: this,
+# then the project's `[tests] timeout_s`, then the adapter's default; the source is recorded with each run.
+_TIMEOUT_OVERRIDE: list[float] = []
+
+
+@contextmanager
+def timeout_override(seconds: float | None):
+    """Within this block every runner and artifact adapter uses ``seconds`` as its per-run limit (None: no override)."""
+    if seconds is None:
+        yield
+        return
+    _TIMEOUT_OVERRIDE.append(float(seconds))
+    try:
+        yield
+    finally:
+        _TIMEOUT_OVERRIDE.pop()
+
+
+def current_timeout(default: float) -> float:
+    """The caller's run-wide limit when one is set, else ``default`` (for commands run outside an adapter)."""
+    return _TIMEOUT_OVERRIDE[-1] if _TIMEOUT_OVERRIDE else default
+
+
+def _limit(adapters: list, configured: float | None = None) -> list:
+    for adapter in adapters:
+        if _TIMEOUT_OVERRIDE:
+            adapter.timeout_s, adapter.timeout_source = _TIMEOUT_OVERRIDE[-1], "command line (--timeout-s)"
+        elif configured:
+            adapter.timeout_s, adapter.timeout_source = configured, "project configuration ([tests] timeout_s)"
+        else:
+            adapter.timeout_source = "adapter default"
+    return adapters
+
+
 def artifact_adapters(root: str | Path, python: str | None = None) -> list:
     """Adapters that build and verify a deliverable artifact for the project at ``root``."""
     candidates = [factory(python=python) for factory in ARTIFACT_FACTORIES]
-    return [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
+    return _limit([adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED])
 
 
 def runner_name(adapter) -> str:
@@ -119,10 +154,7 @@ def runner_adapters(root: str | Path, python: str | None = None) -> list:
         chosen = [adapter for adapter in candidates if runner_name(adapter) in config.runners]
     else:
         chosen = [adapter for adapter in candidates if adapter.supports(Path(root)) is SupportLevel.SUPPORTED]
-    if config.timeout_s:
-        for adapter in chosen:
-            adapter.timeout_s = config.timeout_s
-    return chosen
+    return _limit(chosen, config.timeout_s)
 
 
 def static_providers(adapters: list) -> list:

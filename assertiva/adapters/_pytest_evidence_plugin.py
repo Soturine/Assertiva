@@ -61,6 +61,61 @@ def pytest_collection_finish(session):
         )
 
 
+def _project_names(root):
+    """Top-level modules and packages the project itself provides (at the root or under src/), tests excluded."""
+    names = set()
+    for base in (root, os.path.join(root, "src")):
+        try:
+            entries = os.listdir(base)
+        except OSError:
+            continue
+        for entry in entries:
+            path = os.path.join(base, entry)
+            if entry.endswith(".py") and entry not in ("conftest.py", "setup.py") and not entry.startswith("test"):
+                names.add(entry[:-3])
+            elif os.path.isfile(os.path.join(path, "__init__.py")) and not entry.startswith(("test", ".")):
+                names.add(entry)
+    return names
+
+
+def _inside(path, root):
+    try:
+        return os.path.commonpath([os.path.realpath(path), os.path.realpath(root)]) == os.path.realpath(root)
+    except ValueError:  # another drive
+        return False
+
+
+def pytest_sessionfinish(session):
+    """What the run really used: where the project's own modules were imported from (the copy, or an installed copy
+    that shadows it), the temporary directory tests get, and site directories borrowed from another environment."""
+    import site
+    import sys
+    import tempfile
+
+    root = str(session.config.rootpath)
+    imported = {}
+    for name in sorted(_project_names(root)):
+        module = sys.modules.get(name)
+        location = getattr(module, "__file__", None) if module is not None else None
+        if location:
+            imported[name] = {"file": location, "inside_root": _inside(location, root)}
+    temp = tempfile.gettempdir()
+    try:
+        with tempfile.TemporaryFile(dir=temp):
+            writable = True
+    except OSError:
+        writable = False
+    prefixes = {os.path.realpath(p) for p in (sys.prefix, sys.base_prefix, getattr(sys, "exec_prefix", sys.prefix))}
+    sites = [p for p in sys.path if os.path.basename(p.rstrip("/\\")) in ("site-packages", "dist-packages")]
+    user_site = site.getusersitepackages() if getattr(site, "ENABLE_USER_SITE", False) else None
+    # the per-user site directory belongs to this interpreter; another environment's site-packages does not
+    borrowed = [p for p in sites if not any(_inside(p, prefix) for prefix in prefixes)
+                and not (user_site and os.path.realpath(p) == os.path.realpath(user_site))]
+    _emit({"type": "session", "root": root, "imported": imported, "tempdir": temp, "tempdir_writable": writable,
+           "python": sys.executable, "prefix": sys.prefix, "borrowed_site_dirs": borrowed,
+           "user_site": user_site if user_site in sys.path else None})
+
+
 def pytest_runtest_logreport(report):
     _emit(
         {

@@ -26,6 +26,14 @@ def _gate(*continue_on_error) -> GateMode:
     return GateMode.ALLOWED_FAILURE if any(value is True for value in continue_on_error) else GateMode.UNKNOWN
 
 
+def _default_directory(node) -> str | None:
+    """`defaults.run.working-directory` of a workflow or a job (a step's own `working-directory` wins over both)."""
+    defaults = node.get("defaults") if isinstance(node, dict) else None
+    run = defaults.get("run") if isinstance(defaults, dict) else None
+    value = run.get("working-directory") if isinstance(run, dict) else None
+    return str(value) if value not in (None, "") else None
+
+
 class GitHubActionsAdapter:
     adapter_id = "github-actions"
 
@@ -50,11 +58,12 @@ class GitHubActionsAdapter:
                 checks.append(unreadable_check(self.adapter_id, f"gha:{source}", source, f"workflow could not be parsed: {exc}"))
                 continue
             for job_id, job in jobs.items():
-                checks.extend(self._job_checks(source, str(job_id), job if isinstance(job, dict) else {}))
+                checks.extend(self._job_checks(source, str(job_id), job if isinstance(job, dict) else {}, _default_directory(document)))
         return checks
 
-    def _job_checks(self, source: str, job_id: str, job: dict) -> list[VerificationCheck]:
+    def _job_checks(self, source: str, job_id: str, job: dict, workflow_directory: str | None = None) -> list[VerificationCheck]:
         where = f"{source}#{job_id}"
+        job_directory = _default_directory(job) or workflow_directory
         strategy = job.get("strategy") if isinstance(job.get("strategy"), dict) else {}
         steps = [s for s in job.get("steps") or [] if isinstance(s, dict)]
         setup = {}
@@ -81,7 +90,7 @@ class GitHubActionsAdapter:
             check_id = f"gha:{source}:{job_id}:{index}"
             if "run" in step:
                 check = command_check(self.adapter_id, check_id, str(step["run"]), where, gate,
-                                      {**meta, "working_directory": step.get("working-directory")}, deploys=bool(environment))
+                                      {**meta, "working_directory": step.get("working-directory") or job_directory}, deploys=bool(environment))
                 if check is not None:
                     checks.append(check)
             elif "uses" in step:

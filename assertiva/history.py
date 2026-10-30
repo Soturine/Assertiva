@@ -131,6 +131,8 @@ _NORMALIZE = (
     (re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"), "<TS>"),
     (re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"), "<ID>"),
     (re.compile(r"\b0x[0-9a-fA-F]+\b"), "<ADDR>"),
+    # relative Windows paths (venv\Lib\x.py, ..\x\y.py) -> file name; only from the start of a token
+    (re.compile(r"(?<![^\s'\"(<>=])(?:[^\s:'\"\\/<>]+\\)+([^\s:'\"\\/<>]+)"), r"\1"),
     (re.compile(r"(?:[A-Za-z]:)?[\\/](?:[^\s:'\"\\/<>]+[\\/])+([^\s:'\"\\/<>]+)"), r"\1"),  # paths -> file name
     (re.compile(r"\b[0-9a-fA-F]{12,}\b"), "<HEX>"),
     (re.compile(r"\b\d{6,}\b"), "<N>"),

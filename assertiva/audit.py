@@ -21,6 +21,7 @@ from .config import ProjectConfig, load_config
 from .evidence import StateEvidence, attach_mutation, measure, mutant_label, runnable_copy
 from .candidate import StageStatus
 from .models import BudgetDecision, Finding, MutantStatus, Outcome
+from .failures import clusters as failure_clusters, origin as failure_origin
 from contextlib import ExitStack
 
 from . import environment
@@ -43,9 +44,29 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
     errors = [e for run in own for e in run.collection_errors]
     if errors:
         findings.append(Finding("NATIVE_COLLECTION_ERRORS", "The native runner could not collect some tests.", {"errors": errors[:20]}))
-    failing = [inv.invocation_id for inv in invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
+    failed = [inv for inv in invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
+    failing = [inv.invocation_id for inv in failed]
     if failing:
-        findings.append(Finding("NATIVE_TESTS_FAILING", "Some tests fail or error in the current state.", {"count": len(failing), "tests": failing[:20]}))
+        evidence, first = {"count": len(failing), "tests": failing[:20]}, None
+        top = failure_clusters([(inv.invocation_id, inv.message) for inv in failed])[:1]
+        if top and top[0]["count"] * 2 >= len(failing):  # most failures, one cause: the next step says it (AG-03); tests stay listed
+            cause = top[0]
+            sample = next(inv.message for inv in failed if inv.invocation_id == cause["invocations"][0])
+            kind, why = failure_origin(sample)
+            first = (f"{cause['count']} of {len(failing)} failing invocations share one cause: {cause['exception']} at "
+                     f"{cause['raised_at']} (origin {kind}); triage that cause before the individual tests.")
+            evidence["dominant_cause"] = {"exception": cause["exception"], "raised_at": cause["raised_at"], "count": cause["count"],
+                                          "of": len(failing), "origin": kind, "origin_basis": why, "basis": cause["basis"]}
+        findings.append(Finding("NATIVE_TESTS_FAILING", "Some tests fail or error in the current state.", evidence, recommendation=first))
+    shadowed = [run for run in own if (run.metadata.get("source_identity") or {}).get("status") == "MISMATCH"]
+    if shadowed:
+        modules = sorted({m for run in shadowed for m in run.metadata["source_identity"]["from_outside_the_copy"]})
+        findings.append(Finding(
+            "SOURCE_IDENTITY_MISMATCH",
+            "The tests imported the project's own modules from an installed copy instead of the source tree under test.",
+            {"modules": modules[:20], "files": {m: f for run in shadowed for m, f in run.metadata["source_identity"]["modules"].items()
+                                                if m in modules}, "adapters": [run.adapter_id for run in shadowed],
+             "basis": "OBSERVED"}))
     executed = [inv for run in current.runs if run.mode == "execute" for inv in run.invocations]
     # The static inventory counts runnable nodes (definitions + inherited/composed materializations) and never expands
     # parameters; the comparable native unit is the materialization, not the invocation (one per parameter case).

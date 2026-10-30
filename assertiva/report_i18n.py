@@ -1080,6 +1080,17 @@ FINDINGS: dict[str, dict] = {
                "Uma execução nativa do mesmo escopo não tem invocações com falha ou erro."),
         rec=("Triage failing tests before trusting any other metric in this report.",
              "Faça a triagem dos testes com falha antes de confiar em qualquer outra métrica deste relatório.")),
+    "SOURCE_IDENTITY_MISMATCH": F(
+        category="execution", tier="E0",
+        title=("The tests ran another copy of the code", "Os testes executaram outra cópia do código"),
+        summary=("The tests imported the project's own modules from an installed copy instead of the source tree under test.",
+                 "Os testes importaram os módulos do próprio projeto de uma cópia instalada em vez da árvore de código sob teste."),
+        why=("A green run then says nothing about the source being audited: a change to it would not be exercised.",
+             "Uma execução verde então nada diz sobre o código auditado: uma mudança nele não seria exercitada."),
+        close=("A native run imports every project module from the tested copy (or the run qualifies an installed artifact on purpose).",
+               "Uma execução nativa importa todos os módulos do projeto da cópia testada (ou qualifica de propósito um artefato instalado)."),
+        rec=("Run the tests against the source tree (an editable install or the src path first) or qualify the installed package on purpose as an artifact; until then the green run proves another copy of the code.",
+             "Execute os testes contra a árvore de código (instalação editável ou o caminho src primeiro) ou qualifique de propósito o pacote instalado como artefato; até lá a execução verde comprova outra cópia do código.")),
     "STATIC_INVENTORY_DIVERGES_FROM_NATIVE": F(
         category="discovery", tier="E1",
         title=("Static inventory differs from native collection", "Inventário estático difere da coleta nativa"),

@@ -64,3 +64,52 @@ def test_a_product_file_whose_name_ends_a_test_files_name_is_still_product():
     text = ("E           TypeError: unsupported operand type(s) for //: 'int' and 'NoneType'\n\npricing.py:6: TypeError")
     assert origin(text, ["tests/test_pricing.py"])[0] == PRODUCT
     assert origin(text.replace("pricing.py:6", "tests/test_pricing.py:6"), ["tests/test_pricing.py"])[0] != PRODUCT
+
+
+# --- AG-01 / AG-02 / AG-07: frames outside the project, environment permissions, Windows paths ---------------
+
+SITE_PERMISSION = ("/usr/lib/python3/site-packages/requests/adapters.py:519: PermissionError\n"
+                   "E PermissionError: [Errno 13] Permission denied: '/tmp/x'")
+TMP_PATH_ACL = ("C:/venv/Lib/site-packages/_pytest/pathlib.py:175: PermissionError\n"
+                "E PermissionError: [WinError 5] Access is denied: 'C:/Users/u/AppData/Local/Temp/pytest-of-u'")
+PRODUCT_PERMISSION = ("    def save(path):\n>       open(path, 'w').write('x')\n"
+                      "E       PermissionError: [Errno 13] Permission denied: 'out/report.txt'\nshop/export.py:7: PermissionError")
+PRODUCT_THROUGH_STDLIB = ("shop/cart.py:12: in total\n    return Decimal(text)\n"
+                          "/usr/lib/python3.12/_pydecimal.py:612: InvalidOperation\nE   decimal.InvalidOperation")
+ONLY_LIBRARY = "/home/u/.venv/lib/python3.12/site-packages/yaml/constructor.py:60: ValueError\nE   ValueError: bad"
+
+
+def test_drawlab_reproducers_frames_in_site_packages_are_not_product():
+    assert origin(SITE_PERMISSION)[0] != PRODUCT
+    assert origin(TMP_PATH_ACL)[0] in (INFRASTRUCTURE, UNKNOWN)
+
+
+def test_a_permission_error_raised_outside_the_project_is_the_environment():
+    kind, why = origin(TMP_PATH_ACL)
+    assert kind == INFRASTRUCTURE and "permission" in why.lower()
+
+
+def test_a_permission_error_in_the_projects_own_code_stays_product():
+    # negative control: the product really fails to write; not moved to the environment
+    assert origin(PRODUCT_PERMISSION)[0] == PRODUCT
+
+
+def test_the_innermost_project_frame_decides_when_the_raise_is_in_the_stdlib():
+    kind, why = origin(PRODUCT_THROUGH_STDLIB)
+    assert kind == PRODUCT and "shop/cart.py:12" in why
+
+
+def test_a_failure_only_in_a_library_is_unknown_not_product():
+    kind, why = origin(ONLY_LIBRARY)
+    assert kind == UNKNOWN and "outside the project" in why
+
+
+def test_windows_paths_keep_their_file_name_in_signatures_and_their_drive_in_sites():
+    from assertiva.history import fingerprint
+
+    relative = r"venv\Lib\site-packages\_pytest\pathlib.py:228: PermissionError"
+    assert "at pathlib.py:228" in fingerprint(relative)[1] and "venvpathlib" not in fingerprint(relative)[1]
+    dotted = r"..\venv\Lib\site-packages\_pytest\pathlib.py:228: in make_numbered_dir"
+    assert "..pathlib" not in fingerprint(dotted)[1]
+    assert raise_site(r"C:\venv\Lib\site-packages\_pytest\pathlib.py:175: PermissionError")[1] == \
+        "C:/venv/Lib/site-packages/_pytest/pathlib.py:175"

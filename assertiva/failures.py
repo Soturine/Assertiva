@@ -34,8 +34,12 @@ _ASSERTION = re.compile(
     r"\bassert\s+.{0,120}==|\bAssert\.\w+ failed|org\.opentest4j\.", re.S)
 _TEST_CODE_ERROR = re.compile(r"\b(?:NameError|SyntaxError|IndentationError|ImportError|ModuleNotFoundError|ReferenceError|"
                               r"fixture '[^']+' not found|NoSuchMethodError|ClassNotFoundException)\b")
-_TYPE = re.compile(r"\b([A-Z][A-Za-z0-9_.]*(?:Error|Exception|Failure|Exit|Timeout))\b")
-_FRAME = re.compile(r"([\w./\\-]+\.(?:py|js|cjs|mjs|ts|tsx|jsx|java|kt)):(\d+)")
+_TYPE = re.compile(r"(?<!\[)\b([A-Z][A-Za-z0-9_.]*(?:Error|Exception|Failure|Exit|Timeout))\b")  # not `[WinError 5]`
+_FRAME = re.compile(r"((?:\b[A-Za-z]:)?[\w./\\-]+\.(?:py|js|cjs|mjs|ts|tsx|jsx|java|kt)):(\d+)")
+# installed libraries, the interpreter's standard library and frozen modules: code the project does not own
+_EXTERNAL = re.compile(r"(?:^|/)(?:site-packages|dist-packages|node_modules)/|(?:^|/)lib/python\d+(?:\.\d+)?/|"
+                       r"(?:^|/)Lib/[^/]+\.py$|^<frozen|(?:^|/)node:internal/", re.I)
+_PERMISSION = re.compile(r"\bPermissionError\b|\bEACCES\b|\bEPERM\b|\[WinError 5\]|Access is denied|Permission denied", re.I)
 _JVM_FRAME = re.compile(r"\bat [\w.$]+\(([\w$]+\.(?:java|kt)):(\d+)\)")
 
 
@@ -58,8 +62,18 @@ def raise_site(message: str | None) -> tuple[str | None, str | None]:
     frames = [f"{m.group(1).replace(chr(92), '/').rsplit('/', 1)[-1]}:{m.group(2)}" for m in _JVM_FRAME.finditer(message)]
     if frames:  # a JVM stack lists the innermost frame first
         return (types[0] if types else None), frames[0]
-    frames = [f"{m.group(1).replace(chr(92), '/')}:{m.group(2)}" for m in _FRAME.finditer(message)]
+    frames = _frames(message)
     return (types[-1] if types else None), (frames[-1] if frames else None)
+
+
+def _frames(message: str) -> list[str]:
+    """Python/JS ``file:line`` frames in the order the text shows them (the innermost last)."""
+    return [f"{m.group(1).replace(chr(92), '/')}:{m.group(2)}" for m in _FRAME.finditer(message)]
+
+
+def external(path: str) -> bool:
+    """Whether a frame's file belongs to an installed library or the interpreter, not to the project."""
+    return bool(_EXTERNAL.search(path.replace(chr(92), "/")))
 
 
 def origin(message: str | None, test_paths=()) -> tuple[str, str]:
@@ -73,6 +87,15 @@ def origin(message: str | None, test_paths=()) -> tuple[str, str]:
         return UNKNOWN, "an assertion did not hold: the product's behavior or the test's expectation changed; read both"
     if site is None:
         return UNKNOWN, "no source location in the failure text"
+    if not _JVM_FRAME.search(message):  # the innermost frame the project owns decides, not a library's or the stdlib's
+        owned = [f for f in _frames(message) if not external(f.rsplit(":", 1)[0])]
+        if not owned:
+            if _PERMISSION.search(message):
+                return INFRASTRUCTURE, (f"a permission was refused to {kind or 'the run'} at {site}, outside the project's code "
+                                        "(a folder or file of the machine or the runner, such as its temporary directory)")
+            return UNKNOWN, (f"{kind or 'an error'} raised outside the project at {site} (an installed library or the "
+                             "standard library); the project frame that called it is not in the failure text")
+        site = owned[-1]
     in_test = _test_file(site.rsplit(":", 1)[0], set(test_paths))
     if in_test and _TEST_CODE_ERROR.search(message):
         return TEST, f"{kind or 'an error'} raised in test code at {site}, not by an assertion"

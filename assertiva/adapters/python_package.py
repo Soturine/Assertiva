@@ -457,7 +457,7 @@ class PythonPackageAdapter:
             for base in (copy, copy / "src"):
                 shutil.rmtree(base / name, ignore_errors=True)
                 (base / f"{name}.py").unlink(missing_ok=True)
-        runner = PytestNativeAdapter(python=str(vpy), timeout_s=self.timeout_s)
+        runner = PytestNativeAdapter(python=str(vpy), timeout_s=self.timeout_s, expect_installed=True)
         if runner.supports(copy) is not SupportLevel.SUPPORTED:
             evidence.checks.append(ArtifactCheck("tests", StageStatus.NOT_RUN, detail="no test runner adapter for this project"))
             evidence.limitations.append("only build, install and import were verified; no tests ran against the artifact")

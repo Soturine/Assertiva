@@ -215,7 +215,11 @@ def measure(
                     state.limitations.append(f"{adapter.adapter_id}: none of the selected tests belong to it; it was not run")
                     continue
             with traced_stage(f"{label}:{adapter.adapter_id}"):
-                state.runs.append(adapter.run(copy, args=args, coverage=True))
+                run = adapter.run(copy, args=args, coverage=True)
+            run.metadata.setdefault("limits", {"timeout_s": getattr(adapter, "timeout_s", None),
+                                               "timeout_source": getattr(adapter, "timeout_source", "adapter default"),
+                                               "selection": "selected tests" if args else "full suite"})
+            state.runs.append(run)
         for adapter in static_providers(adapters):
             for name, value in adapter.static_signals(copy).items():
                 state.static[name] = state.static.get(name, 0) + value
@@ -235,6 +239,8 @@ def measure(
         for adapter in artifact_adapters(source, python):
             with traced_stage(f"{label}:{adapter.adapter_id}"):
                 evidence = adapter.qualify(source)
+            evidence.environment.setdefault("timeout_s", getattr(adapter, "timeout_s", None))
+            evidence.environment.setdefault("timeout_source", getattr(adapter, "timeout_source", "adapter default"))
             state.artifacts.append(evidence)
             blocked = evidence.status is StageStatus.BLOCKED and evidence.limitations
             state.budget.append(BudgetDecision(

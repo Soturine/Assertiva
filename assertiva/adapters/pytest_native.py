@@ -65,9 +65,11 @@ def _outcome(reports: dict[str, dict]) -> Outcome:
 class PytestNativeAdapter(PythonStatic):
     adapter_id = "pytest-native"
 
-    def __init__(self, python: str | None = None, timeout_s: float = 900.0):
+    def __init__(self, python: str | None = None, timeout_s: float = 900.0, expect_installed: bool = False):
         self.python = python or sys.executable
         self.timeout_s = timeout_s
+        # artifact qualification runs the tests against the installed wheel on purpose; otherwise the copy is the subject
+        self.expect_installed = expect_installed
 
     def supports(self, root: Path) -> SupportLevel:
         from assertiva.pytest_audit import has_pytest_surface
@@ -181,6 +183,38 @@ class PytestNativeAdapter(PythonStatic):
             evidence.limitations.append("pytest produced no native evidence: " + " | ".join(tail))
         return evidence
 
+    def _session_facts(self, evidence: RunEvidence, record: dict) -> None:
+        """Code identity (AX-E02), the temp root (AG-08) and borrowed site directories (AG-09) of this run."""
+        imported = record.get("imported") or {}
+        outside = sorted(name for name, where in imported.items() if not where.get("inside_root"))
+        expected = "INSTALLED_ARTIFACT" if self.expect_installed else "SOURCE_TREE"
+        if not imported:
+            status = "UNKNOWN"
+        elif self.expect_installed:
+            status = "INSTALLED_ARTIFACT" if len(outside) == len(imported) else "MISMATCH"
+        else:
+            status = "MISMATCH" if outside else "SOURCE_TREE"
+        evidence.metadata["source_identity"] = {
+            "expected": expected, "status": status, "modules": {n: w.get("file") for n, w in imported.items()},
+            "from_outside_the_copy": outside if not self.expect_installed else sorted(set(imported) - set(outside)),
+            "basis": "OBSERVED: the module files the test process had imported when the session finished",
+        }
+        if status == "MISMATCH" and not self.expect_installed:
+            evidence.limitations.append(
+                "the tests imported the project's own modules from outside the tested copy (" + ", ".join(outside[:5])
+                + "): an installed copy shadows the source tree, so this run does not prove the source under test")
+        evidence.metadata["temp_root"] = {"path": record.get("tempdir"), "writable": record.get("tempdir_writable")}
+        if record.get("tempdir_writable") is False:
+            evidence.limitations.append(f"the test process's temporary directory ({record.get('tempdir')}) is not writable: "
+                                        "tests that use temporary paths fail for the machine, not for the product")
+        borrowed = record.get("borrowed_site_dirs") or []
+        evidence.metadata["interpreter"] = {"python": record.get("python"), "prefix": record.get("prefix"),
+                                            "borrowed_site_dirs": borrowed}
+        if borrowed:
+            evidence.limitations.append("the interpreter also loads packages from site directories outside its own "
+                                        "environment (" + ", ".join(borrowed[:3]) + "): the run's dependencies are not "
+                                        "only that environment's")
+
     def _normalize(self, evidence: RunEvidence, records: list[dict]) -> None:
         reports: dict[str, dict[str, dict]] = {}
         for record in records:
@@ -191,6 +225,8 @@ class PytestNativeAdapter(PythonStatic):
                 evidence.deselected.append(record["nodeid"])
             elif record["type"] == "report":
                 reports.setdefault(record["nodeid"], {})[record["when"]] = record
+            elif record["type"] == "session":
+                self._session_facts(evidence, record)
 
         for record in (r for r in records if r["type"] == "item"):
             declaration, inherited = _declaration(record)

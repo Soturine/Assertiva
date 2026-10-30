@@ -143,7 +143,9 @@ def reproduce_check(
         return Reproduction(record, StageStatus.NOT_RUN, budget=[BudgetDecision(stage, "NOT_RUN", reason)])
     env = dict(os.environ)
     env["PATH"] = str(Path(python or sys.executable).parent) + os.pathsep + env.get("PATH", "")
-    result = run_command(list(plan.argv), copy(), env=env)
+    from .adapters import current_timeout
+
+    result = run_command(list(plan.argv), copy(), env=env, timeout_s=current_timeout(900.0))
     if result.error or result.timed_out:
         status = StageStatus.BLOCKED
     else:

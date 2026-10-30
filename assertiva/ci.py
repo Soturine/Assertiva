@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import posixpath
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,10 +10,26 @@ class CiPytestInvocation:
     workflow: str
     command: str
     scopes: tuple[str, ...] = ()
+    # where the runner starts, relative to the repository root ("" = the root); scopes are relative to it
+    base: str = ""
 
     @property
     def runs_all_tests(self) -> bool:
-        return not self.scopes
+        return not self.scopes and not self.base
+
+    @property
+    def base_unresolved(self) -> bool:
+        """The directory is an expression (`${{ matrix.dir }}`): where it runs is not known from configuration."""
+        return "${{" in self.base or "$(" in self.base
+
+    def root_scopes(self) -> tuple[str, ...]:
+        """The scopes as repository paths: joined to the working directory (a base alone means everything under it)."""
+        if not self.base:
+            return self.scopes
+        base = posixpath.normpath(self.base.replace("\\", "/")).removeprefix("./")
+        base = "" if base == "." else base
+        joined = [posixpath.normpath(posixpath.join(base, s)) if base else s for s in self.scopes or ("",)]
+        return tuple(dict.fromkeys(("" if j == "." else j) for j in joined))
 
 
 _OPTIONS_WITH_VALUES = {
@@ -62,7 +79,8 @@ def _ci_invocations(root: str | Path, tool: str, scopes) -> list[CiPytestInvocat
     from .verification import VerificationOrigin, discover_surface
 
     return [
-        CiPytestInvocation(check.source.split("#")[0], check.command, scopes(check.metadata.get("runner_args", ())))
+        CiPytestInvocation(check.source.split("#")[0], check.command, scopes(check.metadata.get("runner_args", ())),
+                           str(check.metadata.get("working_directory") or ""))
         for check in discover_surface(Path(root)).by_origin(VerificationOrigin.CI)
         if check.tool == tool and check.command
     ]
@@ -81,10 +99,10 @@ def discover_ci_unittest(root: str | Path) -> list[CiPytestInvocation]:
 def path_selected_by_ci(path: str, invocations: list[CiPytestInvocation]) -> bool:
     normalized = path.replace("\\", "/").removeprefix("./")
     for inv in invocations:
-        if inv.runs_all_tests:
+        if inv.runs_all_tests or inv.base_unresolved:  # an unresolved directory may be this one: no gap is claimed
             return True
-        for scope in inv.scopes:
+        for scope in inv.root_scopes():
             s = scope.split("::")[0].rstrip("/")
-            if normalized in {s, s + ".py"} or normalized.startswith(s + "/"):
+            if not s or normalized in {s, s + ".py"} or normalized.startswith(s + "/"):
                 return True
     return False

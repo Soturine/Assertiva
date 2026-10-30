@@ -28,7 +28,7 @@ _SEVERITY = {
     "MUTATION_REPORT_SOURCE_MISMATCH": "medium", "MUTATION_REPORT_UNTIED": "info",
     "ARTIFACT_QUALIFICATION_FAILED": "high", "PROJECT_LINK_ESCAPES_ROOT": "high", "BROKEN_PROJECT_LINK": "medium",
     "NESTED_REPOSITORY": "info", "DECLARED_CHECK_FAILED": "high", "ERROR_CONTRACT_FIELD_NOT_OBSERVED": "medium",
-    "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high",
+    "STATE_AFTER_REJECTION_NOT_EVIDENCED": "info", "ASYNC_FAILURE_NOT_OBSERVED": "high", "ARTIFACT_QUALIFICATION_INCOMPLETE": "medium", "ARTIFACT_OMITS_SOURCE_FILES": "medium", "NATIVE_COLLECTION_ERRORS": "high", "NATIVE_TESTS_FAILING": "high", "SOURCE_IDENTITY_MISMATCH": "high",
     "WEAK_ORACLE_SIGNAL": "medium", "ERROR_STATUS_ONLY_SIGNAL": "medium",
     "BROAD_ERROR_EXPECTATION_SIGNAL": "medium", "LINE_BRANCH_COVERAGE_DIVERGENCE": "medium", "CI_ONLY_CHECK": "medium",
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "info", "NO_DELIVERY_PIPELINE_OBSERVED": "info",
@@ -48,6 +48,7 @@ _RECOMMENDATION = {
     "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED": "Provide portable evidence (standard test-result and coverage reports) or an adapter for this toolchain.",
     "NATIVE_COLLECTION_ERRORS": "Fix collection errors first: tests that cannot be collected provide no evidence.",
     "NATIVE_TESTS_FAILING": "Triage failing tests before trusting any other metric in this report.",
+    "SOURCE_IDENTITY_MISMATCH": "Run the tests against the source tree (an editable install or the src path first) or qualify the installed package on purpose as an artifact; until then the green run proves another copy of the code.",
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
     "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
     "MUTATION_REPORT_UNTIED": "Run the mutation tool through the engine (--execute --mutate FILE), or import a report that includes the source it mutated and the tests it ran.",
@@ -93,6 +94,9 @@ def state_summary(state: StateEvidence | None) -> dict | None:
                 # Adapter-defined execution dimensions (e.g. projects or targets) and attachment references.
                 "matrix": dict(run.metadata.get("matrix") or {}),
                 "attachments": sum(len(v) for v in (run.metadata.get("attachments") or {}).values()),
+                # what the run really used: the copy of the code it imported, its temp root, its interpreter, its limits
+                "source_identity": run.metadata.get("source_identity"), "temp_root": run.metadata.get("temp_root"),
+                "interpreter": run.metadata.get("interpreter"), "limits": run.metadata.get("limits"),
             }
             for run in state.runs
         ],
@@ -219,11 +223,28 @@ def execution_manifest(root: Path, baseline, current: StateEvidence, started: st
         "engine": {"assertiva_version": __version__, "runtime_version": sys.version.split()[0], "platform": platform.platform(terse=True)},
         "runs": [{"adapter": run.adapter_id, "provenance": run.metadata.get("provenance") or ("EXTERNAL_UNVERIFIED" if run.mode == "report" else "ENGINE_EXECUTED"),
                   "command": [redact(str(c)) for c in run.command], "exit_code": run.exit_code, "wall_clock_s": run.wall_clock_s,
-                  "status": run.status.value, "invocations": len(run.invocations)} for run in current.runs],
+                  "status": run.status.value, "invocations": len(run.invocations), "mode": run.mode,
+                  "limits": run.metadata.get("limits")} for run in current.runs],
+        # each run and each artifact qualification side by side: two outcomes for one revision can differ by limit,
+        # selection or environment, and this says which (AG-12)
+        "comparison": _run_comparison(current),
         "read": [{"kind": kind, "path": str(path), "sha256": digest(path)} for kind, paths in
                  (("test_results", results), ("coverage", coverage), ("mutation", mutation), ("ci_run", ci)) for path in paths],
         "environment": {"withheld": list(withheld), "passed_through": sorted(PASSTHROUGH)},
     }
+
+
+def _run_comparison(current: StateEvidence) -> list[dict]:
+    rows = [{"what": f"{run.adapter_id} ({run.mode})", "status": run.status.value, "invocations": len(run.invocations),
+             "wall_clock_s": run.wall_clock_s, **(run.metadata.get("limits") or {})} for run in current.runs]
+    for artifact in current.artifacts:
+        tests = next((c for c in artifact.checks if c.name == "tests"), None)
+        rows.append({"what": f"{artifact.adapter_id} tests against the installed {artifact.kind}",
+                     "status": tests.status.value if tests else "NOT_RUN", "invocations": None,
+                     "wall_clock_s": tests.duration_s if tests else None, "detail": tests.detail if tests else None,
+                     "timeout_s": artifact.environment.get("timeout_s"), "timeout_source": artifact.environment.get("timeout_source"),
+                     "selection": "full suite"})
+    return rows
 
 
 def _technologies(root: Path, files: list[str], runs) -> dict:

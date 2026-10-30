@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import __version__, process
+from .adapters import timeout_override
 from .assessment import apply_assessment, load_assessment
 from .audit import run_audit
 from .config import load_config
@@ -236,6 +237,16 @@ def _result_from(data: dict):
     )
 
 
+def _seconds(value: str) -> float:
+    try:
+        seconds = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a number of seconds") from None
+    if not 0 < seconds <= 7 * 24 * 3600:
+        raise argparse.ArgumentTypeError("the limit must be more than 0 and at most a week of seconds")
+    return seconds
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="assertiva", description="Adaptive Test Intelligence & Assurance")
     parser.add_argument("--version", action="version", version=f"assertiva {__version__}")
@@ -246,6 +257,9 @@ def _parser() -> argparse.ArgumentParser:
         p.add_argument("--python", help="interpreter of the project environment (default: this interpreter)")
         p.add_argument("--report-dir", help="where to write the report (must be outside the project)")
         p.add_argument("--output", choices=("text", "json"), default="text")
+        p.add_argument("--timeout-s", type=_seconds, metavar="SECONDS",
+                       help="per-run limit for test runs and artifact qualification (wins over the project's [tests] "
+                            "timeout_s and the adapter defaults; recorded in the run's manifest; never written to the project)")
 
     audit = sub.add_parser("audit", help="read-only assurance audit; never changes project files")
     common(audit)
@@ -306,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         process.TRACE_PATH = state_dir(Path(args.root), "traces") / f"{args.command}-{stamp}.jsonl"
-        with process.run_scope():
+        with process.run_scope(), timeout_override(getattr(args, "timeout_s", None)):
             return args.handler(args)
     except (UsageError, ValueError, ApprovalRequiredError, SessionExistsError) as exc:
         print(f"assertiva: {exc}", file=sys.stderr)

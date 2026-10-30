@@ -25,7 +25,7 @@ _TOOLS: dict[tuple[str, str | None], K] = {
     ("pytest", None): K.TEST, ("py.test", None): K.TEST, ("unittest", None): K.TEST,
     ("jest", None): K.TEST, ("vitest", None): K.TEST, ("mocha", None): K.TEST,
     ("playwright", "test"): K.TEST, ("cypress", "run"): K.TEST,
-    ("go", "test"): K.TEST, ("go", "vet"): K.STATIC_ANALYSIS, ("go", "build"): K.BUILD,
+    ("node", "--test"): K.TEST, ("go", "test"): K.TEST, ("go", "vet"): K.STATIC_ANALYSIS, ("go", "build"): K.BUILD,
     ("cargo", "test"): K.TEST, ("cargo", "clippy"): K.LINT, ("cargo", "build"): K.BUILD, ("cargo", "fmt"): K.FORMAT,
     ("dotnet", "test"): K.TEST, ("dotnet", "build"): K.BUILD, ("dotnet", "format"): K.FORMAT,
     ("mvn", None): K.TEST, ("gradle", None): K.TEST, ("./gradlew", None): K.TEST, ("./mvnw", None): K.TEST,

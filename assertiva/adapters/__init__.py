@@ -61,6 +61,12 @@ def _vitest(python=None):
     return VitestAdapter(python=python)
 
 
+def _node_test(python=None):
+    from .node_test import NodeTestAdapter
+
+    return NodeTestAdapter(python=python)
+
+
 def _playwright(python=None):
     from .playwright import PlaywrightAdapter
 
@@ -80,7 +86,7 @@ def _maven(python=None):
 
 
 # Plain lists of factories (called with the target interpreter); no plugin machinery.
-RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _vitest, _playwright, _maven, _gradle]
+RUNNER_FACTORIES = [_pytest, _unittest, _django, _jest, _vitest, _node_test, _playwright, _maven, _gradle]
 ARTIFACT_FACTORIES = [_python_package]
 
 

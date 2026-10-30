@@ -41,6 +41,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "{n} de {total} invocações com falha têm uma causa comum: {exception} em {site} (origem {origin}); trate essa causa antes dos testes individuais."),
     ("the tests imported the project's own modules from outside the tested copy ({modules}): an installed copy shadows the source tree, so this run does not prove the source under test",
      "os testes importaram os módulos do próprio projeto de fora da cópia testada ({modules}): uma cópia instalada se sobrepõe à árvore de código, então esta execução não comprova o código sob teste"),
+    ("test files could not be matched to every case: ids use Node's class name only",
+     "os arquivos de teste não puderam ser associados a todos os casos: os ids usam apenas o nome de classe do Node"),
     ("only the selected tests ran for each mutant ({tests}): a survivor may be killed by a test outside the selection, and the rest of the suite was not run for this analysis",
      "apenas os testes selecionados rodaram para cada mutante ({tests}): um sobrevivente pode ser morto por um teste fora da seleção, e o restante da suíte não rodou nesta análise"),
     ("the test process's temporary directory ({path}) is not writable: tests that use temporary paths fail for the machine, not for the product",

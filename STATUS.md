@@ -4,6 +4,7 @@
 
 | Version | State |
 | --- | --- |
+| 0.10.0.dev0 — Reliability, Portfolio Assurance & Continuous Dogfood | **in development** on `feature/assertiva-0.10.0-hardening`, not released, not merged; what it adds and what it leaves open: [CHANGELOG](CHANGELOG.md), [gap matrix](docs/assurance/POST_DOGFOOD_GAP_MATRIX.md), [release readiness](docs/assurance/RELEASE_READINESS.md). Everything below describes the published 0.9.0 |
 | **0.9.0** — Advanced Test Intelligence & Continuous Assurance | **published 2026-10-20** as `v0.9.0` (GitHub Release); this page describes it. It includes the work of 0.7.3, 0.8.0 and 0.8.1 |
 | 0.8.1 | not a release: its scope (advanced mutation and improve) is in 0.9.0 |
 | 0.8.0 — Intelligence & Proof of Protection | qualified on `release/0.8.0` (`5fe2124`, 2026-10-19); **no independent release**; included in 0.9.0 |

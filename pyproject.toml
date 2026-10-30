@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assertiva"
-version = "0.9.0"
+version = "0.10.0.dev0"
 description = "Adaptive Test Intelligence & Assurance for coding agents"
 requires-python = ">=3.11"
 license = "Apache-2.0"

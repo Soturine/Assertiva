@@ -28,3 +28,7 @@ Research records are dated evidence and benchmarks, not permanent Assertiva poli
 ## Rule
 
 When a mutable external tool changes, update or add a dated record instead of silently rewriting history. Promote only reusable, evidence-supported conclusions into canonical docs.
+
+## Dogfood field reports integrated in 0.10.0 (from PR #1 at `6a375ec`)
+
+- [TCC multistack dogfood](2026-10-25-tcc-multistack-dogfood.md), [TCC Android A1/A2](2026-10-25-tcc-android-a1-a2-dogfood.md), [TCC improvement backlog (TCC-A01..A24, AX-E01..E06)](2026-10-25-tcc-improvement-backlog.md), [Derivanta Engine cross-dogfood](2026-10-29-derivanta-engine-cross-dogfood.md). Dispositions: [gap matrix](../docs/assurance/POST_DOGFOOD_GAP_MATRIX.md).

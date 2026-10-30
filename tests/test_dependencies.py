@@ -3,6 +3,7 @@ nothing is installed or looked up, and readiness never claims READY without an e
 
 import json
 import sys
+from pathlib import Path
 
 from assertiva import cli
 from assertiva.dependencies import _satisfies_npm, inventory
@@ -73,6 +74,10 @@ def test_the_audit_option_adds_the_inventory_and_findings_without_touching_the_p
     codes = {f["code"] for f in report["findings"]}
     assert {"DEPENDENCY_LOCK_OUTSIDE_RANGE", "DEPENDENCY_USAGE_UNTESTED"} <= codes
     assert report["dependencies"]["note"].startswith("nothing was installed")
+    schema = json.loads((Path(__file__).parents[1] / "schemas" / "assurance-report.schema.json").read_text(encoding="utf-8"))
+    assert set(report) <= set(schema["properties"])  # the published contract lists the key (additionalProperties: false)
+    for entry in report["dependencies"]["dependencies"]:
+        assert set(schema["properties"]["dependencies"]["properties"]["dependencies"]["items"]["required"]) <= set(entry)
     assert tree_fingerprint(root) == before
     assert cli.main(["audit", str(root), "--output", "json"]) == 0
     assert "dependencies" not in json.loads(capsys.readouterr().out)  # opt-in only

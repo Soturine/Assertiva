@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.10.0.dev0] — unreleased — Reliability, Portfolio Assurance & Continuous Dogfood
+
+Development line toward 0.10.0 on `feature/assertiva-0.10.0-hardening`, from `main` at `cf5cb7d` (0.9.0). **Not
+released:** no tag, no GitHub Release, no merge until the full qualification and CI pass and the owner decides. It
+closes the reproducible gaps of three dogfood rounds (TCC-A01..A24 and AX-E01..E06 from PR #1, AG-01..AG-13 from the
+DrawLab M10 branch) plus four found in this work (SEC-EVAL-01/02, ENG-01/02); every disposition, with its before/after
+test and commit, is in [docs/assurance/POST_DOGFOOD_GAP_MATRIX.md](docs/assurance/POST_DOGFOOD_GAP_MATRIX.md).
+
+### Security
+- **The package dependency-closure check no longer imports package code** (AX-E01). It reads modules with `ast` and locates their top-level imports with `find_spec`; an unguarded `__main__` or an import-time effect no longer runs during artifact qualification. Optional (`try/except ImportError`) and `TYPE_CHECKING` imports are skipped, interpreter conditions are decided, any other condition is UNKNOWN (0.9.0 passed such imports unchecked). Dynamic imports are not followed.
+- **Project wrappers are never launched raw** (TCC-A16, ENG-01): `gradlew`, `gradlew.bat`, `.\gradlew.bat`, `mvnw.cmd` are one wrapper; a wrapper step with build and test tasks reproduces through the Gradle adapter (prepared distribution, never the committed `gradle-wrapper.jar`), the same on every OS; any other wrapper step is NOT_RUN with the reason. 0.9.0 failed with `[WinError 2]` on Windows and ran the committed wrapper on POSIX.
+- **Eval boundary enforced outside the model** (SEC-EVAL-01, SEC-EVAL-02, AG-13): case text is framed as untrusted data; a directive lint refuses cases that address the agent; fixture copies never follow links; files a case marks private are replaced by a canary; `evals/guard.py` decides each tool call (hook-ready) and `record` applies a deterministic safety gate a judge's PASS cannot outrank.
+
+### Evidence integrity
+- **Code identity of a green run** (AX-E02, ENG-02, AG-08, AG-09): each pytest run records where every loaded module of the project's packages came from, the child's temp root and whether it is writable, and site directories borrowed from another environment; a run that imported an installed copy instead of the source tree raises `SOURCE_IDENTITY_MISMATCH` (high). Artifact qualification expects the installed copy.
+- **Failure origin** (AG-01, AG-02, AG-07): the innermost frame the project owns decides; frames in site-packages, the stdlib or Node internals are not PRODUCT; a refused permission outside the project's code and git without a checkout are INFRASTRUCTURE; a product's own permission error stays PRODUCT. Relative Windows paths keep their file name in signatures (fingerprints of such messages change: history comparisons across this version boundary differ for them).
+- **One cause, said once** (AG-03): when most failures share a fingerprint, the failing-tests finding's next step names the cause and its origin; every test stays listed.
+- **CI working directory** (TCC-A01): `defaults.run.working-directory` (workflow, job) and step directories are applied to the scopes; fixes a false high `CI_TEST_EXECUTION_GAP` and the opposite miss. A job with a default directory is no longer reproduced at the repository root by `--run-check` (it says the directory is not reproduced).
+- **Run limits and side-by-side runs** (AG-10, AG-12): `--timeout-s` (audit, improve; never written to the project) wins over `[tests] timeout_s`; every run and the artifact qualification record limit, source, selection and duration in `execution_manifest.comparison`.
+
+### Test-quality signals (calibrated with negative controls)
+- AG-04: the hand-written `pytest.raises` idiom is not a swallowed exception. AG-05/AX-E05: `f(x) == f(x)` is a weak **DETERMINISM** oracle, no longer a TAUTOLOGY — **contract change**: the 0.9.0 test expecting TAUTOLOGY now expects DETERMINISM. AG-06: decidable literal-loop conditions are not conditional assertions. AX-E03: `VACUOUS_ASSERTION` (`set() <= x`). AX-E04: `MOCKED_SUBJECT` (patching the function the test then checks). AX-E05/TCC-A05: imported test-support helpers that assert are oracles; a no-assertion test paired with a sibling that expects the same call to raise (or `does_not_raise`) is a `NO_RAISE_CONTRACT`. TCC-A17: Compose `assertIsEnabled`, `assertCountEquals`, `assertDoesNotExist` are STATE/VALUE oracles.
+
+### Mutation, adapters, classification
+- `--mutate FILE --mutate-tests PATH` (AG-11, Cosmic Ray): the named tests qualify the baseline and run per mutant; the run records the selection and `whole_suite: NOT_RUN`.
+- Operator-run manual mutants (`assertiva-manual-mutation/1`, TCC-A14/A23): OPERATOR_MANUAL provenance, exit-code-backed statuses, never a state metric or a project score; every mutation summary names its provenance.
+- Node's built-in test runner adapter (`node --test`, TCC-A03), verified on Node 24.19.
+- PlatformIO modalities (TCC-A04/A07/A13): NATIVE_HOST test, TARGET_DEVICE (never run), FIRMWARE_BUILD, upload as deploy; docker run/compose, mosquitto and mysql clients classified and consent-gated.
+- Package-script graph and `NESTED_SCRIPT_REPETITION` (TCC-A11). Missing test extras are BLOCKED naming the declaring group (AX-E06).
+
+### New: portfolio, explorer, dependencies
+- `assertiva portfolio add|list|audit|report|feedback|move|discover`: an opt-in local registry (ASSERTIVA_HOME) of audited projects with CURRENT/STALE/BLOCKED/UNKNOWN from evidence, counting units kept apart, legacy projects never scored, and Assertiva feedback (false positives, misses, adapter errors) kept apart from project findings with stable ids, append-only history and evidence-gated closing.
+- `assertiva explain ROOT --test ID`: one test's chain of evidence from the last audit (oracle, what ran it and on which copy of the code, mutants it detected, what it does not observe, unknowns); nothing re-runs. The report keeps per-invocation outcomes and mutation kills by test for it.
+- `assertiva audit --dependencies`: declared range, locked and installed versions, static Python usage, migration readiness (at most READY_WITH_GAPS without an executed upgrade); vulnerabilities UNKNOWN (OSV-Scanner named, nothing looked up).
+
+### Maintenance
+- Removed dead code (`STRONG_ORACLES`, `expected_error_count`, `VerificationSurface.by_kind`/`.blocking`, an unused impact method, `LANGS`) and duplicates (a second `_LEVEL_TONE`, a copied `_relative`, three copies of the PEP 508 name pattern).
+- Dogfood evidence of PR #1 (`6a375ec`) and the DrawLab M10 branch (`5685523`) integrated verbatim; 13 eval cases added (71 in all), all passing the directive lint.
+
+### Not done in this line (see the gap matrix)
+TCC-A02 (per-root denominators), TCC-A06 (module-loader doubles), TCC-A12 (unverified UI behavior) are open; TCC-A18 (emulator) and TCC-A15 (semantic eval runs, pending the owner's budget approval) are BLOCKED; the Skill changes are not semantically evaluated.
+
 ## [0.9.0] — 2026-10-20 — Advanced Test Intelligence & Continuous Assurance
 
 The first release since 0.7.2. It includes the work developed as 0.7.3, 0.8.0 and 0.8.1, which were never published on their own: their entries are kept below, marked as incorporated. The code was qualified at `32ce4d8` (see the qualification tables); the release commit differs from it in documentation only. Report fields and options are added; where a result's meaning became stricter, the entry says so (an untied mutation report is a lead; an imported run with unknown results is not a pass).

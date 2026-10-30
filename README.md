@@ -220,6 +220,12 @@ assertiva audit . --contract verification.json --accessibility-report axe.json  
 assertiva audit . --changed-since main --execute   # impact-based selection, widened when impact is not proven
 assertiva audit . --run-check <CHECK_ID>           # reproduce a declared check (e.g. the CI test step) in a disposable copy
 assertiva audit . --assessment assessment.json    # attach the auditing agent's assessment to the last run's report
+# 0.10.0 development line (not released yet):
+assertiva audit . --execute --timeout-s 3600      # a per-run limit for this audit only; never written to the project
+assertiva audit . --execute --mutate src/fees.py --mutate-tests tests/test_fees.py   # targeted mutation (Cosmic Ray)
+assertiva audit . --dependencies                  # declared vs locked vs installed, usage, readiness (offline)
+assertiva explain . --test test_fee_rounding      # one test's chain of evidence from the last audit
+assertiva portfolio add ../other-project && assertiva portfolio list   # a local registry of audited projects
 
 # Improve: one command, called again at each step.
 assertiva improve .                      # measure baseline, create the candidate workspace

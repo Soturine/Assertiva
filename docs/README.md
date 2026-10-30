@@ -51,6 +51,8 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 ## Evidence, schemas and evals
 
 - [Research Index](../research/README.md) — dated evidence, not permanent policy.
+- Assurance of the 0.10.0 line: [entry audit](assurance/POST_DOGFOOD_ENTRY_AUDIT.md), [gap matrix](assurance/POST_DOGFOOD_GAP_MATRIX.md) (source: [JSON](assurance/POST_DOGFOOD_GAP_MATRIX.json)), [implementation report](assurance/POST_DOGFOOD_IMPLEMENTATION_REPORT.md), [self-dogfood](assurance/ASSERTIVA_SELF_DOGFOOD.md), [benchmarks and positioning](assurance/ASSERTIVA_COMPETITIVE_BENCHMARK.md), [release readiness](assurance/RELEASE_READINESS.md).
+- Dogfood records: [DrawLab M10](dogfood/drawlab-m10/README.md); TCC and Derivanta Engine reports in [research/](../research/README.md).
 - [Eval Catalog](../evals/README.md)
 - [Eval Case Contract](../evals/CASE_SPEC.md)
 - `../schemas/assurance-report.schema.json` — the report contract (every top-level key the report emits).

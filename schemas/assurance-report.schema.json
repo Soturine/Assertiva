@@ -608,6 +608,24 @@
         }
       }
     },
+    "dependencies": {
+      "type": "object",
+      "description": "Present only with `audit --dependencies`: declared range, locked and installed versions, static usage and migration readiness per dependency; offline, nothing installed.",
+      "required": ["dependencies", "lockfiles", "vulnerabilities", "used_version", "note"],
+      "properties": {
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["ecosystem", "name", "declared_range", "locked", "installed", "lock_state", "install_state", "migration_readiness"]
+          }
+        },
+        "lockfiles": {"type": "array", "items": {"type": "string"}},
+        "vulnerabilities": {"type": "object", "required": ["status"]},
+        "used_version": {"type": "string"},
+        "note": {"type": "string"}
+      }
+    },
     "declared_checks": {
       "type": "array",
       "description": "Discovered checks reproduced on request (`audit --run-check`) in a disposable copy.",

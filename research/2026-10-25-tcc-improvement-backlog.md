@@ -54,3 +54,18 @@ See [the Android field report](2026-10-25-tcc-android-a1-a2-dogfood.md) and [the
 ## Release evidence required
 
 For each adopted item: failure reproduction before fix, real positive+negative fixture, old/new comparison on same commit, Windows/Linux if relevant, frozen external confirmation, declared support matrix updated, complete regression suite, no silently weakened tests, isolated engine execution, no new false HIGH, risk/UX tradeoff and CI SHA. Apply version label only when owner selects milestone and full qualification passes.
+
+## Derivanta Engine M0 extensions — 2026-10-29 (proposals, not implemented)
+
+See [the cross-dogfood field report](2026-10-29-derivanta-engine-cross-dogfood.md) and grader-ready scenarios [closure import safety](../evals/cases/ASSERTIVA_PACKAGE_CLOSURE_IMPORT_SIDE_EFFECT.md) and [test-source/oracle fidelity](../evals/cases/ASSERTIVA_SOURCE_TREE_AND_ORACLE_FALSE_GREEN.md). These items **extend** A01–A24 without replacing them. The Engine's fixes are not Assertiva implementation fixes.
+
+| ID / priority | Gap / action | Required acceptance evidence | Owner |
+|---|---|---|---|
+| **AX-E01 P1** | Package closure probe imports `__main__` and potentially other effectful modules; do not treat dynamic import as read-only metadata. | Controlled guarded/unguarded package pair; no unconsented program invocation in metadata check; honest UNKNOWN/BLOCKED for incomplete closure; Windows/Linux; execution isolation reviewed. | package qualification / execution security |
+| **AX-E02 P1** | No assurance that pytest native run exercised *this source tree* rather than stale installed wheel. | `src/` + stale site-packages negative control; module import origins; same mutant killed in source mode and not misattributed in wheel mode; clear revision/identity labels. | Python runner / provenance |
+| **AX-E03 P1** | Vacuous empty-subset oracle missed (`assert set() <= {1,2}`). | Missed and valid nonempty subset tests; defect-inducing negative controls; no blanket false positives. | test effectiveness |
+| **AX-E04 P1** | Patching the tested subject itself missed as mocked-away behavior. | Own-symbol patch vs legitimate dependency patch plus alias/helper controls; scope-aware finding, no unconditional mock prohibition. | test fidelity |
+| **AX-E05 P2** | Weak-oracle false positives for imported helpers, no-raise contracts and independent repeated calls. Extends **TCC-A05**; do not duplicate the owner. | Context-aware grader, positive/negative fixtures and holdout; retains real weak-oracle detection and reports unresolved helpers explicitly. | static oracles / semantic skill eval |
+| **AX-E06 P2** | Python `--provision` may not include optional test extras; failure to collect must not become an application defect. | Missing runtime vs dev fixture; preflight and proposed interpreter/provision steps, preserving consent and no automatic side-effectful install. | Python provisioning / docs |
+
+**Implementation order:** AX-E01 (security and correctness) then AX-E02 (provenance of green), AX-E03/E04 (known misses), AX-E05/E06 (calibration). Keep earlier TCC waves A01–A24 and all framework-neutral architecture constraints. **Not closed:** no Assertiva code changed, no independent re-run here, no CI at this PR SHA, no release commitment.

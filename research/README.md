@@ -35,3 +35,7 @@ When a mutable external tool changes, update or add a dated record instead of si
 - [TCC-driven improvement backlog](2026-10-25-tcc-improvement-backlog.md) — prioritized reproduction cases, acceptance criteria and independent confirmation requirements for CI path scoping, Node/PlatformIO, fidelity, mutation attribution and UI/HIL assurance.
 
 - [Segundo dogfood — Android Kotlin/Compose/Gradle](2026-10-25-tcc-android-a1-a2-dogfood.md) — análise das execuções 0.9.0 no TCC 0.10.0-dev.0, limites do Windows, falsos positivos em Compose, teste fraco confirmado, estado de emulador e mutação manual.
+
+## 2026-10-29 — Derivanta Engine M0 cross-dogfood
+
+- [Derivanta Engine / Assertiva 0.9.0 cross-dogfood](2026-10-29-derivanta-engine-cross-dogfood.md) — grounded audit A/B, source-tree false green, dependency-closure import side effects, oracle false positives/negatives and release gates. Findings are proposed, not implemented.

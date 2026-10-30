@@ -110,3 +110,8 @@ The engine's test-effectiveness candidates are leads; these cases check that the
 A guidance change validated on one case can fit that case's structure without changing the reasoning. These cases ask the same kind of question in another ecosystem and surface, with their own rubric written before any run.
 
 - [A green CI run on the same commit, with the integration tests outside it](cases/GREEN_CI_UNSELECTED_INTEGRATION.md)
+
+## 2026-10-29 — Derivanta Engine cross-dogfood cases (grader-ready, not executed)
+
+- [Package closure import side effects](cases/ASSERTIVA_PACKAGE_CLOSURE_IMPORT_SIDE_EFFECT.md) — distinguish metadata-only inspection from potentially effectful imports and false package-qualification confidence.
+- [Source tree and oracle false green](cases/ASSERTIVA_SOURCE_TREE_AND_ORACLE_FALSE_GREEN.md) — stale installed package, vacuous subset, self-patching and contextual assertions.

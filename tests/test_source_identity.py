@@ -80,3 +80,19 @@ def test_an_unwritable_temp_root_is_named_as_the_environment():
     assert any("temporary directory" in limitation and "not for the product" in limitation for limitation in run_.limitations)
     assert any("D:/other-venv/Lib/site-packages" in limitation for limitation in run_.limitations)  # AG-09
     assert run_.metadata["source_identity"]["status"] == "UNKNOWN"
+
+
+def test_a_submodule_served_from_another_tree_is_a_mismatch(tmp_path, capsys, assertiva_home, monkeypatch):
+    # ENG-02, found while benchmarking 0.9.0 against this branch: an editable install's finder served a submodule
+    # missing from the tested tree from another checkout; the package itself came from the tree, so a top-level check
+    # passed. Emulated with a __path__ extension, the mechanism such finders rely on.
+    other = tmp_path / "other-checkout"
+    write(other / "shop" / "fees.py", "def fee(amount):\n    return amount * 2\n")
+    monkeypatch.setenv("OTHER_SHOP", str(other / "shop"))
+    root = tmp_path / "p"
+    write(root / "src" / "shop" / "__init__.py", "import os\n__path__.append(os.environ['OTHER_SHOP'])\n")
+    write(root / "tests" / "test_fee.py", "from shop.fees import fee\n\ndef test_fee():\n    assert fee(10) == 20\n")
+    write(root / "pytest.ini", "[pytest]\npythonpath = src\n")
+    code, report = run(capsys, "audit", str(root), "--execute")
+    identity = native(report)["source_identity"]
+    assert identity["status"] == "MISMATCH" and identity["from_outside_the_copy"] == ["shop.fees"]

@@ -94,9 +94,11 @@ def pytest_sessionfinish(session):
 
     root = str(session.config.rootpath)
     imported = {}
-    for name in sorted(_project_names(root)):
-        module = sys.modules.get(name)
-        location = getattr(module, "__file__", None) if module is not None else None
+    names = _project_names(root)
+    # every loaded module of the project's packages, not only the top level: an import hook (an editable install's
+    # finder, a __path__ extension) can serve a submodule from another tree while the package itself comes from here
+    for name in sorted(n for n in list(sys.modules) if n.split(".")[0] in names)[:500]:
+        location = getattr(sys.modules.get(name), "__file__", None)
         if location:
             imported[name] = {"file": location, "inside_root": _inside(location, root)}
     temp = tempfile.gettempdir()

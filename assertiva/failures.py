@@ -27,7 +27,9 @@ _ENVIRONMENT = re.compile(
     r"Executable doesn't exist|browserType\.launch|command not found|is not recognized as an internal or external command|"
     r"Could not resolve host|Temporary failure in name resolution|SSL(?:Error|: CERTIFICATE)|"
     r"Unable to access jarfile|Could not find or load main class|Could not resolve dependencies|"
-    r"service .{0,40}(?:unavailable|not available)|Docker daemon|Cannot connect to the Docker", re.I)
+    r"service .{0,40}(?:unavailable|not available)|Docker daemon|Cannot connect to the Docker|"
+    # git with no repository: the code needs a checkout and the run's copy (Assertiva's disposable one too) has none
+    r"not a git repository|\['git',[^\]]*\]' returned non-zero exit status 128", re.I)
 _ASSERTION = re.compile(
     r"\bAssertionError\b|\bAssertionFailedError\b|\bComparisonFailure\b|\bAssertionFailure\b|expect\(received\)|"
     r"\bExpected\b[^\n]{0,80}\bReceived\b|\bexpected:?\s*<|\bto (?:be|equal|have|contain)\b|\bMismatch\b|"

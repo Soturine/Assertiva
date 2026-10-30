@@ -113,3 +113,16 @@ def test_windows_paths_keep_their_file_name_in_signatures_and_their_drive_in_sit
     assert "..pathlib" not in fingerprint(dotted)[1]
     assert raise_site(r"C:\venv\Lib\site-packages\_pytest\pathlib.py:175: PermissionError")[1] == \
         "C:/venv/Lib/site-packages/_pytest/pathlib.py:175"
+
+
+F07_GIT = ("    def revision():\n>       return subprocess.run(['git', 'rev-parse', 'HEAD'], check=True).stdout\n"
+           "src/ledgerlite/release.py:6: in revision\n"
+           "E   subprocess.CalledProcessError: Command '['git', 'rev-parse', 'HEAD']' returned non-zero exit status 128.\n"
+           "/usr/lib/python3.12/subprocess.py:571: CalledProcessError")
+
+
+def test_git_without_a_repository_is_the_environment_not_the_product():
+    # AG-01 as reproduced in the F07 fixture: the engine's copy has no .git, so a test that needs one fails there
+    assert origin(F07_GIT)[0] == INFRASTRUCTURE
+    other = F07_GIT.replace("exit status 128", "exit status 1")  # control: another git failure is not assumed environmental
+    assert origin(other)[0] == PRODUCT

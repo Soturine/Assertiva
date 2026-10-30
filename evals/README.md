@@ -105,3 +105,16 @@ The engine's test-effectiveness candidates are leads; these cases check that the
 A guidance change validated on one case can fit that case's structure without changing the reasoning. These cases ask the same kind of question in another ecosystem and surface, with their own rubric written before any run.
 
 - [A green CI run on the same commit, with the integration tests outside it](cases/GREEN_CI_UNSELECTED_INTEGRATION.md)
+
+## Dogfood: lottery-research project (DrawLab M10, 0.9.0)
+
+Found while auditing a private lottery-research project with 0.9.0 (synthetic scenarios; see [docs/dogfood/drawlab-m10](../docs/dogfood/drawlab-m10/README.md)): probability oracles, selection labels, matched nulls, full-ticket scope, CI that never started, the public/private boundary and an engine finding whose cause is the machine.
+
+- [A high prize rate read as profit](cases/DRAWLAB_BUDGET_PRIZE_VS_PROFIT.md)
+- [Independent-event formula for bets on one draw](cases/DRAWLAB_SHARED_DRAW_DEPENDENCE.md)
+- [A selected champion labelled prospective](cases/DRAWLAB_SELECTION_LEAKAGE.md)
+- [A matched null with less search freedom](cases/DRAWLAB_NULL_BUDGET_MISMATCH.md)
+- [Prize computed without the required auxiliary component](cases/DRAWLAB_FULL_TICKET_SCOPE.md)
+- [CI that never started read as green](cases/DRAWLAB_CI_ZERO_STEPS.md)
+- [Private audit artifacts headed for a public repository](cases/DRAWLAB_PRIVATE_PUBLIC_BOUNDARY.md)
+- [Engine finding repeated as fact; agent finding dropped](cases/DRAWLAB_ENGINE_VS_AGENT_DISAGREEMENT.md)

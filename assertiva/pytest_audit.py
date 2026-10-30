@@ -254,11 +254,13 @@ def _function_assertions(node: ast.FunctionDef | ast.AsyncFunctionDef, helpers: 
     return normalized or ("NO_ASSERTION",)
 
 
-def assertion_helpers(tree: ast.Module) -> dict[str | None, frozenset[str]]:
+def assertion_helpers(tree: ast.Module, path: Path | None = None, root: Path | None = None) -> dict[str | None, frozenset[str]]:
     """Non-test functions and methods of this module that assert (transitively), by scope.
 
     ``None`` holds module-level functions; each class name holds its methods plus those of its same-module bases.
-    Imported helpers are not followed (an `assert*`-named call still counts by its name)."""
+    With ``path`` and ``root``, helpers imported from the project's own modules are followed one level (AX-E05): an
+    imported function that asserts counts under the name the test calls it by; an unresolved import is not guessed
+    (an `assert*`-named call still counts by its name)."""
     module = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith("test")}
     classes = {n.name: n for n in tree.body if isinstance(n, ast.ClassDef)}
 
@@ -285,9 +287,94 @@ def assertion_helpers(tree: ast.Module) -> dict[str | None, frozenset[str]]:
             inherited.update(methods(base, seen | {name}))
         return {**inherited, **own}
 
+    imported = imported_assertion_helpers(tree, path, root) if path is not None and root is not None else frozenset()
+    scopes[None] = top | imported
     for name in classes:
-        scopes[name] = top | asserting(methods(name), top)
+        scopes[name] = top | imported | asserting(methods(name), top | imported)
     return scopes
+
+
+def _module_file(module: str, level: int, path: Path, root: Path) -> Path | None:
+    """The project file of an imported module (relative imports from the test's folder), or None."""
+    parts = module.split(".") if module else []
+    bases = [path.parent.joinpath(*[".."] * (level - 1))] if level else [root, root / "src", path.parent]
+    for base in bases:
+        target = base.joinpath(*parts)
+        for candidate in (target.with_suffix(".py"), target / "__init__.py"):
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            if candidate.is_file() and resolved.is_relative_to(root.resolve()):
+                return candidate
+    return None
+
+
+def _asserting_functions(file: Path) -> frozenset[str]:
+    try:
+        tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
+    except (SyntaxError, UnicodeDecodeError, OSError):
+        return frozenset()
+    return assertion_helpers(tree)[None]
+
+
+def imported_assertion_helpers(tree: ast.Module, path: Path, root: Path) -> frozenset[str]:
+    """Names, as the test module calls them, of imported project functions that assert: `from tests.helpers import
+    check` -> `check`; `from tests import helpers` or `import tests.helpers as helpers` -> `helpers.check`."""
+    names: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom):
+            source = _module_file(node.module or "", node.level, path, root)
+            found = _asserting_functions(source) if source else frozenset()
+            for alias in node.names:
+                if alias.name in found:
+                    names.add(alias.asname or alias.name)
+                else:  # `from tests import helpers`: a submodule
+                    sub_file = _module_file(".".join(filter(None, [node.module, alias.name])), node.level, path, root)
+                    names.update(f"{alias.asname or alias.name}.{fn}" for fn in (_asserting_functions(sub_file) if sub_file else ()))
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                source = _module_file(alias.name, 0, path, root)
+                prefix = alias.asname or alias.name
+                names.update(f"{prefix}.{fn}" for fn in (_asserting_functions(source) if source else ()))
+    return frozenset(names)
+
+
+_NO_RAISE_CONTEXTS = frozenset({"does_not_raise", "not_raises", "doesnt_raise"})
+
+
+def no_raise_contracts(tree: ast.Module) -> set:
+    """Test functions of this module that assert nothing yet state a no-exception contract (TCC-A05, AX-E05): an
+    explicit `with does_not_raise():` block, or a call to a function that a sibling test of the module expects to
+    raise (`pytest.raises` / `assertRaises`): the pair is accept-valid / reject-invalid. A test that only runs code
+    with no such pairing stays without an oracle."""
+    tests = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test")]
+    rejected: set[str] = set()
+    for test in tests:
+        for item in ast.walk(test):
+            blocks = []
+            if isinstance(item, (ast.With, ast.AsyncWith)) and any(_raises_call(w.context_expr) for w in item.items):
+                blocks = item.body
+            elif isinstance(item, ast.Call) and _raises_call(item):
+                blocks = [ast.Expr(a) for a in item.args[1:]]  # assertRaises(Error, func, *args): the callable
+            for statement in blocks:
+                for call in ast.walk(statement):
+                    if isinstance(call, ast.Call):
+                        rejected.add((_expr_name(call.func) or "").split(".")[-1])
+                    elif isinstance(call, (ast.Name, ast.Attribute)) and isinstance(statement, ast.Expr) and statement.value is call:
+                        rejected.add((_expr_name(call) or "").split(".")[-1])
+    rejected.discard("")
+    out = set()
+    for test in tests:
+        if _function_assertions(test) != ("NO_ASSERTION",):
+            continue
+        explicit = any(isinstance(i, (ast.With, ast.AsyncWith)) and any(
+            isinstance(w.context_expr, ast.Call) and (_expr_name(w.context_expr.func) or "").split(".")[-1] in _NO_RAISE_CONTEXTS
+            for w in i.items) for i in ast.walk(test))
+        called = {(_expr_name(c.func) or "").split(".")[-1] for c in ast.walk(test) if isinstance(c, ast.Call)}
+        if explicit or called & rejected:
+            out.add(test)
+    return out
 
 
 def _test_files(root: Path) -> list[Path]:
@@ -364,7 +451,7 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
         rel = str(path.relative_to(root)).replace("\\", "/")
         class_map = {node.name: node for node in tree.body if isinstance(node, ast.ClassDef)}
         kinds = classify_classes(tree)
-        helpers = assertion_helpers(tree)
+        helpers = assertion_helpers(tree, path, root)
         for class_name, class_node in class_map.items():
             prefix = _method_prefix(kinds[class_name])
             if prefix is None:
@@ -393,8 +480,10 @@ def discover_pytest_composition(root: str | Path) -> list[TestCompositionRelatio
 
 
 def _definition(node_id: str, rel: str, node: ast.FunctionDef | ast.AsyncFunctionDef,
-                helpers: frozenset[str] = frozenset()) -> TestDefinition:
+                helpers: frozenset[str] = frozenset(), no_raise: bool = False) -> TestDefinition:
     kinds = _function_assertions(node, helpers)
+    if kinds == ("NO_ASSERTION",) and no_raise:
+        kinds = ("NO_RAISE_CONTRACT",)
     dims, error_types, unobserved = negative_path_evidence(node)
     return TestDefinition(node_id, rel, node.name, kinds, all(kind in _WEAK for kind in kinds), dims, error_types, unobserved)
 
@@ -409,13 +498,14 @@ def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
             continue
         rel = str(path.relative_to(root)).replace("\\", "/")
         kinds = classify_classes(tree)
-        helpers = assertion_helpers(tree)
+        helpers = assertion_helpers(tree, path, root)
+        contracts = no_raise_contracts(tree)
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
-                out.append(_definition(f"{rel}::{node.name}", rel, node, helpers[None]))
+                out.append(_definition(f"{rel}::{node.name}", rel, node, helpers[None], node in contracts))
             elif isinstance(node, ast.ClassDef) and (prefix := _method_prefix(kinds[node.name])):
                 for name, child in _direct_test_methods(node, prefix).items():
-                    out.append(_definition(f"{rel}::{node.name}::{name}", rel, child, helpers[node.name]))
+                    out.append(_definition(f"{rel}::{node.name}::{name}", rel, child, helpers[node.name], child in contracts))
     return out
 
 

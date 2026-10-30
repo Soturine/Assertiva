@@ -319,14 +319,15 @@ def _conditional_only(clean_body: str, assertion: re.Pattern) -> bool:
 _PY_ORACLES = {"BEHAVIORAL_ASSERTION": "VALUE", "EXISTENCE_ONLY": "EXISTENCE", "HTTP_STATUS_ONLY": "STATUS_ONLY",
                "ERROR_STATUS_ONLY": "STATUS_ONLY", "BROAD_ERROR_EXPECTATION": "BROAD_ERROR", "EXPECTED_ERROR_CONTRACT": "SPECIFIC_ERROR",
                "INTERACTION_ASSERTION": "INTERACTION", "FORBIDDEN_CALL_GUARD": "GUARD", "HELPER_ASSERTION": "HELPER",
-               "EXPLICIT_FAIL": "VALUE", "EXPECTED_WARNING": "SPECIFIC_ERROR"}
+               "EXPLICIT_FAIL": "VALUE", "EXPECTED_WARNING": "SPECIFIC_ERROR",
+               "NO_RAISE_CONTRACT": "NO_RAISE"}
 _PY_NETWORK = ("requests", "httpx", "urllib", "urlopen", "socket", "smtplib", "boto", "aiohttp", "http.client")
 _PY_DB = (".objects", "session", "cursor", "database", ".db.", "repository")
 
 
 def _python_facts(root: Path) -> list[TestFacts]:
     from assertiva.adapters.python_test_classes import classify_classes
-    from assertiva.pytest_audit import _test_files, assertion_helpers
+    from assertiva.pytest_audit import _test_files, assertion_helpers, no_raise_contracts
 
     out = []
     for path in _test_files(root):
@@ -335,7 +336,8 @@ def _python_facts(root: Path) -> list[TestFacts]:
         except (SyntaxError, UnicodeDecodeError, OSError):
             continue
         rel = path.relative_to(root).as_posix()
-        helpers = assertion_helpers(tree)
+        helpers = assertion_helpers(tree, path, root)
+        contracts = no_raise_contracts(tree)
         kinds = classify_classes(tree)
         functions = []
         for node in tree.body:
@@ -346,14 +348,14 @@ def _python_facts(root: Path) -> list[TestFacts]:
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test"):
                         functions.append((f"{rel}::{node.name}::{child.name}", child, helpers.get(node.name, helpers[None])))
         for test_id, node, scope in functions:
-            out.append(_python_test(test_id, rel, node, scope))
+            out.append(_python_test(test_id, rel, node, scope, node in contracts))
     return out
 
 
-def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
+def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) -> TestFacts:
     from assertiva.pytest_audit import _function_assertions, _expr_name, negative_path_evidence
 
-    kinds = [k for k in _function_assertions(node, helpers) if k != "NO_ASSERTION"]
+    kinds = [k for k in _function_assertions(node, helpers) if k != "NO_ASSERTION"] or (["NO_RAISE_CONTRACT"] if no_raise else [])
     oracles = tuple(dict.fromkeys(_PY_ORACLES.get(k, "VALUE") for k in kinds))
     parents = {child: parent for parent in ast.walk(node) for child in ast.iter_child_nodes(parent)}
     asserts, signature, doubles, smells = [], [], [], []
@@ -374,15 +376,17 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
                 smells.append("TAUTOLOGY")
             if isinstance(item.test, ast.Tuple) and item.test.elts:  # `assert (check, "message")`: a non-empty tuple is always true
                 smells.append("TAUTOLOGY")
-            if isinstance(item.test, ast.Compare) and len(item.test.comparators) == 1 and ast.dump(item.test.left) == ast.dump(item.test.comparators[0]):
+            if isinstance(item.test, ast.Compare) and len(item.test.comparators) == 1 and _same_value(item.test.left, item.test.comparators[0]):
                 smells.append("TAUTOLOGY")
+            if _vacuous(item.test):
+                smells.append("VACUOUS_ASSERTION")
         elif isinstance(item, ast.Call):
             name = _expr_name(item.func) or ""
             leaf = name.split(".")[-1]
             if leaf.startswith("assert") and name.startswith("self."):
                 asserts.append(item)
                 signature.append(ast.unparse(item))
-                if len(item.args) == 2 and ast.dump(item.args[0]) == ast.dump(item.args[1]):
+                if len(item.args) == 2 and _same_value(item.args[0], item.args[1]):
                     smells.append("TAUTOLOGY")
                 if leaf in ("assertTrue",) and item.args and isinstance(item.args[0], ast.Constant):
                     smells.append("TAUTOLOGY")
@@ -442,10 +446,13 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
         for handler in item.handlers:
             ignores = all(isinstance(s, (ast.Pass, ast.Continue)) or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
                           for s in handler.body)
-            if ignores and (inside or not outside):
+            if ignores and (inside or not outside) and not _expects_error(item, handler):
                 smells.append("SWALLOWED_EXCEPTION")
-    if asserts and all(any(isinstance(p, ast.If) and not _checks(p.orelse) for p in _ancestors(a, parents, node)) for a in asserts):
+    if asserts and all(any(isinstance(p, ast.If) and not _checks(p.orelse) and not _condition_holds(p, parents, node)
+                           for p in _ancestors(a, parents, node)) for a in asserts):
         smells.append("CONDITIONAL_ASSERTION")
+    if _mocks_subject(node):
+        smells.append("MOCKED_SUBJECT")
     _, _, unobserved = negative_path_evidence(node)
     if unobserved:
         smells.append("UNAWAITED_ASYNC")
@@ -455,6 +462,8 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
         smells.append("SNAPSHOT_ONLY")
     if not oracles and "BROWSER" in boundaries and re.search(r"\.click\(", ast.unparse(node)):
         smells.append("ACTION_WITHOUT_CHECK")
+    if asserts and all(_determinism(a) for a in asserts) and set(oracles) <= {"VALUE"}:
+        oracles = ("DETERMINISM",)  # every check compares a call with the same call: falsifiable, but only by nondeterminism
     markers = " ".join(ast.unparse(d) for d in getattr(node, "decorator_list", []))
     parameters, expressions = _python_rows(node, _expr_name)
     return TestFacts(test_id=test_id, path=rel, language="python", oracles=oracles, assertions=len(asserts), doubles=tuple(doubles),
@@ -463,6 +472,134 @@ def _python_test(test_id: str, rel: str, node, helpers) -> TestFacts:
                      rungs=_rungs(ast.unparse(node), boundaries, simulated),
                      oracle_signature=" ; ".join(sorted(_norm(s) for s in signature)), parameters=tuple(parameters),
                      parameter_expressions=tuple(expressions), body_signature=_python_body(node))
+
+
+def _same_value(left, right) -> bool:
+    """Both sides are the same expression and evaluating it twice cannot differ: a name, an attribute, a literal. A call
+    compared with the same call (`render(a) == render(a)`) runs the code twice: a determinism check, weak but falsifiable."""
+    return ast.dump(left) == ast.dump(right) and not any(isinstance(n, (ast.Call, ast.Await, ast.Yield)) for n in ast.walk(left))
+
+
+def _determinism(check) -> bool:
+    """`assert f(x) == f(x)` / `self.assertEqual(f(x), f(x))`: the same call on both sides."""
+    if isinstance(check, ast.Assert):
+        test = check.test
+        pair = (test.left, test.comparators[0]) if isinstance(test, ast.Compare) and len(test.comparators) == 1 else None
+    else:
+        pair = tuple(check.args) if len(check.args) == 2 else None
+    return bool(pair) and ast.dump(pair[0]) == ast.dump(pair[1]) and any(isinstance(n, ast.Call) for n in ast.walk(pair[0]))
+
+
+_EMPTY_FACTORIES = frozenset({"set", "frozenset", "list", "tuple", "dict"})
+
+
+def _empty(node) -> bool:
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)) and not node.elts or isinstance(node, ast.Dict) and not node.keys:
+        return True
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _EMPTY_FACTORIES
+            and not node.args and not node.keywords)
+
+
+def _vacuous(test) -> bool:
+    """An assertion that holds for any code: an empty collection is a subset of everything (`set() <= x`,
+    `frozenset().issubset(x)`)."""
+    if isinstance(test, ast.Compare) and len(test.ops) == 1 and isinstance(test.ops[0], ast.LtE) and _empty(test.left):
+        return True
+    return (isinstance(test, ast.Call) and isinstance(test.func, ast.Attribute) and test.func.attr == "issubset"
+            and _empty(test.func.value))
+
+
+_ASSERTION_ERRORS = frozenset({"AssertionError", "Exception", "BaseException"})
+
+
+def _expects_error(try_node, handler) -> bool:
+    """`try: f(); assert False; except ValueError: pass`: the try ends in an unconditional failure and the handler does
+    not catch AssertionError, so the test fails when f() does not raise. It is pytest.raises written by hand."""
+    from assertiva.pytest_audit import _expr_name
+
+    if handler.type is None:
+        return False
+    caught = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+    if any((_expr_name(t) or "").split(".")[-1] in _ASSERTION_ERRORS for t in caught):
+        return False
+    last = try_node.body[-1] if try_node.body else None
+    if isinstance(last, ast.Assert):
+        return isinstance(last.test, ast.Constant) and not last.test.value
+    if isinstance(last, ast.Raise) and last.exc is not None:
+        target = last.exc.func if isinstance(last.exc, ast.Call) else last.exc
+        return (_expr_name(target) or "").split(".")[-1] == "AssertionError"
+    if isinstance(last, ast.Expr) and isinstance(last.value, ast.Call):
+        return (_expr_name(last.value.func) or "") in {"pytest.fail", "self.fail", "fail"}
+    return False
+
+
+_LOOP_LIMIT = 10_000
+_DECIDABLE = (ast.Expression, ast.Compare, ast.BinOp, ast.BoolOp, ast.UnaryOp, ast.Name, ast.Constant, ast.Load,
+              ast.operator, ast.cmpop, ast.boolop, ast.unaryop)
+
+
+def _condition_holds(if_node, parents, stop) -> bool:
+    """Whether an `if` inside `for i in range(<literals>)` tests only the loop variable and literals, and holds for at
+    least one value: then its assertions run on every execution of the test, whatever the data."""
+    loop = next((p for p in _ancestors(if_node, parents, stop) if isinstance(p, ast.For)), None)
+    if loop is None or not isinstance(loop.target, ast.Name) or not isinstance(loop.iter, ast.Call):
+        return False
+    if not (isinstance(loop.iter.func, ast.Name) and loop.iter.func.id == "range" and not loop.iter.keywords):
+        return False
+    try:
+        values = range(*[ast.literal_eval(a) for a in loop.iter.args])
+    except (ValueError, TypeError, SyntaxError):
+        return False
+    test = ast.Expression(body=if_node.test)
+    if len(values) > _LOOP_LIMIT or not all(isinstance(n, _DECIDABLE) for n in ast.walk(test)):
+        return False
+    if any(isinstance(n, ast.Name) and n.id != loop.target.id for n in ast.walk(test)):
+        return False
+    code = compile(ast.fix_missing_locations(test), "<condition>", "eval")  # only the loop variable, literals, operators
+    try:
+        return any(eval(code, {"__builtins__": {}}, {loop.target.id: v}) for v in values)  # noqa: S307
+    except (ArithmeticError, TypeError, ValueError):
+        return False
+
+
+def _patch_targets(node) -> set[tuple[str, str]]:
+    """(owner, attribute) of every patch in a test: `patch("a.b.f")`, `patch.object(X, "f")`, `monkeypatch.setattr`."""
+    from assertiva.pytest_audit import _expr_name
+
+    targets = set()
+    for item in ast.walk(node):
+        if not isinstance(item, ast.Call) or not item.args:
+            continue
+        name = _expr_name(item.func) or ""
+        leaf, first = name.split(".")[-1], item.args[0]
+        dotted = first.value if isinstance(first, ast.Constant) and isinstance(first.value, str) and "." in first.value else None
+        if leaf in ("patch", "setattr") and dotted:
+            owner, _, attr = dotted.rpartition(".")
+            targets.add((owner, attr))
+        elif (name.endswith("patch.object") or leaf == "setattr") and len(item.args) >= 2 \
+                and isinstance(item.args[1], ast.Constant) and isinstance(item.args[1].value, str):
+            targets.add((ast.unparse(first), item.args[1].value))
+    return targets
+
+
+def _mocks_subject(node) -> bool:
+    """A test that patches a function and then calls that same function through the patched name and checks it: the
+    double answers, so the test verifies the double, not the code (`patch("shop.pricing.discount")` and then
+    `assert pricing.discount(100) == 90`). Patching a dependency of the function called is legitimate; a call through a
+    name imported before the patch reaches the original and is not counted."""
+    from assertiva.pytest_audit import _expr_name
+
+    targets = _patch_targets(node)
+    if not targets:
+        return False
+    checked = [n for n in ast.walk(node) if isinstance(n, ast.Assert)] + [
+        n for n in ast.walk(node) if isinstance(n, ast.Call) and (_expr_name(n.func) or "").startswith("self.assert")]
+    for check in checked:
+        for call in (n for n in ast.walk(check) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)):
+            base = ast.unparse(call.func.value)
+            if any(call.func.attr == attr and (base == owner or owner.endswith("." + base)) for owner, attr in targets):
+                return True
+    return False
 
 
 def _python_rows(node, expr_name) -> tuple[list[str], list[str]]:
@@ -729,6 +866,11 @@ _JVM_ORACLES = [
     (re.compile(r"\b(verify|coVerify|verifyNoInteractions|verifyNoMoreInteractions|confirmVerified)\b"), "INTERACTION"),
     (re.compile(r"\bassertEquals\s*\(\s*\d{3}\s*,\s*[\w.()]*status\w*(\(\))?\s*\)|\bstatus\(\)\s*\.\s*is\w+\(\s*\)|"
                 r"status(Code)?(\(\))?\s*\)?\s*\.isEqualTo\(\s*\d{3}\s*\)|status(Code)?\s+shouldBe\s+\d{3}"), "STATUS_ONLY"),
+    # Compose UI test: a node found by its text or tag, then checked for state, count or absence, pins behavior
+    (re.compile(r"\.assert(?:IsEnabled|IsNotEnabled|IsOn|IsOff|IsSelected|IsNotSelected|IsSelectable|IsToggleable|IsFocused|"
+                r"IsNotFocused|HasClickAction|HasNoClickAction)\(\)"), "STATE"),
+    (re.compile(r"\.assert(?:CountEquals|TextEquals|TextContains|ContentDescriptionEquals|ContentDescriptionContains|"
+                r"ValueEquals|RangeInfoEquals)\(|\.assertDoesNotExist\(\)|\.assertIsNotDisplayed\(\)|\.assert\(\s*has\w+\("), "VALUE"),
     (re.compile(r"\bassertNotNull\b|\.isNotNull\(\)|shouldNotBeNull|assertExists\(\)|assertIsDisplayed\(\)|matches\(\s*isDisplayed\(\)\)"), "EXISTENCE"),
     (re.compile(r"\bassert(True|False)\s*\([^)]*(!=|==)\s*null|\bassert(True|False)\s*\(\s*null\s*(!=|==)"), "EXISTENCE"),
     # a predicate's boolean result checked exactly (assertTrue(accepts(x))) pins a value, like `assert accepts(x)`

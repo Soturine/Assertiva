@@ -589,7 +589,8 @@ def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(t
     facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
     for name in ("test_through_a_name", "test_unittest"):
         assert "SELF_REFERENTIAL_ORACLE" in facts[name].smells, name
-    assert "TAUTOLOGY" in facts["test_inline"].smells  # the direct form was already a tautology; not counted twice
+    # AG-05 / AX-E05 (0.10.0): the same call on both sides runs the code twice: a weak determinism oracle, not a tautology
+    assert "TAUTOLOGY" not in facts["test_inline"].smells and facts["test_inline"].oracles == ("DETERMINISM",)
     for name in ("test_inline", "test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
         assert "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name
 

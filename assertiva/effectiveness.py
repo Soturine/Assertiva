@@ -15,7 +15,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
-WEAK_ORACLES = frozenset({"EXISTENCE", "TRUTHY", "STATUS_ONLY", "BROAD_ERROR"})
+# DETERMINISM: a call compared with the same call fails only if the code is nondeterministic, never on a wrong value
+WEAK_ORACLES = frozenset({"EXISTENCE", "TRUTHY", "STATUS_ONLY", "BROAD_ERROR", "DETERMINISM"})
 STRONG_ORACLES = frozenset({"VALUE", "SPECIFIC_ERROR", "INTERACTION", "GUARD", "HELPER", "STATE"})
 FALSE_GREEN_SMELLS = {
     "SWALLOWED_EXCEPTION": "an exception is caught and ignored, so the test passes whether or not the code fails",
@@ -26,6 +27,8 @@ FALSE_GREEN_SMELLS = {
     "SNAPSHOT_ONLY": "the only oracle is a snapshot, which an update accepts without review",
     "NO_OP_ASSERTION": "a mock check is referenced but never called, or misspelled so that the mock answers it with a new "
                        "attribute: it checks nothing",
+    "VACUOUS_ASSERTION": "the assertion holds for any code: an empty collection is a subset of everything",
+    "MOCKED_SUBJECT": "the test replaces the function it then calls and checks: the double answers, not the code under test",
     "SELF_REFERENTIAL_ORACLE": "the expected value is computed by the same call as the actual one: the test passes whatever "
                                "the code returns",
 }

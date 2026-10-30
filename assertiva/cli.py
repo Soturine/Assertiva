@@ -317,6 +317,12 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--run-check", action="append", metavar="CHECK_ID", help="authorize running a discovered delivery check in the candidate copy")
     improve.add_argument("--discard", action="store_true", help="drop the candidate session without touching the project")
     improve.set_defaults(handler=_improve)
+    exp = sub.add_parser("explain", help="one test's chain of evidence from the last audit (never re-runs anything)")
+    exp.add_argument("root", nargs="?", default=".")
+    exp.add_argument("--test", required=True, help="the test's id or its unique ending (file::name or name)")
+    exp.add_argument("--report-dir", help="where the audit report was written (default: ASSERTIVA_HOME)")
+    exp.add_argument("--output", choices=("text", "json"), default="text")
+    exp.set_defaults(handler=_explain)
     port = sub.add_parser("portfolio", help="registry of audited projects, their audits over time, and feedback about Assertiva")
     port.add_argument("--output", choices=("text", "json"), default="text")
     acts = port.add_subparsers(dest="action", required=True)
@@ -354,6 +360,24 @@ def _parser() -> argparse.ArgumentParser:
     p_disc.add_argument("--owner", required=True)
     port.set_defaults(handler=_portfolio, root=".")
     return parser
+
+
+def _explain(args: argparse.Namespace) -> int:
+    from .explain import explain
+
+    root = Path(args.root).resolve()
+    chain = explain(root, args.test, _report_dir(root, args.report_dir) if args.report_dir else None)
+    lines = [f"{chain['test']}",
+             *([f"  scope: {chain['scope']}"] if chain.get("scope") else []),
+             *([f"  oracle: {', '.join(chain['oracle']['kinds']) or 'none'}; smells: {', '.join(chain['oracle']['smells']) or 'none'}"]
+               if chain.get("oracle") else []),
+             *[f"  ran: {e['adapter']} ({e['provenance']}, code {e['code_identity']}): {', '.join(sorted(set(e['outcomes'].values())))}"
+               for e in chain["executed"]],
+             *[f"  mutation: {m['tool']} ({m['provenance']}): detected {m['detected']}" for m in chain["mutation"]],
+             *[f"  candidate: {c['kind']}: {c['summary']}" for c in chain["candidates"]],
+             *[f"  not observed: {n}" for n in chain["not_observed"]], *[f"  unknown: {u}" for u in chain["unknowns"]]]
+    _emit(chain, args.output, lines)
+    return 0
 
 
 def _portfolio(args: argparse.Namespace) -> int:

@@ -98,6 +98,8 @@ def state_summary(state: StateEvidence | None) -> dict | None:
                 # what the run really used: the copy of the code it imported, its temp root, its interpreter, its limits
                 "source_identity": run.metadata.get("source_identity"), "temp_root": run.metadata.get("temp_root"),
                 "interpreter": run.metadata.get("interpreter"), "limits": run.metadata.get("limits"),
+                # each invocation's outcome, so one test's evidence can be read back (assertiva explain)
+                "outcomes_by_invocation": {inv.invocation_id: inv.outcome.value for inv in run.invocations if inv.outcome is not None},
             }
             for run in state.runs
         ],
@@ -125,6 +127,15 @@ def survivor_sites(run, limit: int = 20) -> list[dict]:
     return out
 
 
+def _kills_by_test(run) -> dict[str, int]:
+    """How many mutants each named test detected (a tool usually names only the first killer: see killers_complete)."""
+    kills: dict[str, int] = {}
+    for mutant in run.mutants:
+        for test in mutant.killed_by:
+            kills[test] = kills.get(test, 0) + 1
+    return kills
+
+
 def _mutation_summary(run) -> dict:
     return {
         "tool": run.tool, "tool_version": run.tool_version, "source": run.source, "error": run.error,
@@ -134,6 +145,7 @@ def _mutation_summary(run) -> dict:
         # where the evidence came from and how much it can decide
         "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,
         "provenance": run.provenance or ("ENGINE_EXECUTED" if run.orchestrated else "EXTERNAL_TOOL_REPORT"),
+        "kills_by_test": _kills_by_test(run),
         "reused": run.reused, "incremental": run.incremental, "finished": run.finished, "config": dict(run.config), "inputs_digest": run.inputs_digest,
         "limitations": list(run.limitations),
     }

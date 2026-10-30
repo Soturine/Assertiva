@@ -113,3 +113,12 @@ Every audit reads each test in every language it supports (Python by syntax tree
 4. `--discard` drops the candidate without touching the project.
 
 Qualification has five pillars — execution, behavioral assurance, fault sensitivity, delivery fidelity, stability and cost. A check that did not run never passes a pillar; read the remaining unknowns before calling a candidate ready.
+
+## 0.10.0 additions
+
+- `--timeout-s SECONDS` (audit, improve): the per-run limit for this audit only; it wins over the project's `[tests] timeout_s` and is recorded per run (`execution_manifest.runs[].limits`, `execution_manifest.comparison`). Use it instead of editing the project's `.assertiva.toml`.
+- `--mutate FILE --mutate-tests PATH` (Cosmic Ray): the baseline and every mutant run only the named tests; the run records `config.test_selection` with `whole_suite: NOT_RUN`. Use it when an unrelated test is red or the whole suite is too long; say the result covers those tests.
+- `--dependencies`: declared range, locked and installed versions, static usage and migration readiness (at most READY_WITH_GAPS); vulnerabilities are UNKNOWN (not looked up).
+- `assertiva explain ROOT --test ID`: one test's chain of evidence from the last audit (oracle, what ran it and on which copy of the code, mutants it detected, unknowns); nothing re-runs.
+- `assertiva portfolio …`: a local registry of the projects you audit (`add`, `list`, `audit`, `report`), and `feedback`/`move` for issues of Assertiva itself, kept apart from project findings. Use `feedback` for a false positive or a miss of the engine with a synthetic reproducer; never copy the project's code into it.
+- Each pytest run records `source_identity` (where the project's modules were imported from), `temp_root` and `interpreter.borrowed_site_dirs`; read them before trusting a green run.

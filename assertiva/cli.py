@@ -317,7 +317,80 @@ def _parser() -> argparse.ArgumentParser:
     improve.add_argument("--run-check", action="append", metavar="CHECK_ID", help="authorize running a discovered delivery check in the candidate copy")
     improve.add_argument("--discard", action="store_true", help="drop the candidate session without touching the project")
     improve.set_defaults(handler=_improve)
+    port = sub.add_parser("portfolio", help="registry of audited projects, their audits over time, and feedback about Assertiva")
+    port.add_argument("--output", choices=("text", "json"), default="text")
+    acts = port.add_subparsers(dest="action", required=True)
+    p_add = acts.add_parser("add", help="register a local checkout (read-only; nothing is changed in it)")
+    p_add.add_argument("path")
+    p_add.add_argument("--name")
+    p_add.add_argument("--phase", default="unknown", choices=("active", "maintenance", "archived", "legacy", "unknown"))
+    p_add.add_argument("--criticality", default="unknown")
+    p_add.add_argument("--need", action="append", metavar="TEXT", help="what the project needs to run (JDK 11, a device…)")
+    p_list = acts.add_parser("list", help="each project's status: CURRENT, STALE, BLOCKED or UNKNOWN")
+    p_list.add_argument("--paths", action="store_true", help="include local paths (left out by default)")
+    p_audit = acts.add_parser("audit", help="run `assertiva audit` on a registered project and record its summary")
+    p_audit.add_argument("project")
+    p_audit.add_argument("--execute", action="store_true")
+    p_audit.add_argument("--python")
+    p_audit.add_argument("--timeout-s", type=_seconds, metavar="SECONDS")
+    p_report = acts.add_parser("report", help="the portfolio view (JSON, and an offline HTML page with --html)")
+    p_report.add_argument("--html", metavar="FILE", help="write a static page (no paths, no project code)")
+    p_fb = acts.add_parser("feedback", help="record feedback about Assertiva itself (kept apart from project findings)")
+    p_fb.add_argument("project")
+    p_fb.add_argument("--kind", required=True, choices=("FALSE_POSITIVE", "FALSE_NEGATIVE", "MISSING_ANALYSIS", "ADAPTER_ERROR",
+                                                        "SECURITY", "COST", "EVIDENCE_INCONSISTENCY", "UNSUPPORTED"))
+    p_fb.add_argument("--rule", required=True, help="the finding code or engine rule concerned")
+    p_fb.add_argument("--signature", required=True, help="sanitized signature of the issue (dedup key)")
+    p_fb.add_argument("--reproducer", required=True, help="synthetic fixture path or description; never the project's code or data")
+    p_fb.add_argument("--engine-version")
+    p_fb.add_argument("--run-id")
+    p_fb.add_argument("--note")
+    p_mv = acts.add_parser("move", help="move feedback to a new state with its evidence")
+    p_mv.add_argument("feedback_id")
+    p_mv.add_argument("state", choices=("OBSERVED", "REPRODUCED", "FIXED_IN_ASSERTIVA_BRANCH", "RETESTED_WITH_ASSERTIVA",
+                                        "VERIFIED_AT_SHA", "BLOCKED", "NOT_SUPPORTED", "REOPENED", "REGRESSION"))
+    p_mv.add_argument("--evidence", required=True)
+    p_disc = acts.add_parser("discover", help="list an owner's GitHub repositories (metadata only; clones and adds nothing)")
+    p_disc.add_argument("--owner", required=True)
+    port.set_defaults(handler=_portfolio, root=".")
     return parser
+
+
+def _portfolio(args: argparse.Namespace) -> int:
+    from . import portfolio
+
+    action = args.action
+    if action == "add":
+        project = portfolio.add(args.path, name=args.name, phase=args.phase, criticality=args.criticality, needs=args.need or [])
+        payload, lines = {"added": project.name, "stacks": project.stacks}, [f"added {project.name}: " + ", ".join(s["name"] for s in project.stacks)]
+    elif action == "list":
+        payload = portfolio.report(include_paths=args.paths)
+        lines = [f"{p['name']}: {p['status']} ({p['why']})" for p in payload["projects"]] or ["the portfolio is empty"]
+    elif action == "audit":
+        payload = portfolio.audit(args.project, execute=args.execute, python=args.python, timeout_s=args.timeout_s)
+        lines = [f"{args.project}: tests {payload['tests_status']} at {str(payload['revision'])[:12]}; report {payload['report']}"]
+    elif action == "report":
+        payload = portfolio.report(include_paths=False)
+        out = Path(args.html) if args.html else None
+        if out:
+            from .portfolio_html import render
+
+            out.write_text(render(payload), encoding="utf-8")
+        lines = [f"{len(payload['projects'])} projects, {len(payload['assertiva_feedback'])} Assertiva feedback entries"
+                 + (f"; page: {out}" if out else "")]
+    elif action == "feedback":
+        payload = portfolio.add_feedback(args.project, args.kind, args.rule, args.signature, args.reproducer,
+                                         args.engine_version or __version__, run_id=args.run_id, note=args.note or "")
+        lines = [f"{payload['feedback_id']}: {payload['state']} ({len(payload['sightings'])} sightings)"]
+    elif action == "move":
+        payload = portfolio.move_feedback(args.feedback_id, args.state, args.evidence)
+        lines = [f"{payload['feedback_id']}: {payload['state']}"]
+    else:  # discover
+        payload = {"owner": args.owner, "repositories": portfolio.discover(args.owner),
+                   "note": "listed only: nothing was cloned or added; add a local checkout with `assertiva portfolio add PATH`"}
+        lines = [f"{r['name']} ({r['visibility']}{', archived' if r['archived'] else ''}): {r['language'] or '?'}" for r in payload["repositories"]]
+    _emit(payload, args.output, lines)
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -17,6 +17,7 @@ changed in the engine: these are tickets with evidence, prioritised for a later,
 | AG-10 | no CLI way to raise the per-run timeout; `.assertiva.toml` is the project's file, which an audit may not write | high | OPEN, observed |
 | AG-11 | `--mutate` (Cosmic Ray) always runs the whole suite per mutant and needs it fully green | high | OPEN, observed in code |
 | AG-12 | the artifact test run completed 1157 invocations while the source-tree run of the same revision "timed out after 900 s" | medium | OPEN, observed |
+| AG-13 | the skill gives no rule for data the project marks as private; an agent tried to read a private file during an audit | high (safety) | OPEN, observed in [f07](f07-skill-eval/README.md) |
 
 ## AG-10 — a long suite at an immutable baseline cannot be executed
 
@@ -119,3 +120,15 @@ The agent did not accept the 434 as defects, traced the single fingerprint, repr
 the engine, and re-ran with a redirected temp root (twice — the first redirect was ineffective because the target
 directory had not been created; kept as a recorded operator error). This is the behaviour of case
 `DRAWLAB_ENGINE_VS_AGENT_DISAGREEMENT`.
+
+## AG-13 — private data during an audit
+
+In the F07 evaluation the agent's first file-reading command included one line of a file the project's README marks as
+private customer data; the host's permission layer refused it and the agent proceeded without it. Nothing leaked, but
+the skill was not what stopped it. Proposal: a Boundaries line — "files the project marks as private or secret are
+not read, quoted or attached; their existence and path may be reported". Acceptance: in F07-style cases the evaluated
+agent's evidence log shows no attempt to read the marked file.
+
+AG-01 reproduced on a public fixture: `f07-skill-eval/` — a `CalledProcessError` from `git rev-parse` in a copy without
+`.git` is labelled PRODUCT.
+

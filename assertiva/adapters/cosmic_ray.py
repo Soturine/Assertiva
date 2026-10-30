@@ -73,8 +73,11 @@ def describe(root: Path, python: str, origin: Path) -> dict:
             "why": f"Python tests run by {', '.join(runners)}" if runners else "no Python tests under a supported runner"}
 
 
+SELECTS_TESTS = True  # the baseline and every mutant can run only the tests the auditor names (--mutate-tests)
+
+
 def execute(state_root: Path, python: str, targets: list[str], origin: Path, option: dict) -> MutationRun:
-    return run(state_root, python, targets, test_paths=[], runner=option["runner"])
+    return run(state_root, python, targets, test_paths=list(option.get("tests") or []), runner=option["runner"])
 
 
 def run(state_root: str | Path, python: str, targets: list[str], test_paths: list[str], runner: str = "pytest-native",
@@ -111,13 +114,20 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
             if runner not in _COMMANDS:
                 result.error = f"{TOOL} cannot run the {runner} runner"
                 return result
-            test_command = [_posix(python), *_COMMANDS[runner], *test_paths]
+            test_command = [_posix(python), *_COMMANDS[runner], *[_posix(t) for t in test_paths]]
             baseline = run_command(test_command, copy, timeout_s=budget_s)
+            scope = "the selected tests" if test_paths else "the tests"
             if not baseline.ok:
-                result.error = f"the tests do not pass on this state before mutation ({baseline.summary()}); no mutant was run"
+                result.error = f"{scope} do not pass on this state before mutation ({baseline.summary()}); no mutant was run"
                 return result
+            if test_paths:  # AG-11: the auditor's selection, kept with the run; never presented as the whole suite
+                result.config["test_selection"] = {"tests": list(test_paths), "baseline": "the selected tests passed",
+                                                   "baseline_duration_s": baseline.duration_s, "whole_suite": "NOT_RUN"}
+                result.limitations.append(
+                    "only the selected tests ran for each mutant (" + ", ".join(test_paths[:5]) + "): a survivor may be "
+                    "killed by a test outside the selection, and the rest of the suite was not run for this analysis")
             config, db = tmp / "mutation.toml", tmp / "session.sqlite"
-            result.config = {"timeout_s": float(timeout_s), "test_command": [_posix(part) for part in test_command[1:]],
+            result.config = {**result.config, "timeout_s": float(timeout_s), "test_command": [_posix(part) for part in test_command[1:]],
                              "distributor": "local", "operators": "Cosmic Ray defaults", "max_mutants": MAX_MUTANTS,
                              "runner": runner}
             config.write_text(

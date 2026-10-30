@@ -85,6 +85,8 @@ def _attach(root: Path, directory: Path, args: argparse.Namespace) -> int:
 
 def _audit(args: argparse.Namespace) -> int:
     root = Path(args.root).resolve()
+    if args.mutate_tests and not args.mutate:
+        raise UsageError("--mutate-tests selects the tests for --mutate; name the files to mutate with --mutate")
     directory = _report_dir(root, args.report_dir)
     if args.assessment:
         return _attach(root, directory, args)
@@ -94,7 +96,7 @@ def _audit(args: argparse.Namespace) -> int:
                        export_ctrf=args.ctrf,
                        ci_runs=args.ci_run or [], provision=args.provision,
                        run_checks=args.run_check or [], mutation_targets=args.mutate or [],
-                       mutation_tool=args.mutation_tool)
+                       mutation_tool=args.mutation_tool, mutation_tests=args.mutate_tests or [])
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -273,6 +275,9 @@ def _parser() -> argparse.ArgumentParser:
                        help="with --execute: run the project's native mutation tool on FILE in a disposable copy (repeatable; "
                             "Cosmic Ray for Python tests under pytest, unittest or Django; StrykerJS for Jest or Vitest; "
                             "PIT for a Maven build that declares it; each installed in the project, never by Assertiva)")
+    audit.add_argument("--mutate-tests", action="append", metavar="PATH",
+                       help="with --mutate: run only these tests (files or folders) for the baseline and each mutant; the "
+                            "run records the selection and never claims the whole suite (repeatable; Cosmic Ray)")
     audit.add_argument("--mutation-tool", choices=["cosmic-ray", "stryker", "pit"],
                        help="with --mutate: the mutation tool to use when several apply to the project")
     audit.add_argument("--ctrf", action="store_true",

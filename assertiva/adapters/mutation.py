@@ -218,7 +218,7 @@ def mutation_tools(root: str | Path, python: str, origin: str | Path | None = No
 
 
 def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], tool: str | None = None,
-                      origin: str | Path | None = None) -> MutationRun:
+                      origin: str | Path | None = None, tests: list[str] | None = None) -> MutationRun:
     """Run one native mutation tool on a copy of ``state_root``: the one the user names, otherwise the only one that
     applies. Several applicable tools need the user's choice; a tool that does not apply or cannot run gives an
     explained error, never a result. Tools are never all run, and a missing tool is never a pass."""
@@ -238,6 +238,16 @@ def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], t
     chosen = applicable[0]
     if chosen["blocked"]:
         return MutationRun(source="mutation tool", tool=chosen["name"], error=chosen["blocked"])
+    if tests:
+        adapter = adapters[chosen["tool"]]
+        if not getattr(adapter, "SELECTS_TESTS", False):
+            return MutationRun(source="mutation tool", tool=chosen["name"],
+                               error=f"{chosen['name']} cannot be limited to selected tests here; run without --mutate-tests")
+        bad = {t: why for t in tests if (why := unsafe_test_path(Path(state_root), t))}
+        if bad:
+            return MutationRun(source="mutation tool", tool=chosen["name"], error="selected tests must be files or folders "
+                               "inside the project, reached without links: " + "; ".join(f"{t}: {w}" for t, w in bad.items()))
+        chosen = {**chosen, "tests": list(tests)}
     try:
         run = adapters[chosen["tool"]].execute(Path(state_root), python, list(targets), Path(origin or state_root), chosen)
     except OSError as exc:  # the copy could not be made or read (a path too long, a file in use): nothing was concluded
@@ -246,6 +256,21 @@ def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], t
     run.config = {**run.config, "selected": chosen["tool"],
                   "selected_because": chosen["why"] + (" (named by the user)" if tool else "")}
     return run
+
+
+def unsafe_test_path(root: Path, test: str) -> str | None:
+    """Why ``test`` cannot be a selected test path under ``root``: absolute, escaping, a link, or missing."""
+    from assertiva.workspace import is_link
+
+    rel = Path(test)
+    if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+        return "not a path relative to the project"
+    current = Path(root)
+    for part in rel.parts:
+        current = current / part
+        if is_link(current):
+            return f"{current.relative_to(root).as_posix()} is a link"
+    return None if current.exists() else "not in the project"
 
 
 def unsafe_target(root: Path, target: str, suffixes: tuple[str, ...]) -> str | None:

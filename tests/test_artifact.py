@@ -261,6 +261,57 @@ def test_declared_dependency_unavailable_offline_is_unknown_not_pass(tmp_path):
     assert evidence.status is StageStatus.UNKNOWN
 
 
+def effectful_package(root, marker):
+    """A package whose `__main__` (unguarded) and one submodule act when imported: they write ``marker``."""
+    closure_package(root, [])
+    act = f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran', encoding='utf-8')\n"
+    write(root / "greet" / "__main__.py", act + "raise SystemExit(0)\n")
+    write(root / "greet" / "effect.py", act)
+    return root
+
+
+def test_closure_check_reads_modules_without_importing_them(tmp_path):
+    # AX-E01: importing a module runs it; the closure check must not invoke the program or any module's top level
+    marker = tmp_path / "ran.txt"
+    evidence = ADAPTER.qualify(effectful_package(tmp_path / "effectful", marker))
+    closure = check(evidence, "dependency_closure")
+    assert not marker.exists(), "the closure check executed package code"
+    assert closure.status is StageStatus.PASS, closure
+    assert "without importing" in closure.detail
+
+
+def test_closure_check_still_finds_an_undeclared_import_in_an_entry_point(tmp_path):
+    root = closure_package(tmp_path / "main-dep", [])
+    write(root / "greet" / "__main__.py", "import yaml\nraise SystemExit(0)\n")
+    closure = check(ADAPTER.qualify(root), "dependency_closure")
+    assert closure.status is StageStatus.FAIL and "yaml" in closure.detail
+
+
+def test_optional_and_type_checking_imports_are_not_closure_failures(tmp_path):
+    root = closure_package(tmp_path / "optional", [])
+    write(root / "greet" / "fast.py", "try:\n    import definitely_absent_accelerator\nexcept ImportError:\n"
+                                       "    definitely_absent_accelerator = None\n"
+                                       "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    import definitely_absent_types\n"
+                                       "def lazy():\n    import definitely_absent_lazy\n")
+    closure = check(ADAPTER.qualify(root), "dependency_closure")
+    assert closure.status is StageStatus.PASS, closure
+
+
+def test_version_guarded_import_follows_the_target_interpreter(tmp_path):
+    root = closure_package(tmp_path / "guarded", [])
+    write(root / "greet" / "compat.py", "import sys\nif sys.version_info >= (3, 0):\n    import json\nelse:\n"
+                                         "    import definitely_absent_backport\n")
+    closure = check(ADAPTER.qualify(root), "dependency_closure")
+    assert closure.status is StageStatus.PASS, closure
+
+
+def test_undecidable_conditional_import_is_unknown_not_pass(tmp_path):
+    root = closure_package(tmp_path / "undecidable", [])
+    write(root / "greet" / "plugin.py", "import os\nif os.environ.get('GREET_PLUGIN'):\n    import definitely_absent_plugin\n")
+    closure = check(ADAPTER.qualify(root), "dependency_closure")
+    assert closure.status is StageStatus.UNKNOWN and "definitely_absent_plugin" in closure.detail
+
+
 def test_fidelity_states_what_was_and_was_not_verified(tmp_path):
     evidence = ADAPTER.qualify(make_package(tmp_path / "fid"))
     assert evidence.fidelity == {

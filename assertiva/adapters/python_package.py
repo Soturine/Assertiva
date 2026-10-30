@@ -90,23 +90,111 @@ while queue:
     queue.extend((r, wanted) for r in dist.requires or [])
 print(json.dumps({"resolved": sorted(seen), "missing": missing, "unsupported": unsupported}))
 """
-# Import every module of the installed package; report modules nothing declared provides.
+# Read (never import) every module of the installed package and resolve what its top level imports. Importing runs
+# the module: an unguarded `__main__` would start the program and any module may act on import. Only module and class
+# bodies are followed (what an import would run); `try`/`except ImportError` imports are optional, `TYPE_CHECKING`
+# blocks never run, and conditions on the interpreter (`sys.version_info`, `sys.platform`, `os.name`) are decided for
+# this one; any other condition leaves its imports undecided. Top-level names are located with find_spec, which runs
+# no package code. Dynamic imports (importlib, __import__) are not seen.
 _CLOSURE_PROBE = r"""
-import importlib, json, pkgutil, sys
-tops, missing, errors = sys.argv[1:], set(), []
-def visit(name):
+import ast, importlib.util, json, os, sys
+tops, missing, undecided, errors, files = sys.argv[1:], set(), set(), [], 0
+OPTIONAL = {"ImportError", "ModuleNotFoundError", "Exception", "BaseException"}
+FACTS = {"sys.version_info": sys.version_info[:3], "sys.platform": sys.platform, "os.name": os.name}
+def name_of(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = name_of(node.value)
+        return base + "." + node.attr if base else None
+def decide(test):
+    if name_of(test) in ("TYPE_CHECKING", "typing.TYPE_CHECKING"):
+        return False
     try:
-        return importlib.import_module(name)
-    except ModuleNotFoundError as exc:
-        missing.add(exc.name or str(exc))
-    except Exception as exc:
-        errors.append((name + ": " + type(exc).__name__ + ": " + str(exc))[:200])
+        return bool(value(test))
+    except (ValueError, TypeError, IndexError):
+        return None
+def value(node):
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.Tuple):
+        return tuple(value(e) for e in node.elts)
+    if name_of(node) in FACTS:
+        return FACTS[name_of(node)]
+    if isinstance(node, ast.Subscript) and name_of(node.value) == "sys.version_info":
+        return sys.version_info[value(node.slice)]
+    if isinstance(node, ast.Call) and name_of(node.func) == "sys.platform.startswith" and len(node.args) == 1:
+        return sys.platform.startswith(value(node.args[0]))
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        return not value(node.operand)
+    if isinstance(node, ast.BoolOp):
+        values = [value(v) for v in node.values]
+        return all(values) if isinstance(node.op, ast.And) else any(values)
+    if isinstance(node, ast.Compare) and len(node.ops) == 1:
+        left, right, op = value(node.left), value(node.comparators[0]), type(node.ops[0]).__name__
+        compare = {"Eq": lambda: left == right, "NotEq": lambda: left != right, "Lt": lambda: left < right,
+                   "LtE": lambda: left <= right, "Gt": lambda: left > right, "GtE": lambda: left >= right}
+        if op in compare:
+            return compare[op]()
+    raise ValueError("undecidable")
+def imports(body, sure, out):
+    for node in body:
+        if isinstance(node, ast.Import):
+            out.extend((a.name, sure) for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
+            out.append((node.module, sure))
+        elif isinstance(node, ast.If):
+            taken = decide(node.test)
+            if taken is not False:
+                imports(node.body, sure and taken is True, out)
+            if taken is not True:
+                imports(node.orelse, sure and taken is False, out)
+        elif isinstance(node, ast.Try) or type(node).__name__ == "TryStar":
+            caught = {name_of(t) for h in node.handlers for t in ((h.type.elts if isinstance(h.type, ast.Tuple) else [h.type]) if h.type else [ast.Name("BaseException")])}
+            if not {str(c).rsplit(".", 1)[-1] for c in caught} & OPTIONAL:
+                imports(node.body, sure, out)
+                for handler in node.handlers:
+                    imports(handler.body, sure, out)
+            else:  # a tolerated import; its fallback runs (and must resolve) only when the tolerated one is absent
+                tolerated = []
+                imports(node.body, sure, tolerated)
+                if not all(locate(m) for m, _ in tolerated):
+                    for handler in node.handlers:
+                        imports(handler.body, sure, out)
+            imports(node.orelse, sure, out)
+            imports(node.finalbody, sure, out)
+        elif isinstance(node, (ast.With, ast.ClassDef)):
+            imports(node.body, sure, out)
+def locate(module):
+    first = module.split(".")[0]
+    if first in tops or first == "__future__":
+        return True
+    try:
+        return importlib.util.find_spec(first) is not None
+    except (ImportError, ValueError):
+        return False
 for top in tops:
-    module = visit(top)
-    if module is not None and hasattr(module, "__path__"):
-        for info in pkgutil.walk_packages(module.__path__, top + "."):
-            visit(info.name)
-print(json.dumps({"missing": sorted(m for m in missing if m.split(".")[0] not in tops), "errors": errors}))
+    spec = importlib.util.find_spec(top)
+    roots = list(spec.submodule_search_locations or []) if spec else []
+    paths = [spec.origin] if spec and spec.origin and not roots else []
+    for base in roots:
+        for folder, dirs, names in os.walk(base):
+            dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+            paths += [os.path.join(folder, n) for n in sorted(names) if n.endswith(".py")]
+    for path in paths:
+        files += 1
+        try:
+            with open(path, encoding="utf-8") as handle:
+                tree = ast.parse(handle.read(), filename=path)
+        except (SyntaxError, UnicodeDecodeError, OSError) as exc:
+            errors.append((os.path.relpath(path, os.path.dirname(roots[0]) if roots else os.path.dirname(path)) + ": " + type(exc).__name__)[:200])
+            continue
+        found = []
+        imports(tree.body, True, found)
+        for module, sure in found:
+            if not locate(module):
+                (missing if sure else undecided).add(module.split(".")[0])
+print(json.dumps({"missing": sorted(missing), "undecided": sorted(undecided - missing), "errors": errors, "files": files}))
 """
 
 
@@ -282,7 +370,7 @@ class PythonPackageAdapter:
             self._dependency_closure(evidence, wheel_site, tops, requirements, tmp, outside)
 
     def _dependency_closure(self, evidence: ArtifactEvidence, wheel_site: str | None, tops: list[str], requirements: list[str], tmp: Path, cwd: Path) -> None:
-        """Import every module of the installed wheel where only its declared dependencies exist.
+        """Resolve every module's top-level imports of the installed wheel where only its declared dependencies exist.
 
         The clean venv sees the wheel's installed files as a plain path entry (so the host
         environment linked from that venv stays invisible) plus a view of the declared
@@ -314,10 +402,15 @@ class PythonPackageAdapter:
                 status = StageStatus.FAIL
                 detail = "imports modules no declared dependency provides: " + ", ".join(found["missing"])
             elif found["errors"]:
-                status, detail = StageStatus.UNKNOWN, "modules failed to import for other reasons: " + "; ".join(found["errors"][:3])
+                status, detail = StageStatus.UNKNOWN, "modules could not be read: " + "; ".join(found["errors"][:3])
+            elif found["undecided"]:
+                status = StageStatus.UNKNOWN
+                detail = ("imports under a condition read without importing could not be decided and no declared dependency "
+                          "provides them: " + ", ".join(found["undecided"]))
             else:
                 status = StageStatus.PASS
-                detail = f"every module imports with only declared dependencies ({', '.join(deps['resolved']) or 'none'})"
+                detail = (f"the top-level imports of {found['files']} module(s), read without importing them, resolve with only "
+                          f"declared dependencies ({', '.join(deps['resolved']) or 'none'}); dynamic imports are not followed")
         evidence.checks.append(ArtifactCheck("dependency_closure", status, "clean venv + declared dependencies only", None, detail))
         if status is StageStatus.FAIL or (status is not StageStatus.PASS and evidence.status is StageStatus.PASS):
             evidence.status = status

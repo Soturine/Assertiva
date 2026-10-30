@@ -41,6 +41,7 @@ _FRAMEWORKS = {
     "kotest": "Kotest", "testng": "TestNG", "robolectric": "Robolectric", "espresso": "Espresso", "ui-test-junit4": "Compose UI test",
     "mockk": "MockK (doubles)", "mockito": "Mockito (doubles)",
 }
+_BUILD_LIFECYCLE = re.compile(r"^(?:assemble\w*|build|check|compile\w*|classes|testClasses)$")
 _COMPILE_ERROR = re.compile(r"(Compilation failed|compileTestKotlin|compileTestJava|^e: |error: )", re.M)
 _RESOLUTION = re.compile(r"(Could not resolve|No cached version|offline mode|Could not GET|Could not download|Plugin \[id: .+\] was not found)")
 _KMP_HOSTS = {"js": "JS targets are not run by this version", "wasm": "Wasm targets are not run by this version",
@@ -487,11 +488,16 @@ class GradleAdapter:
         return {}
 
     def reproduction_args(self, check) -> list[str] | None:
-        """Gradle tasks a declared `./gradlew test` / `gradle check` step runs (test tasks only)."""
+        """Gradle tasks a declared `./gradlew test` / `gradle assembleDebug testDebugUnitTest` step runs: at least one test
+        task, plus only the build lifecycle tasks a test run depends on anyway (assemble, build, check, compile). The
+        prepared distribution runs them, never the project's wrapper, so the step reproduces the same way on every OS."""
         if check.tool not in ("gradle", "./gradlew") or not check.command or "${{" in check.command:
             return None
         tasks = [a for a in check.metadata.get("runner_args", []) if not a.startswith("-")]
-        return tasks if tasks and all(t.split(":")[-1].lower().endswith("test") for t in tasks) else None
+        leaves = [t.split(":")[-1] for t in tasks]
+        if not any(leaf.lower().endswith("test") for leaf in leaves):
+            return None
+        return tasks if all(leaf.lower().endswith("test") or _BUILD_LIFECYCLE.match(leaf) for leaf in leaves) else None
 
     def equivalent_to_default(self, args: list[str]) -> bool:
         return False

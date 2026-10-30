@@ -65,6 +65,43 @@ def test_a_ci_gradle_test_step_is_reproduced_through_the_adapter_only_for_test_t
     assert publish.kind.value == "DEPLOY" and adapter.reproduction_args(publish) is None
 
 
+@pytest.mark.parametrize("command", ["./gradlew assembleDebug testDebugUnitTest", "gradlew.bat assembleDebug testDebugUnitTest",
+                                     ".\\gradlew.bat assembleDebug testDebugUnitTest", "gradlew assembleDebug testDebugUnitTest"])
+def test_a_wrapper_step_that_builds_and_tests_is_reproduced_through_the_adapter_on_every_os(command):
+    # TCC-A16: `./gradlew assembleDebug testDebugUnitTest` fell through to launching the wrapper ([WinError 2] on Windows)
+    from assertiva.adapters.ci_common import command_check
+    from assertiva.verification import GateMode
+
+    check = command_check("gha", "c1", command, "ci.yml", GateMode.UNKNOWN, {})
+    assert check.tool == "./gradlew"
+    assert GradleAdapter().reproduction_args(check) == ["assembleDebug", "testDebugUnitTest"]
+
+
+def test_a_wrapper_step_without_a_test_task_is_not_run_and_the_wrapper_never_starts(tmp_path):
+    from assertiva.adapters.ci_common import command_check
+    from assertiva.reproduction import reproduce_check
+    from assertiva.verification import GateMode
+
+    project = tmp_path / "p"
+    project.mkdir()
+    for name in ("gradlew", "gradlew.bat"):
+        (project / name).write_text("echo ran > wrapper-ran\n", encoding="utf-8")
+    check = command_check("gha", "c1", "./gradlew lint", "ci.yml", GateMode.UNKNOWN, {})
+    done = reproduce_check(check, lambda: project, [GradleAdapter()], sys.executable, {}, lambda c: True)
+    assert done.status.value == "NOT_RUN" and "wrapper" in done.record["detail"]
+    assert not (project / "wrapper-ran").exists()
+
+
+def test_a_maven_wrapper_spelling_is_maven():
+    from assertiva.adapters.ci_common import command_check
+    from assertiva.adapters.maven import MavenAdapter
+    from assertiva.verification import GateMode
+
+    for command in ("mvnw.cmd -B verify", ".\\mvnw.cmd -B verify", "./mvnw -B verify"):
+        check = command_check("gha", "c1", command, "ci.yml", GateMode.UNKNOWN, {})
+        assert check.tool == "./mvnw" and MavenAdapter().reproduction_args(check) == ["-B", "verify"], command
+
+
 def _why(report: dict) -> str:
     """Steps and run limitations, in full, so a CI log shows the cause of a failed real run."""
     steps = [f"{s['step_id']}: {s['status']}: {s['detail']}" for s in report["environment"]["steps"]]

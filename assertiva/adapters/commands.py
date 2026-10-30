@@ -49,6 +49,10 @@ SAFE_KINDS = frozenset({K.LINT, K.FORMAT, K.TYPECHECK, K.STATIC_ANALYSIS, K.PACK
 RUN_WHEN_NAMED = SAFE_KINDS | {K.TEST}
 # Build-tool goals/tasks that publish or deploy: such an invocation is a DEPLOY, whatever else it runs.
 _BUILD_TOOLS = {"mvn", "./mvnw", "mvnw", "gradle", "./gradlew", "gradlew"}
+# a project's own wrapper script, by every name a CI shell uses for it
+_WRAPPER_SPELLINGS = {"gradlew": "./gradlew", "gradlew.bat": "./gradlew", "gradlew.cmd": "./gradlew",
+                      "mvnw": "./mvnw", "mvnw.cmd": "./mvnw", "mvnw.bat": "./mvnw"}
+PROJECT_WRAPPERS = frozenset(_WRAPPER_SPELLINGS.values())
 _PUBLISHING_GOALS = re.compile(r"^(deploy|publish\w*|release:\w+|jib:build|dockerPush|uploadArchives|bintrayUpload)$", re.I)
 _SHELL = re.compile(r"\$\{\{|&&|\|\||[;|<>`$*?]")
 _MANAGE_PY = {"test": K.TEST, "check": K.STATIC_ANALYSIS, "migrate": K.MIGRATION, "makemigrations": K.MIGRATION, "compilemessages": K.LOCALIZATION}
@@ -70,6 +74,9 @@ class CommandClass:
 
 
 def _tokens(segment: str) -> list[str]:
+    # a Windows path as the executable (`.\gradlew.bat`, `C:\venv\Scripts\pytest.exe`): POSIX splitting would drop
+    # its backslashes as escapes
+    segment = re.sub(r"^\s*([^\s\"']+)", lambda m: m.group(1).replace("\\", "/"), segment)
     try:
         tokens = shlex.split(segment, posix=True)
     except ValueError:
@@ -80,6 +87,8 @@ def _tokens(segment: str) -> list[str]:
         tokens[0] = PurePosixPath(tokens[0].replace("\\", "/")).name  # .venv/bin/pytest -> pytest
     if tokens and tokens[0].endswith(".exe"):
         tokens[0] = tokens[0][:-4]
+    if tokens:  # gradlew, gradlew.bat, .\gradlew.bat, mvnw.cmd: one wrapper, whatever the shell spells it
+        tokens[0] = _WRAPPER_SPELLINGS.get(PurePosixPath(tokens[0].replace("\\", "/")).name.lower(), tokens[0])
     if tokens and _PYTHON.match(tokens[0]):  # python -X utf8 -u -m unittest -> python -m unittest
         rest, i = tokens[1:], 0
         while i < len(rest) and rest[i].startswith("-") and rest[i] not in {"-m", "-c", "-"}:
@@ -159,6 +168,10 @@ def reproduction_plan(check, python: str) -> ReproductionPlan:
         argv = shlex.split(lines[0], posix=True)
     except ValueError:
         return ReproductionPlan(None, False, "command could not be parsed")
+    if check.tool in PROJECT_WRAPPERS:  # the same refusal on every OS: never a raw launch of ./gradlew or gradlew.bat
+        return ReproductionPlan(None, False, f"the project's {check.tool[2:]} wrapper is never executed (it runs the committed "
+                                             "wrapper jar and downloads a distribution); its build tool's adapter reproduces "
+                                             "test tasks with a prepared distribution, and this step names none it can run")
     if argv and PurePosixPath(argv[0].replace("\\", "/")).name in {"python", "python3", "py", "python.exe"}:
         argv[0] = python
     return ReproductionPlan(tuple(argv), kind not in RUN_WHEN_NAMED, f"{kind.value} check")

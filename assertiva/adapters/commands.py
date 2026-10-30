@@ -39,6 +39,9 @@ _TOOLS: dict[tuple[str, str | None], K] = {
     ("docker", "build"): K.CONTAINER, ("alembic", "upgrade"): K.MIGRATION,
     ("npm", "test"): K.TEST, ("npm", "run"): K.UNKNOWN, ("pre-commit", "run"): K.CUSTOM,
     ("compileall", None): K.STATIC_ANALYSIS,
+    ("docker", "run"): K.CONTAINER, ("docker", "compose"): K.CONTAINER, ("docker-compose", None): K.CONTAINER,
+    ("mosquitto", None): K.CUSTOM, ("mosquitto_pub", None): K.CUSTOM, ("mosquitto_sub", None): K.CUSTOM,
+    ("mysql", None): K.CUSTOM, ("mysqladmin", None): K.CUSTOM,
     ("twine", "upload"): K.DEPLOY, ("docker", "push"): K.DEPLOY, ("kubectl", "apply"): K.DEPLOY, ("helm", "upgrade"): K.DEPLOY,
     ("helm", "install"): K.DEPLOY, ("gh", "release"): K.DEPLOY,
 }
@@ -104,9 +107,36 @@ def _tokens(segment: str) -> list[str]:
     return tokens
 
 
+_PIO = {"pio", "platformio"}
+
+
+def _platformio(tokens: list[str]) -> tuple[K, str, tuple[str, ...], dict[str, Any]] | None:
+    """PlatformIO (TCC-A04/A13): `pio test -e native` runs unit tests on this host; `pio test -e <board>` builds, uploads
+    and runs them on a connected device (hardware in the loop); `pio run` builds firmware, which tests nothing."""
+    sub = tokens[1] if len(tokens) > 1 else None
+    envs = [tokens[i + 1] for i, t in enumerate(tokens[:-1]) if t in ("-e", "--environment")]
+    meta: dict[str, Any] = {"environments": envs}
+    if sub == "test":
+        if "--without-testing" in tokens:
+            return K.BUILD, "pio test", tuple(tokens[2:]), {**meta, "modality": "FIRMWARE_BUILD"}
+        native = bool(envs) and all("native" in e.lower() or e.lower() in ("host", "desktop") for e in envs)
+        modality = "NATIVE_HOST" if native else "TARGET_DEVICE"
+        if not envs:
+            meta["limitation"] = "no -e environment named: which targets run (host or device) depends on platformio.ini"
+        return K.TEST, "pio test", tuple(tokens[2:]), {**meta, "modality": modality if envs else "UNKNOWN"}
+    if sub == "run":
+        uploads = any(t in ("upload", "-t", "--target") for t in tokens[2:]) and "upload" in tokens
+        return (K.DEPLOY if uploads else K.BUILD), "pio run", tuple(tokens[2:]), {**meta, "modality": "FIRMWARE_UPLOAD" if uploads else "FIRMWARE_BUILD"}
+    if sub == "check":
+        return K.STATIC_ANALYSIS, "pio check", tuple(tokens[2:]), meta
+    return None
+
+
 def _classify_segment(segment: str) -> tuple[K | None, str, tuple[str, ...], dict[str, Any]] | None:
     """None for setup; (None, ...) for unknown; else (kind, tool, args, metadata)."""
     tokens = _tokens(segment)
+    if tokens and tokens[0] in _PIO and (pio := _platformio(tokens)):
+        return pio
     if tokens[:2] == ["coverage", "run"] and "-m" in tokens[2:-1]:  # coverage run [opts] -m pytest ... runs pytest, measured
         inner = tokens[tokens.index("-m", 2) + 1:]
         classified = _classify_segment(" ".join(shlex.quote(t) for t in ["python", "-m", *inner]))
@@ -168,6 +198,9 @@ def reproduction_plan(check, python: str) -> ReproductionPlan:
         argv = shlex.split(lines[0], posix=True)
     except ValueError:
         return ReproductionPlan(None, False, "command could not be parsed")
+    if check.metadata.get("modality") in ("TARGET_DEVICE", "UNKNOWN") and str(check.tool).startswith("pio"):
+        return ReproductionPlan(None, False, "runs on a connected device (hardware in the loop) or on targets not named: "
+                                             "never run by Assertiva; a host build or native test is not device evidence")
     if check.tool in PROJECT_WRAPPERS:  # the same refusal on every OS: never a raw launch of ./gradlew or gradlew.bat
         return ReproductionPlan(None, False, f"the project's {check.tool[2:]} wrapper is never executed (it runs the committed "
                                              "wrapper jar and downloads a distribution); its build tool's adapter reproduces "

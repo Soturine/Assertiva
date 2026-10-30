@@ -62,6 +62,20 @@ def _outcome(reports: dict[str, dict]) -> Outcome:
     return Outcome.XPASSED if call["wasxfail"] else Outcome.PASSED
 
 
+def declared_test_extras(root: Path) -> list[str]:
+    """Optional-dependency groups of pyproject.toml (PEP 621) or dependency groups (PEP 735) that declare pytest."""
+    import re
+    import tomllib
+
+    try:
+        data = tomllib.loads((Path(root) / "pyproject.toml").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    groups = {**((data.get("project") or {}).get("optional-dependencies") or {}), **(data.get("dependency-groups") or {})}
+    return sorted(name for name, reqs in groups.items() if isinstance(reqs, list)
+                  and any(isinstance(r, str) and re.match(r"\s*pytest(?![\w-])", r) for r in reqs))
+
+
 class PytestNativeAdapter(PythonStatic):
     adapter_id = "pytest-native"
 
@@ -139,6 +153,14 @@ class PytestNativeAdapter(PythonStatic):
         refusal = execution_refusal()
         if refusal:
             return RunEvidence(adapter_id=self.adapter_id, mode=mode, status=StageStatus.BLOCKED, limitations=[refusal])
+        if not module_available(self.python, "pytest"):  # AX-E06: the environment, not the project, lacks the runner
+            groups = declared_test_extras(root)
+            hint = (f"; the project declares it in the optional dependencies {', '.join(f'[{g}]' for g in groups)}: install "
+                    "them into that environment (or pass --python an interpreter that has them); Assertiva installs nothing"
+                    if groups else "; Assertiva installs nothing")
+            return RunEvidence(adapter_id=self.adapter_id, mode=mode, status=StageStatus.BLOCKED, command=[self.python, "-m", "pytest"],
+                               limitations=[f"pytest is not installed in {self.python}{hint}"],
+                               metadata={"missing_test_dependency": "pytest", "declared_extras": groups})
         with tempfile.TemporaryDirectory(prefix="assertiva-pytest-") as tmp:
             plugin_dir = Path(tmp)
             (plugin_dir / f"{_PLUGIN_MODULE}.py").write_text(_PLUGIN_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")

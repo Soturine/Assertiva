@@ -96,7 +96,8 @@ def _audit(args: argparse.Namespace) -> int:
                        export_ctrf=args.ctrf,
                        ci_runs=args.ci_run or [], provision=args.provision,
                        run_checks=args.run_check or [], mutation_targets=args.mutate or [],
-                       mutation_tool=args.mutation_tool, mutation_tests=args.mutate_tests or [])
+                       mutation_tool=args.mutation_tool, mutation_tests=args.mutate_tests or [],
+                       dependencies=args.dependencies)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
@@ -275,6 +276,9 @@ def _parser() -> argparse.ArgumentParser:
                        help="with --execute: run the project's native mutation tool on FILE in a disposable copy (repeatable; "
                             "Cosmic Ray for Python tests under pytest, unittest or Django; StrykerJS for Jest or Vitest; "
                             "PIT for a Maven build that declares it; each installed in the project, never by Assertiva)")
+    audit.add_argument("--dependencies", action="store_true",
+                       help="add the dependency inventory: declared range, locked, installed, static usage and migration "
+                            "readiness (offline; nothing installed or upgraded; vulnerabilities are not looked up)")
     audit.add_argument("--mutate-tests", action="append", metavar="PATH",
                        help="with --mutate: run only these tests (files or folders) for the baseline and each mutant; the "
                             "run records the selection and never claims the whole suite (repeatable; Cosmic Ray)")

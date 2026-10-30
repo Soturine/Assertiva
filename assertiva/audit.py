@@ -335,6 +335,7 @@ def run_audit(
     mutation_targets: list[str] | tuple = (),
     mutation_tool: str | None = None,
     mutation_tests: list[str] | tuple = (),
+    dependencies: bool = False,
 ) -> dict:
     root = Path(root).resolve()
     started = _now()
@@ -426,6 +427,12 @@ def run_audit(
         elif mutation_targets:
             limitations.append("mutation targets were given without --execute: no mutant was run")
         findings.extend(_mutation_findings(current))
+        dependency_view = None
+        if dependencies:  # opt-in, offline, read-only: declared vs locked vs installed, and static usage
+            from .dependencies import findings as dependency_findings, inventory
+
+            dependency_view = inventory(root, python)
+            findings.extend(dependency_findings(dependency_view))
         effectiveness = _effectiveness(root, current)
         findings.extend(_effectiveness_findings(effectiveness))
         findings.extend(_artifact_findings(current))
@@ -480,6 +487,8 @@ def run_audit(
                 f"CI run reported by {run['provider']} for {run['head_sha'][:12]}: {run['conclusion']} ({run['identity']})")
     report["environment"] = environment_summary(prepared, execute)
     report["test_effectiveness"] = effectiveness
+    if dependencies:
+        report["dependencies"] = dependency_view
     report["execution_manifest"] = execution_manifest(root, baseline, current, started, junit_reports, coverage_reports,
                                                       mutation_reports, ci_runs, withheld)
     boundary = report["claim_boundary"]

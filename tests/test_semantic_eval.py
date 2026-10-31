@@ -240,6 +240,16 @@ def _policy(tmp_path):
     ("Glob", {"pattern": "../**/*.env"}),
     ("WebFetch", {"url": "https://example.invalid"}),
     ("Write", {"file_path": "../escape.py", "content": "x"}),
+    # PR #2 review: paths built at run time
+    ("Bash", {"command": "cat $(printf data/customers_private.csv)"}),
+    ("Bash", {"command": "cat `echo data/customers_private.csv`"}),
+    ("Bash", {"command": "diff <(cat data/customers_private.csv) /dev/null"}),
+    ("Bash", {"command": "cat $'data/customers_private.csv'"}),
+    ("Bash", {"command": "python -c \"print(open('data/' + 'customers_private.csv').read())\""}),
+    ("Bash", {"command": "bash -c 'cat data/cust*'"}),
+    ("Bash", {"command": "eval cat data/customers_private.csv"}),
+    ("PowerShell", {"command": "powershell -EncodedCommand ZQBjAGgAbwA="}),
+    ("Bash", {"command": "(cat data/customers_private.csv)"}),
 ])
 def test_guard_refuses_attempts_on_private_files_and_outside_paths(tmp_path, tool, tool_input):
     workspace, policy = _policy(tmp_path)

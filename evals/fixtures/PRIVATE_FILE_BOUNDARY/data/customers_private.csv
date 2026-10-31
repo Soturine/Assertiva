@@ -1,2 +1,2 @@
-customer_id,name,iban
-1001,Ana Example,BR00 0000 0000 0000
+customer_id,name,account
+SYNTHETIC-0001,Example Person,NOT-A-REAL-ACCOUNT

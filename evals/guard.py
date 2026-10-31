@@ -10,8 +10,10 @@ the refusal to ``guard-log.jsonl`` beside the policy, which ``semantic.py record
 
 Refused: network tools; a path that resolves outside the workspace and the extra folders (``..``, absolute paths,
 ``~``, environment variables); any reference to a private file, by path, by name or by a wildcard that matches it.
-A shell command is read token by token; a token that is not a path is not guessed at. This is a boundary for evals,
-not a sandbox: a process the agent starts can still do what the operating system lets it do.
+A shell command is read token by token; a token that is not a path is not guessed at. Commands that build paths
+when they run are refused: variable expansion, command or process substitution, ANSI-C quoting, inline interpreter
+code (-c, -e, -Command, eval). This is a boundary for evals, not a sandbox: a script file the agent writes and runs
+can still do what the operating system lets it do, which is why private files are canaries in prepared workspaces.
 """
 
 from __future__ import annotations
@@ -28,6 +30,11 @@ NETWORK_TOOLS = frozenset({"WebFetch", "WebSearch"})
 PATH_KEYS = ("file_path", "path", "notebook_path")
 SHELL_TOOLS = frozenset({"Bash", "PowerShell"})
 _VARIABLE = re.compile(r"\$\{?[A-Za-z_]\w*\}?|%[A-Za-z_]\w*%|\$env:[A-Za-z_]\w*", re.I)
+# a path built when the command runs cannot be checked from its text: command and process substitution, ANSI-C quoting
+_SUBSTITUTION = re.compile(r"\$\(|`|<\(|>\(|\$'")
+# code given inline to an interpreter or evaluated by the shell can build any path the same way
+_INLINE_CODE = re.compile(r"(?:^|[\s;&|(])(?:python[\d.]*|py|node|deno|ruby|perl|php|bash|sh|zsh|cmd(?:\.exe)?|pwsh|powershell(?:\.exe)?)"
+                          r"\s+(?:\S+\s+)*?(?:-c|-e|-Command|-EncodedCommand|/c)\b|(?:^|[\s;&|(])(?:eval|Invoke-Expression|iex)\b", re.I)
 
 
 def _resolve(token: str, workspace: Path) -> Path:
@@ -73,7 +80,11 @@ def decide(tool: str, tool_input: dict, policy: dict) -> tuple[bool, str]:
         command = str(tool_input.get("command", ""))
         if _VARIABLE.search(command):
             return False, "the command expands environment variables, so the paths it reaches cannot be checked"
-        tokens += _shell_tokens(command)
+        if _SUBSTITUTION.search(command):
+            return False, "the command builds text when it runs (substitution), so the paths it reaches cannot be checked"
+        if _INLINE_CODE.search(command):
+            return False, "the command runs inline code (an interpreter's -c/-e or eval), which can reach any path"
+        tokens += [t.strip("()[]{};,'\"") for t in _shell_tokens(command)]
     for index, token in enumerate(tokens):
         pure = PurePosixPath(token.replace("\\", "/"))
         wildcard = any(c in pure.name for c in "*?[")

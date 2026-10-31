@@ -6,7 +6,7 @@ never evidence of how Assertiva compares in practice.
 
 ## 1. Executed: 0.9.0 against the candidate, same inputs
 
-Conditions: Windows 11 Pro 10.0.26200, Python 3.12.10, Node 24.19.0, 2026-10-30. 0.9.0 is a Git worktree at
+Conditions: Windows 11 Pro 10.0.26200, Python 3.12.10, Node 24.19.0, 2026-10-30 (frozen sets re-run 2026-10-31 at `a14b3ff`: unchanged). 0.9.0 is a Git worktree at
 `cf5cb7d` run from a **clean virtual environment** (the first attempt used the main checkout's interpreter, whose
 editable install served modules missing from 0.9.0 out of the candidate tree: mixed code, discarded, recorded as
 ENG-02). The candidate is this branch.
@@ -36,7 +36,8 @@ real subsets are not flagged, optional imports pass). On the candidate all pass.
 
 | Target | 0.9.0 | candidate | Findings |
 | --- | --- | --- | --- |
-| this repository (static audit) | 16.8 s | 19.7 s | identical codes |
+| this repository (static audit), 2026-10-30 | 16.8 s | 19.7 s | identical codes |
+| this repository (static audit), 2026-10-31, after the final hardening | 15.0 s | 13.7 s | identical codes (single samples: within run-to-run noise, not a speed-up) |
 | confirmation v2 py-parking / js-tickets / kt-library | 0.84 / 0.60 / 0.84 s | 0.86 / 0.62 / 0.77 s | identical codes and candidate counts |
 | PRIVATE_FILE_BOUNDARY fixture | 1.06 s | 1.14 s | identical |
 

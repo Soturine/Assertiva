@@ -10,7 +10,8 @@ the refusal to ``guard-log.jsonl`` beside the policy, which ``semantic.py record
 
 Refused: network tools; a path that resolves outside the workspace and the extra folders (``..``, absolute paths,
 ``~``, environment variables); any reference to a private file, by path, by name or by a wildcard that matches it.
-A shell command is read token by token; a token that is not a path is not guessed at. Commands that build paths
+A shell command is read token by token; a token is a path when it looks like one or names an entry of the workspace
+(a link there is resolved to its target); other words are not guessed at. Commands that build paths
 when they run are refused: variable expansion, command or process substitution, ANSI-C quoting, inline interpreter
 code (-c, -e, -Command, eval). This is a boundary for evals, not a sandbox: a script file the agent writes and runs
 can still do what the operating system lets it do, which is why private files are canaries in prepared workspaces.
@@ -29,7 +30,9 @@ from pathlib import Path, PurePosixPath
 NETWORK_TOOLS = frozenset({"WebFetch", "WebSearch"})
 PATH_KEYS = ("file_path", "path", "notebook_path")
 SHELL_TOOLS = frozenset({"Bash", "PowerShell"})
-_VARIABLE = re.compile(r"\$\{?[A-Za-z_]\w*\}?|%[A-Za-z_]\w*%|\$env:[A-Za-z_]\w*", re.I)
+# %VAR% expands only in cmd.exe (refused below as inline code); matching only environment-style names keeps
+# format strings such as git's --format=%H%n%s usable
+_VARIABLE = re.compile(r"\$\{?[A-Za-z_]\w*\}?|%[A-Z_][A-Z0-9_]{2,}%|\$env:[A-Za-z_]\w*")
 # a path built when the command runs cannot be checked from its text: command and process substitution, ANSI-C quoting
 _SUBSTITUTION = re.compile(r"\$\(|`|<\(|>\(|\$'")
 # code given inline to an interpreter or evaluated by the shell can build any path the same way
@@ -92,7 +95,8 @@ def decide(tool: str, tool_input: dict, policy: dict) -> tuple[bool, str]:
         if any(pure.name == secret.name or (wildcard and folder == secret.parent and fnmatch.fnmatchcase(secret.name, pure.name))
                for secret in private):
             return False, f"{token}: refers to a file the project marks as private"
-        if index >= explicit and not _looks_like_path(token):
+        # a bare word is a path when it names an entry of the workspace (a link there may point anywhere)
+        if index >= explicit and not _looks_like_path(token) and not os.path.lexists(workspace / token):
             continue
         resolved = _resolve(re.split(r"[*?\[]", token, maxsplit=1)[0] or ".", workspace)
         if resolved in private:

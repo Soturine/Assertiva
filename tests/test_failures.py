@@ -126,3 +126,28 @@ def test_git_without_a_repository_is_the_environment_not_the_product():
     assert origin(F07_GIT)[0] == INFRASTRUCTURE
     other = F07_GIT.replace("exit status 128", "exit status 1")  # control: another git failure is not assumed environmental
     assert origin(other)[0] == PRODUCT
+
+
+# --- pinned by the self-mutation run of failures.py (behavior that surviving mutants changed unnoticed) -------------
+
+def test_explicit_test_paths_decide_whether_a_frame_is_test_code():
+    # a helper outside any test naming convention is test code only because the run names it as a test path
+    message = "E   NameError: name 'x' is not defined\nqa/checks/pricing_checks.py:4: NameError"
+    assert origin(message)[0] == PRODUCT
+    assert origin(message, ["qa/checks/pricing_checks.py"])[0] == TEST
+    assert origin(message, ["checks/pricing_checks.py"])[0] == TEST  # a trailing part of the path, on whole components
+    assert origin(message, ["ricing_checks.py"])[0] == PRODUCT  # never a partial component
+
+
+def test_an_error_in_test_code_that_is_not_a_code_error_stays_unknown():
+    message = "E   ValueError: bad fixture data\ntests/test_cart.py:9: ValueError"
+    assert origin(message)[0] == UNKNOWN  # a broken test or a product change it relied on: not decided
+    assert origin("E   NameError: name 'x'\ntests/test_cart.py:9: NameError")[0] == TEST
+
+
+def test_clusters_list_the_largest_cause_first_and_drop_singletons():
+    a = "shop/a.py:3: TypeError\nE TypeError: x"
+    b = "shop/b.py:7: KeyError\nE KeyError: y"
+    found = clusters([("t1", a), ("t2", b), ("t3", b), ("t4", b), ("t5", a), ("t6", "shop/c.py:1: OSError")])
+    assert [(c["raised_at"], c["count"]) for c in found] == [("shop/b.py:7", 3), ("shop/a.py:3", 2)]
+    assert clusters([("t1", a), ("t2", a)], minimum=3) == []

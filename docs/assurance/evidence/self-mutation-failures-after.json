@@ -1,0 +1,100 @@
+{
+ "tool": "Cosmic Ray",
+ "tool_version": "8.7.0",
+ "provenance": "ENGINE_EXECUTED",
+ "error": null,
+ "counts": {
+  "KILLED": 121,
+  "SURVIVED": 88
+ },
+ "finished": true,
+ "wall_clock_s": 105.9,
+ "targets": [
+  "assertiva/failures.py"
+ ],
+ "config": {
+  "test_selection": {
+   "tests": [
+    "tests/test_failures.py",
+    "tests/test_failure_headline.py"
+   ],
+   "baseline": "the selected tests passed",
+   "baseline_duration_s": 0.784,
+   "whole_suite": "NOT_RUN"
+  },
+  "timeout_s": 60.0,
+  "test_command": [
+   "-m",
+   "pytest",
+   "-x",
+   "-q",
+   "-p",
+   "no:cacheprovider",
+   "tests/test_failures.py",
+   "tests/test_failure_headline.py"
+  ],
+  "distributor": "local",
+  "operators": "Cosmic Ray defaults",
+  "max_mutants": 300,
+  "runner": "pytest-native",
+  "selected": "cosmic-ray",
+  "selected_because": "Python tests run by pytest-native (named by the user)"
+ },
+ "survivors": [
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Add",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Add",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Add",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_Add",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_Add",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Sub",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Sub",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Sub",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_Sub",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_Sub",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Mul",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Mul",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Mul",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_Mul",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_Mul",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Div",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Div",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Div",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_Div",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_Div",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_FloorDiv",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_FloorDiv",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_FloorDiv",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_FloorDiv",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_FloorDiv",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Mod",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Mod",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Mod",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_Mod",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_Mod",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Pow",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Pow",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_Pow",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_Pow",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_Pow",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_RShift",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_RShift",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_RShift",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_RShift",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_RShift",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_LShift",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_LShift",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_LShift",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_LShift",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_LShift",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_BitAnd",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_BitAnd",
+  "assertiva/failures.py:59 core/ReplaceBinaryOperator_BitOr_BitAnd",
+  "assertiva/failures.py:81 core/ReplaceBinaryOperator_BitOr_BitAnd",
+  "assertiva/failures.py:109 core/ReplaceBinaryOperator_BitOr_BitAnd"
+ ],
+ "limitations": [
+  "Cosmic Ray runs the whole test command for each mutant and records no killing test: per-test contribution is unknown",
+  "mutants were executed by Assertiva on a disposable copy of this state (the tool mutates files in place)",
+  "only the selected tests ran for each mutant (tests/test_failures.py, tests/test_failure_headline.py): a survivor may be killed by a test outside the selection, and the rest of the suite was not run for this analysis"
+ ]
+}

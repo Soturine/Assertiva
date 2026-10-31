@@ -5,7 +5,7 @@
 Development line toward 0.10.0 on `feature/assertiva-0.10.0-hardening`, from `main` at `cf5cb7d` (0.9.0). **Not
 released:** no tag, no GitHub Release, no merge until the full qualification and CI pass and the owner decides. It
 closes the reproducible gaps of three dogfood rounds (TCC-A01..A24 and AX-E01..E06 from PR #1, AG-01..AG-13 from the
-DrawLab M10 branch) plus four found in this work (SEC-EVAL-01/02, ENG-01/02); every disposition, with its before/after
+DrawLab M10 branch) plus ten found in this work (SEC-EVAL-01..04, ENG-01..06); every disposition, with its before/after
 test and commit, is in [docs/assurance/POST_DOGFOOD_GAP_MATRIX.md](docs/assurance/POST_DOGFOOD_GAP_MATRIX.md).
 
 ### Security
@@ -38,6 +38,13 @@ test and commit, is in [docs/assurance/POST_DOGFOOD_GAP_MATRIX.md](docs/assuranc
 ### Maintenance
 - Removed dead code (`STRONG_ORACLES`, `expected_error_count`, `VerificationSurface.by_kind`/`.blocking`, an unused impact method, `LANGS`) and duplicates (a second `_LEVEL_TONE`, a copied `_relative`, three copies of the PEP 508 name pattern).
 - Dogfood evidence of PR #1 (`6a375ec`) and the DrawLab M10 branch (`5685523`) integrated verbatim; 13 eval cases added (71 in all), all passing the directive lint.
+
+### Final hardening (2026-10-31; ENG-03..06, SEC-EVAL-03/04)
+- **Identity is checked for every loaded module** (ENG-03): the check stopped at 500 modules, so a module from another checkout loaded after them was missed and the run read SOURCE_TREE. Counts are now complete (`loaded`, `inspected`, `unexpected`); at most 50 names are listed per side with `names_truncated`. Cost: about 90 µs per module on Windows, 11 µs on Linux.
+- **The portfolio registry is safe under concurrent processes** (ENG-04): six processes writing feedback lost all 180 updates and left invalid JSON; every operation now runs under an OS file lock and writes through a private temporary file, fsynced and atomically replaced.
+- **Dependency usage says only what static imports show** (ENG-05): tests reaching the code through other or relative project imports are found; importing is never read as exercising (`exercised: UNKNOWN`); `DEPENDENCY_USAGE_UNTESTED` is renamed `DEPENDENCY_USAGE_NOT_REACHED_STATICALLY` and names what it does not follow.
+- **Eval guard** (SEC-EVAL-03/04): paths built at run time (substitution, ANSI-C quoting, inline interpreter code) are refused, as found by code scanning on PR #2; a bare word naming a workspace link is resolved (a link to the private file passed); git format strings are no longer refused. It remains a tool-call guard, not an OS sandbox.
+- **Run cards show the code identity and the limit** (ENG-06), so the page and the JSON agree.
 
 ### Not done in this line (see the gap matrix)
 TCC-A02 (per-root denominators), TCC-A06 (module-loader doubles), TCC-A12 (unverified UI behavior) are open; TCC-A18 (emulator) and TCC-A15 (semantic eval runs, pending the owner's budget approval) are BLOCKED; the Skill changes are not semantically evaluated.

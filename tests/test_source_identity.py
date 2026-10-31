@@ -96,3 +96,68 @@ def test_a_submodule_served_from_another_tree_is_a_mismatch(tmp_path, capsys, as
     code, report = run(capsys, "audit", str(root), "--execute")
     identity = native(report)["source_identity"]
     assert identity["status"] == "MISMATCH" and identity["from_outside_the_copy"] == ["shop.fees"]
+
+
+def many_modules_project(root, other, count=510):
+    """A package that loads ``count`` of its own submodules and, last, one served from another checkout."""
+    write(other / "shop" / "zz_foreign.py", "VALUE = 2\n")
+    for i in range(count):
+        write(root / "src" / "shop" / f"m{i:04d}.py", f"VALUE = {i}\n")
+    write(root / "src" / "shop" / "__init__.py", "import os\n__path__.append(os.environ['OTHER_SHOP'])\n")
+    write(root / "tests" / "test_all.py",
+          "import importlib\n\ndef test_all():\n"
+          f"    for i in range({count}):\n        importlib.import_module(f'shop.m{{i:04d}}')\n"
+          "    assert importlib.import_module('shop.zz_foreign').VALUE == 2\n")
+    write(root / "pytest.ini", "[pytest]\npythonpath = src\n")
+    return root
+
+
+def test_a_foreign_module_after_hundreds_of_own_modules_is_still_found(tmp_path, capsys, assertiva_home, monkeypatch):
+    # CP-F1: the identity check stopped at 500 modules, so a foreign submodule loaded after them was never inspected
+    other = tmp_path / "other-checkout"
+    monkeypatch.setenv("OTHER_SHOP", str(other / "shop"))
+    root = many_modules_project(tmp_path / "p", other)
+    code, report = run(capsys, "audit", str(root), "--execute")
+    identity = native(report)["source_identity"]
+    assert identity["status"] == "MISMATCH" and identity["from_outside_the_copy"] == ["shop.zz_foreign"]
+    assert identity["inspected"] == identity["loaded"] == 512  # the package, 510 own modules, the foreign one
+
+
+def test_many_own_modules_are_all_inspected_and_stay_source_tree(tmp_path, capsys, assertiva_home, monkeypatch):
+    # negative control: the same size, no foreign module
+    other = tmp_path / "empty-other"
+    other.mkdir()
+    monkeypatch.setenv("OTHER_SHOP", str(other / "shop"))
+    root = many_modules_project(tmp_path / "p", tmp_path / "unused")
+    (root / "tests" / "test_all.py").write_text(
+        "import importlib\n\ndef test_all():\n    for i in range(510):\n        importlib.import_module(f'shop.m{i:04d}')\n",
+        encoding="utf-8")
+    code, report = run(capsys, "audit", str(root), "--execute")
+    identity = native(report)["source_identity"]
+    assert identity["status"] == "SOURCE_TREE" and identity["inspected"] == identity["loaded"] == 511
+
+
+def test_counts_are_complete_when_listed_names_are_truncated():
+    from assertiva.adapters.pytest_native import PytestNativeAdapter
+    from assertiva.candidate import StageStatus
+    from assertiva.models import RunEvidence
+
+    foreign = {f"shop.f{i:03d}": f"/other/shop/f{i:03d}.py" for i in range(50)}
+    identity = {"loaded": 2000, "inside": 1880, "outside": 120, "inside_listed": {}, "outside_listed": foreign, "names_truncated": True}
+    run_ = RunEvidence(adapter_id="pytest-native", mode="execute", status=StageStatus.UNKNOWN)
+    PytestNativeAdapter()._session_facts(run_, {"identity": identity, "tempdir": "/tmp", "tempdir_writable": True})
+    found = run_.metadata["source_identity"]
+    assert found["status"] == "MISMATCH" and found["unexpected"] == 120 and found["inspected"] == 2000
+    assert found["names_truncated"] is True and len(found["from_outside_the_copy"]) == 50
+
+
+def test_an_empty_or_missing_identity_record_is_unknown_never_verified():
+    from assertiva.adapters.pytest_native import PytestNativeAdapter
+    from assertiva.candidate import StageStatus
+    from assertiva.models import RunEvidence
+
+    for record in ({}, {"identity": {"loaded": 0, "inside": 0, "outside": 0, "inside_listed": {}, "outside_listed": {}}},
+                   {"identity": "garbage"}):
+        run_ = RunEvidence(adapter_id="pytest-native", mode="execute", status=StageStatus.UNKNOWN)
+        PytestNativeAdapter()._session_facts(run_, {**record, "tempdir": "/tmp", "tempdir_writable": True})
+        assert run_.metadata["source_identity"]["status"] == "UNKNOWN", record

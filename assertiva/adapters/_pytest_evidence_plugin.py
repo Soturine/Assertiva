@@ -78,11 +78,15 @@ def _project_names(root):
     return names
 
 
-def _inside(path, root):
+def _inside(path, root, real_root=None):
+    real_root = real_root or os.path.realpath(root)
     try:
-        return os.path.commonpath([os.path.realpath(path), os.path.realpath(root)]) == os.path.realpath(root)
+        return os.path.commonpath([os.path.realpath(path), real_root]) == real_root
     except ValueError:  # another drive
         return False
+
+
+LISTED = 50  # names reported per side; every loaded module is inspected and counted whatever this is
 
 
 def pytest_sessionfinish(session):
@@ -93,14 +97,18 @@ def pytest_sessionfinish(session):
     import tempfile
 
     root = str(session.config.rootpath)
-    imported = {}
-    names = _project_names(root)
+    names, real_root = _project_names(root), os.path.realpath(root)
     # every loaded module of the project's packages, not only the top level: an import hook (an editable install's
-    # finder, a __path__ extension) can serve a submodule from another tree while the package itself comes from here
-    for name in sorted(n for n in list(sys.modules) if n.split(".")[0] in names)[:500]:
+    # finder, a __path__ extension) can serve a submodule from another tree while the package itself comes from here.
+    # All of them are inspected; only the names listed in the record are bounded (counts are always complete).
+    inside, outside = {}, {}
+    for name in sorted(n for n in list(sys.modules) if n.split(".")[0] in names):
         location = getattr(sys.modules.get(name), "__file__", None)
         if location:
-            imported[name] = {"file": location, "inside_root": _inside(location, root)}
+            (inside if _inside(location, root, real_root) else outside)[name] = location
+    identity = {"loaded": len(inside) + len(outside), "inside": len(inside), "outside": len(outside),
+                "inside_listed": dict(list(inside.items())[:LISTED]), "outside_listed": dict(list(outside.items())[:LISTED]),
+                "names_truncated": len(inside) > LISTED or len(outside) > LISTED}
     temp = tempfile.gettempdir()
     try:
         with tempfile.TemporaryFile(dir=temp):
@@ -113,7 +121,7 @@ def pytest_sessionfinish(session):
     # the per-user site directory belongs to this interpreter; another environment's site-packages does not
     borrowed = [p for p in sites if not any(_inside(p, prefix) for prefix in prefixes)
                 and not (user_site and os.path.realpath(p) == os.path.realpath(user_site))]
-    _emit({"type": "session", "root": root, "imported": imported, "tempdir": temp, "tempdir_writable": writable,
+    _emit({"type": "session", "root": root, "identity": identity, "tempdir": temp, "tempdir_writable": writable,
            "python": sys.executable, "prefix": sys.prefix, "borrowed_site_dirs": borrowed,
            "user_site": user_site if user_site in sys.path else None})
 

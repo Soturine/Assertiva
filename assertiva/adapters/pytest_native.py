@@ -207,20 +207,26 @@ class PytestNativeAdapter(PythonStatic):
 
     def _session_facts(self, evidence: RunEvidence, record: dict) -> None:
         """Code identity (AX-E02), the temp root (AG-08) and borrowed site directories (AG-09) of this run."""
-        imported = record.get("imported") or {}
-        outside = sorted(name for name, where in imported.items() if not where.get("inside_root"))
+        identity = record.get("identity")
         expected = "INSTALLED_ARTIFACT" if self.expect_installed else "SOURCE_TREE"
-        if not imported:
-            status = "UNKNOWN"
-        elif self.expect_installed:
-            status = "INSTALLED_ARTIFACT" if len(outside) == len(imported) else "MISMATCH"
+        if not isinstance(identity, dict) or not isinstance(identity.get("loaded"), int):
+            status, wrong, counts = "UNKNOWN", {}, {}  # nothing recorded: never read as verified
         else:
-            status = "MISMATCH" if outside else "SOURCE_TREE"
+            # the modules on the unexpected side are the evidence: outside the copy for a source run, inside it for an
+            # installed-artifact run. Counts cover every loaded module; only the listed names may be truncated.
+            wrong_count = identity["inside"] if self.expect_installed else identity["outside"]
+            wrong = identity["inside_listed"] if self.expect_installed else identity["outside_listed"]
+            counts = {k: identity.get(k) for k in ("loaded", "inside", "outside", "names_truncated")}
+            status = ("UNKNOWN" if not identity["loaded"] else "MISMATCH" if wrong_count else expected)
         evidence.metadata["source_identity"] = {
-            "expected": expected, "status": status, "modules": {n: w.get("file") for n, w in imported.items()},
-            "from_outside_the_copy": outside if not self.expect_installed else sorted(set(imported) - set(outside)),
-            "basis": "OBSERVED: the module files the test process had imported when the session finished",
+            "expected": expected, "status": status, "modules": dict(wrong), "from_outside_the_copy": sorted(wrong),
+            "loaded": counts.get("loaded"), "inspected": counts.get("loaded"),
+            "unexpected": (counts.get("inside") if self.expect_installed else counts.get("outside")) if counts else None,
+            "names_truncated": counts.get("names_truncated"),
+            "basis": "OBSERVED: every module of the project's packages the test process had imported when the session "
+                     "finished; listed names are bounded, counts are complete",
         }
+        outside = sorted(wrong)
         if status == "MISMATCH" and not self.expect_installed:
             evidence.limitations.append(
                 "the tests imported the project's own modules from outside the tested copy (" + ", ".join(outside[:5])

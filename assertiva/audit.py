@@ -66,6 +66,8 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
             "The tests imported the project's own modules from an installed copy instead of the source tree under test.",
             {"modules": modules[:20], "files": {m: f for run in shadowed for m, f in run.metadata["source_identity"]["modules"].items()
                                                 if m in modules}, "adapters": [run.adapter_id for run in shadowed],
+             "unexpected_count": sum(run.metadata["source_identity"].get("unexpected") or 0 for run in shadowed),
+             "names_truncated": any(run.metadata["source_identity"].get("names_truncated") for run in shadowed),
              "basis": "OBSERVED"}))
     executed = [inv for run in current.runs if run.mode == "execute" for inv in run.invocations]
     # The static inventory counts runnable nodes (definitions + inherited/composed materializations) and never expands

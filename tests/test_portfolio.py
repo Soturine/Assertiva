@@ -3,6 +3,7 @@ audit, keep project findings and Assertiva feedback apart, and say CURRENT/STALE
 
 import json
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -111,3 +112,45 @@ def test_bad_names_and_projects_inside_assertiva_home_are_refused(tmp_path, caps
     code, _, err = run(capsys, "add", str(python_project(tmp_path / "calc")), "--name", "../escape")
     assert code == 2 and "name" in err
     assert run(capsys, "audit", "missing")[0] == 2
+
+
+@pytest.mark.integration
+def test_concurrent_processes_lose_no_update_and_keep_valid_json(tmp_path, assertiva_home):
+    # CP-F2: six processes, fifteen rounds each; 26461ce lost every update and left invalid JSON on Windows
+    import subprocess
+
+    (tmp_path / "proj").mkdir()
+    done = subprocess.run([sys.executable, str(Path(__file__).with_name("portfolio_concurrency.py")), str(assertiva_home),
+                           str(tmp_path / "proj"), "6", "15"], capture_output=True, text=True, timeout=600)
+    verdict = json.loads(done.stdout.strip().splitlines()[-1])
+    assert verdict == {"valid_json": True, "errors": [], "error_count": 0, "shared_sightings": 90, "own_entries": 90,
+                       "expected_each": 90, "lost": 0, "project_kept": True}, (verdict, done.stderr[-500:])
+    assert not list((assertiva_home / "portfolio").glob("*.tmp"))
+
+
+def test_an_interrupted_write_leaves_the_previous_registry_whole(tmp_path, capsys, assertiva_home, monkeypatch):
+    run(capsys, "add", str(python_project(tmp_path / "calc")))
+    before = (assertiva_home / "portfolio" / "registry.json").read_text(encoding="utf-8")
+
+    def crash(*args, **kwargs):
+        raise OSError("disk went away")
+
+    with monkeypatch.context() as patched:
+        patched.setattr("assertiva.portfolio.os.replace", crash)
+        with pytest.raises(OSError):
+            portfolio.add_feedback("calc", "COST", "X", "sig", "synthetic", "dev")
+    assert (assertiva_home / "portfolio" / "registry.json").read_text(encoding="utf-8") == before
+    assert not list((assertiva_home / "portfolio").glob("*.tmp"))
+    entry = portfolio.add_feedback("calc", "COST", "X", "sig", "synthetic", "dev")  # works again, nothing lost
+    assert len(entry["sightings"]) == 1 and portfolio.get("calc").name == "calc"
+
+
+def test_existing_projects_and_history_survive_later_writes(tmp_path, capsys, assertiva_home):
+    run(capsys, "add", str(python_project(tmp_path / "a")))
+    run(capsys, "add", str(python_project(tmp_path / "b")))
+    fid = portfolio.add_feedback("a", "COST", "R", "s", "synthetic", "dev")["feedback_id"]
+    portfolio.move_feedback(fid, "REPRODUCED", "fixture tests/x.py")
+    portfolio.add_feedback("b", "COST", "R", "s", "synthetic", "dev")
+    data = json.loads((assertiva_home / "portfolio" / "registry.json").read_text(encoding="utf-8"))
+    assert set(data["projects"]) == {"a", "b"}
+    assert [h["to"] for h in data["feedback"][fid]["history"]] == ["REPRODUCED"] and len(data["feedback"][fid]["sightings"]) == 2

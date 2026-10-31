@@ -20,10 +20,16 @@ nothing scores them.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
+import os
 import re
 import subprocess
+import tempfile
+import threading
+import time
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -77,11 +83,83 @@ def _load() -> dict:
 
 
 def _save(data: dict) -> None:
+    """Write to a temporary file of this writer's own, flush it to disk, then replace the registry in one step: a crash
+    or an error before the replace leaves the previous registry whole (the temporary file is removed)."""
     folder = portfolio_dir()
     folder.mkdir(parents=True, exist_ok=True)
-    temporary = folder / "registry.json.tmp"
-    temporary.write_text(json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False), encoding="utf-8")
-    temporary.replace(folder / "registry.json")  # atomic on the same volume: a crash leaves the old registry whole
+    handle, temporary = tempfile.mkstemp(prefix="registry.", suffix=".tmp", dir=folder)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as out:
+            out.write(json.dumps(data, indent=1, sort_keys=True, ensure_ascii=False))
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temporary, folder / "registry.json")
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+_HELD = threading.local()
+LOCK_TIMEOUT_S = 60.0
+
+
+@contextmanager
+def _locked():
+    """An OS lock on ``registry.lock`` for one read-modify-write of the registry, across processes and threads. The
+    operating system releases it when a process dies, so a crash leaves no stale lock. Reentrant within a thread."""
+    if getattr(_HELD, "depth", 0):
+        _HELD.depth += 1
+        try:
+            yield
+        finally:
+            _HELD.depth -= 1
+        return
+    folder = portfolio_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    handle = open(folder / "registry.lock", "a+b")
+    deadline = time.monotonic() + LOCK_TIMEOUT_S
+    try:
+        while True:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise PortfolioError(f"the portfolio registry stayed locked by another process for {LOCK_TIMEOUT_S:.0f} s") from None
+                time.sleep(0.02)
+        _HELD.depth = 1
+        try:
+            yield
+        finally:
+            _HELD.depth = 0
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    finally:
+        handle.close()
+
+
+def _serialized(function):
+    """Run a registry operation (its load, change and save) under the registry lock."""
+    @functools.wraps(function)
+    def run(*args, **kwargs):
+        with _locked():
+            return function(*args, **kwargs)
+    return run
 
 
 def _revision(path: Path) -> tuple[str | None, bool | None]:
@@ -126,6 +204,11 @@ def add(path: str | Path, name: str | None = None, phase: str = "unknown", criti
         raise PortfolioError(f"{name!r} is not a usable project name (letters, digits, . _ -)")
     if phase not in PHASES:
         raise PortfolioError(f"phase must be one of {', '.join(PHASES)}")
+    return _register(path, name, phase, criticality, needs, detect_stacks(path))
+
+
+@_serialized
+def _register(path: Path, name: str, phase: str, criticality: str, needs: list[str] | None, stacks: list[dict]) -> Project:
     data = _load()
     existing = data["projects"].get(name)
     if existing and existing.get("path") not in (None, str(path)):
@@ -133,12 +216,13 @@ def add(path: str | Path, name: str | None = None, phase: str = "unknown", criti
     project = Project(**existing) if existing else Project(name=name)
     project.path, project.phase, project.criticality = str(path), phase, criticality
     project.needs = list(needs or project.needs)
-    project.stacks = detect_stacks(path)
+    project.stacks = stacks
     data["projects"][name] = asdict(project)
     _save(data)
     return project
 
 
+@_serialized
 def get(name: str) -> Project:
     data = _load()
     if name not in data["projects"]:
@@ -201,6 +285,7 @@ def summarize_run(report: dict, report_path: str | None) -> dict:
     }
 
 
+@_serialized
 def record_audit(name: str, report: dict, report_path: str | None) -> dict:
     data = _load()
     if name not in data["projects"]:
@@ -237,6 +322,7 @@ def feedback_id(kind: str, rule: str, signature: str) -> str:
     return "AFB-" + hashlib.sha256(f"{kind}|{rule}|{normalized}".encode()).hexdigest()[:10]
 
 
+@_serialized
 def add_feedback(project: str, kind: str, rule: str, signature: str, reproducer: str, engine_version: str,
                  run_id: str | None = None, note: str = "") -> dict:
     """Record (or add a sighting to) feedback about Assertiva. ``reproducer`` must be sanitized and synthetic: a
@@ -260,6 +346,7 @@ def add_feedback(project: str, kind: str, rule: str, signature: str, reproducer:
     return entry
 
 
+@_serialized
 def move_feedback(fid: str, state: str, evidence: str) -> dict:
     """Move feedback to ``state`` with the evidence for it (a test, a commit, a run). Moving to FIXED or later needs a
     commit or run reference in the evidence; no state is ever erased."""
@@ -279,6 +366,7 @@ def move_feedback(fid: str, state: str, evidence: str) -> dict:
     return entry
 
 
+@_serialized
 def report(include_paths: bool = False) -> dict:
     """The portfolio view: each project's status and last summary, and Assertiva feedback apart. Local paths are left
     out unless asked for (the view may be shared)."""

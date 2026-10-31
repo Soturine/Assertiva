@@ -1812,6 +1812,7 @@ def _runs(r: _R) -> str:
                 f'<li class="run"><div class="run-head"><span class="run-title"><code>{_e(run["adapter"])}</code> {r.state(key)}</span>{r.pill(run["status"])}</div>'
                 f'<p class="run-how">{how} · {r.t("runs.invocations", n=run["invocations"])}'
                 + (f' · {r.t("runs.exit")} <code>{_e(run["exit_code"])}</code>' if run.get("exit_code") is not None else "") + "</p>"
+                + _run_facts(r, run)
                 + (f'<p class="tech-label">{r.t("runs.matrix")}</p><ul class="matrix">{matrix}</ul>' if matrix else "")
                 + (f'<div class="cmd"><div class="cmd-head">{r.t("surface.command")}{_copy(r)}</div><pre class="code"><code>{_e(command)}</code></pre></div>' if command else "")
                 + (f'<p class="tech-label">{r.t("surface.limitations")}</p>{r.items(run["limitations"])}' if run.get("limitations") else "")
@@ -1819,6 +1820,19 @@ def _runs(r: _R) -> str:
             )
     body = f'<ul class="runs">{"".join(rows)}</ul>' if rows else r.t("runs.none", tag="p", cls="empty")
     return _panel(r, "runs", "runs.title", r.t("runs.summary", n=total) if total else r.t("runs.summary.none"), body)
+
+
+def _run_facts(r: _R, run: dict) -> str:
+    """What the run really used: the copy of the code it imported (with how many modules were inspected) and its limit."""
+    parts = []
+    identity = run.get("source_identity") or {}
+    if identity.get("status"):
+        parts.append(f'{r.t("runs.identity")} <code class="raw">{_e(identity["status"])}</code>'
+                     + (f' ({r.t("runs.inspected", n=identity["inspected"])})' if identity.get("inspected") is not None else ""))
+    limits = run.get("limits") or {}
+    if limits.get("timeout_s") is not None:
+        parts.append(f'{r.t("runs.limit")} <code>{float(limits["timeout_s"]):g} s</code> ({_e(limits.get("timeout_source"))})')
+    return f'<p class="run-how">{" · ".join(parts)}</p>' if parts else ""
 
 
 def _effectiveness(r: _R) -> str:

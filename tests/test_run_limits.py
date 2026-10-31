@@ -70,3 +70,15 @@ def test_source_and_artifact_runs_of_one_revision_are_compared_side_by_side(tmp_
     assert [r["what"] for r in rows] == ["pytest-native (execute)", "python-package tests against the installed wheel"]
     assert all(r["timeout_s"] == 300.0 and r["timeout_source"] == "command line (--timeout-s)" for r in rows)
     assert all(r["status"] == "PASS" and r["wall_clock_s"] is not None for r in rows)
+
+
+@pytest.mark.integration
+def test_the_page_shows_each_runs_code_identity_and_limit(tmp_path, capsys, assertiva_home):
+    # CP-F5: the JSON and the HTML say the same about what a run used
+    from pathlib import Path
+
+    code, report = run(capsys, "audit", str(slow_project(tmp_path / "p", 0)), "--execute", "--timeout-s", "120")
+    page = Path(report["report_path"]).with_name("audit.html").read_text(encoding="utf-8")
+    entry = next(r for r in report["states"]["current"]["runs"] if r["adapter"] == "pytest-native")
+    assert entry["source_identity"]["status"] == "SOURCE_TREE"
+    assert "SOURCE_TREE</code>" in page and "120 s</code>" in page and "command line (--timeout-s)" in page

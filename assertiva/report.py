@@ -145,6 +145,8 @@ def _mutation_summary(run) -> dict:
         "tool": run.tool, "tool_version": run.tool_version, "source": run.source, "error": run.error,
         "per_mutant": run.per_mutant, "matches_state": run.matches_state, "counts": dict(run.counts),
         "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:50]],
+        # the list is bounded; the count is complete and the bound is stated, never silently applied
+        "survivors_total": len(run.survivors()), "survivors_truncated": len(run.survivors()) > 50,
         "survivor_sites": survivor_sites(run),
         # where the evidence came from and how much it can decide
         "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,

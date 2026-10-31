@@ -1,7 +1,8 @@
-# Release readiness — 0.10.0.dev0
+# Release readiness — 0.10.0
 
-**State:** v0.9.0 is the published release. 0.10.0.dev0 is in development on `feature/assertiva-0.10.0-hardening`
-(draft PR #2). No tag, GitHub Release, PyPI upload or merge to `main` happens without the owner's decision.
+**State:** 0.10.0 is released on the owner's authorization (2026-10-31): PR #2 merged to `main`, annotated tag
+`v0.10.0`, stable GitHub Release with wheel, sdist and SHA-256 checksums; not published on PyPI. The owner accepted
+publishing with the paid semantic Skill evals NOT_RUN and the open gaps below documented.
 
 ## Evidence by kind
 
@@ -27,7 +28,7 @@
 | Wheel and sdist from a clean `git archive` export | Windows | `10a900b` | both built; wheel installed in a fresh venv outside the tree |
 | Installed CLI on a real fixture, `--python` with pytest | same | `10a900b` | PASS, 4 PASSED, ENGINE_EXECUTED, code identity SOURCE_TREE; `explain` shows the execution; fixture unchanged |
 | Installed CLI, interpreter without pytest | same | `10a900b` | BLOCKED with the reason (AX-E06 preflight), as intended |
-| Engine-run mutation of `assertiva/failures.py` (named tests) | Windows, Cosmic Ray 8.7.0 | `b98386d` | 209 mutants: 121 killed, 88 survived (55 equivalent) |
+| Engine-run mutation of `assertiva/failures.py` (named tests) | Windows, Cosmic Ray 8.7.0 | `b98386d` | 209 mutants: 121 killed, 88 survived (55 equivalence candidates, not proven; 33 with impact UNKNOWN); complete per-mutant records in `evidence/` |
 | Frozen benchmarks v1+v2 | static | `a14b3ff` vs `cf5cb7d` | identical: precision 1.0, recall 0.841 (37/0/7). No gain is claimed |
 | Static audit cost on this repository | Windows, single samples | `a14b3ff` vs `cf5cb7d` | 13.7 s vs 15.0 s, identical findings (within run-to-run noise) |
 | ruff F-rules, repository validation, gap matrix check, schema check | Windows | `a14b3ff` | PASS |
@@ -37,9 +38,12 @@
 | Run | Event | SHA | Result |
 | --- | --- | --- | --- |
 | [41163321031](https://github.com/Soturine/Assertiva/actions/runs/41163321031) | push | `26461ce` | success: 7 jobs ran with steps; Runtime self-qualification skipped (runs on dispatch only) |
-| final push of this hardening round | push | recorded in PR #2 | see PR #2 |
+| [41181800794](https://github.com/Soturine/Assertiva/actions/runs/41181800794) | push | `f94e46e` | success: 7 jobs ran with steps; Runtime self-qualification skipped (dispatch-only) |
+| [41181803198](https://github.com/Soturine/Assertiva/actions/runs/41181803198) | pull_request | `f94e46e` | success: 7 jobs ran with steps; Runtime self-qualification skipped (dispatch-only) |
+| [41182439362](https://github.com/Soturine/Assertiva/actions/runs/41182439362) | workflow_dispatch | `f94e46e` | **success: all 8 jobs ran, including Runtime self-qualification (9 steps)** |
+| release commit | push, pull_request, workflow_dispatch | the release-preparation commit | recorded in the GitHub Release notes and PR #2 (a run on `f94e46e` does not qualify a later commit) |
 
 ## What blocks a release, and what is only the owner's decision
 
-- **Blocks:** nothing technical in the local gates above. CI on the final SHA, including the dispatch-only runtime self-qualification, must pass before a tag.
-- **Owner decisions:** the contract changes listed in the CHANGELOG; PR #1's disposition (superseded by #2); approval of a budget for semantic agent evals (or shipping with them recorded NOT_RUN); merging #2; tagging `v0.10.0` (the version string is then changed from `0.10.0.dev0`).
+- **Gate for the tag:** CI on the release commit, including the dispatch-only Runtime self-qualification, and CI on `main` after the merge.
+- **Owner decisions (taken 2026-10-31):** contract changes approved; semantic evals NOT_RUN accepted; PR #1 closed as superseded by #2; merge, tag and release authorized.

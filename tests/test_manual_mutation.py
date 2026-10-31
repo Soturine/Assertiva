@@ -42,3 +42,16 @@ def test_manual_mutants_never_become_the_states_mutation_metrics(tmp_path):
     attach_mutation(state, load_mutation_report(manifest(tmp_path, [
         {"id": "m1", "patch_sha256": PATCH, "exit_code": 1, "status": "KILLED"}])), tmp_path)
     assert not any(name.startswith("mutation_") for name in state_metrics(state))
+
+
+def test_a_summary_states_the_complete_survivor_count_and_its_truncation():
+    from assertiva.models import MutantRecord, MutantStatus, MutationRun
+    from assertiva.report import _mutation_summary
+
+    run = MutationRun(source="t", tool="Cosmic Ray", mutants=[
+        MutantRecord(mutant_id=str(i), status=MutantStatus.SURVIVED, native_status="x", path="a.py", line=i, operator="op")
+        for i in range(1, 80)])
+    summary = _mutation_summary(run)
+    assert len(summary["survivors"]) == 50 and summary["survivors_total"] == 79 and summary["survivors_truncated"] is True
+    small = _mutation_summary(MutationRun(source="t", mutants=run.mutants[:3]))
+    assert small["survivors_total"] == 3 and small["survivors_truncated"] is False

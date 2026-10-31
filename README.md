@@ -16,15 +16,15 @@ Assertiva audits whether a test suite provides meaningful evidence, selects the 
 
 *The Assurance Report from a real `assertiva audit --execute` run on [`tests/fixtures/django-site`](tests/fixtures/django-site): one self-contained, offline HTML page (English / Brazilian Portuguese, light / dark).*
 
-> **Assertiva v0.9.0** — Advanced Test Intelligence & Continuous Assurance. It is distributed as its [GitHub Release](https://github.com/Soturine/Assertiva/releases/tag/v0.9.0) (wheel and sdist, with SHA-256 checksums) and from this repository's source. It is **not** published on PyPI or in any Skill marketplace. Python 3.11 or newer.
+> **Assertiva v0.10.0** — Reliability, Portfolio Assurance & Continuous Dogfood. It is distributed as its [GitHub Release](https://github.com/Soturine/Assertiva/releases/tag/v0.10.0) (wheel and sdist, with SHA-256 checksums) and from this repository's source. It is **not** published on PyPI or in any Skill marketplace. Python 3.11 or newer.
 
 ## Quick start
 
 ```bash
 # 1. Install. From a clone of this repository, or from the wheel attached to the GitHub Release:
 python -m pip install -e .
-python -m pip install assertiva-0.9.0-py3-none-any.whl      # alternative: the release wheel
-assertiva --version                                          # assertiva 0.9.0
+python -m pip install assertiva-0.10.0-py3-none-any.whl     # alternative: the release wheel
+assertiva --version                                          # assertiva 0.10.0
 
 # 2. First audit: static. It reads the project, runs nothing and changes nothing.
 assertiva audit path/to/project
@@ -220,7 +220,7 @@ assertiva audit . --contract verification.json --accessibility-report axe.json  
 assertiva audit . --changed-since main --execute   # impact-based selection, widened when impact is not proven
 assertiva audit . --run-check <CHECK_ID>           # reproduce a declared check (e.g. the CI test step) in a disposable copy
 assertiva audit . --assessment assessment.json    # attach the auditing agent's assessment to the last run's report
-# 0.10.0 development line (not released yet):
+# Added in 0.10.0:
 assertiva audit . --execute --timeout-s 3600      # a per-run limit for this audit only; never written to the project
 assertiva audit . --execute --mutate src/fees.py --mutate-tests tests/test_fees.py   # targeted mutation (Cosmic Ray)
 assertiva audit . --dependencies                  # declared vs locked vs installed, usage, readiness (offline)

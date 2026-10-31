@@ -1,9 +1,9 @@
 # Changelog
 
-## [0.10.0.dev0] — unreleased — Reliability, Portfolio Assurance & Continuous Dogfood
+## [0.10.0] — 2026-10-31 — Reliability, Portfolio Assurance & Continuous Dogfood
 
-Development line toward 0.10.0 on `feature/assertiva-0.10.0-hardening`, from `main` at `cf5cb7d` (0.9.0). **Not
-released:** no tag, no GitHub Release, no merge until the full qualification and CI pass and the owner decides. It
+Published as the GitHub Release `v0.10.0` (wheel and sdist with SHA-256 checksums; not PyPI). Developed on
+`feature/assertiva-0.10.0-hardening` from `main` at `cf5cb7d` (0.9.0) and merged through PR #2. It
 closes the reproducible gaps of three dogfood rounds (TCC-A01..A24 and AX-E01..E06 from PR #1, AG-01..AG-13 from the
 DrawLab M10 branch) plus ten found in this work (SEC-EVAL-01..04, ENG-01..06); every disposition, with its before/after
 test and commit, is in [docs/assurance/POST_DOGFOOD_GAP_MATRIX.md](docs/assurance/POST_DOGFOOD_GAP_MATRIX.md).
@@ -45,9 +45,20 @@ test and commit, is in [docs/assurance/POST_DOGFOOD_GAP_MATRIX.md](docs/assuranc
 - **Dependency usage says only what static imports show** (ENG-05): tests reaching the code through other or relative project imports are found; importing is never read as exercising (`exercised: UNKNOWN`); `DEPENDENCY_USAGE_UNTESTED` is renamed `DEPENDENCY_USAGE_NOT_REACHED_STATICALLY` and names what it does not follow.
 - **Eval guard** (SEC-EVAL-03/04): paths built at run time (substitution, ANSI-C quoting, inline interpreter code) are refused, as found by code scanning on PR #2; a bare word naming a workspace link is resolved (a link to the private file passed); git format strings are no longer refused. It remains a tool-call guard, not an OS sandbox.
 - **Run cards show the code identity and the limit** (ENG-06), so the page and the JSON agree.
+- **Mutation summaries state their bounds**: `survivors_total` and `survivors_truncated` beside the survivor list (bounded at 50). The self-mutation of `failures.py` has complete per-mutant records (`docs/assurance/evidence/*-complete.json`, produced by `benchmarks/self_mutation.py`); its 55 annotation survivors are equivalence candidates, not proven equivalent.
+
+### Contract changes and compatibility (approved for 0.10.0)
+CLI options and report fields are additive; nothing was removed from the CLI or the report schema. Behavior changes, each pinned by a regression test:
+- `f(x) == f(x)` is a weak `DETERMINISM` oracle instead of a `TAUTOLOGY` false-green candidate (`tests/test_effectiveness.py`, `tests/test_oracle_calibration.py`).
+- Failures raised outside the project's code (site-packages, stdlib, Node internals) are no longer `PRODUCT`; refused permissions outside the project and git without a checkout are `INFRASTRUCTURE` (`tests/test_failures.py`).
+- Relative Windows paths normalize to the file name in failure signatures, so fingerprints of such messages differ from 0.9.0's in history comparisons (`tests/test_failures.py`).
+- A GitHub Actions job with `defaults.run.working-directory` is no longer reproduced at the repository root by `--run-check`; scopes are joined to the directory (`tests/test_ci_working_directory.py`).
+- Project wrapper scripts (`gradlew`, `mvnw` in any spelling) are never launched raw; such a step without a reproducible test task is NOT_RUN (`tests/test_gradle.py`).
+- The dependency-closure check of artifact qualification reads modules instead of importing them; an undecidable conditional import is UNKNOWN, where 0.9.0 passed it unchecked (`tests/test_artifact.py`).
+- The report adds `source_identity`, `temp_root`, `interpreter`, `limits` and `outcomes_by_invocation` per run, `execution_manifest.comparison`, `kills_by_test`, `provenance`, `survivors_total` and `survivors_truncated` per mutation summary, and the optional top-level `dependencies` (schema updated).
 
 ### Not done in this line (see the gap matrix)
-TCC-A02 (per-root denominators), TCC-A06 (module-loader doubles), TCC-A12 (unverified UI behavior) are open; TCC-A18 (emulator) and TCC-A15 (semantic eval runs, pending the owner's budget approval) are BLOCKED; the Skill changes are not semantically evaluated.
+TCC-A02 (per-root denominators), TCC-A06 (module-loader doubles), TCC-A12 (unverified UI behavior) are open; TCC-A09 and TCC-A13 are partial; TCC-A18 (emulator) and TCC-A15 (semantic eval runs) are BLOCKED. The Skill changes of 0.10.0 were **not semantically evaluated**: paid agent evals stay NOT_RUN, and the owner accepted publishing with them in that state. The eval harness, its cases and its deterministic safety gate are tested.
 
 ## [0.9.0] — 2026-10-20 — Advanced Test Intelligence & Continuous Assurance
 

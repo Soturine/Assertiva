@@ -33,17 +33,27 @@ running: at most 300 mutants, 60 s per mutant, 1200 s wall clock. The CLI path w
 runs the whole suite natively (and again against the wheel), which stopped the first attempt after 30 minutes; this
 evidence covers the mutation step, not the full CLI flow.
 
-| Run | Mutants | Killed | Survived | Wall clock | Evidence |
+| Run | Mutants | Killed | Survived | Survivors: equivalence candidates / impact UNKNOWN | Evidence |
 | --- | --- | --- | --- | --- | --- |
-| before (`10a900b` tests) | 209 | 110 | 99 | 111 s | [evidence/self-mutation-failures-before.json](evidence/self-mutation-failures-before.json) |
-| after three pinned tests (`b98386d`) | 209 | 121 | 88 | 106 s | [evidence/self-mutation-failures-after.json](evidence/self-mutation-failures-after.json) |
+| before (tests at `10a900b`) | 209 | 110 | 99 | 55 / 44 | [summary](evidence/self-mutation-failures-before.json) (2026-10-31, survivor list bounded at 50), [complete](evidence/self-mutation-failures-before-complete.json) (rerun of the same trees, every mutant) |
+| after three pinned tests (`b98386d`) | 209 | 121 | 88 | 55 / 33 | [summary](evidence/self-mutation-failures-after.json), [complete](evidence/self-mutation-failures-after-complete.json) |
 
-Of the 99 first survivors, 55 mutate type annotations (`str | None`), which are never evaluated under
-`from __future__ import annotations`: equivalent, unkillable by any test. Of the 44 behavioral candidates, three groups
-were real untested behavior (explicit test paths matched on whole components, TEST vs UNKNOWN for errors in test code,
-the largest cluster first) and are now pinned by tests; 11 more mutants are killed. The remaining 33 mostly change
-message wording or slice lengths of explanatory text; they are recorded, not chased. No score is claimed from this run:
-it covers one module and two test files.
+The complete files were produced by [`benchmarks/self_mutation.py`](../../benchmarks/self_mutation.py) from `git
+archive` exports of the two commits (`failures.py` is identical in both; only the tests differ), with the same budget;
+they reproduce the first runs' totals exactly. Each mutant has its file, line, operator, status and stable id.
+
+**How the survivors are classified (a lead, not a verdict).** 55 survivors replace `|` inside a type annotation. With
+`from __future__ import annotations` such a change does not alter a normal call, so they are **equivalence
+candidates**; they are not proven equivalent, because they still change `__annotations__`, what
+`typing.get_type_hints()` returns and what tools reading type metadata see. The other survivors (44 before, 33 after)
+have **UNKNOWN** behavioral impact until someone reads each one; most change the wording of explanatory messages or
+slice lengths. Three groups of them were real untested behavior (explicit test paths matched on whole components, TEST
+vs UNKNOWN for errors in test code, the largest cluster first) and are pinned by tests: 11 more mutants are killed. The
+raw Cosmic Ray results are unchanged and no adjusted score is computed: the run covers one module and two test files.
+
+**Why the first record listed 50 survivors.** The report's mutation summary bounds its survivor list at 50; 0.10.0
+adds `survivors_total` and `survivors_truncated` to every mutation summary so the bound is stated, and the complete
+records live in the artifacts above.
 
 ## Not done
 

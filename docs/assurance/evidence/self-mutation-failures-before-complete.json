@@ -1,0 +1,1805 @@
+{
+ "label": "before: tests at 10a900b",
+ "tool": "Cosmic Ray",
+ "tool_version": "8.7.0",
+ "provenance": "ENGINE_EXECUTED",
+ "error": null,
+ "finished": true,
+ "target": "assertiva/failures.py",
+ "tests": [
+  "tests/test_failures.py",
+  "tests/test_failure_headline.py"
+ ],
+ "selection": {
+  "tests": [
+   "tests/test_failures.py",
+   "tests/test_failure_headline.py"
+  ],
+  "baseline": "the selected tests passed",
+  "baseline_duration_s": 0.817,
+  "whole_suite": "NOT_RUN"
+ },
+ "counts": {
+  "KILLED": 110,
+  "SURVIVED": 99
+ },
+ "survivor_leads": {
+  "EQUIVALENCE_CANDIDATE_ANNOTATION": 55,
+  "IMPACT_UNKNOWN": 44
+ },
+ "leads_note": "EQUIVALENCE_CANDIDATE_ANNOTATION is a candidate, not proven equivalence; IMPACT_UNKNOWN is unread",
+ "wall_clock_s": 107.9,
+ "mutants": [
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Sub:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Sub:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Sub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Sub:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Sub:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Sub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mul:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mul:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Mul",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mul:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mul:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Mul",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Div:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Div:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Div",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Div:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Div:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Div",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_FloorDiv:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_FloorDiv:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_FloorDiv",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_FloorDiv:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_FloorDiv:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_FloorDiv",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mod:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mod:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Mod",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mod:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Mod:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Mod",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Pow:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Pow:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Pow",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Pow:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_Pow:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_Pow",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_RShift:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_RShift:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_RShift",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_RShift:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_RShift:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_RShift",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_LShift:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_LShift:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_LShift",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_LShift:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_LShift:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_LShift",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitOr:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitOr:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_BitOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitOr:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitOr:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_BitOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitAnd:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitAnd:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_BitAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitAnd:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitAnd:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_BitAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitXor:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitXor:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_BitXor",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitXor:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_Add_BitXor:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceBinaryOperator_Add_BitXor",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Add:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Sub:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mul:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Div:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Mod:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_Pow:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_RShift:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_LShift:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitAnd:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:0",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:1",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:2",
+   "file": "assertiva/failures.py",
+   "line": 59,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:3",
+   "file": "assertiva/failures.py",
+   "line": 81,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceBinaryOperator_BitOr_BitXor:4",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_NotEq:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_NotEq:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_Lt:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_Lt:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_LtE:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_LtE:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_Gt:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_Gt:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_GtE:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_GtE:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_Is:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_Is:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_IsNot:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Eq_IsNot:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Eq:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Eq:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_NotEq:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_NotEq:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Lt:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Lt:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_LtE:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_LtE:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Gt:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Gt:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Is:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_Is:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_IsNot:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_GtE_IsNot:0",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceComparisonOperator_GtE_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Is_IsNot:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Is_IsNot:0",
+   "file": "assertiva/failures.py",
+   "line": 88,
+   "operator": "core/ReplaceComparisonOperator_Is_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_Is_IsNot:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_Is_IsNot:1",
+   "file": "assertiva/failures.py",
+   "line": 90,
+   "operator": "core/ReplaceComparisonOperator_Is_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceComparisonOperator_IsNot_Is:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceComparisonOperator_IsNot_Is:0",
+   "file": "assertiva/failures.py",
+   "line": 114,
+   "operator": "core/ReplaceComparisonOperator_IsNot_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:0",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/ReplaceUnaryOperator_USub_UAdd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:1",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/ReplaceUnaryOperator_USub_UAdd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:2",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_USub_UAdd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:3",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_USub_UAdd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:4",
+   "file": "assertiva/failures.py",
+   "line": 100,
+   "operator": "core/ReplaceUnaryOperator_USub_UAdd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:5",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_UAdd:5",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceUnaryOperator_USub_UAdd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:0",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/ReplaceUnaryOperator_USub_Invert",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:1",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/ReplaceUnaryOperator_USub_Invert",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:2",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_USub_Invert",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:3",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_USub_Invert",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:4",
+   "file": "assertiva/failures.py",
+   "line": 100,
+   "operator": "core/ReplaceUnaryOperator_USub_Invert",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:5",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Invert:5",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceUnaryOperator_USub_Invert",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:0",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/ReplaceUnaryOperator_USub_Not",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:1",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/ReplaceUnaryOperator_USub_Not",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:2",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_USub_Not",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:3",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_USub_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:4",
+   "file": "assertiva/failures.py",
+   "line": 100,
+   "operator": "core/ReplaceUnaryOperator_USub_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:5",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_USub_Not:5",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceUnaryOperator_USub_Not",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:0",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/ReplaceUnaryOperator_Delete_USub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:1",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/ReplaceUnaryOperator_Delete_USub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:2",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_Delete_USub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:3",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/ReplaceUnaryOperator_Delete_USub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:4",
+   "file": "assertiva/failures.py",
+   "line": 100,
+   "operator": "core/ReplaceUnaryOperator_Delete_USub",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:5",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_USub:5",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/ReplaceUnaryOperator_Delete_USub",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:0",
+   "file": "assertiva/failures.py",
+   "line": 61,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:1",
+   "file": "assertiva/failures.py",
+   "line": 83,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:2",
+   "file": "assertiva/failures.py",
+   "line": 92,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:3",
+   "file": "assertiva/failures.py",
+   "line": 93,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:4",
+   "file": "assertiva/failures.py",
+   "line": 94,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:5",
+   "stable_id": "assertiva/failures.py:core/ReplaceUnaryOperator_Delete_Not:5",
+   "file": "assertiva/failures.py",
+   "line": 104,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:0",
+   "stable_id": "assertiva/failures.py:core/AddNot:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:1",
+   "stable_id": "assertiva/failures.py:core/AddNot:1",
+   "file": "assertiva/failures.py",
+   "line": 61,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:2",
+   "stable_id": "assertiva/failures.py:core/AddNot:2",
+   "file": "assertiva/failures.py",
+   "line": 65,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:3",
+   "stable_id": "assertiva/failures.py:core/AddNot:3",
+   "file": "assertiva/failures.py",
+   "line": 66,
+   "operator": "core/AddNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:4",
+   "stable_id": "assertiva/failures.py:core/AddNot:4",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:5",
+   "stable_id": "assertiva/failures.py:core/AddNot:5",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:6",
+   "stable_id": "assertiva/failures.py:core/AddNot:6",
+   "file": "assertiva/failures.py",
+   "line": 83,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:7",
+   "stable_id": "assertiva/failures.py:core/AddNot:7",
+   "file": "assertiva/failures.py",
+   "line": 85,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:8",
+   "stable_id": "assertiva/failures.py:core/AddNot:8",
+   "file": "assertiva/failures.py",
+   "line": 88,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:9",
+   "stable_id": "assertiva/failures.py:core/AddNot:9",
+   "file": "assertiva/failures.py",
+   "line": 90,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:10",
+   "stable_id": "assertiva/failures.py:core/AddNot:10",
+   "file": "assertiva/failures.py",
+   "line": 92,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:11",
+   "stable_id": "assertiva/failures.py:core/AddNot:11",
+   "file": "assertiva/failures.py",
+   "line": 94,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:12",
+   "stable_id": "assertiva/failures.py:core/AddNot:12",
+   "file": "assertiva/failures.py",
+   "line": 95,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:13",
+   "stable_id": "assertiva/failures.py:core/AddNot:13",
+   "file": "assertiva/failures.py",
+   "line": 102,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:14",
+   "stable_id": "assertiva/failures.py:core/AddNot:14",
+   "file": "assertiva/failures.py",
+   "line": 104,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/AddNot:15",
+   "stable_id": "assertiva/failures.py:core/AddNot:15",
+   "file": "assertiva/failures.py",
+   "line": 114,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceTrueWithFalse:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceTrueWithFalse:0",
+   "file": "assertiva/failures.py",
+   "line": 53,
+   "operator": "core/ReplaceTrueWithFalse",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceAndWithOr:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceAndWithOr:0",
+   "file": "assertiva/failures.py",
+   "line": 88,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceAndWithOr:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceAndWithOr:1",
+   "file": "assertiva/failures.py",
+   "line": 102,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:0",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:0",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:1",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:1",
+   "file": "assertiva/failures.py",
+   "line": 52,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:2",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:2",
+   "file": "assertiva/failures.py",
+   "line": 56,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:3",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:3",
+   "file": "assertiva/failures.py",
+   "line": 56,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:4",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:4",
+   "file": "assertiva/failures.py",
+   "line": 56,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:5",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:5",
+   "file": "assertiva/failures.py",
+   "line": 88,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:6",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:6",
+   "file": "assertiva/failures.py",
+   "line": 88,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:7",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:7",
+   "file": "assertiva/failures.py",
+   "line": 88,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:8",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:8",
+   "file": "assertiva/failures.py",
+   "line": 96,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:9",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:9",
+   "file": "assertiva/failures.py",
+   "line": 98,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:10",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:10",
+   "file": "assertiva/failures.py",
+   "line": 103,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:11",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:11",
+   "file": "assertiva/failures.py",
+   "line": 105,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:12",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:12",
+   "file": "assertiva/failures.py",
+   "line": 106,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ReplaceOrWithAnd:13",
+   "stable_id": "assertiva/failures.py:core/ReplaceOrWithAnd:13",
+   "file": "assertiva/failures.py",
+   "line": 115,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:0",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:0",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:1",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:1",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:2",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:2",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:3",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:3",
+   "file": "assertiva/failures.py",
+   "line": 54,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:4",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:4",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:5",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:5",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:6",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:6",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:7",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:7",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:8",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:8",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:9",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:9",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:10",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:10",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:11",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:11",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:12",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:12",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:13",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:13",
+   "file": "assertiva/failures.py",
+   "line": 64,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:14",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:14",
+   "file": "assertiva/failures.py",
+   "line": 66,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:15",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:15",
+   "file": "assertiva/failures.py",
+   "line": 66,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:16",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:16",
+   "file": "assertiva/failures.py",
+   "line": 66,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:17",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:17",
+   "file": "assertiva/failures.py",
+   "line": 66,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:18",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:18",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:19",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:19",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:20",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:20",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:21",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:21",
+   "file": "assertiva/failures.py",
+   "line": 68,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:22",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:22",
+   "file": "assertiva/failures.py",
+   "line": 73,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:23",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:23",
+   "file": "assertiva/failures.py",
+   "line": 73,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:24",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:24",
+   "file": "assertiva/failures.py",
+   "line": 73,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:25",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:25",
+   "file": "assertiva/failures.py",
+   "line": 73,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:26",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:26",
+   "file": "assertiva/failures.py",
+   "line": 73,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:27",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:27",
+   "file": "assertiva/failures.py",
+   "line": 73,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:28",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:28",
+   "file": "assertiva/failures.py",
+   "line": 78,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:29",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:29",
+   "file": "assertiva/failures.py",
+   "line": 78,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:30",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:30",
+   "file": "assertiva/failures.py",
+   "line": 86,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:31",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:31",
+   "file": "assertiva/failures.py",
+   "line": 86,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:32",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:32",
+   "file": "assertiva/failures.py",
+   "line": 86,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:33",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:33",
+   "file": "assertiva/failures.py",
+   "line": 86,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:34",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:34",
+   "file": "assertiva/failures.py",
+   "line": 93,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:35",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:35",
+   "file": "assertiva/failures.py",
+   "line": 93,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:36",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:36",
+   "file": "assertiva/failures.py",
+   "line": 93,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:37",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:37",
+   "file": "assertiva/failures.py",
+   "line": 93,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:38",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:38",
+   "file": "assertiva/failures.py",
+   "line": 100,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:39",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:39",
+   "file": "assertiva/failures.py",
+   "line": 100,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:40",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:40",
+   "file": "assertiva/failures.py",
+   "line": 101,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:41",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:41",
+   "file": "assertiva/failures.py",
+   "line": 101,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:42",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:42",
+   "file": "assertiva/failures.py",
+   "line": 101,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:43",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:43",
+   "file": "assertiva/failures.py",
+   "line": 101,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:44",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:44",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:45",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:45",
+   "file": "assertiva/failures.py",
+   "line": 109,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:46",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:46",
+   "file": "assertiva/failures.py",
+   "line": 116,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:47",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:47",
+   "file": "assertiva/failures.py",
+   "line": 116,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:48",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:48",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/failures.py:core/NumberReplacer:49",
+   "stable_id": "assertiva/failures.py:core/NumberReplacer:49",
+   "file": "assertiva/failures.py",
+   "line": 118,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ZeroIterationForLoop:0",
+   "stable_id": "assertiva/failures.py:core/ZeroIterationForLoop:0",
+   "file": "assertiva/failures.py",
+   "line": 51,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/failures.py:core/ZeroIterationForLoop:1",
+   "stable_id": "assertiva/failures.py:core/ZeroIterationForLoop:1",
+   "file": "assertiva/failures.py",
+   "line": 112,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "KILLED"
+  }
+ ]
+}

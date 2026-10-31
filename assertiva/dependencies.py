@@ -251,6 +251,9 @@ def inventory(root: str | Path, python: str | None = None) -> dict:
             "product_files": sorted(modules[m]["file"] for m in users)[:20],
             "tests_importing_directly": direct[:20], "tests_reaching_transitively": transitive[:20],
             "dynamic_imports": dynamic[:20], "dynamic_basis": "INFERRED" if dynamic else None,
+            # the lists above are bounded at 20 names; these counts are complete
+            "counts": {"product_files": len(users), "tests_importing_directly": len(direct),
+                       "tests_reaching_transitively": len(transitive), "dynamic_imports": len(dynamic)},
             "exercised": "UNKNOWN",  # importing code that uses a dependency does not show that a test runs that use
             "not_followed": "dynamic imports with computed names, plugins and entry points, fixtures, subprocesses"}))
     js_declared, js_locked, js_lock, js_installed = _js(root)

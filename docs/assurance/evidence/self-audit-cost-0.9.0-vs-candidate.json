@@ -3,7 +3,7 @@
   "target": "Assertiva",
   "engine": "0.9.0",
   "exit": 0,
-  "seconds": 16.78,
+  "seconds": 14.95,
   "findings": [
    "STATE_AFTER_REJECTION_NOT_EVIDENCED",
    "TEST_SMELL_SIGNALS",
@@ -15,12 +15,48 @@
   "target": "Assertiva",
   "engine": "candidate",
   "exit": 0,
-  "seconds": 19.73,
+  "seconds": 13.66,
   "findings": [
    "STATE_AFTER_REJECTION_NOT_EVIDENCED",
    "TEST_SMELL_SIGNALS",
    "UNCLASSIFIED_VERIFICATION"
   ],
   "candidates": 1
+ },
+ {
+  "target": "py-parking",
+  "engine": "0.9.0",
+  "exit": 0,
+  "seconds": 0.75,
+  "findings": [
+   "BROAD_ERROR_EXPECTATION_SIGNAL",
+   "CI_PYTEST_NOT_OBSERVED",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "TEST_SMELL_SIGNALS",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 6
+ },
+ {
+  "target": "py-parking",
+  "engine": "candidate",
+  "exit": 0,
+  "seconds": 0.69,
+  "findings": [
+   "BROAD_ERROR_EXPECTATION_SIGNAL",
+   "CI_PYTEST_NOT_OBSERVED",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "FALSE_GREEN_CANDIDATE",
+   "NO_DELIVERY_PIPELINE_OBSERVED",
+   "REDUNDANCY_CANDIDATE",
+   "TEST_SMELL_SIGNALS",
+   "WEAK_ORACLE_SIGNAL"
+  ],
+  "candidates": 6
  }
 ]

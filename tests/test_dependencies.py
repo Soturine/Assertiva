@@ -135,3 +135,11 @@ def test_dynamic_and_plugin_uses_are_inferred_or_unknown_never_reported_unreache
 
     reported = [d["name"] for f in findings(data) if f.code == "DEPENDENCY_USAGE_NOT_REACHED_STATICALLY" for d in f.evidence["dependencies"]]
     assert "simplejson" not in reported and "pluggy-extra" not in reported
+
+
+def test_lists_are_bounded_but_counts_are_complete(tmp_path):
+    root = usage_project(tmp_path / "u")
+    for i in range(25):
+        write(root / "tests" / f"test_api_{i:02d}.py", "from ledger.api import handle\n\ndef test_x():\n    assert handle('a: 1')\n")
+    usage = by_name(inventory(root))["PyYAML"]["usage"]
+    assert len(usage["tests_reaching_transitively"]) == 20 and usage["counts"]["tests_reaching_transitively"] == 26

@@ -6,8 +6,10 @@ the declared range (what the project accepts), the locked version (what a lockfi
 says that; it is not inferred here). A lock outside its declared range, a dependency with no lock and an installed
 version that differs from the lock are findings with their basis.
 
-Usage is read statically for Python: which product modules import a dependency and whether any test imports those
-modules. Migration readiness is READY_WITH_GAPS at most from this static view (tests reach the code that uses the
+Usage is read statically for Python: which product modules import a dependency (literal dynamic imports are kept
+apart as INFERRED) and which tests import those modules, directly or through other project modules. An import is
+not an execution: whether a test exercises the use is always UNKNOWN here, and a missing static path is not proof
+that no test reaches the code. Migration readiness is READY_WITH_GAPS at most from this static view (tests reach the code that uses the
 dependency, nothing ran a candidate upgrade), BLOCKED when the dependency cannot be resolved offline, UNKNOWN
 otherwise; READY needs an executed upgrade in a disposable copy, which this version does not perform.
 
@@ -161,33 +163,72 @@ def _satisfies_npm(version: str, spec: str) -> bool | None:
     return have == want
 
 
-def _python_usage(root: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
-    """(top-level import -> product files importing it, dotted module a test imports -> those test files)."""
+def _module_name(rel: str) -> str:
+    name = rel.removesuffix(".py").removeprefix("src/").replace("/", ".")
+    return name.removesuffix(".__init__")
+
+
+def _python_usage(root: Path) -> dict[str, dict]:
+    """The project's Python modules read statically: module -> {file, test, imports (absolute and resolved relative
+    names), dynamic (literal names given to importlib.import_module / __import__)}. Nothing is imported or run."""
     from .adapters.python_discovery import test_files
 
     tests = {p.resolve() for p in test_files(root)}
-    imports: dict[str, set[str]] = {}
-    reached: dict[str, set[str]] = {}
+    modules: dict[str, dict] = {}
     for path in sorted(root.rglob("*.py")):
-        rel_parts = path.relative_to(root).parts
-        if SKIPPED_DIRS & set(rel_parts):
+        if SKIPPED_DIRS & set(path.relative_to(root).parts):
             continue
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (SyntaxError, UnicodeDecodeError, OSError):
             continue
-        dotted = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
-        for n in ast.walk(tree):
-            if isinstance(n, ast.ImportFrom) and n.module and not n.level:
-                dotted |= {n.module, *(f"{n.module}.{a.name}" for a in n.names)}
         rel = path.relative_to(root).as_posix()
-        if path.resolve() in tests:
-            for name in dotted:
-                reached.setdefault(name, set()).add(rel)
-        else:
-            for name in {d.split(".")[0] for d in dotted}:
-                imports.setdefault(name, set()).add(rel)
-    return imports, reached
+        name = _module_name(rel)
+        package = name if path.name == "__init__.py" else name.rpartition(".")[0]
+        names, dynamic = set(), set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                names |= {a.name for a in node.names}
+            elif isinstance(node, ast.ImportFrom):
+                if node.level:  # relative: resolved against this module's package
+                    base = package.split(".")[: max(len(package.split(".")) - (node.level - 1), 0)] if package else []
+                    module = ".".join([*base, *(node.module.split(".") if node.module else [])])
+                else:
+                    module = node.module or ""
+                if module:
+                    names |= {module, *(f"{module}.{a.name}" for a in node.names)}
+            elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) \
+                    and isinstance(node.args[0].value, str) and ast.unparse(node.func) in ("importlib.import_module", "import_module", "__import__"):
+                dynamic.add(node.args[0].value)
+        modules[name] = {"file": rel, "test": path.resolve() in tests, "imports": names, "dynamic": dynamic}
+    return modules
+
+
+def _project_module(name: str, modules: dict) -> str | None:
+    """The project module an imported name refers to (`ledger.config.load` -> `ledger.config`), or None."""
+    while name:
+        if name in modules:
+            return name
+        name = name.rpartition(".")[0]
+    return None
+
+
+def _reach(modules: dict) -> dict[str, tuple[set[str], set[str]]]:
+    """For each test file: (project modules it imports directly, project modules reachable through project imports)."""
+    out = {}
+    for info in modules.values():
+        if not info["test"]:
+            continue
+        direct = {m for n in info["imports"] if (m := _project_module(n, modules)) and not modules[m]["test"]}
+        seen, queue = set(direct), list(direct)
+        while queue:
+            for n in modules[queue.pop()]["imports"]:
+                m = _project_module(n, modules)
+                if m and m not in seen and not modules[m]["test"]:
+                    seen.add(m)
+                    queue.append(m)
+        out[info["file"]] = (direct, seen)
+    return out
 
 
 def inventory(root: str | Path, python: str | None = None) -> dict:
@@ -196,17 +237,22 @@ def inventory(root: str | Path, python: str | None = None) -> dict:
     py_declared = _python_declared(root)
     py_locked, py_lock = _python_locked(root)
     py_installed = _python_installed(python, sorted(py_declared))
-    imports, reached = _python_usage(root) if py_declared else ({}, {})
+    modules = _python_usage(root) if py_declared else {}
+    reach = _reach(modules)
     for key, entry in sorted(py_declared.items()):
-        module = _IMPORT_NAMES.get(key, key.replace("-", "_"))
-        product = sorted(imports.get(module, set()))
-        product_modules = {Path(f).with_suffix("").as_posix().removeprefix("src/").removesuffix("/__init__").replace("/", ".")
-                           for f in product}
-        tests = sorted({t for m in product_modules for name, files in reached.items()
-                        if name == m or name.startswith(m + ".") for t in files})
-        entries.append(_entry(entry, py_locked.get(key), py_lock, py_installed.get(key), _satisfies_python,
-                              {"basis": "STATIC: imports read from the source", "import_name": module, "product_files": product[:20],
-                               "tests_reaching_them": tests[:20]}))
+        top = _IMPORT_NAMES.get(key, key.replace("-", "_"))
+        users = {m for m, info in modules.items() if not info["test"] and any(n.split(".")[0] == top for n in info["imports"])}
+        dynamic = sorted(modules[m]["file"] for m, info in modules.items()
+                         if not info["test"] and any(n.split(".")[0] == top for n in info["dynamic"]))
+        direct = sorted(t for t, (d, _) in reach.items() if d & users)
+        transitive = sorted(t for t, (d, seen) in reach.items() if not d & users and seen & users)
+        entries.append(_entry(entry, py_locked.get(key), py_lock, py_installed.get(key), _satisfies_python, {
+            "basis": "STATIC: imports read from the source; nothing was run", "import_name": top,
+            "product_files": sorted(modules[m]["file"] for m in users)[:20],
+            "tests_importing_directly": direct[:20], "tests_reaching_transitively": transitive[:20],
+            "dynamic_imports": dynamic[:20], "dynamic_basis": "INFERRED" if dynamic else None,
+            "exercised": "UNKNOWN",  # importing code that uses a dependency does not show that a test runs that use
+            "not_followed": "dynamic imports with computed names, plugins and entry points, fixtures, subprocesses"}))
     js_declared, js_locked, js_lock, js_installed = _js(root)
     for name, entry in sorted(js_declared.items()):
         entries.append(_entry(entry, js_locked.get(name), js_lock, js_installed.get(name), _satisfies_npm,
@@ -228,14 +274,19 @@ def _entry(entry: dict, locked: str | None, lock: str | None, installed: str | N
     install_state = ("NOT_INSTALLED_HERE" if installed is None else "INSTALLED_MATCHES_LOCK" if installed == locked
                      else "INSTALLED_DIFFERS_FROM_LOCK" if locked else "INSTALLED_UNLOCKED")
     product = usage.get("product_files")
+    reached = usage.get("tests_importing_directly") or usage.get("tests_reaching_transitively")
     if product is None:
         readiness, why = "UNKNOWN", "usage of this ecosystem is not mapped"
+    elif not product and usage.get("dynamic_imports"):
+        readiness, why = "UNKNOWN", "used through a dynamic import (INFERRED from a literal name); test reach is not followed"
     elif not product:
         readiness, why = "UNKNOWN", "no product module imports it under its usual name (plugins, entry points or another import name)"
-    elif usage.get("tests_reaching_them"):
-        readiness, why = "READY_WITH_GAPS", "tests import the product modules that use it; no candidate upgrade was executed"
+    elif reached:
+        readiness, why = "READY_WITH_GAPS", ("tests import code that uses it (directly or through project modules); they are "
+                                             "not shown to exercise that use, and no candidate upgrade was executed")
     else:
-        readiness, why = "READY_WITH_GAPS", "product code uses it and no test imports those modules: an upgrade would be unverified"
+        readiness, why = "READY_WITH_GAPS", ("no static import path from a test to the code that uses it was found; paths the "
+                                             "analysis does not follow may exist, and no candidate upgrade was executed")
     return {**{k: entry[k] for k in ("ecosystem", "name", "groups")}, "declared_range": spec, "locked": locked, "lockfile": lock,
             "installed": installed, "lock_state": lock_state, "install_state": install_state, "usage": usage,
             "migration_readiness": readiness, "readiness_basis": why}
@@ -253,9 +304,12 @@ def findings(data: dict) -> list:
     if drift:
         out.append(Finding("DEPENDENCY_INSTALLED_DIFFERS_FROM_LOCK", "The installed versions differ from the locked ones; local runs test other dependencies than the lock.",
                            {"dependencies": [{"name": d["name"], "locked": d["locked"], "installed": d["installed"]} for d in drift][:20]}))
-    untested = [d for d in data["dependencies"] if d["usage"].get("product_files") and not d["usage"].get("tests_reaching_them")]
-    if untested:
-        out.append(Finding("DEPENDENCY_USAGE_UNTESTED", "Product code uses dependencies that no test reaches; upgrading them would be unverified.",
-                           {"dependencies": [{"name": d["name"], "product_files": d["usage"]["product_files"][:5]} for d in untested][:20],
-                            "basis": "STATIC"}, severity="info"))
+    unreached = [d for d in data["dependencies"] if d["usage"].get("product_files") and not d["usage"].get("dynamic_imports")
+                 and not d["usage"].get("tests_importing_directly") and not d["usage"].get("tests_reaching_transitively")]
+    if unreached:
+        out.append(Finding("DEPENDENCY_USAGE_NOT_REACHED_STATICALLY",
+                           "No static import path leads from a test to the code that uses these dependencies; an upgrade may be unverified.",
+                           {"dependencies": [{"name": d["name"], "product_files": d["usage"]["product_files"][:5]} for d in unreached][:20],
+                            "basis": "STATIC", "limitations": "dynamic imports with computed names, plugins and entry points, "
+                            "fixtures and subprocesses are not followed: a test may still reach this code"}, severity="info"))
     return out

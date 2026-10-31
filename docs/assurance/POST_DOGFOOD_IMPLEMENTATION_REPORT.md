@@ -20,7 +20,7 @@ final push. Per-gap dispositions: [POST_DOGFOOD_GAP_MATRIX.md](POST_DOGFOOD_GAP_
 | CP7 dependencies | `dc01f49` | `audit --dependencies` | 5 tests; core 962 |
 | CP8 dogfood + skill | `4acb036`, `e6ddd9b` | PR #1 and DrawLab evidence integrated, PRIVATE_FILE_BOUNDARY case, Skill rules | 71 cases pass the lint; core 1003 |
 | CP8 self-assurance | `54cb130` | dead code and duplicates removed; helper-resolution cost and precision fixed; benchmarks | see [ASSERTIVA_SELF_DOGFOOD.md](ASSERTIVA_SELF_DOGFOOD.md) |
-| CP9 qualification | final commits | docs, version `0.10.0.dev0`, schema, full local qualification, final push | [RELEASE_READINESS.md](RELEASE_READINESS.md) |
+| CP9 qualification | `e807d4c`, `815c8de`, final commit | docs, version `0.10.0.dev0`, schema, full local qualification, final push | [RELEASE_READINESS.md](RELEASE_READINESS.md) |
 
 ## Before / after (same inputs)
 

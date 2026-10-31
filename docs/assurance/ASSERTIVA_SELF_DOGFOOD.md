@@ -27,5 +27,8 @@ modules that 3 test files reach: READY_WITH_GAPS.
 
 - The executed self-audit (`--execute` over the whole suite in a disposable copy) was not part of this record; the
   suites ran directly (see [RELEASE_READINESS.md](RELEASE_READINESS.md)).
-- Engine-run mutation of Assertiva's own security and evidence modules was not run in this line.
+- Engine-run mutation of Assertiva's own modules: NOT_RUN. An `audit --execute --mutate assertiva/failures.py
+  --mutate-tests tests/test_failures.py` was started and stopped after 30 minutes (the executed audit first runs the
+  whole suite serially and again against the wheel); the direct targeted run was not performed. AG-11's targeted
+  mutation is evidenced by its own tests with real Cosmic Ray 8.7.0 on a fixture, not on this repository.
 - Independent labeling and blind holdout: not available (single author).

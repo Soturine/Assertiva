@@ -116,3 +116,32 @@ def _cut_lists_without_count():
 
 def test_no_engine_finding_cuts_a_list_without_its_complete_count():
     assert _cut_lists_without_count() == []
+
+
+# --- pinned by the targeted mutation of assessment.py (0.10.1 candidate): survivors on the review-scope path ----------
+
+from assertiva.assessment import item_count  # noqa: E402
+
+
+def test_the_item_count_prefers_the_complete_count_and_falls_back_to_a_single_list_only():
+    assert item_count({"evidence": {"count": 35, "survivors": ["a"] * 20}}) == 35
+    assert item_count({"evidence": {"tests": ["a", "b", "c"]}}) == 3  # no count, one list: its length
+    assert item_count({"evidence": {"tests": ["a"], "files": ["b", "c"]}}) is None  # two lists: not decidable
+    assert item_count({"evidence": {}}) is None
+
+
+def test_a_complete_review_of_more_than_256_items_is_accepted():
+    finding = survivors_finding(run_with(survived=300, killed=0))  # `of is not items` would refuse this one
+    assert review(finding, "CONFIRMED", {"reviewed": 300, "of": 300})["findings"][0]["assessment"]["scope"]["of"] == 300
+
+
+@pytest.mark.parametrize("reviewed", [0, -1])
+def test_a_scope_must_review_at_least_one_item(reviewed):
+    finding = survivors_finding(run_with(survived=3))
+    with pytest.raises(AssessmentError, match="0 < n <= total"):
+        review(finding, "PARTIAL", {"reviewed": reviewed, "of": 3}, subjects=[{"subject": "m0", "disposition": "CONFIRMED"}])
+
+
+def test_a_single_item_finding_can_be_confirmed_without_a_scope():
+    finding = survivors_finding(run_with(survived=1))
+    assert review(finding, "CONFIRMED", None)["findings"][0]["assessment"]["disposition"] == "CONFIRMED"

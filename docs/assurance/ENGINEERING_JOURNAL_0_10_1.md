@@ -232,3 +232,42 @@ export, so the mutated tree is the only Assertiva on the path (ENG-02).
   Linux runs are repeated on a `git archive` of a commit.
 - One comparison imported the main checkout instead of the 0.10.0 worktree (`python -c` puts the current directory
   first on `sys.path`); caught by printing the module path, rerun from inside the worktree.
+
+CP4 commit: `9f64c03`.
+
+## CP5 — closing: one more silent gap, final gates, documents
+
+**DG-0101-06 reproduced and fixed** (it was RESEARCH after CP0). This machine has `LongPathsEnabled=0`; a test
+file at 329 characters inside a synthetic project vanished from `project_files` with no error: `_walk` swallowed the
+`OSError` of the directory it could not list, and the Git branch of the listing dropped an entry Git lists but the
+filesystem cannot reach. Fixing it at the source: the listing records unreadable entries, `boundary_report` returns
+them, and the audit raises `PROJECT_ENTRIES_UNREADABLE` (high). The entries are still not audited — they cannot be
+read — but an audit no longer looks complete where it is not.
+
+**Self-dogfood.** Assertiva audited by the candidate vs 0.10.0: no candidate changed; the one difference is
+DG-0101-01 itself — `STATE_AFTER_REJECTION_NOT_EVIDENCED` has 21 tests, and 0.10.0 listed 20 with no count, so one
+was invisible in Assertiva's own audit.
+
+**Gates on the final code** (Windows, Python 3.12.10): core 1094 passed / 5 skipped, integration 167 passed / 11
+skipped (exit 0). Linux (`python:3.12-slim`, Python 3.12.16) on a `git archive` of `9f64c03`: core 1095 passed,
+integration 169 passed / 13 skipped (exit 0); the CP5 change (listing) is covered on Linux by its portable test in
+the remote CI run. `scripts/gap_matrix.py --check` and `scripts/validate_repo.py` pass.
+
+**Documents.** CHANGELOG `[0.10.1]` (unreleased candidate, with its contract changes), STATUS and ROADMAP entries,
+[RELEASE_READINESS_0_10_1.md](RELEASE_READINESS_0_10_1.md), and `references/` for the readings an agent now meets.
+The 0.10.0 matrix and the M1/M2/M3 intakes are unchanged (history); the remediation ledger is the post-release
+record.
+
+**Not done, with the reason.** The AXF-08 semantic evaluation (agent + judge) needs the owner's budget approval; the
+targeted mutation of `assertiva/ci.py` is refused by the 300-run budget (DG-0101-12); the push to `main` was refused
+by the session's permission policy, so `main` is reached through a pull request.
+
+**Targeted mutation of the AXF-04 consumer** (`assertiva/assessment.py` at `ec5c796`, Cosmic Ray 8.7.0 in a scratch
+venv, tests `test_review_denominator.py` + `test_assessment.py`, 1982 s): 240 mutants — 162 killed, 73 survived (22
+type-annotation equivalence candidates, 51 impact unknown), 3 timeout, 2 error
+([record](evidence/derivanta-0.10.1/self-mutation-assessment-before.json)). Survivors sat exactly on the path AXF-04
+depends on (DG-0101-13): the single-list fallback of `item_count` was no longer exercised once every finding carried
+a count; `scope["of"] != items` mutated to `is not` survived only because CPython caches small integers — a complete
+review of more than 256 items would have been refused; `0 < reviewed` and `(items or 0) > 1` had no boundary test.
+Four tests now pin them. Not a number to optimize: the 51 unknown-impact survivors elsewhere in the module are not
+triaged in this round.

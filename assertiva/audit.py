@@ -199,6 +199,14 @@ def _boundary_findings(report: dict) -> list[Finding]:
         ))
     if report["broken_links"]:
         findings.append(Finding("BROKEN_PROJECT_LINK", "Some project links point to nothing.", {"count": len(report["broken_links"]), "links": report["broken_links"][:30]}))
+    if report.get("unreadable"):
+        findings.append(Finding(
+            "PROJECT_ENTRIES_UNREADABLE",
+            "Some project entries exist but could not be read; they are missing from the inventory, the copies and every result.",
+            {"count": len(report["unreadable"]), "paths": report["unreadable"][:30], "basis": "OBSERVED",
+             "hint": "on Windows, paths longer than 260 characters need long paths enabled (LongPathsEnabled) or a shorter location"},
+            severity="high",
+        ))
     if report["nested_repositories"]:
         findings.append(Finding(
             "NESTED_REPOSITORY",

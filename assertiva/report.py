@@ -55,6 +55,7 @@ _RECOMMENDATION = {
     "DEPENDENCY_USAGE_NOT_REACHED_STATICALLY": "Check whether a test exercises the code that uses the dependency (a run, coverage of that code); add one before upgrading if none does.",
     "NESTED_SCRIPT_REPETITION": "Run each script once in CI (or call the leaf scripts directly); keep every gate, only drop the repeats.",
     "SOURCE_IDENTITY_MISMATCH": "Run the tests against the source tree (an editable install or the src path first) or qualify the installed package on purpose as an artifact; until then the green run proves another copy of the code.",
+    "PROJECT_ENTRIES_UNREADABLE": "Make the listed entries readable (on Windows, enable long paths or move the project to a shorter path) and audit again.",
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
     "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
     "MUTATION_REPORT_UNTIED": "Run the mutation tool through the engine (--execute --mutate FILE), or import a report that includes the source it mutated and the tests it ran.",

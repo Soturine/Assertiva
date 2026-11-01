@@ -35,12 +35,20 @@ M1, M2; PR #4: M3). Every item, with its fail-before test, controls and commit, 
   works with `--dependencies` and `--execute`; a missing interpreter is refused with exit 2 and a message (0.10.0:
   `FileNotFoundError` traceback, exit 1). Library callers (`run_audit`, `start_improve`) resolve it the same way.
 
+- **Unreadable project entries are reported** (DG-0101-06, from Derivanta M3 OBS-M3-02): a path past Windows'
+  MAX_PATH (or a refused permission) was silently left out of the inventory, the copies and every result; the audit
+  now raises `PROJECT_ENTRIES_UNREADABLE` (high) with the entries.
+- **Test status discarded in CI** (DG-0101-11): new `CI_TEST_STATUS_MASKED` (medium) for `cmd || true` / `|| echo`
+  in any shell and a test command piped in GitHub's default Linux shell (`bash -e`, no pipefail); explicit `shell:
+  bash` or `set -o pipefail` keep the status. Pipes and redirections are no longer runner arguments (DG-0101-10).
+
 ### Test-quality signals (each with look-alike controls)
 - AXF-M2-01: `assert x == y or True` (any always-true `or` operand, a message string or f-string by mistake, `not
   False`) is a TAUTOLOGY candidate.
 - AXF-03: `a = f(x); assert a == f(x)` is the same weak DETERMINISM oracle as `assert f(x) == f(x)` — **contract
-  change**: no longer a `SELF_REFERENTIAL_ORACLE` false green in Python (a test that pinned the old reading now pins
-  the new one). JavaScript/JVM are not aligned yet (DG-0101-09).
+  change**: no longer a `SELF_REFERENTIAL_ORACLE` false green; JavaScript and JVM read it the same way, and
+  `expect(f(x)).toEqual(f(x))` is no longer a TAUTOLOGY there (DG-0101-09; tests that pinned the old readings now pin
+  the new one, same-value comparisons stay tautologies).
 - AXF-06: `try: f(x)` / `except (A, B): pass` with no assertion in the try is a weak `TYPED_ERROR` oracle (assertion
   kind `TYPED_ERROR_BOUNDARY`), not a swallowed exception; `except Exception`, `except AssertionError` and a typed
   handler around an assertion still are.
@@ -60,6 +68,7 @@ M1, M2; PR #4: M3). Every item, with its fail-before test, controls and commit, 
 
 ### Housekeeping
 - Removed the unused `report_html._STRENGTH` (DG-0101-05). `scripts/gap_matrix.py` validates and renders both ledgers.
+- HTML run cards list each declared command run one by one; `references/` describe the new readings.
 
 ## [0.10.0] — 2026-10-31 — Reliability, Portfolio Assurance & Continuous Dogfood
 

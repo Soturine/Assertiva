@@ -1184,6 +1184,17 @@ FINDINGS: dict[str, dict] = {
                "Todo arquivo de teste descoberto está dentro de um escopo que o CI executa, ou sua exclusão está documentada."),
         rec=("Run the unobserved test paths in CI or document why they are excluded from the delivery gate.",
              "Execute no CI os caminhos de teste não observados ou documente por que estão fora do gate de entrega.")),
+    "PROJECT_ENTRIES_UNREADABLE": F(
+        category="project", tier="E1",
+        title=("Project entries could not be read", "Entradas do projeto não puderam ser lidas"),
+        summary=("Some project entries exist but could not be read; they are missing from the inventory, the copies and every result.",
+                 "Algumas entradas do projeto existem, mas não puderam ser lidas; elas faltam no inventário, nas cópias e em todo resultado."),
+        why=("Tests or code there were neither inspected nor run: the audit is incomplete where it looks complete.",
+             "Testes ou código ali não foram inspecionados nem executados: a auditoria está incompleta onde parece completa."),
+        close=("Every entry is readable (on Windows: long paths enabled or the project in a shorter location) and the audit is rerun.",
+               "Toda entrada é legível (no Windows: caminhos longos habilitados ou o projeto num local mais curto) e a auditoria é refeita."),
+        rec=("Make the listed entries readable (on Windows, enable long paths or move the project to a shorter path) and audit again.",
+             "Torne as entradas listadas legíveis (no Windows, habilite caminhos longos ou mova o projeto para um caminho mais curto) e audite de novo.")),
     "CI_TEST_STATUS_MASKED": F(
         category="delivery", tier="E2",
         title=("Test status discarded in CI", "Status dos testes descartado no CI"),

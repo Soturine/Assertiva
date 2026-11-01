@@ -457,31 +457,31 @@
   },
   {
    "id": "DG-0101-06",
-   "checkpoint": "CP0",
+   "checkpoint": "CP5",
    "origin": "Derivanta M3 observation OBS-M3-02",
    "source": "https://github.com/Soturine/Derivanta-Engine/blob/562d2ec6ed863060578cd513a0f1f6a5e51d41f4/docs/audits/m3/ASSERTIVA_FEEDBACK.md",
    "pr_url": "https://github.com/Soturine/Assertiva/pull/4",
    "revision_evidence": "Assertiva 0.10.0 2e34542",
-   "failure_reproducer": "not reproduced in Assertiva",
+   "failure_reproducer": "tests/test_unreadable_entries.py (portable: a directory whose listing is refused; Windows: a real path past MAX_PATH)",
    "stack": "",
    "severity": "P3",
    "root_cause": "",
    "shared_root_cause_ids": [],
    "layer": "robustness",
    "risk": "",
-   "expected": "a copy that cannot be complete because of Windows path length is reported, not silently partial",
-   "observed": "Engine saw `git clone -q` under a long path check out 100 of 1512 files with no error",
-   "test_before": "",
-   "test_after": "",
-   "negative_controls": "",
+   "expected": "an entry the inventory cannot read is reported, not silently left out",
+   "observed": "reproduced on this Windows machine (LongPathsEnabled=0): a test file at 329 characters vanished from project_files with no error; _walk swallowed OSError, and the Git branch dropped a listed entry that was neither file nor directory",
+   "test_before": "3 tests fail on 0.10.0",
+   "test_after": "pass: PROJECT_ENTRIES_UNREADABLE (high) names the unreadable entries; boundary_report gains `unreadable`",
+   "negative_controls": "a readable project reports nothing",
    "metrics": "",
    "owner": "workspace.py (disposable copies)",
-   "commit_fixed": "",
-   "decision": "RESEARCH",
-   "status": "NEW",
-   "limitations": "an Engine observation about git clone; Assertiva copies with Python, which may already fail loudly",
+   "commit_fixed": "CP5 final commit",
+   "decision": "FIX_NOW",
+   "status": "FIXED",
+   "limitations": "the entries are still not audited (they cannot be read); the finding makes the incompleteness visible. tree_fingerprint (read-only guard) still cannot see writes there",
    "release_gate": "0.10.1 candidate",
-   "next": "build a fixture whose copy path exceeds 260 characters on Windows and compare the copied tree with the source fingerprint; fix only if Assertiva's copy loses files silently"
+   "next": ""
   },
   {
    "id": "DG-0101-07",
@@ -565,7 +565,7 @@
    "negative_controls": "expect(x).toBe(x) and assertEquals(cart, cart) (same value, no call) stay TAUTOLOGY; different arguments, a state check around an action stay sound",
    "metrics": "frozen v1+v2 unchanged: precision 1.0, recall 0.841",
    "owner": "adapters/test_facts.py (JS/JVM readers)",
-   "commit_fixed": "CP4 commit (see journal)",
+   "commit_fixed": "9f64c03",
    "decision": "FIX_NOW",
    "status": "FIXED",
    "limitations": "lexical readers: a call is recognized by a parenthesis in the expression",
@@ -596,7 +596,7 @@
    "negative_controls": "a quoted | (`-k \"a|b\"`) stays an argument",
    "metrics": "",
    "owner": "adapters/commands.py",
-   "commit_fixed": "CP4 commit (see journal)",
+   "commit_fixed": "9f64c03",
    "decision": "FIX_NOW",
    "status": "FIXED",
    "limitations": "",
@@ -623,7 +623,7 @@
    "negative_controls": "explicit `shell: bash`, `set -o pipefail`, a Windows runner, a matrix-chosen runner (not decided), a pipe after a non-test command, `|| exit 1`",
    "metrics": "no finding on the Framework, the Engine, Assertiva or the two third-party repositories (none pipes its tests: no false positive, and no real-world positive either)",
    "owner": "adapters/commands.py + adapters/github_actions.py + verification.py",
-   "commit_fixed": "CP4 commit (see journal)",
+   "commit_fixed": "9f64c03",
    "decision": "FIX_NOW",
    "status": "FIXED",
    "limitations": "GitHub Actions decides the pipe case (its shell semantics are adapter knowledge); `|| true` is read for every provider. Windows (pwsh) pipelines are not decided",
@@ -658,6 +658,36 @@
    "limitations": "honest refusal, the same behavior the Derivanta M2 round recorded; not a defect",
    "release_gate": "0.10.1 candidate",
    "next": "IDEA-02: shards of one module that keep the full planned population as the denominator; until then a module over 300 mutants is BLOCKED, as the Engine's maintainability.py (594) was"
+  },
+  {
+   "id": "DG-0101-13",
+   "checkpoint": "CP5",
+   "origin": "targeted self-mutation (Cosmic Ray 8.7.0) of assertiva/assessment.py at ec5c796 with tests/test_review_denominator.py and tests/test_assessment.py",
+   "source": "this round",
+   "pr_url": "",
+   "revision_evidence": "",
+   "failure_reproducer": "benchmarks/self_mutation.py <export> out.json label assertiva/assessment.py tests/test_review_denominator.py tests/test_assessment.py",
+   "stack": "",
+   "severity": "P2",
+   "root_cause": "",
+   "shared_root_cause_ids": [
+    "AXF-04"
+   ],
+   "layer": "test effectiveness",
+   "risk": "",
+   "expected": "the review-scope rules AXF-04 relies on are pinned by tests",
+   "observed": "240 mutants: 162 killed, 73 survived (22 type-annotation equivalence candidates, 51 impact unknown), 3 timeout, 2 error; survivors on the scope path: item_count's single-list fallback, `scope['of'] != items` -> `is not` (passes only because small ints are cached: a review of more than 256 items would be refused), `0 < reviewed`, `(items or 0) > 1`",
+   "test_before": "the listed mutants survive the CP3 tests",
+   "test_after": "four tests added to tests/test_review_denominator.py (item_count fallback, a 300-item complete review, reviewed 0/-1 refused, a single item confirmed without scope); the mutation rerun with them is recorded in the journal",
+   "negative_controls": "",
+   "metrics": "",
+   "owner": "assessment.py tests",
+   "commit_fixed": "CP5 final commit",
+   "decision": "FIX_NOW",
+   "status": "FIXED",
+   "limitations": "`reviewed < of` -> `!=` is an equivalence candidate (reviewed <= of is enforced first); the other 51 unknown-impact survivors elsewhere in assessment.py are not triaged in this round",
+   "release_gate": "0.10.1 candidate",
+   "next": ""
   }
  ],
  "ideas": [
@@ -695,6 +725,41 @@
    "source": "Derivanta M2 maintainability scan",
    "decision": "REJECT",
    "why": "they drive different tools and keep fixture independence; merging saves little and couples them"
+  },
+  {
+   "id": "IDEA-06",
+   "idea": "Read the provider's documented shell semantics to decide whether a piped test step can fail (pipefail)",
+   "source": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax (accessed 2026-11-01): unspecified shell `bash -e {0}`, explicit bash `-eo pipefail`, Windows pwsh",
+   "decision": "ADOPT",
+   "why": "implemented as CI_TEST_STATUS_MASKED (DG-0101-11) for GitHub Actions; other providers only for `|| true`-style forms until their defaults are verified"
+  },
+  {
+   "id": "IDEA-07",
+   "idea": "Treat unittest exit 5 / zero executed tests as never-passing in every reproduced part",
+   "source": "https://docs.python.org/3/library/unittest.html; CPython issues https://github.com/python/cpython/issues/106584 and https://github.com/python/cpython/issues/113875 (accessed 2026-11-01)",
+   "decision": "ADOPT",
+   "why": "the declared plan (AXF-05) keeps an empty part UNKNOWN; consistent with the adapter's existing single-run rule"
+  },
+  {
+   "id": "IDEA-08",
+   "idea": "Process-level confinement (container/VM) for running untrusted project code; venv or RestrictedPython are not sandboxes",
+   "source": "https://github.com/zopefoundation/RestrictedPython README (states it is not a sandbox); OWASP Top 10 for LLM Applications 2025 LLM01/LLM06 https://genai.owasp.org/llm-top-10/ (accessed 2026-11-01)",
+   "decision": "DEFER",
+   "why": "the Skill now refuses to call a copy or venv a sandbox (AXF-08); real confinement is the existing roadmap item (EXECUTION_SECURITY residual risk 1), not a patch-release change"
+  },
+  {
+   "id": "IDEA-09",
+   "idea": "Per-mutant identity and a complete survivor record as the unit of review (as cross-tool survivor triage formats do: file, line, mutator, original, mutated)",
+   "source": "Cosmic Ray docs https://cosmic-ray.readthedocs.io/en/latest/ (no equivalence marker; survivors triaged by people); tessl.io mutant-survival-triage (third-party skill, not a standard) (accessed 2026-11-01)",
+   "decision": "ADOPT",
+   "why": "survivor_sites is complete with mutant_id and status (AXF-04); reviewing scope by an explicit list of ids is the next step if assessments need it"
+  },
+  {
+   "id": "IDEA-10",
+   "idea": "Assessment scope given as reviewed mutant ids instead of a number",
+   "source": "this round (AXF-04 design)",
+   "decision": "DEFER",
+   "why": "the count check closes the reported defect; a list of ids would let the engine say which mutants stay unreviewed, worth it once an agent consumer asks for it"
   }
  ]
 }

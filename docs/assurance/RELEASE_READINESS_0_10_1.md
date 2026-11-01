@@ -1,9 +1,8 @@
-# Release readiness — Assertiva 0.10.1 candidate
+# Release readiness — Assertiva 0.10.1
 
-**Decision: not released.** The candidate is qualified locally (Windows, Linux) and by its own probes, dogfood and
-benchmarks; publishing needs the owner's approval, the remote CI run of the final commit, and — for AXF-08 — a
-semantic evaluation the owner has to budget. Nothing here is a tag or a GitHub Release; `pyproject.toml` says
-`0.10.1.dev0`.
+**Decision: released** as `v0.10.1` on 2026-11-01, approved by the owner, who accepted publishing with the AXF-08
+semantic evaluation NOT_RUN and no paid evaluation. Version `0.10.1`; GitHub Release with wheel, sdist and SHA-256
+checksums; not PyPI. The publication record (merge, tag, CI of the tag, artifacts) is at the end of this page.
 
 Baseline: 0.10.0 `2e34542`. Branch: `fix/assertiva-0.10.1-dogfood` (PR into `main`; a direct push to `main` was
 refused by the session's permission policy). Items, tests and commits:
@@ -24,7 +23,8 @@ refused by the session's permission policy). Items, tests and commits:
 | Local suites, Windows | `pytest -m "not integration and not artifact"` / `-m "(integration or artifact) and not browser and not jvm"` | core 1094 passed / 5 skipped, integration 167 passed / 11 skipped (exit 0) |
 | Local suites, Linux | the same commands in `python:3.12-slim` on a `git archive` of `9f64c03` | core 1095 passed, integration 169 passed / 13 skipped (exit 0) |
 | Remote CI | GitHub Actions | `4e2268c`: push [41341845670](https://github.com/Soturine/Assertiva/actions/runs/41341845670) 7/7, pull_request [41341849603](https://github.com/Soturine/Assertiva/actions/runs/41341849603) 7/7; Runtime self-qualification not run (tags / dispatch only) |
-| Semantic evaluation (AXF-08) | `evals/semantic.py` with a separate agent and judge | **NOT_RUN** — owner budget approval; the Derivanta M1 REVIEW stands |
+| Semantic evaluation (AXF-08) | `evals/semantic.py` with a separate agent and judge | **NOT_RUN** — no paid evaluation; the owner accepted publishing without it; the Derivanta M1 REVIEW stands |
+| Frozen-set gain | — | **none claimed**: identical to 0.10.0 |
 
 ## Contract changes a consumer may notice
 
@@ -47,9 +47,9 @@ an assessment that relied on the cut list as its denominator is now rejected —
 - AXF-08 semantic evaluation (budget); DG-0101-12 / IDEA-02 mutation of
   modules over 300 mutants; IDEA-01 advisory lookup (deferred); TCC-A02/A06/A12 from 0.10.0 remain as they were.
 
-## To publish 0.10.1 (owner)
+## Publication
 
-1. Review and merge the PR into `main` (no squash, as for 0.10.0), after its CI run is green.
-2. Optionally approve a budget for the AXF-08 semantic evaluation and record the verdict.
-3. Set `version = "0.10.1"`, date the CHANGELOG entry, tag `v0.10.1`, build wheel and sdist from the tag with SHA-256
-   checksums, publish the GitHub Release.
+Release preparation (version `0.10.1`, dated CHANGELOG, README/STATUS/ROADMAP) was committed to PR #5 and qualified on
+its own SHA; PR #5 was merged into `main` without squash (PR #3 and #4 commits preserved); the annotated tag `v0.10.1`
+points at the merge result; wheel and sdist were built from the tag. SHAs, run links and checksums are in the GitHub
+Release notes, so this file does not have to change after the tag.

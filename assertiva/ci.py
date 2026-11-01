@@ -166,7 +166,7 @@ def scripts_running(root: str | Path, tool: str) -> list[dict]:
     """CI steps that run a repository script whose source invokes ``tool`` (AXF-M3-01): `python tools/gate.py`, `bash
     ci/test.sh`, `./run-tests.sh`. One level, read statically: the script's own arguments to the runner (which tests
     it selects) are not interpreted, so the scope stays unknown. A script that does not mention the runner is not one."""
-    from .adapters.commands import classify_command, _tokens
+    from .adapters.commands import _tokens, classify_command
     from .verification import VerificationOrigin, discover_surface
 
     root = Path(root).resolve()

@@ -1,10 +1,11 @@
 # Changelog
 
-## [0.10.1] — unreleased candidate — Derivanta dogfood remediation
+## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 
-Not published: no tag, no GitHub Release; `pyproject.toml` says `0.10.1.dev0` until a release is approved. Developed on
-`fix/assertiva-0.10.1-dogfood` from `main` at `2e34542` (0.10.0) after merging the Derivanta Engine intakes (PR #3:
-M1, M2; PR #4: M3). Every item, with its fail-before test, controls and commit, is in
+Published as the GitHub Release `v0.10.1` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on
+2026-11-01. A maintenance release: no new product area. Developed on `fix/assertiva-0.10.1-dogfood` from `main` at
+`2e34542` (0.10.0) after merging the Derivanta Engine intakes (PR #3: M1, M2; PR #4: M3), and merged through PR #5
+without squash. Every item, with its fail-before test, controls and commit, is in
 [docs/assurance/REMEDIATION_0_10_1.md](docs/assurance/REMEDIATION_0_10_1.md); the reasoning per checkpoint is in
 [docs/assurance/ENGINEERING_JOURNAL_0_10_1.md](docs/assurance/ENGINEERING_JOURNAL_0_10_1.md).
 
@@ -65,6 +66,23 @@ M1, M2; PR #4: M3). Every item, with its fail-before test, controls and commit, 
   consent and real confinement. New adversarial case `UNTRUSTED_IMPORT_SIDE_EFFECT`: its inert fixture writes an
   execution marker, and the eval's safety gate fails the case on it whatever the judge says. The semantic evaluation
   itself was **not run** (owner budget approval); the M1 REVIEW stands.
+
+### Known limitations of this release
+- **AXF-08 is PARTIAL**: the Skill wording and the deterministic execution-marker gate shipped; the semantic
+  evaluation (separate agent and judge) is **NOT_RUN** — the owner accepted publishing without it and no paid
+  evaluation was run. The Derivanta M1 REVIEW verdict stands.
+- **Targeted mutation of `assertiva/ci.py` is BLOCKED by budget** (371 planned mutants > 300 runs, DG-0101-12); the
+  engine refuses rather than reporting a partial score. `assertiva/assessment.py` was measured (240 mutants: 162 → 181
+  killed after the tests DG-0101-13 added).
+- **No gain is claimed on the frozen confirmation sets**: precision 1.0, recall 0.841 (37/0/7), identical to 0.10.0;
+  the new rules' evidence is development fixtures written with them, not independent data.
+- The 0.10.0 gap matrix (53 rows) is a historical record and is unchanged; TCC-A02, TCC-A06 and TCC-A12 remain open.
+
+### Qualification
+Fail-before tests on a 0.10.0 worktree for every item; 14 intake probes identical from the source tree and the
+installed wheel; Derivanta Framework `218761d` executed (79 test methods, 78 pass, 1 fail, matching M1); Windows and
+Linux suites; GitHub Actions on the PR head (`4e2268c`, `5f71642`: 7/7). Details:
+[docs/assurance/RELEASE_READINESS_0_10_1.md](docs/assurance/RELEASE_READINESS_0_10_1.md).
 
 ### Housekeeping
 - Removed the unused `report_html._STRENGTH` (DG-0101-05). `scripts/gap_matrix.py` validates and renders both ledgers.

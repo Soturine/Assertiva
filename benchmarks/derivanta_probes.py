@@ -31,7 +31,7 @@ def project(name, files):
 
 def audit(root, *extra, cwd=None):
     done = subprocess.run([sys.executable, "-m", "assertiva.cli", "audit", str(root), "--output", "json", *extra],
-                          capture_output=True, text=True, cwd=cwd, env={**os.environ, "ASSERTIVA_HOME": str(BASE / "home")})
+                          capture_output=True, text=True, cwd=cwd, check=False, env={**os.environ, "ASSERTIVA_HOME": str(BASE / "home")})
     try:
         report = json.loads(done.stdout)
     except ValueError:

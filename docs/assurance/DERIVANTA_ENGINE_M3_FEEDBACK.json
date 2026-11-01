@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "title": "Derivanta Engine M3 -> Assertiva 0.10.0 dogfood feedback",
+  "status": "INTAKE_ONLY_NOT_IMPLEMENTED",
+  "observation_date": "2026-11-01",
+  "assertiva_tested_revision": "2e34542b4d04f2553618875498cd0e71842b9196",
+  "assertiva_wheel_sha256": "5c96356a47dce59e68851f90c91b8feba2dc7c5d93f7d291eb26a2dc13a2adc1",
+  "engine_final_revision": "562d2ec6ed863060578cd513a0f1f6a5e51d41f4",
+  "related_pr": 3,
+  "canonical_narrative": "docs/assurance/DERIVANTA_ENGINE_M3_DOGFOOD_INTAKE.md",
+  "authority": "Assertiva executed directly by the Engine M3 round on Windows; same model family built, audited and judged. Not an independent qualification; nothing repaired in Assertiva.",
+  "sources": {
+    "feedback": "https://github.com/Soturine/Derivanta-Engine/blob/562d2ec6ed863060578cd513a0f1f6a5e51d41f4/docs/audits/m3/ASSERTIVA_FEEDBACK.md",
+    "dogfood": "https://github.com/Soturine/Derivanta-Engine/blob/562d2ec6ed863060578cd513a0f1f6a5e51d41f4/docs/audits/m3/ASSERTIVA_DOGFOOD.md",
+    "ledger": "https://github.com/Soturine/Derivanta-Engine/blob/562d2ec6ed863060578cd513a0f1f6a5e51d41f4/docs/audits/m3/FINDINGS.md",
+    "run_manifest": "https://github.com/Soturine/Derivanta-Engine/blob/562d2ec6ed863060578cd513a0f1f6a5e51d41f4/docs/audits/m3/RUN_MANIFEST.json",
+    "m3_report": "https://github.com/Soturine/Derivanta-Engine/blob/562d2ec6ed863060578cd513a0f1f6a5e51d41f4/docs/milestones/M3_REPORT.md"
+  },
+  "findings": [
+    {"id": "AXF-M3-01", "priority": "P2", "kind": "FALSE_POSITIVE", "rule": "CI_PYTEST_NOT_OBSERVED", "summary": "CI that runs pytest through a repository script is reported as no pytest in CI", "reproducer": "two projects differing only in the CI step: 'python tools/gate.py' (runs pytest) vs 'python -m pytest -q'", "acceptance": "indirect step stays UNKNOWN without the medium recommendation, or one level of a local script is followed; a script that does not run pytest keeps the finding", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-M3-02", "priority": "P3", "kind": "EVIDENCE_IMPRECISION", "rule": "ERROR_CONTRACT_FIELD_NOT_OBSERVED", "summary": "says tests only check the type when exit_code and a full payload equality are asserted; disappears only when an attribute named code is asserted", "acceptance": "evidence names observed and unobserved fields, or a full-payload equality counts as observing every field", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-01", "priority": "P1", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "REPRODUCED_M3", "summary": "relative --python with --dependencies crashes (FileNotFoundError, exit 1); absolute path exit 0", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-02", "priority": "P1", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "REPRODUCED_M3", "summary": "multi-line run step: second suite reported unobserved (high)", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-03", "priority": "P2", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "REPRODUCED_M3", "summary": "assigned determinism reported as SELF_REFERENTIAL_ORACLE", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-04", "priority": "P1", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "NOT_RE_EXECUTED", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-05", "priority": "P1", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "NOT_RE_EXECUTED", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-06", "priority": "P2", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "NOT_RE_EXECUTED", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-07", "priority": "P2", "kind": "PREVIOUSLY_REGISTERED_AXF", "m3_status": "REPRODUCED_M3", "summary": "identical bodies importing different modules reported as redundant", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-08", "priority": "P1", "kind": "SKILL_REVIEW", "m3_status": "NOT_RE_JUDGED", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-M2-01", "priority": "P1", "kind": "FALSE_NEGATIVE", "m3_status": "REPRODUCED_M3", "summary": "assert ... or True not reported while assert True is", "owner_repo": "Soturine/Assertiva", "implemented": false}
+  ],
+  "observations": [
+    {"id": "OBS-M3-01", "summary": "optional, labelled advisory adapter for --dependencies (resolved versions had real advisories in two owner projects)", "kind": "PRODUCT_IDEA"},
+    {"id": "OBS-M3-02", "summary": "Windows MAX_PATH can silently break copies/clones under long temporary paths", "kind": "ROBUSTNESS"},
+    {"id": "OBS-M3-03", "summary": "STATE_AFTER_REJECTION_NOT_EVIDENCED lists constructor-level rejections of immutable values", "kind": "PRECISION"}
+  ],
+  "engine_contribution_summary": {
+    "real_test_improvements_from_assertiva": 1,
+    "new_instrument_findings": 2,
+    "engine_defects_found_by_assertiva": 0
+  }
+}

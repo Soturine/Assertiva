@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, path_selected_by_ci
+from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, indirect_invocations, path_selected_by_ci, scripts_running
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.python_discovery import test_files
 from .adapters.python_test_classes import TESTCASE_METHOD_PREFIX, ClassKind, classify_classes
@@ -675,7 +675,18 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
                 recommendation="Turn them into TestCase methods or run them with a runner that collects them in CI.",
             )
         )
-    if (tests or materializations) and not ci and not unittest_ci:
+    through_scripts = [s for tool in ("pytest", "unittest") for s in scripts_running(root, tool)] if not (ci or unittest_ci) else []
+    if (tests or materializations) and not ci and not unittest_ci and through_scripts:
+        findings.append(
+            Finding(
+                "CI_TESTS_RUN_THROUGH_SCRIPT",
+                "CI runs a repository script whose source invokes the test runner; which tests the script selects is not read.",
+                {"count": len(through_scripts), "scripts": through_scripts[:20], "basis": "STATIC",
+                 "limitations": "one level, read statically: the script's arguments, conditions and failures are not interpreted"},
+                severity="info",
+            )
+        )
+    elif (tests or materializations) and not ci and not unittest_ci:
         findings.append(
             Finding(
                 "CI_PYTEST_NOT_OBSERVED",
@@ -686,7 +697,8 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
             )
         )
     if tests and (ci or unittest_ci):
-        missing = sorted({test.path for test in tests if not path_selected_by_ci(test.path, ci + unittest_ci)})
+        indirect = indirect_invocations(root, "pytest") + indirect_invocations(root, "unittest")  # scope unknown: no gap claimed
+        missing = sorted({test.path for test in tests if not path_selected_by_ci(test.path, ci + unittest_ci + indirect)})
         if missing:
             findings.append(
                 Finding(

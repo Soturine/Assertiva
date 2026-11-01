@@ -26,7 +26,7 @@ from contextlib import ExitStack
 
 from . import environment
 from .adapters.provisioning import plan, prepare
-from .process import passthrough, scoped, traced_stage, withheld_variables
+from .process import passthrough, resolve_interpreter, scoped, traced_stage, withheld_variables
 from .reproduction import reproduce_check
 from .history import record_state
 from .adapters.ci_runs import green, identity, load_ci_run
@@ -358,6 +358,7 @@ def run_audit(
     dependencies: bool = False,
 ) -> dict:
     root = Path(root).resolve()
+    python = resolve_interpreter(python) if python else python  # once, before any child runs elsewhere (AXF-01)
     started = _now()
     selection = None
     findings: list[Finding] = []

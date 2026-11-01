@@ -250,6 +250,14 @@ def _seconds(value: str) -> float:
     return seconds
 
 
+def _interpreter(value: str) -> str:
+    """--python as an absolute path, resolved against the directory Assertiva was started from (AXF-01)."""
+    try:
+        return process.resolve_interpreter(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="assertiva", description="Adaptive Test Intelligence & Assurance")
     parser.add_argument("--version", action="version", version=f"assertiva {__version__}")
@@ -257,7 +265,7 @@ def _parser() -> argparse.ArgumentParser:
 
     def common(p: argparse.ArgumentParser) -> None:
         p.add_argument("root", nargs="?", default=".")
-        p.add_argument("--python", help="interpreter of the project environment (default: this interpreter)")
+        p.add_argument("--python", type=_interpreter, help="interpreter of the project environment (default: this interpreter)")
         p.add_argument("--report-dir", help="where to write the report (must be outside the project)")
         p.add_argument("--output", choices=("text", "json"), default="text")
         p.add_argument("--timeout-s", type=_seconds, metavar="SECONDS",
@@ -341,7 +349,7 @@ def _parser() -> argparse.ArgumentParser:
     p_audit = acts.add_parser("audit", help="run `assertiva audit` on a registered project and record its summary")
     p_audit.add_argument("project")
     p_audit.add_argument("--execute", action="store_true")
-    p_audit.add_argument("--python")
+    p_audit.add_argument("--python", type=_interpreter)
     p_audit.add_argument("--timeout-s", type=_seconds, metavar="SECONDS")
     p_report = acts.add_parser("report", help="the portfolio view (JSON, and an offline HTML page with --html)")
     p_report.add_argument("--html", metavar="FILE", help="write a static page (no paths, no project code)")

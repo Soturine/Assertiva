@@ -105,6 +105,8 @@ def state_summary(state: StateEvidence | None) -> dict | None:
                 "interpreter": run.metadata.get("interpreter"), "limits": run.metadata.get("limits"),
                 # each invocation's outcome, so one test's evidence can be read back (assertiva explain)
                 "outcomes_by_invocation": {inv.invocation_id: inv.outcome.value for inv in run.invocations if inv.outcome is not None},
+                # several declared invocations reproduced one by one (AXF-05): each with its status and test count
+                "declared_invocations": run.metadata.get("declared_invocations"),
             }
             for run in state.runs
         ],

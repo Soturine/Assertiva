@@ -100,7 +100,8 @@ def command_check(adapter_id: str, check_id: str, command: str, source: str, gat
     return VerificationCheck(
         check_id=check_id, kind=cls.kind, origin=VerificationOrigin.CI, gate=gate, command=command, tool=cls.tool,
         source=source, adapter_id=adapter_id, evidence_tier="E2", limitations=tuple(limitations),
-        metadata={**meta, **cls.metadata, "runner_args": list(cls.runner_args), "lifecycle": lifecycle(meta.get("condition"), deploys)},
+        metadata={**meta, **cls.metadata, "runner_args": list(cls.runner_args), "invocations": list(cls.invocations),
+                  "lifecycle": lifecycle(meta.get("condition"), deploys)},
     )
 
 

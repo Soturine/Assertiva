@@ -46,7 +46,7 @@ from .evidence import (
 )
 from .history import Stability, classify_attempts, record_state
 from .models import BudgetDecision, MutantStatus, Outcome, StabilityEvidence, StabilityRecord
-from .process import scoped, traced_stage
+from .process import resolve_interpreter, scoped, traced_stage
 from .reproduction import reproduce_check
 from .verification import GateMode, VerificationOrigin, discover_surface
 from .workspace import (
@@ -198,6 +198,7 @@ def load_session(root: str | Path) -> ImproveSession | None:
 @scoped
 def start_improve(root: str | Path, python: str | None = None) -> ImproveSession:
     root = Path(root).resolve()
+    python = resolve_interpreter(python) if python else python  # once, before any child runs elsewhere (AXF-01)
     if load_session(root) is not None:
         raise SessionExistsError(f"an improve session is already active for {root}")
     directory = state_dir(root, "sessions")

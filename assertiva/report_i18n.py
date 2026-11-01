@@ -1183,6 +1183,15 @@ FINDINGS: dict[str, dict] = {
                "Todo arquivo de teste descoberto está dentro de um escopo que o CI executa, ou sua exclusão está documentada."),
         rec=("Run the unobserved test paths in CI or document why they are excluded from the delivery gate.",
              "Execute no CI os caminhos de teste não observados ou documente por que estão fora do gate de entrega.")),
+    "CI_TESTS_RUN_THROUGH_SCRIPT": F(
+        category="delivery", tier="E2",
+        title=("Tests run in CI through a script", "Testes executados no CI por um script"),
+        summary=("CI runs a repository script whose source invokes the test runner; which tests the script selects is not read.",
+                 "O CI executa um script do repositório cujo código invoca o executor de testes; quais testes o script seleciona não é lido."),
+        why=("The suite is declared through the script, not absent; what it selects and whether it fails the job are unknown from configuration.",
+             "A suíte é declarada pelo script, não está ausente; o que ele seleciona e se ele falha o job são desconhecidos pela configuração."),
+        close=("The script's selection is read (or a run of the pipeline is checked) and matches the tests that must gate delivery.",
+               "A seleção do script é lida (ou uma execução do pipeline é verificada) e corresponde aos testes que devem bloquear a entrega.")),
     "CI_PYTEST_NOT_OBSERVED": F(
         category="delivery", tier="E2",
         title=("Test runner not observed in CI", "Executor de testes não observado no CI"),

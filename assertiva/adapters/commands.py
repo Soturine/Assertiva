@@ -6,6 +6,7 @@ as UNKNOWN with the command preserved; it is never guessed to be a test or a gat
 
 from __future__ import annotations
 
+import posixpath
 import re
 import shlex
 from dataclasses import dataclass, field
@@ -74,6 +75,10 @@ class CommandClass:
     metadata: dict[str, Any] = field(default_factory=dict)
     setup_only: bool = False
     unclassified: tuple[str, ...] = ()
+    # every recognized command of the step, in order (AXF-02): {"tool", "kind", "runner_args", "command", "directory"};
+    # `directory` is where a preceding literal `cd` leads, relative to the step's start ("" = unchanged), None when a
+    # `cd` target is not literal (a variable, an absolute or parent path): then where the command runs is unknown
+    invocations: tuple[dict, ...] = ()
 
 
 def _tokens(segment: str) -> list[str]:
@@ -210,9 +215,46 @@ def reproduction_plan(check, python: str) -> ReproductionPlan:
     return ReproductionPlan(tuple(argv), kind not in RUN_WHEN_NAMED, f"{kind.value} check")
 
 
+def _strip_comment(line: str) -> str:
+    """A shell line without its comment: `#` starts one only at the start of a word and outside quotes (`a#b` is a
+    word), so `pytest tests/a  # tests/b nightly` selects tests/a only (DG-0101-08)."""
+    quote, previous = None, " "
+    for index, char in enumerate(line):
+        if quote:
+            quote = None if char == quote else quote
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and previous.isspace():
+            return line[:index].rstrip()
+        previous = char
+    return line
+
+
+def _change_directory(current: str | None, segment: str) -> str | None:
+    """The directory after `cd X` / `pushd X` (relative to the step's start), or None when X is not a literal path
+    inside it. `cd` with no argument goes home: unknown too."""
+    tokens = _tokens(segment)
+    target = tokens[1] if len(tokens) > 1 else None
+    if current is None or target is None or any(c in target for c in "$~`%") or target.startswith(("/", "\\")) or ":" in target:
+        return None
+    joined = posixpath.normpath(posixpath.join(current or ".", target.replace("\\", "/")))
+    return None if joined == ".." or joined.startswith("../") else ("" if joined == "." else joined)
+
+
 def classify_command(command: str) -> CommandClass:
-    segments = [s for line in command.splitlines() for s in _SPLIT.split(line.strip()) if s and not s.startswith("#")]
-    classified = [(s, _classify_segment(s)) for s in segments]
+    segments = [s for line in command.splitlines() for s in _SPLIT.split(_strip_comment(line.strip())) if s]
+    classified, directory, invocations = [], "", []
+    for segment in segments:
+        head = (_tokens(segment) or [""])[0]
+        if head in ("cd", "pushd"):
+            directory = _change_directory(directory, segment)
+        elif head == "popd":
+            directory = None  # the stack is not followed
+        found = _classify_segment(segment)
+        classified.append((segment, found))
+        if found is not None and found[0] is not K.UNKNOWN:
+            invocations.append({"tool": found[1], "kind": found[0].value, "runner_args": list(found[2]), "command": segment,
+                                "directory": directory})
     meaningful = [(s, c) for s, c in classified if c is not None]
     if not meaningful:
         return CommandClass(K.UNKNOWN, command.strip(), setup_only=True)
@@ -221,4 +263,4 @@ def classify_command(command: str) -> CommandClass:
     if not known:
         return CommandClass(K.UNKNOWN, meaningful[0][1][1], unclassified=unknown)
     kind, tool, args, metadata = known[0][1]
-    return CommandClass(kind, tool, args, metadata, unclassified=unknown)
+    return CommandClass(kind, tool, args, metadata, unclassified=unknown, invocations=tuple(invocations))

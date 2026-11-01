@@ -95,3 +95,42 @@ installs only Assertiva's own dependencies, so it would have failed there. The t
 with the effect.
 
 **Measured.** Core suite 1048 passed, 5 skipped (exit 0).
+
+CP1 commit: `f696808`.
+
+## CP2 — CI scopes and declared execution (AXF-02, AXF-05, AXF-01, AXF-M3-01)
+
+**One owner for three findings.** `classify_command` now records every recognized command of a step, in order,
+with the directory a preceding literal `cd` leads to (`None` when the target is a variable, absolute or a parent
+path). `ci.py` builds one CI scope per command (AXF-02) and `python_discovery.declared_invocations` hands the unittest
+adapter one declaration per command instead of whole step texts (AXF-05). No second parser was added.
+
+**Predicted defects confirmed.** Both CP0 inferences reproduced on 0.10.0 before being fixed: a second runner in the
+same step lost its scope (DG-0101-02) and `cd sub && runner tests` was scoped from the root (DG-0101-03).
+
+**Surprise (DG-0101-08).** Writing the tests showed that an inline shell comment (`pytest tests/a  # tests/b
+nightly`) turned its words into selected paths — a false negative that hides a real gap. `shlex(comments=True)` was
+rejected: it also cuts `a#b`, which bash keeps as a word; a small quote-aware rule (a `#` at the start of a word,
+outside quotes) replaced it. The first version of the regression test used unittest and passed on 0.10.0 (its `-s`
+wins over stray words); it was rewritten with pytest so it discriminates.
+
+**AXF-05 design.** Several declared invocations run one by one in the copy; the evidence keeps each command's status,
+argv, exit code and test count; a duplicate declaration runs once; the combined status is the worst part's; an
+empty part, or a part in another working directory (not reproduced: its paths would need re-rooting), keeps the run
+from passing. Coverage across parts would need `coverage combine`; it is stated as not measured rather than
+measured partially. A local run of a declared command is still not proof that CI ran it.
+
+**AXF-01.** On Windows the failure depends on the form of the relative path (`../..` forms worked, `.venv/...`
+did not), so the fix does not rely on how `subprocess` resolves programs: `--python` is resolved once against the
+invocation directory (argparse type, exit 2 with a message when nothing executable is there) and again at the
+library entry points (`run_audit`, `start_improve`).
+
+**AXF-M3-01.** A CI step that runs a repository script (`python tools/gate.py`, `bash ci/test.sh`) is read one level
+deep, statically: a process-launching call with the runner as a literal argument, `pytest.main`, or an uncommented
+shell line. Such a script gives an info finding and no gap is claimed against its unknown selection. Controls: a
+script that runs another tool, one that only prints the word, and a commented shell line keep the medium finding.
+
+**Fail-before.** On a `2e34542` worktree 16 of the 22 new tests fail (with a stub for the new resolver); the six that
+pass there are controls, plus the comment test that was then rewritten (now failing on 0.10.0).
+
+**Measured.** Core 1066 passed / 5 skipped; integration 166 passed / 11 skipped (both exit 0, `-n auto`, Windows).

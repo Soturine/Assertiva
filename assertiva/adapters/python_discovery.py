@@ -135,17 +135,35 @@ def pytest_configured(root: str | Path) -> bool:
     return pytest_config(root) is not None
 
 
-def declared_runners(root: str | Path) -> dict[str, list[str]]:
-    """Runner -> the declared commands (CI, hooks, scripts) that invoke it."""
+_RUNNERS = {"pytest": "pytest", "unittest": "unittest", "manage.py test": "django"}
+
+
+def declared_invocations(root: str | Path) -> dict[str, list[dict]]:
+    """Runner -> each declared command (CI, hooks, scripts) that invokes it: one per command of a step, never the whole
+    step (a step may run several suites: AXF-02/AXF-05), with the directory it runs in relative to the root ("" = the
+    root, ``ci.UNRESOLVED`` when configuration does not determine it) and where it is declared."""
+    from assertiva.ci import join_directories
     from assertiva.verification import discover_surface
 
-    found: dict[str, list[str]] = {}
+    found: dict[str, list[dict]] = {}
     for check in discover_surface(Path(root)).checks:
-        tool = check.tool or ""
-        runner = {"pytest": "pytest", "unittest": "unittest", "manage.py test": "django"}.get(tool)
-        if runner and check.command:
-            found.setdefault(runner, []).append(check.command)
+        if not check.command:
+            continue
+        recorded = check.metadata.get("invocations")
+        if recorded is None:
+            recorded = [{"tool": check.tool, "command": check.command, "directory": ""}]
+        for inv in recorded:
+            runner = _RUNNERS.get(inv.get("tool") or "")
+            if runner:
+                found.setdefault(runner, []).append({
+                    "command": inv.get("command") or check.command, "source": check.source,
+                    "directory": join_directories(str(check.metadata.get("working_directory") or ""), inv.get("directory"))})
     return found
+
+
+def declared_runners(root: str | Path) -> dict[str, list[str]]:
+    """Runner -> the declared commands (CI, hooks, scripts) that invoke it, one per command."""
+    return {runner: [inv["command"] for inv in invocations] for runner, invocations in declared_invocations(root).items()}
 
 
 def python_runners(root: str | Path) -> set[str]:

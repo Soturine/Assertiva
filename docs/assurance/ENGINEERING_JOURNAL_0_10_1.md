@@ -134,3 +134,38 @@ script that runs another tool, one that only prints the word, and a commented sh
 pass there are controls, plus the comment test that was then rewritten (now failing on 0.10.0).
 
 **Measured.** Core 1066 passed / 5 skipped; integration 166 passed / 11 skipped (both exit 0, `-n auto`, Windows).
+
+CP2 commit: `06b6704`.
+
+## CP3 — oracle calibration (AXF-M2-01, AXF-03, AXF-06, AXF-07, AXF-M3-02, DG-0101-04/05)
+
+Each rule was tested on the reported case, on variants and on look-alike controls that must keep their earlier
+reading (`tests/test_dogfood_calibration.py`: 11 tests, all failing on a `2e34542` worktree, all passing here).
+
+- **AXF-M2-01.** `always_true` covers a truthy literal, non-empty displays, an f-string with literal text, `not` of
+  a falsy literal, and `or`/`and` composition — the `assert x == y or "message"` slip is the same false green as
+  `or True`. Controls: a runtime `or`, `and True`, `not value`, an f-string with no literal text.
+- **AXF-03.** Not a new heuristic: the assigned form now reuses the determinism reading the inline form got in
+  0.10.0 (AG-05). The Python `SELF_REFERENTIAL_ORACLE` reading disappears because, read precisely, it was the same
+  pattern. This is a **contract change** (a test in `tests/test_effectiveness.py` pinned the old reading and was
+  rewritten with every control kept). Still surfaced: as a WEAK_ORACLE candidate, never silently accepted.
+- **Surprise (DG-0101-09).** JavaScript and JVM still call `expect(f(x)).toBe(f(x))` a TAUTOLOGY and the assigned
+  form SELF_REFERENTIAL, against the module's "judged the same way in every language". Deferred with a precise next
+  step: their regex readers produce oracles from matchers, and threading a per-assertion flag is larger than a
+  calibration change.
+- **AXF-06.** The defect was larger than reported: a typed handler was a *false green* (SWALLOWED_EXCEPTION), not
+  only "no oracle". A typed handler with no assertion inside the try is now a weak TYPED_ERROR oracle; `except
+  Exception`, `except AssertionError` and a typed handler around an assertion (which skips it) still swallow.
+- **AXF-07.** The redundancy key gains the project files the test's imported names resolve to (nearest directory
+  up to the root, then `src/`, relative imports inside their package). Unresolved names keep the candidate with
+  `subject_identity: UNKNOWN`, so text similarity is never upgraded to redundancy nor silently dropped.
+- **AXF-M3-02.** The summary said "only check the type" of a test asserting `exit_code`. It now says the tests do
+  not assert the detail other tests pin, and the evidence lists what each one asserts.
+- **DG-0101-04 (OBS-M3-03).** Reproduced before changing: a rejection while constructing a value, with nothing built
+  before it, has no state to check; a rejection on an existing object still needs one.
+- **DG-0101-05.** `_STRENGTH` was dead (one occurrence, its definition); removed.
+
+**Measured.** Frozen confirmation sets v1+v2: precision 1.0, recall 0.841 (37/0/7) on the candidate and on 0.10.0
+(worktree, import location checked: the ENG-02 trap) — no regression and no gain: the new patterns do not occur in
+the frozen sets, so the calibration evidence is the development fixtures, written with the rules (not independent).
+Static self-audit 18.8 s (two runs) vs 17.4-18.7 s on 0.10.0. Core 1077 passed / 5 skipped; integration 166 / 11.

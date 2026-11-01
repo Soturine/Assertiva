@@ -575,7 +575,7 @@ def test_mock_checks_that_cannot_fail_are_false_greens_and_real_ones_are_not(tmp
     assert len(found) == 1 and len(found[0].tests) == 3
 
 
-def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(tmp_path):
+def test_an_expected_value_computed_by_the_same_call_is_a_determinism_check(tmp_path):
     write(tmp_path / "tests" / "test_s.py",
           "import unittest\n\n"
           "def test_through_a_name():\n    expected = total([1, 2])\n    assert total([1, 2]) == expected\n\n\n"
@@ -587,12 +587,14 @@ def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(t
           "def test_state_before_and_after():\n    before = fingerprint(root)\n    run(root)\n    assert fingerprint(root) == before\n\n\n"
           "class T(unittest.TestCase):\n    def test_unittest(self):\n        want = total([1, 2])\n        self.assertEqual(total([1, 2]), want)\n")
     facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
-    for name in ("test_through_a_name", "test_unittest"):
-        assert "SELF_REFERENTIAL_ORACLE" in facts[name].smells, name
-    # AG-05 / AX-E05 (0.10.0): the same call on both sides runs the code twice: a weak determinism oracle, not a tautology
-    assert "TAUTOLOGY" not in facts["test_inline"].smells and facts["test_inline"].oracles == ("DETERMINISM",)
-    for name in ("test_inline", "test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
-        assert "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name
+    # AG-05 / AX-E05 (0.10.0): the same call on both sides runs the code twice: a weak determinism oracle, not a tautology.
+    # AXF-03 (0.10.1 candidate): through a name assigned just before, it is the same check, judged the same way (0.10.0
+    # called this form a SELF_REFERENTIAL_ORACLE false green while calling the inline form a determinism check)
+    for name in ("test_inline", "test_through_a_name", "test_unittest"):
+        assert facts[name].oracles == ("DETERMINISM",) and not {"TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"} & set(facts[name].smells), name
+    # controls: a contract value, another input, a reassigned name, a state check around an action are not determinism
+    for name in ("test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
+        assert facts[name].oracles == ("VALUE",) and "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name
 
 
 def test_complete_tied_matrices_show_subsumption_on_known_mutants_never_a_removal():

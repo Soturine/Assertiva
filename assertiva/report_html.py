@@ -590,7 +590,6 @@ def _scope(report: dict) -> list[dict]:
     return sorted(rows, key=lambda row: order[row["level"]])
 
 
-_STRENGTH = {"VERIFIED": 4, "EXECUTED": 4, "FAILED": 4, "MEASURED": 3, "INGESTED": 3, "PARTIAL": 2, "INSPECTED": 2, "DECLARED": 1, "NOT_EVIDENCED": 0}
 
 
 # --- shared pieces ---------------------------------------------------------------------

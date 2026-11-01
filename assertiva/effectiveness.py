@@ -16,7 +16,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 # DETERMINISM: a call compared with the same call fails only if the code is nondeterministic, never on a wrong value
-WEAK_ORACLES = frozenset({"EXISTENCE", "TRUTHY", "STATUS_ONLY", "BROAD_ERROR", "DETERMINISM"})
+# TYPED_ERROR: `except (A, B): pass` around the call fails only when another exception escapes (AXF-06)
+WEAK_ORACLES = frozenset({"EXISTENCE", "TRUTHY", "STATUS_ONLY", "BROAD_ERROR", "DETERMINISM", "TYPED_ERROR"})
 FALSE_GREEN_SMELLS = {
     "SWALLOWED_EXCEPTION": "an exception is caught and ignored, so the test passes whether or not the code fails",
     "CONDITIONAL_ASSERTION": "every assertion sits behind a condition, so a run where it is false asserts nothing",
@@ -67,6 +68,9 @@ class TestFacts:
     basis_signals: tuple[str, ...] = ()
     # how close to the real thing each boundary is exercised, "BOUNDARY:RUNG" (see LADDER)
     rungs: tuple[str, ...] = ()
+    # the project files the test's imported names come from (Python): equal bodies over different modules test
+    # different code (AXF-07); empty when nothing resolves (other languages, installed packages)
+    subjects: tuple[str, ...] = ()
 
 
 @dataclass
@@ -124,8 +128,8 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
             # different setup test different inputs and are never nominated, and parameter rows are setup too
             if f.body_signature and f.oracles:
                 signatures[(f.component, f.body_signature, tuple(sorted(f.boundaries)), tuple(sorted(f.simulated)), f.declared_level,
-                            tuple(sorted(f.parameters)))].append(f)
-        for (_, _, boundaries, simulated, level, _), same in signatures.items():
+                            tuple(sorted(f.parameters)), f.subjects)].append(f)
+        for (_, _, boundaries, simulated, level, _, subjects), same in signatures.items():
             if len(same) > 1:
                 out.append(Candidate("REDUNDANCY", _ids(same),
                                      f"{len(same)} test(s) have the same body (setup, call and checks) with the same boundaries and fidelity",
@@ -134,7 +138,11 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
                                      "per-test mutation kills (killedBy) or a negative control: does each one detect something the others miss?",
                                      "review together; consolidate only after the candidate shows equal regression, coverage and mutation results",
                                      language=language, detail={"boundaries": list(boundaries), "simulated": list(simulated), "level": level,
-                                                                "repetition": "IDENTICAL_BODY", "redundancy": "INFERRED"}))
+                                                                "repetition": "IDENTICAL_BODY", "redundancy": "INFERRED",
+                                                                # the same project modules, or none resolved: then whether the
+                                                                # bodies exercise the same code is not known
+                                                                "subjects": list(subjects),
+                                                                "subject_identity": "SAME_MODULES" if subjects else "UNKNOWN"}))
         for f in group:
             rows = Counter(f.parameters)
             computed = set(f.parameter_expressions)

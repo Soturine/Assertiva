@@ -1037,8 +1037,8 @@ FINDINGS: dict[str, dict] = {
     "ERROR_CONTRACT_FIELD_NOT_OBSERVED": F(
         category="negative", tier="E3",
         title=("Error contract field not asserted", "Campo do contrato de erro não verificado"),
-        summary=("Other tests show these errors carry a machine code/field/context, but these tests only check the type.",
-                 "Outros testes mostram que esses erros carregam código/campo/contexto, mas estes testes verificam apenas o tipo."),
+        summary=("Other tests assert a machine code, field or context of these errors; these tests do not (what each one asserts about the error is listed).",
+                 "Outros testes verificam um código, campo ou contexto destes erros; estes testes não verificam (o que cada um verifica sobre o erro está listado)."),
         why=("A change to the code or field the error contract carries would go unnoticed by these tests.",
              "Uma mudança no código ou campo que o contrato de erro carrega passaria despercebida por estes testes."),
         close=("The listed tests assert the machine code, field or context as the other tests for the same error do.",

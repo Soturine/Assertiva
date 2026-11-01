@@ -1,5 +1,66 @@
 # Changelog
 
+## [0.10.1] — unreleased candidate — Derivanta dogfood remediation
+
+Not published: no tag, no GitHub Release; `pyproject.toml` says `0.10.1.dev0` until a release is approved. Developed on
+`fix/assertiva-0.10.1-dogfood` from `main` at `2e34542` (0.10.0) after merging the Derivanta Engine intakes (PR #3:
+M1, M2; PR #4: M3). Every item, with its fail-before test, controls and commit, is in
+[docs/assurance/REMEDIATION_0_10_1.md](docs/assurance/REMEDIATION_0_10_1.md); the reasoning per checkpoint is in
+[docs/assurance/ENGINEERING_JOURNAL_0_10_1.md](docs/assurance/ENGINEERING_JOURNAL_0_10_1.md).
+
+### Evidence integrity
+- **A review can no longer close more mutants than it read** (AXF-04): `MUTATION_SURVIVORS` (and an untied report's
+  finding) states the complete `count` of undetected mutants, how many are `listed`, whether the list is `truncated`,
+  the distinct `sites` and the listed `mutant_ids`; an assessment scope is checked against that count, so "20/20
+  reviewed" of 35 survivors is refused. Mutants no test covered are listed, not only counted (DG-0101-07). The
+  report's `survivor_sites` lists every undetected mutant with its id and status (0.10.0 kept 20); the HTML shows 50
+  and says how many more the JSON holds.
+- **Every cut list carries its complete count** (DG-0101-01): nine findings that cut their evidence at 10, 20 or 30
+  items now say how many there are, so no assessment denominator is derived from a truncated list (guarded by an AST
+  test over every engine finding).
+
+### CI and execution
+- **Every command of a CI step is a declared scope** (AXF-02, DG-0101-02/03/08): a multi-line `run:` with two
+  `unittest discover` lines, two runners in one step, a literal `cd dir &&` before the runner, and an inline shell
+  comment are read per command. 0.10.0 kept only the first command: a false high `CI_TEST_EXECUTION_GAP` (and the
+  words of a comment counted as selected paths, hiding real gaps). A `cd` to a variable claims nothing.
+- **Declared unittest start directories run one by one** (AXF-05): with several declared `unittest discover -s`
+  invocations, `--execute` reproduces each in the copy (a duplicate once) and records per-command status, argv, exit
+  code and test count in the run's `declared_invocations`; an empty or unreproduced part keeps the run from passing.
+  0.10.0 ran `discover` at the root (0 tests, UNKNOWN). Coverage is not measured across several parts (stated).
+- **CI that runs the tests through a repository script** (AXF-M3-01): `python tools/gate.py` / `bash ci/test.sh`
+  that run pytest or unittest are read one level, statically; an info `CI_TESTS_RUN_THROUGH_SCRIPT` replaces the
+  medium `CI_PYTEST_NOT_OBSERVED`, and no execution gap is claimed against the script's unknown selection.
+- **`--python` is resolved once against the invocation directory** (AXF-01): a relative `.venv/Scripts/python.exe`
+  works with `--dependencies` and `--execute`; a missing interpreter is refused with exit 2 and a message (0.10.0:
+  `FileNotFoundError` traceback, exit 1). Library callers (`run_audit`, `start_improve`) resolve it the same way.
+
+### Test-quality signals (each with look-alike controls)
+- AXF-M2-01: `assert x == y or True` (any always-true `or` operand, a message string or f-string by mistake, `not
+  False`) is a TAUTOLOGY candidate.
+- AXF-03: `a = f(x); assert a == f(x)` is the same weak DETERMINISM oracle as `assert f(x) == f(x)` — **contract
+  change**: no longer a `SELF_REFERENTIAL_ORACLE` false green in Python (a test that pinned the old reading now pins
+  the new one). JavaScript/JVM are not aligned yet (DG-0101-09).
+- AXF-06: `try: f(x)` / `except (A, B): pass` with no assertion in the try is a weak `TYPED_ERROR` oracle (assertion
+  kind `TYPED_ERROR_BOUNDARY`), not a swallowed exception; `except Exception`, `except AssertionError` and a typed
+  handler around an assertion still are.
+- AXF-07: identical test bodies over different imported project modules are not redundancy candidates; a candidate
+  names its `subjects` and says `subject_identity: UNKNOWN` when they do not resolve.
+- AXF-M3-02: `ERROR_CONTRACT_FIELD_NOT_OBSERVED` no longer says "only check the type"; its evidence lists what each
+  test asserts about the error (`asserted`) and the detail other tests pin.
+- DG-0101-04: a rejection while constructing a value (`with raises(E): Model(...)`, nothing built before) is not asked
+  for state afterwards.
+
+### Skill and evaluations
+- AXF-08: `SKILL.md` "Read before you run" — closure and import behavior are read first; running project code beyond
+  the request needs authorization even in a copy; a venv or copy is never called a sandbox; untrusted code waits for
+  consent and real confinement. New adversarial case `UNTRUSTED_IMPORT_SIDE_EFFECT`: its inert fixture writes an
+  execution marker, and the eval's safety gate fails the case on it whatever the judge says. The semantic evaluation
+  itself was **not run** (owner budget approval); the M1 REVIEW stands.
+
+### Housekeeping
+- Removed the unused `report_html._STRENGTH` (DG-0101-05). `scripts/gap_matrix.py` validates and renders both ledgers.
+
 ## [0.10.0] — 2026-10-31 — Reliability, Portfolio Assurance & Continuous Dogfood
 
 Published as the GitHub Release `v0.10.0` (wheel and sdist with SHA-256 checksums; not PyPI). Developed on

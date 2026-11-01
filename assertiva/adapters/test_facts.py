@@ -135,14 +135,33 @@ def _arguments(clean: str, opening: int) -> tuple[list[tuple[int, int]], int] | 
     return None
 
 
+# A check that compares a call with the same call (inline, or through a name assigned from it just before): it runs the
+# code twice and fails only on nondeterminism. A marker between the smell readers and the fact builders, never a smell.
+DETERMINISM_CHECK = "DETERMINISM_CHECK"
+
+
+def _calls_code(text: str, span: tuple[int, int]) -> bool:
+    return "(" in text[span[0]:span[1]]
+
+
+def _determinism_oracles(oracles: list[str], smells: list[str], checks: int) -> tuple[list[str], list[str]]:
+    """Python's reading (AG-05, AXF-03) for the lexical readers (DG-0101-09): when every check of the test is a
+    determinism check, its oracle is DETERMINISM; the marker never reaches the reported smells."""
+    marked = smells.count(DETERMINISM_CHECK)
+    smells = [s for s in smells if s != DETERMINISM_CHECK]
+    if marked and marked >= checks and set(oracles) <= {"VALUE"}:
+        oracles = ["DETERMINISM"]
+    return oracles, smells
+
+
 def _same(text: str, a: tuple[int, int], b: tuple[int, int]) -> bool:
     return _norm(text[a[0]:a[1]]) == _norm(text[b[0]:b[1]])
 
 
 def _expected_from_same_call(text: str, clean: str, start: int, actual: tuple[int, int], expected: tuple[int, int]) -> bool:
     """`const expected = total(cart)` (or `val`/`var`/a typed local) on the line just before an assertion of
-    `total(cart)` against `expected`: the expected value is the actual one. (The Python reader treats this pattern as a
-    weak determinism oracle since AXF-03; aligning JavaScript and JVM is DG-0101-09.)"""
+    `total(cart)` against `expected`: the same call twice, a weak determinism check in every language (AXF-03 for
+    Python, DG-0101-09 here)."""
     before = clean.rfind("\n", 0, start)
     previous = clean.rfind("\n", 0, max(before, 0))
     if before < 0:
@@ -219,9 +238,9 @@ def _js_assertion_smells(text: str, clean: str) -> list[str]:
             if found and len(found[0]) == 1:
                 expected = found[0][0]
                 if _same(text, args[0], expected):
-                    smells.append("TAUTOLOGY")
+                    smells.append(DETERMINISM_CHECK if _calls_code(text, args[0]) else "TAUTOLOGY")
                 elif _expected_from_same_call(text, clean, start, args[0], expected):
-                    smells.append("SELF_REFERENTIAL_ORACLE")
+                    smells.append(DETERMINISM_CHECK)
     return smells
 
 
@@ -235,9 +254,9 @@ def _jvm_assertion_smells(text: str, clean: str) -> list[str]:
             # JUnit 4 puts an optional message first, JUnit 5 last
             pair = args[1:3] if len(args) == 3 and text[args[0][0]:args[0][1]].strip().startswith('"') else args[:2]
             if len(pair) == 2 and _same(text, *pair):
-                smells.append("TAUTOLOGY")
+                smells.append(DETERMINISM_CHECK if _calls_code(text, pair[0]) else "TAUTOLOGY")
             elif len(pair) == 2 and _expected_from_same_call(text, clean, start, pair[1], pair[0]):
-                smells.append("SELF_REFERENTIAL_ORACLE")
+                smells.append(DETERMINISM_CHECK)
     for start, args, after in _calls(text, clean, "assertThat"):
         if len(args) != 1:
             continue
@@ -249,9 +268,9 @@ def _jvm_assertion_smells(text: str, clean: str) -> list[str]:
             found = _arguments(clean, after + chain.start("call"))
             if found and len(found[0]) == 1:
                 if _same(text, args[0], found[0][0]):
-                    smells.append("TAUTOLOGY")
+                    smells.append(DETERMINISM_CHECK if _calls_code(text, args[0]) else "TAUTOLOGY")
                 elif _expected_from_same_call(text, clean, start, args[0], found[0][0]):
-                    smells.append("SELF_REFERENTIAL_ORACLE")
+                    smells.append(DETERMINISM_CHECK)
     return smells
 
 
@@ -911,6 +930,7 @@ def _js_test(test_id, rel, body, body_clean, file_doubles, level, msw, retries) 
         else:
             surfaces.add("RETURN")
     smells += _js_assertion_smells(body, body_clean)
+    oracles, smells = _determinism_oracles(oracles, smells, len(signature))
     if _swallowed(body_clean, _JS_ASSERTION):
         smells.append("SWALLOWED_EXCEPTION")
     if re.search(r"waitForTimeout\(|new Promise\(\s*\(?\w*\)?\s*=>\s*setTimeout", body) and not _time_is_subject(test_id, body):
@@ -1056,6 +1076,7 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
         if re.search(r"assertTrue\(\s*true\s*\)", statement):
             smells.append("TAUTOLOGY")
     smells += _jvm_assertion_smells(body, body_clean)
+    oracles, smells = _determinism_oracles(oracles, smells, len(signature))
     doubles = [*class_doubles, *re.findall(r"\bmockk<(\w+)>|\bmock\(\s*(\w+)(?:::class|\.class)", body)]
     doubles = [d if isinstance(d, str) else next(x for x in d if x) for d in doubles]
     boundaries, simulated, surfaces = set(), set(), set()

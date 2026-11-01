@@ -116,3 +116,11 @@ def test_one_declared_invocation_keeps_the_single_run_behavior(tmp_path):
     root = suites(tmp_path, [[discover("x")]], {"x": 1})
     args, source = UnittestAdapter(python=sys.executable)._declared_args(root)
     assert args[:3] == ["discover", "-s", "x/tests"] and source == discover("x")
+
+
+@pytest.mark.integration
+def test_the_report_page_shows_each_declared_command_with_its_status(tmp_path, capsys, assertiva_home):
+    root = suites(tmp_path / "p", [[discover("x"), discover("y")]], {"x": 2, "y": 1}, failing={("y", 0)})
+    cli.main(["audit", str(root), "--execute", "--python", sys.executable, "--output", "json"])
+    page = Path(json.loads(capsys.readouterr().out)["report_path"]).read_text(encoding="utf-8")
+    assert "2 declared commands run one by one" in page and "<code>FAIL</code> 1" in page

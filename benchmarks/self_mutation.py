@@ -1,13 +1,14 @@
 """Engine-run mutation of Assertiva's own failures.py with named tests, written as a complete per-mutant record.
 
-    python benchmarks/self_mutation.py TREE OUT.json [LABEL]
+    python benchmarks/self_mutation.py TREE OUT.json [LABEL [TARGET TEST ...]]
 
 TREE is a checkout of this repository (a `git archive` export of a commit). The engine's orchestrator runs Cosmic Ray
 on assertiva/failures.py with tests/test_failures.py and tests/test_failure_headline.py (what `audit --mutate FILE
 --mutate-tests PATH` does after its native run). Budget: at most 300 mutants (the engine's cap), Cosmic Ray's 60 s per
 mutant; run it under an outer time limit. Every mutant is written with file, line, operator, status and its stable
 id; paths are relative to TREE, nothing else of the machine is recorded. The classification of survivors is a
-conservative lead (see `classify`), never a claim of equivalence.
+conservative lead (see `classify`), never a claim of equivalence. Another TARGET with its TESTs runs the same way
+(0.10.1 candidate: assertiva/ci.py with the CI scope tests).
 """
 
 from __future__ import annotations
@@ -30,14 +31,15 @@ def classify(line_text: str, operator: str | None) -> str:
     return "EQUIVALENCE_CANDIDATE_ANNOTATION" if annotation else "IMPACT_UNKNOWN"
 
 
-def main(tree: str, out: str, label: str = "") -> dict:
+def main(tree: str, out: str, label: str = "", target: str = TARGET, tests: list[str] | None = None) -> dict:
     sys.path.insert(0, str(Path(tree).resolve()))
     from assertiva.adapters.mutation import run_mutation_tool
 
     root = Path(tree).resolve()
     started = time.perf_counter()
-    run = run_mutation_tool(root, sys.executable, [TARGET], "cosmic-ray", root, TESTS)
-    source = (root / TARGET).read_text(encoding="utf-8").splitlines()
+    tests = tests or TESTS
+    run = run_mutation_tool(root, sys.executable, [target], "cosmic-ray", root, tests)
+    source = (root / target).read_text(encoding="utf-8").splitlines()
     mutants = []
     for m in run.mutants:
         record = {"id": m.mutant_id, "stable_id": m.stable_id, "file": m.path, "line": m.line, "operator": m.operator,
@@ -50,7 +52,7 @@ def main(tree: str, out: str, label: str = "") -> dict:
         if "lead" in record:
             leads[record["lead"]] = leads.get(record["lead"], 0) + 1
     data = {"label": label, "tool": run.tool, "tool_version": run.tool_version, "provenance": "ENGINE_EXECUTED",
-            "error": run.error, "finished": run.finished, "target": TARGET, "tests": TESTS,
+            "error": run.error, "finished": run.finished, "target": target, "tests": tests,
             "selection": (run.config or {}).get("test_selection"), "counts": run.counts, "survivor_leads": leads,
             "leads_note": "EQUIVALENCE_CANDIDATE_ANNOTATION is a candidate, not proven equivalence; IMPACT_UNKNOWN is unread",
             "wall_clock_s": round(time.perf_counter() - started, 1), "mutants": mutants}
@@ -59,4 +61,4 @@ def main(tree: str, out: str, label: str = "") -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps(main(*sys.argv[1:4])))
+    print(json.dumps(main(*sys.argv[1:4], *([sys.argv[4], sys.argv[5:]] if len(sys.argv) > 5 else []))))

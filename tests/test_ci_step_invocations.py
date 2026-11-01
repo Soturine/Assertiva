@@ -102,3 +102,49 @@ def test_a_shell_script_that_runs_pytest_counts_and_a_commented_line_does_not(tm
     write(tmp_path / "b" / "ci" / "test.sh", "#!/bin/sh\n# pytest -q\necho skipped\n")
     assert "CI_TESTS_RUN_THROUGH_SCRIPT" in codes(script_project(tmp_path / "a", None, command="bash ci/test.sh"))
     assert "CI_PYTEST_NOT_OBSERVED" in codes(script_project(tmp_path / "b", None, command="bash ci/test.sh"))
+
+
+# --- DG-0101-10 / DG-0101-11: pipes, redirections and discarded test status ---------------------------------------
+
+from assertiva.adapters.commands import classify_command  # noqa: E402
+from assertiva.verification import discover_surface, surface_findings  # noqa: E402
+
+
+@pytest.mark.parametrize("command,args", [
+    ("python -m pytest tests/unit | tee pytest.log", ("tests/unit",)),
+    ("python -m pytest tests/unit 2>&1 | tail -5", ("tests/unit",)),
+    ("pytest tests > out.txt", ("tests",)),
+    ('pytest -k "a|b" tests', ("-k", "a|b", "tests")),  # a quoted | is an argument
+])
+def test_pipes_and_redirections_are_not_runner_arguments(command, args):
+    assert classify_command(command).runner_args == args  # 0.10.0: tee, pytest.log, 2>&1, tail were scopes
+
+
+def masked(root, run, shell=None, runs_on="ubuntu-latest"):
+    step = f"      - run: {run}\n" + (f"        shell: {shell}\n" if shell else "")
+    write(root / ".github" / "workflows" / "ci.yml", f"on: push\njobs:\n  t:\n    runs-on: {runs_on}\n    steps:\n" + step)
+    write(root / "tests" / "test_x.py", "def test_x():\n    assert 1 + 1 == 2\n")
+    return next((f for f in surface_findings(discover_surface(root)) if f.code == "CI_TEST_STATUS_MASKED"), None)
+
+
+def test_a_piped_test_command_in_the_default_shell_discards_its_status(tmp_path):
+    found = masked(tmp_path, "python -m pytest | tee pytest.log")
+    assert found is not None and found.evidence["steps"][0]["how"] == "a pipe in a shell without pipefail"
+
+
+@pytest.mark.parametrize("run", ["python -m pytest || true", "python -m pytest || echo tests failed", "python -m pytest || exit 0"])
+def test_or_true_after_tests_discards_the_status_in_any_shell(tmp_path, run):
+    found = masked(tmp_path, run, shell="bash")
+    assert found is not None and "|| true" in found.evidence["steps"][0]["how"]
+
+
+@pytest.mark.parametrize("run,shell,runs_on", [
+    ("python -m pytest | tee pytest.log", "bash", "ubuntu-latest"),  # explicit bash: -eo pipefail
+    ("set -o pipefail; python -m pytest | tee pytest.log", None, "ubuntu-latest"),
+    ("python -m pytest | tee pytest.log", None, "windows-latest"),  # pwsh: not decided here
+    ("python -m pytest | tee pytest.log", None, "${{ matrix.os }}"),  # unknown runner: no claim
+    ("pip list | grep pytest", None, "ubuntu-latest"),  # not a test command
+    ("python -m pytest || exit 1", None, "ubuntu-latest"),  # the failure is kept
+], ids=["explicit-bash", "set-pipefail", "windows", "matrix-os", "not-a-test", "or-exit-1"])
+def test_status_masking_is_not_claimed_where_the_shell_keeps_it_or_cannot_be_decided(tmp_path, run, shell, runs_on):
+    assert masked(tmp_path, run, shell, runs_on) is None

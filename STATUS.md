@@ -4,6 +4,7 @@
 
 | Version | State |
 | --- | --- |
+| 0.10.1 — Derivanta dogfood remediation | **candidate, not released** (`0.10.1.dev0` on `fix/assertiva-0.10.1-dogfood`; no tag, no GitHub Release). Fixes the 11 Derivanta Engine intake items (AXF-01..08, AXF-M2-01, AXF-M3-01/02; AXF-08 partial: the semantic evaluation is not run) and the discoveries made doing it: [remediation ledger](docs/assurance/REMEDIATION_0_10_1.md), [readiness](docs/assurance/RELEASE_READINESS_0_10_1.md) |
 | **0.10.0** — Reliability, Portfolio Assurance & Continuous Dogfood | **published 2026-10-31** as `v0.10.0` (GitHub Release, wheel and sdist with SHA-256 checksums; not PyPI). What it adds and what it leaves open: [CHANGELOG](CHANGELOG.md), [gap matrix](docs/assurance/POST_DOGFOOD_GAP_MATRIX.md), [release readiness](docs/assurance/RELEASE_READINESS.md). The sections below were written for 0.9.0 and still hold; 0.10.0's additions are in the CHANGELOG and [references/ENGINE.md](references/ENGINE.md) |
 | 0.9.0 — Advanced Test Intelligence & Continuous Assurance | published 2026-10-20 as `v0.9.0` (GitHub Release); the previous release; this page was written for it. It includes the work of 0.7.3, 0.8.0 and 0.8.1 |
 | 0.8.1 | not a release: its scope (advanced mutation and improve) is in 0.9.0 |

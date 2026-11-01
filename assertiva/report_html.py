@@ -1831,6 +1831,10 @@ def _run_facts(r: _R, run: dict) -> str:
     limits = run.get("limits") or {}
     if limits.get("timeout_s") is not None:
         parts.append(f'{r.t("runs.limit")} <code>{float(limits["timeout_s"]):g} s</code> ({_e(limits.get("timeout_source"))})')
+    declared = run.get("declared_invocations") or []
+    if declared:  # several declared commands reproduced one by one (AXF-05): each with its status and test count
+        each = ", ".join(f'<code>{_e(p["status"])}</code> {_e(p.get("invocations", "—"))}' for p in declared)
+        parts.append(f'{r.t("runs.declared", n=len(declared))}: {each}')
     return f'<p class="run-how">{" · ".join(parts)}</p>' if parts else ""
 
 

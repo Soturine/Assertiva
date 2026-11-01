@@ -1,0 +1,36 @@
+{
+ "note": "isolated ASSERTIVA_HOME (not the owner's registry); the project is the synthetic probe fixture, its local path omitted",
+ "assertiva_feedback": [
+  {
+   "feedback_id": "AFB-c5e923e7c9",
+   "history": [
+    {
+     "at": "2026-11-01T18:49:43+00:00",
+     "evidence": "tests/test_dogfood_calibration.py AXF-07 tests fail on 0.10.0 (2e34542 worktree)",
+     "from": "OBSERVED",
+     "to": "REPRODUCED"
+    },
+    {
+     "at": "2026-11-01T18:49:43+00:00",
+     "evidence": "fix/assertiva-0.10.1-dogfood ec5c796: redundancy key includes resolved subject modules; probe c1-multiline-both has no REDUNDANCY candidate",
+     "from": "REPRODUCED",
+     "to": "FIXED_IN_ASSERTIVA_BRANCH"
+    }
+   ],
+   "kind": "FALSE_POSITIVE",
+   "reproducer": "benchmarks/derivanta_probes.py c1-multiline-both: a/tests and b/tests hold the same TestCase body, each importing its own lib.py; 0.10.0 nominated them as IDENTICAL_BODY redundancy. Regression: tests/test_dogfood_calibration.py (AXF-07).",
+   "rule": "REDUNDANCY_CANDIDATE",
+   "sightings": [
+    {
+     "at": "2026-11-01T18:49:25+00:00",
+     "engine_version": "0.10.0",
+     "note": "AXF-07; reported by Derivanta Engine M1 (ASSERTIVA_EVALUATION.md at 2922bdb) but absent from its exported Portfolio (6 unique records); registered here, not retroactively in M1",
+     "project": "derivanta-c1-fixture",
+     "run_id": null
+    }
+   ],
+   "signature": "identical-body-different-imported-subject",
+   "state": "FIXED_IN_ASSERTIVA_BRANCH"
+  }
+ ]
+}

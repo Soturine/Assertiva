@@ -169,3 +169,66 @@ reading (`tests/test_dogfood_calibration.py`: 11 tests, all failing on a `2e3454
 (worktree, import location checked: the ENG-02 trap) — no regression and no gain: the new patterns do not occur in
 the frozen sets, so the calibration evidence is the development fixtures, written with the rules (not independent).
 Static self-audit 18.8 s (two runs) vs 17.4-18.7 s on 0.10.0. Core 1077 passed / 5 skipped; integration 166 / 11.
+
+CP3 commit: `ec5c796`.
+
+## CP4 — dogfood, feedback, installed wheel, and discoveries beyond the intakes
+
+**After-fix probes.** The same 14 probes now pass with the candidate and keep every control
+([pass-after evidence](evidence/derivanta-0.10.1/pass-after-candidate.json), local paths redacted). The installed
+wheel `assertiva-0.10.1.dev0` (sha256 `c31ad092…d4742`, built from the tree, clean venv, run outside the repository
+with `-I`, `assertiva` resolved to the venv's site-packages) gives byte-identical probe results.
+
+**Derivanta Framework at `218761d`, `--execute`** (the real AXF-05 case; the Framework tree was clean before and
+after): five declared roots run one by one — 17, 10, 30, 22 and 4 invocations — status FAIL, 83 invocations, of
+which 82 pass. Counted in the M1 report's unit, that is **79 test methods (78 pass, 1 fail:
+`offline-pilot …test_absent_is_empty`)**, exactly M1's independent count; the 83 includes 6 subTest cases of two
+methods. 0.10.0 ran `discover` at the root: 0 invocations, UNKNOWN.
+
+**Derivanta Engine at `0be2a38`, static** (candidate vs 0.10.0 worktree): `CI_PYTEST_NOT_OBSERVED` became
+`CI_TESTS_RUN_THROUGH_SCRIPT` (its `tools/verify.py` gate: AXF-M3-01 confirmed on the real subject);
+`STATE_AFTER_REJECTION_NOT_EVIDENCED` went from 46 tests (20 listed, no count) to 40 with `count: 40`. The 6 removed
+were all read: every one is a pydantic model rejected in its constructor (DG-0101-04 confirmed, 6/6, none hiding a
+gap). No other finding or candidate changed.
+
+**Other stacks, static only** (third-party public repositories, nothing executed): a Node project and a Django
+course — identical findings and candidates on the candidate and on 0.10.0. No regression; also no gain, since
+neither contains the patterns fixed here.
+
+**Portfolio (AXF-07).** Feedback ids are deterministic: the candidate reproduces the M1 export's ids
+(`AFB-bfd8aad892` AXF-01, `AFB-078b02c4a0` AXF-02). AXF-07 was registered in an isolated `ASSERTIVA_HOME` (not the
+owner's registry) against the synthetic probe fixture: `AFB-c5e923e7c9`, moved OBSERVED → REPRODUCED →
+FIXED_IN_ASSERTIVA_BRANCH with evidence, and stops there until the change is on `main`
+([export](evidence/derivanta-0.10.1/portfolio-axf07.json)). The M1 export itself is not rewritten.
+
+**Targeted mutation.** `assertiva/ci.py` with the CI-scope tests: **refused by the engine** — 371 planned mutants
+exceed the 300-run budget (DG-0101-12): Assertiva's own code meets the limit the Engine met with
+`maintainability.py`, which is evidence for IDEA-02, not a defect. Cosmic Ray (8.7.0) is not in the system
+interpreter and was not installed globally: a scratch venv without Assertiva installed runs it on a `git archive`
+export, so the mutated tree is the only Assertiva on the path (ENG-02).
+
+**Discoveries beyond the intakes** (the owner asked for investigation past the prompt, 2026-11-01):
+
+- **DG-0101-09 fixed** instead of deferred: JavaScript/JVM now read call==call (inline or assigned) as DETERMINISM
+  like Python; same-value comparisons stay TAUTOLOGY (new controls in both languages). Frozen sets unchanged.
+- **DG-0101-10**: what follows a pipe and the shell's redirections were runner arguments (`| tee pytest.log` made
+  `tee` and `pytest.log` CI scopes; with AXF-05 they would have been passed to unittest).
+- **DG-0101-11, new finding `CI_TEST_STATUS_MASKED`**: the M1 report credited the *agent*, not Assertiva, with
+  finding a pipeline that masked a verifier's exit code. GitHub's documented default Linux shell is `bash -e`
+  without pipefail, so `pytest | tee log` passes while tests fail; `|| true` / `|| echo` / `|| exit 0` discard the
+  status in any shell. Controls: explicit `shell: bash`, `set -o pipefail`, Windows and matrix runners (not decided),
+  non-test pipes, `|| exit 1`. None of the five real projects pipes its tests: no false positive, no real positive.
+- The HTML run card now lists each declared command's status and test count; `references/ENGINE.md` tells the agent
+  to review from the complete list (`count`), not the listed sample; DELIVERY/TEST_QUALITY describe the new readings.
+
+**Agent mistakes.**
+
+- My own first control for DG-0101-11 claimed `pytest || echo failed` keeps the status; `echo` returns 0, so it
+  discards it too. The rule and the test were corrected (`|| exit 1` is the control).
+- A shell heredoc turned `\b` into a backspace inside a regular expression (the same pitfall as CP0); found by a
+  failing test, fixed with a direct edit.
+- A YAML-unsafe test case (`run: … || :` unquoted) failed for YAML reasons, not the rule; replaced.
+- The first Linux run copied the live working tree while I was editing: its result mixes states and is discarded.
+  Linux runs are repeated on a `git archive` of a commit.
+- One comparison imported the main checkout instead of the 0.10.0 worktree (`python -c` puts the current directory
+  first on `sys.path`); caught by printing the module path, rerun from inside the worktree.

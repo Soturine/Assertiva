@@ -20,10 +20,10 @@ refused by the session's permission policy). Items, tests and commits:
 | Real subjects, static | Derivanta Engine `0be2a38`, Assertiva itself, two third-party repositories (Node, Django) | only the intended changes; no new false positive; the new rules have no positive in these projects (no measured gain there) |
 | Frozen confirmation sets v1+v2 | `benchmarks/effectiveness.py` | precision 1.0, recall 0.841 (37/0/7) on both 0.10.0 and the candidate: no regression, no gain |
 | Cost | static self-audit | 18.8 s vs 17.4–18.7 s on 0.10.0 (two runs each) |
-| Targeted mutation | `benchmarks/self_mutation.py` | `assertiva/ci.py`: refused, 371 planned > 300 budget (DG-0101-12, BLOCKED). `assertiva/assessment.py` (ec5c796): 240 mutants, 162 killed, 73 survived (22 annotation candidates), 3 timeout, 2 error; scope-path survivors pinned by new tests (DG-0101-13), rerun in the journal |
+| Targeted mutation | `benchmarks/self_mutation.py` | `assertiva/ci.py`: refused, 371 planned > 300 budget (DG-0101-12, BLOCKED). `assertiva/assessment.py` (ec5c796): 240 mutants, 162 killed, 73 survived (22 annotation candidates), 3 timeout, 2 error; scope-path survivors pinned by new tests (DG-0101-13); rerun on `4e2268c`: 181 killed, 57 survived, 0 timeout, 2 error |
 | Local suites, Windows | `pytest -m "not integration and not artifact"` / `-m "(integration or artifact) and not browser and not jvm"` | core 1094 passed / 5 skipped, integration 167 passed / 11 skipped (exit 0) |
 | Local suites, Linux | the same commands in `python:3.12-slim` on a `git archive` of `9f64c03` | core 1095 passed, integration 169 passed / 13 skipped (exit 0) |
-| Remote CI | GitHub Actions on the final push | recorded after the push in the journal; local runs are not CI |
+| Remote CI | GitHub Actions | `4e2268c`: push [41341845670](https://github.com/Soturine/Assertiva/actions/runs/41341845670) 7/7, pull_request [41341849603](https://github.com/Soturine/Assertiva/actions/runs/41341849603) 7/7; Runtime self-qualification not run (tags / dispatch only) |
 | Semantic evaluation (AXF-08) | `evals/semantic.py` with a separate agent and judge | **NOT_RUN** — owner budget approval; the Derivanta M1 REVIEW stands |
 
 ## Contract changes a consumer may notice

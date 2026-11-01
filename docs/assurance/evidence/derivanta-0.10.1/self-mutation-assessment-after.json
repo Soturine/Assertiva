@@ -1,0 +1,2012 @@
+{
+ "label": "4e2268c assessment.py",
+ "tool": "Cosmic Ray",
+ "tool_version": "8.7.0",
+ "provenance": "ENGINE_EXECUTED",
+ "error": null,
+ "finished": true,
+ "target": "assertiva/assessment.py",
+ "tests": [
+  "tests/test_review_denominator.py",
+  "tests/test_assessment.py"
+ ],
+ "selection": {
+  "tests": [
+   "tests/test_review_denominator.py",
+   "tests/test_assessment.py"
+  ],
+  "baseline": "the selected tests passed",
+  "baseline_duration_s": 7.579,
+  "whole_suite": "NOT_RUN"
+ },
+ "counts": {
+  "SURVIVED": 57,
+  "KILLED": 181,
+  "ERROR": 2
+ },
+ "survivor_leads": {
+  "EQUIVALENCE_CANDIDATE_ANNOTATION": 22,
+  "IMPACT_UNKNOWN": 35
+ },
+ "leads_note": "EQUIVALENCE_CANDIDATE_ANNOTATION is a candidate, not proven equivalence; IMPACT_UNKNOWN is unread",
+ "wall_clock_s": 749.4,
+ "mutants": [
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Add:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Add:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Add:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Add:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Add",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Sub:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Sub:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Sub:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Sub:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Sub",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mul:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mul:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mul:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mul:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mul",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Div:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Div:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Div:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Div:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Div",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_FloorDiv:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_FloorDiv",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mod:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mod:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mod:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Mod:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Mod",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Pow:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Pow:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Pow:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_Pow:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_Pow",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_RShift:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_RShift:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_RShift:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_RShift:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_RShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_LShift:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_LShift:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_LShift:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_LShift:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_LShift",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitAnd:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitAnd:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitAnd:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitAnd:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitAnd",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitXor:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitXor:0",
+   "file": "assertiva/assessment.py",
+   "line": 51,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitXor:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceBinaryOperator_BitOr_BitXor:1",
+   "file": "assertiva/assessment.py",
+   "line": 195,
+   "operator": "core/ReplaceBinaryOperator_BitOr_BitXor",
+   "status": "SURVIVED",
+   "lead": "EQUIVALENCE_CANDIDATE_ANNOTATION"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:0",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:1",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:2",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:3",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:4",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:5",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_NotEq:6",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:0",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:1",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:2",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:3",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:4",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:5",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Lt:6",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:1",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:2",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:3",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:4",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:5",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_LtE:6",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:0",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:1",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:2",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:3",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:4",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:5",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Gt:6",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:1",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:2",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:3",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:4",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:5",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_GtE:6",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_GtE",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:0",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:1",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:2",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:3",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:4",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_Is:5",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_Is",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:0",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:1",
+   "file": "assertiva/assessment.py",
+   "line": 77,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:2",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:3",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:4",
+   "file": "assertiva/assessment.py",
+   "line": 175,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Eq_IsNot:5",
+   "file": "assertiva/assessment.py",
+   "line": 176,
+   "operator": "core/ReplaceComparisonOperator_Eq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Eq:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Lt:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_LtE:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Gt:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_GtE:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_Is:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:0",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:1",
+   "file": "assertiva/assessment.py",
+   "line": 139,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:2",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:3",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:4",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:5",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_NotEq_IsNot:6",
+   "file": "assertiva/assessment.py",
+   "line": 172,
+   "operator": "core/ReplaceComparisonOperator_NotEq_IsNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Eq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Eq:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Eq:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Eq:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_NotEq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_NotEq:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_NotEq:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_NotEq:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_NotEq",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_LtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_LtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_LtE:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_LtE:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Gt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Gt:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Gt:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Gt:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_GtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_GtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_GtE:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_GtE:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Is:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Is:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Is:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_Is:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_IsNot:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_IsNot:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_Lt_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_IsNot:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Lt_IsNot:1",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_Lt_IsNot",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Eq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Eq:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_NotEq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_NotEq:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_NotEq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Lt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Lt:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Gt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Gt:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_Gt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_GtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_GtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Is:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_Is:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_IsNot:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_LtE_IsNot:0",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceComparisonOperator_LtE_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_Eq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_Eq:0",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceComparisonOperator_Gt_Eq",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_NotEq:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_NotEq:0",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceComparisonOperator_Gt_NotEq",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_Lt:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_Lt:0",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceComparisonOperator_Gt_Lt",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_LtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_LtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceComparisonOperator_Gt_LtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_GtE:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Gt_GtE:0",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceComparisonOperator_Gt_GtE",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Is_IsNot:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_Is_IsNot:0",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceComparisonOperator_Is_IsNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:0",
+   "file": "assertiva/assessment.py",
+   "line": 81,
+   "operator": "core/ReplaceComparisonOperator_IsNot_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:1",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceComparisonOperator_IsNot_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:2",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceComparisonOperator_IsNot_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceComparisonOperator_IsNot_Is:3",
+   "file": "assertiva/assessment.py",
+   "line": 96,
+   "operator": "core/ReplaceComparisonOperator_IsNot_Is",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:0",
+   "file": "assertiva/assessment.py",
+   "line": 34,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:1",
+   "file": "assertiva/assessment.py",
+   "line": 34,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:2",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:3",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:4",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:5",
+   "file": "assertiva/assessment.py",
+   "line": 61,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:6",
+   "file": "assertiva/assessment.py",
+   "line": 82,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:7",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:7",
+   "file": "assertiva/assessment.py",
+   "line": 97,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:8",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:8",
+   "file": "assertiva/assessment.py",
+   "line": 97,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:9",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:9",
+   "file": "assertiva/assessment.py",
+   "line": 101,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:10",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:10",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:11",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:11",
+   "file": "assertiva/assessment.py",
+   "line": 113,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:12",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:12",
+   "file": "assertiva/assessment.py",
+   "line": 116,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:13",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:13",
+   "file": "assertiva/assessment.py",
+   "line": 116,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:14",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:14",
+   "file": "assertiva/assessment.py",
+   "line": 149,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:15",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:15",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:16",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:16",
+   "file": "assertiva/assessment.py",
+   "line": 167,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:17",
+   "stable_id": "assertiva/assessment.py:core/ReplaceUnaryOperator_Delete_Not:17",
+   "file": "assertiva/assessment.py",
+   "line": 167,
+   "operator": "core/ReplaceUnaryOperator_Delete_Not",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:0",
+   "stable_id": "assertiva/assessment.py:core/AddNot:0",
+   "file": "assertiva/assessment.py",
+   "line": 34,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:1",
+   "stable_id": "assertiva/assessment.py:core/AddNot:1",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:2",
+   "stable_id": "assertiva/assessment.py:core/AddNot:2",
+   "file": "assertiva/assessment.py",
+   "line": 46,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:3",
+   "stable_id": "assertiva/assessment.py:core/AddNot:3",
+   "file": "assertiva/assessment.py",
+   "line": 54,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:4",
+   "stable_id": "assertiva/assessment.py:core/AddNot:4",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:5",
+   "stable_id": "assertiva/assessment.py:core/AddNot:5",
+   "file": "assertiva/assessment.py",
+   "line": 61,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:6",
+   "stable_id": "assertiva/assessment.py:core/AddNot:6",
+   "file": "assertiva/assessment.py",
+   "line": 64,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:7",
+   "stable_id": "assertiva/assessment.py:core/AddNot:7",
+   "file": "assertiva/assessment.py",
+   "line": 68,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:8",
+   "stable_id": "assertiva/assessment.py:core/AddNot:8",
+   "file": "assertiva/assessment.py",
+   "line": 72,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:9",
+   "stable_id": "assertiva/assessment.py:core/AddNot:9",
+   "file": "assertiva/assessment.py",
+   "line": 73,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:10",
+   "stable_id": "assertiva/assessment.py:core/AddNot:10",
+   "file": "assertiva/assessment.py",
+   "line": 81,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:11",
+   "stable_id": "assertiva/assessment.py:core/AddNot:11",
+   "file": "assertiva/assessment.py",
+   "line": 82,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:12",
+   "stable_id": "assertiva/assessment.py:core/AddNot:12",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:13",
+   "stable_id": "assertiva/assessment.py:core/AddNot:13",
+   "file": "assertiva/assessment.py",
+   "line": 88,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:14",
+   "stable_id": "assertiva/assessment.py:core/AddNot:14",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:15",
+   "stable_id": "assertiva/assessment.py:core/AddNot:15",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:16",
+   "stable_id": "assertiva/assessment.py:core/AddNot:16",
+   "file": "assertiva/assessment.py",
+   "line": 96,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:17",
+   "stable_id": "assertiva/assessment.py:core/AddNot:17",
+   "file": "assertiva/assessment.py",
+   "line": 97,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:18",
+   "stable_id": "assertiva/assessment.py:core/AddNot:18",
+   "file": "assertiva/assessment.py",
+   "line": 101,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:19",
+   "stable_id": "assertiva/assessment.py:core/AddNot:19",
+   "file": "assertiva/assessment.py",
+   "line": 104,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:20",
+   "stable_id": "assertiva/assessment.py:core/AddNot:20",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:21",
+   "stable_id": "assertiva/assessment.py:core/AddNot:21",
+   "file": "assertiva/assessment.py",
+   "line": 113,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:22",
+   "stable_id": "assertiva/assessment.py:core/AddNot:22",
+   "file": "assertiva/assessment.py",
+   "line": 116,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:23",
+   "stable_id": "assertiva/assessment.py:core/AddNot:23",
+   "file": "assertiva/assessment.py",
+   "line": 119,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:24",
+   "stable_id": "assertiva/assessment.py:core/AddNot:24",
+   "file": "assertiva/assessment.py",
+   "line": 130,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:25",
+   "stable_id": "assertiva/assessment.py:core/AddNot:25",
+   "file": "assertiva/assessment.py",
+   "line": 149,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:26",
+   "stable_id": "assertiva/assessment.py:core/AddNot:26",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:27",
+   "stable_id": "assertiva/assessment.py:core/AddNot:27",
+   "file": "assertiva/assessment.py",
+   "line": 153,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:28",
+   "stable_id": "assertiva/assessment.py:core/AddNot:28",
+   "file": "assertiva/assessment.py",
+   "line": 160,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:29",
+   "stable_id": "assertiva/assessment.py:core/AddNot:29",
+   "file": "assertiva/assessment.py",
+   "line": 164,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:30",
+   "stable_id": "assertiva/assessment.py:core/AddNot:30",
+   "file": "assertiva/assessment.py",
+   "line": 167,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:31",
+   "stable_id": "assertiva/assessment.py:core/AddNot:31",
+   "file": "assertiva/assessment.py",
+   "line": 173,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:32",
+   "stable_id": "assertiva/assessment.py:core/AddNot:32",
+   "file": "assertiva/assessment.py",
+   "line": 178,
+   "operator": "core/AddNot",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/AddNot:33",
+   "stable_id": "assertiva/assessment.py:core/AddNot:33",
+   "file": "assertiva/assessment.py",
+   "line": 187,
+   "operator": "core/AddNot",
+   "status": "ERROR"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:0",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:1",
+   "file": "assertiva/assessment.py",
+   "line": 82,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:2",
+   "file": "assertiva/assessment.py",
+   "line": 82,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:3",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:4",
+   "file": "assertiva/assessment.py",
+   "line": 85,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:5",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:6",
+   "file": "assertiva/assessment.py",
+   "line": 92,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:7",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:7",
+   "file": "assertiva/assessment.py",
+   "line": 107,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceAndWithOr:8",
+   "stable_id": "assertiva/assessment.py:core/ReplaceAndWithOr:8",
+   "file": "assertiva/assessment.py",
+   "line": 167,
+   "operator": "core/ReplaceAndWithOr",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:0",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:0",
+   "file": "assertiva/assessment.py",
+   "line": 34,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:1",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:1",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:2",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:2",
+   "file": "assertiva/assessment.py",
+   "line": 40,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:3",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:3",
+   "file": "assertiva/assessment.py",
+   "line": 53,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:4",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:4",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:5",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:5",
+   "file": "assertiva/assessment.py",
+   "line": 97,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:6",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:6",
+   "file": "assertiva/assessment.py",
+   "line": 101,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:7",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:7",
+   "file": "assertiva/assessment.py",
+   "line": 116,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:8",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:8",
+   "file": "assertiva/assessment.py",
+   "line": 151,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:9",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:9",
+   "file": "assertiva/assessment.py",
+   "line": 158,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:10",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:10",
+   "file": "assertiva/assessment.py",
+   "line": 162,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:11",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:11",
+   "file": "assertiva/assessment.py",
+   "line": 166,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ReplaceOrWithAnd:12",
+   "stable_id": "assertiva/assessment.py:core/ReplaceOrWithAnd:12",
+   "file": "assertiva/assessment.py",
+   "line": 167,
+   "operator": "core/ReplaceOrWithAnd",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ExceptionReplacer:0",
+   "stable_id": "assertiva/assessment.py:core/ExceptionReplacer:0",
+   "file": "assertiva/assessment.py",
+   "line": 198,
+   "operator": "core/ExceptionReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ExceptionReplacer:1",
+   "stable_id": "assertiva/assessment.py:core/ExceptionReplacer:1",
+   "file": "assertiva/assessment.py",
+   "line": 198,
+   "operator": "core/ExceptionReplacer",
+   "status": "ERROR"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:0",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:0",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:1",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:1",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:2",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:2",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:3",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:3",
+   "file": "assertiva/assessment.py",
+   "line": 57,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:4",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:4",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:5",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:5",
+   "file": "assertiva/assessment.py",
+   "line": 83,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:6",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:6",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:7",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:7",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/NumberReplacer",
+   "status": "SURVIVED",
+   "lead": "IMPACT_UNKNOWN"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:8",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:8",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/NumberReplacer:9",
+   "stable_id": "assertiva/assessment.py:core/NumberReplacer:9",
+   "file": "assertiva/assessment.py",
+   "line": 89,
+   "operator": "core/NumberReplacer",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ZeroIterationForLoop:0",
+   "stable_id": "assertiva/assessment.py:core/ZeroIterationForLoop:0",
+   "file": "assertiva/assessment.py",
+   "line": 100,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ZeroIterationForLoop:1",
+   "stable_id": "assertiva/assessment.py:core/ZeroIterationForLoop:1",
+   "file": "assertiva/assessment.py",
+   "line": 129,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ZeroIterationForLoop:2",
+   "stable_id": "assertiva/assessment.py:core/ZeroIterationForLoop:2",
+   "file": "assertiva/assessment.py",
+   "line": 140,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ZeroIterationForLoop:3",
+   "stable_id": "assertiva/assessment.py:core/ZeroIterationForLoop:3",
+   "file": "assertiva/assessment.py",
+   "line": 170,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "KILLED"
+  },
+  {
+   "id": "assertiva/assessment.py:core/ZeroIterationForLoop:4",
+   "stable_id": "assertiva/assessment.py:core/ZeroIterationForLoop:4",
+   "file": "assertiva/assessment.py",
+   "line": 177,
+   "operator": "core/ZeroIterationForLoop",
+   "status": "KILLED"
+  }
+ ]
+}

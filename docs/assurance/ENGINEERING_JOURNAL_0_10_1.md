@@ -271,3 +271,11 @@ a count; `scope["of"] != items` mutated to `is not` survived only because CPytho
 review of more than 256 items would have been refused; `0 < reviewed` and `(items or 0) > 1` had no boundary test.
 Four tests now pin them. Not a number to optimize: the 51 unknown-impact survivors elsewhere in the module are not
 triaged in this round.
+
+**Mutation rerun with the new tests** (`4e2268c`, same tool, tests and 240 mutants, 749 s): 181 killed, 57 survived
+(22 annotation candidates, 35 impact unknown), 0 timeout, 2 error — before: 162 / 73 / 3 / 2
+([after](evidence/derivanta-0.10.1/self-mutation-assessment-after.json)). The targeted scope-path survivors are
+killed. Left: `(items or 0) > 1` -> `!= 1` (differs only for a finding with no items) and two number replacements.
+The difference measures these tests on this module only; it is not a quality score.
+
+CP5 commit: `4e2268c`. **Remote CI on `4e2268c`** (GitHub Actions, really executed): push run [41341845670](https://github.com/Soturine/Assertiva/actions/runs/41341845670) 7/7 and pull_request run [41341849603](https://github.com/Soturine/Assertiva/actions/runs/41341849603) 7/7 (validate, Windows, Python 3.11, browser, java, Gradle/Kotlin/Android, provisioning and services); Runtime self-qualification is skipped on these events by design (it runs on `workflow_dispatch` and tags) and is not claimed. The commit that records this runs CI again on its own head.

@@ -248,6 +248,30 @@ _MODULE_NAME = re.compile(r"[A-Za-z_]\w*(\.[A-Za-z_]\w*)*")
 _IMPORT_PROBE = "import importlib, os, sys\nsys.path[:] = [p for p in sys.path if p not in ('', os.getcwd())]\nimportlib.import_module(sys.argv[1])"
 
 
+def resolve_interpreter(value: str, base: str | Path | None = None) -> str:
+    """An interpreter as an absolute path, resolved once against the directory the user invoked Assertiva from
+    (AXF-01): every child process runs elsewhere (a disposable copy, an empty probe directory), where a relative path
+    such as `.venv/Scripts/python.exe` names nothing. A bare name (`python3`) is looked up on PATH. Raises ValueError
+    when nothing executable is there; nothing is run to find out."""
+    import shutil
+
+    text = str(value).strip()
+    if not text:
+        raise ValueError("the interpreter path is empty")
+    path = Path(text).expanduser()
+    if path.is_absolute() or len(path.parts) > 1 or path.suffix:
+        path = path if path.is_absolute() else Path(base or Path.cwd()) / path
+        if not path.is_file():
+            raise ValueError(f"no interpreter at {path}")
+        if not os.access(path, os.X_OK):
+            raise ValueError(f"{path} is not executable")
+        return str(path.absolute())
+    found = shutil.which(text)
+    if found is None:
+        raise ValueError(f"no interpreter named {text!r} on PATH")
+    return str(Path(found).absolute())
+
+
 def module_available(python: str, module: str) -> bool:
     """Whether ``module`` imports in interpreter ``python`` (cached only within a run). A name that is not a module
     name (a value read from a project) is refused without running anything."""

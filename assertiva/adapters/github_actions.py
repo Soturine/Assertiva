@@ -34,6 +34,25 @@ def _default_directory(node) -> str | None:
     return str(value) if value not in (None, "") else None
 
 
+def _default_shell(node) -> str | None:
+    defaults = node.get("defaults") if isinstance(node, dict) else None
+    run = defaults.get("run") if isinstance(defaults, dict) else None
+    value = run.get("shell") if isinstance(run, dict) else None
+    return str(value) if value not in (None, "") else None
+
+
+def _status_masked_by_pipe(check, shell: str | None, runs_on) -> bool:
+    """A test command piped into another (`pytest | tee log`) in a step whose shell does not fail on a pipeline's first
+    failure: GitHub's unspecified shell on Linux/macOS runs `bash -e {0}` (no pipefail), `sh` has none; an explicit
+    `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`. Only literal non-Windows runners are decided (Windows
+    defaults to pwsh); a step that sets pipefail itself is not this (DG-0101-11)."""
+    if shell not in (None, "sh") or not isinstance(runs_on, str) or "windows" in runs_on.lower() or "${{" in runs_on:
+        return False
+    if "pipefail" in (check.command or ""):
+        return False
+    return any(inv.get("piped") and inv.get("kind") == "TEST" for inv in check.metadata.get("invocations") or [])
+
+
 class GitHubActionsAdapter:
     adapter_id = "github-actions"
 
@@ -58,12 +77,15 @@ class GitHubActionsAdapter:
                 checks.append(unreadable_check(self.adapter_id, f"gha:{source}", source, f"workflow could not be parsed: {exc}"))
                 continue
             for job_id, job in jobs.items():
-                checks.extend(self._job_checks(source, str(job_id), job if isinstance(job, dict) else {}, _default_directory(document)))
+                checks.extend(self._job_checks(source, str(job_id), job if isinstance(job, dict) else {}, _default_directory(document),
+                                               _default_shell(document)))
         return checks
 
-    def _job_checks(self, source: str, job_id: str, job: dict, workflow_directory: str | None = None) -> list[VerificationCheck]:
+    def _job_checks(self, source: str, job_id: str, job: dict, workflow_directory: str | None = None,
+                    workflow_shell: str | None = None) -> list[VerificationCheck]:
         where = f"{source}#{job_id}"
         job_directory = _default_directory(job) or workflow_directory
+        job_shell = _default_shell(job) or workflow_shell
         strategy = job.get("strategy") if isinstance(job.get("strategy"), dict) else {}
         steps = [s for s in job.get("steps") or [] if isinstance(s, dict)]
         setup = {}
@@ -92,6 +114,8 @@ class GitHubActionsAdapter:
                 check = command_check(self.adapter_id, check_id, str(step["run"]), where, gate,
                                       {**meta, "working_directory": step.get("working-directory") or job_directory}, deploys=bool(environment))
                 if check is not None:
+                    if _status_masked_by_pipe(check, step.get("shell") or job_shell, job.get("runs-on")):
+                        check.metadata["status_masked_by_pipe"] = True
                     checks.append(check)
             elif "uses" in step:
                 action = str(step["uses"]).split("@")[0]

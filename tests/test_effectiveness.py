@@ -575,7 +575,7 @@ def test_mock_checks_that_cannot_fail_are_false_greens_and_real_ones_are_not(tmp
     assert len(found) == 1 and len(found[0].tests) == 3
 
 
-def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(tmp_path):
+def test_an_expected_value_computed_by_the_same_call_is_a_determinism_check(tmp_path):
     write(tmp_path / "tests" / "test_s.py",
           "import unittest\n\n"
           "def test_through_a_name():\n    expected = total([1, 2])\n    assert total([1, 2]) == expected\n\n\n"
@@ -587,12 +587,14 @@ def test_an_expected_value_computed_by_the_code_under_test_is_self_referential(t
           "def test_state_before_and_after():\n    before = fingerprint(root)\n    run(root)\n    assert fingerprint(root) == before\n\n\n"
           "class T(unittest.TestCase):\n    def test_unittest(self):\n        want = total([1, 2])\n        self.assertEqual(total([1, 2]), want)\n")
     facts = {_name(f.test_id): f for f in collect(tmp_path)[0]}
-    for name in ("test_through_a_name", "test_unittest"):
-        assert "SELF_REFERENTIAL_ORACLE" in facts[name].smells, name
-    # AG-05 / AX-E05 (0.10.0): the same call on both sides runs the code twice: a weak determinism oracle, not a tautology
-    assert "TAUTOLOGY" not in facts["test_inline"].smells and facts["test_inline"].oracles == ("DETERMINISM",)
-    for name in ("test_inline", "test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
-        assert "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name
+    # AG-05 / AX-E05 (0.10.0): the same call on both sides runs the code twice: a weak determinism oracle, not a tautology.
+    # AXF-03 (0.10.1 candidate): through a name assigned just before, it is the same check, judged the same way (0.10.0
+    # called this form a SELF_REFERENTIAL_ORACLE false green while calling the inline form a determinism check)
+    for name in ("test_inline", "test_through_a_name", "test_unittest"):
+        assert facts[name].oracles == ("DETERMINISM",) and not {"TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"} & set(facts[name].smells), name
+    # controls: a contract value, another input, a reassigned name, a state check around an action are not determinism
+    for name in ("test_contract_value", "test_other_input", "test_name_reassigned", "test_state_before_and_after"):
+        assert facts[name].oracles == ("VALUE",) and "SELF_REFERENTIAL_ORACLE" not in facts[name].smells, name
 
 
 def test_complete_tied_matrices_show_subsumption_on_known_mutants_never_a_removal():
@@ -617,6 +619,7 @@ _JS_CANNOT_FAIL = """
 test('matcher never called', () => { expect(spy).toHaveBeenCalled; });
 test('no matcher', () => { expect(() => parse('x')); });
 test('same both sides', () => { expect(total(cart)).toEqual(total(cart)); });
+test('same value both sides', () => { const x = 1; expect(x).toBe(x); });
 test('expected from the same call', () => {
   const expected = total(cart);
   expect(total(cart)).toBe(expected);
@@ -647,8 +650,12 @@ def test_js_assertions_that_cannot_fail_are_false_green_candidates(tmp_path):
     facts, _ = collect(tmp_path)
     smells = {f.test_id.split(" › ")[1]: set(f.smells) for f in facts}
     assert "NO_OP_ASSERTION" in smells["matcher never called"] and "NO_OP_ASSERTION" in smells["no matcher"]
-    assert "TAUTOLOGY" in smells["same both sides"]
-    assert "SELF_REFERENTIAL_ORACLE" in smells["expected from the same call"]
+    # DG-0101-09: the same call twice (inline or through a name) is the weak determinism oracle Python reads (AG-05,
+    # AXF-03), not a false green; the same value twice still cannot fail
+    oracles = {f.test_id.split(" › ")[1]: f.oracles for f in facts}
+    for name in ("same both sides", "expected from the same call"):
+        assert oracles[name] == ("DETERMINISM",) and not smells[name] & {"TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"}, name
+    assert "TAUTOLOGY" in smells["same value both sides"]
     sound = {"called", "negated and awaited", "chained on the next line", "different strings", "state before and after", "assertion counts"}
     assert all(not smells[name] & {"NO_OP_ASSERTION", "TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"} for name in sound), smells
 
@@ -669,6 +676,7 @@ class PricingTest {
             .isEqualTo(1500)
     }
     @Test fun different() { assertEquals(price("a"), price("b")) }
+    @Test fun sameValue() { assertEquals(cart, cart) }
 }
 """
 
@@ -680,8 +688,11 @@ def test_jvm_assertions_that_cannot_fail_are_false_green_candidates(tmp_path):
     facts, _ = collect(tmp_path)
     smells = {f.test_id.split("::")[1]: set(f.smells) for f in facts}
     assert "NO_OP_ASSERTION" in smells["noOp"]
-    assert "TAUTOLOGY" in smells["sameBothSides"] and "TAUTOLOGY" in smells["junit4Message"]
-    assert "SELF_REFERENTIAL_ORACLE" in smells["fromTheSameCall"]
+    # DG-0101-09: the same call twice is a weak determinism oracle in every language; the same value twice is a tautology
+    oracles = {f.test_id.split("::")[1]: f.oracles for f in facts}
+    for name in ("sameBothSides", "junit4Message", "fromTheSameCall"):
+        assert oracles[name] == ("DETERMINISM",) and not smells[name] & {"TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"}, name
+    assert "TAUTOLOGY" in smells["sameValue"]
     for name in ("sound", "hamcrest", "chainedNextLine", "different"):
         assert not smells[name] & {"NO_OP_ASSERTION", "TAUTOLOGY", "SELF_REFERENTIAL_ORACLE"}, (name, smells[name])
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, path_selected_by_ci
+from .ci import CiPytestInvocation, discover_ci_pytest, discover_ci_unittest, indirect_invocations, path_selected_by_ci, scripts_running
 from .adapters.coverage_reports import load_coverage_report
 from .adapters.python_discovery import test_files
 from .adapters.python_test_classes import TESTCASE_METHOD_PREFIX, ClassKind, classify_classes
@@ -40,6 +40,7 @@ _WEAK = {
     "HTTP_STATUS_ONLY",
     "ERROR_STATUS_ONLY",
     "BROAD_ERROR_EXPECTATION",
+    "TYPED_ERROR_BOUNDARY",
 }
 
 
@@ -238,9 +239,25 @@ def _call_oracle(call: ast.Call, helpers: frozenset[str]) -> str | None:
     return None
 
 
+def _typed_error_boundary(item: ast.AST) -> bool:
+    """`try: decode(data)` / `except (DecodeError, TypeError): pass` with no assertion in the try: the test fails when any
+    other exception escapes the call (AXF-06). A limited oracle: it says nothing about return values or effects."""
+    from .adapters.test_facts import typed_handler
+
+    if not isinstance(item, ast.Try) or not item.handlers or item.orelse:
+        return False
+    body = ast.Module(body=item.body, type_ignores=[])
+    ignores = all(all(isinstance(s, (ast.Pass, ast.Continue)) or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
+                      for s in h.body) for h in item.handlers)
+    return (ignores and all(typed_handler(h) for h in item.handlers) and any(isinstance(n, ast.Call) for n in ast.walk(body))
+            and not any(isinstance(n, ast.Assert) for n in ast.walk(body)))
+
+
 def _function_assertions(node: ast.FunctionDef | ast.AsyncFunctionDef, helpers: frozenset[str] = frozenset()) -> tuple[str, ...]:
     kinds = [_assertion_kind(item) for item in ast.walk(node) if isinstance(item, ast.Assert)]
     for item in ast.walk(node):
+        if _typed_error_boundary(item):
+            kinds.append("TYPED_ERROR_BOUNDARY")
         if isinstance(item, ast.Call):
             kind = _expected_failure_kind(item) or _unittest_assertion_kind(item) or _call_oracle(item, helpers)
             if kind:
@@ -529,7 +546,37 @@ def _definition(node_id: str, rel: str, node: ast.FunctionDef | ast.AsyncFunctio
     if kinds == ("NO_ASSERTION",) and no_raise:
         kinds = ("NO_RAISE_CONTRACT",)
     dims, error_types, unobserved = negative_path_evidence(node)
-    return TestDefinition(node_id, rel, node.name, kinds, all(kind in _WEAK for kind in kinds), dims, error_types, unobserved)
+    return TestDefinition(node_id, rel, node.name, kinds, all(kind in _WEAK for kind in kinds), dims, error_types, unobserved,
+                          error_fields(node), rejects_construction(node))
+
+
+def rejects_construction(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """`with pytest.raises(Invalid): Price(-1)` and nothing built before it: the rejection happens while the value is
+    constructed, so there is no object or state left to check afterwards (DG-0101-04). A call to a capitalized name is
+    read as a construction; a test that builds anything before its rejection is not this."""
+    blocks = [w for w in ast.walk(node) if isinstance(w, (ast.With, ast.AsyncWith)) and any(_raises_call(i.context_expr) for i in w.items)]
+
+    def constructs(statement) -> bool:
+        value = statement.value if isinstance(statement, (ast.Expr, ast.Assign)) else None
+        name = (_expr_name(value.func) or "") if isinstance(value, ast.Call) else ""
+        return name.split(".")[-1][:1].isupper()
+
+    if not blocks or not all(b.body and all(constructs(s) for s in b.body) for b in blocks):
+        return False
+    first = min(b.lineno for b in blocks)
+    return not any(isinstance(s, (ast.Assign, ast.AnnAssign)) and s.lineno < first for s in ast.walk(node))
+
+
+def error_fields(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, ...]:
+    """The attributes and keys a test's assertions read from the error it expects (`raised.value.exit_code` ->
+    exit_code), so a finding can say what is asserted instead of "only the type"."""
+    names: set[str] = set()
+    variables = {item.optional_vars.id for w in ast.walk(node) if isinstance(w, (ast.With, ast.AsyncWith)) for item in w.items
+                 if _raises_call(item.context_expr) is not None and isinstance(item.optional_vars, ast.Name)}
+    for statement in ast.walk(node):
+        if isinstance(statement, ast.Assert) and any(_refers_to(statement, v) for v in variables):
+            names |= _names(statement)
+    return tuple(sorted(names - {"value", "type", "typename"}))
 
 
 def discover_pytest_definitions(root: str | Path) -> list[TestDefinition]:
@@ -614,24 +661,27 @@ def _negative_path_findings(tests: list[TestDefinition]) -> list[Finding]:
     if type_only:
         findings.append(Finding(
             "ERROR_CONTRACT_FIELD_NOT_OBSERVED",
-            "Other tests show these errors carry a machine code/field/context, but these tests only check the type.",
-            {"tests": [t.node_id for t in type_only][:20], "error_types": sorted({e for t in type_only for e in t.error_types} & detailed_types)},
+            "Other tests assert a machine code, field or context of these errors; these tests do not (what each one asserts about the error is listed).",
+            {"count": len(type_only), "tests": [t.node_id for t in type_only][:20], "error_types": sorted({e for t in type_only for e in t.error_types} & detailed_types),
+             # what the listed tests do assert about the error, and the detail other tests of the same errors pin
+             "asserted": {t.node_id: list(t.error_fields) for t in type_only[:20] if t.error_fields},
+             "detail_asserted_elsewhere": sorted({d for test in tests if set(test.error_types) & detailed_types for d in DETAIL & set(test.negative_dims)})},
         ))
     raising = [t for t in tests if "ERROR_TYPE" in t.negative_dims]
     if any("STATE_AFTER_REJECTION" in t.negative_dims for t in raising):
-        missing = [t.node_id for t in raising if "STATE_AFTER_REJECTION" not in t.negative_dims]
+        missing = [t.node_id for t in raising if "STATE_AFTER_REJECTION" not in t.negative_dims and not t.rejects_construction]
         if missing:
             findings.append(Finding(
                 "STATE_AFTER_REJECTION_NOT_EVIDENCED",
                 "Some tests check state after a rejection; these do not, so partial writes would go unnoticed (static E3 signal).",
-                {"tests": missing[:20]},
+                {"count": len(missing), "tests": missing[:20]},
             ))
     unobserved = [t.node_id for t in tests if t.async_unobserved]
     if unobserved:
         findings.append(Finding(
             "ASYNC_FAILURE_NOT_OBSERVED",
             "An async task is created but never awaited, so its failure cannot fail the test.",
-            {"tests": unobserved[:20]},
+            {"count": len(unobserved), "tests": unobserved[:20]},
         ))
     return findings
 
@@ -675,7 +725,18 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
                 recommendation="Turn them into TestCase methods or run them with a runner that collects them in CI.",
             )
         )
-    if (tests or materializations) and not ci and not unittest_ci:
+    through_scripts = [s for tool in ("pytest", "unittest") for s in scripts_running(root, tool)] if not (ci or unittest_ci) else []
+    if (tests or materializations) and not ci and not unittest_ci and through_scripts:
+        findings.append(
+            Finding(
+                "CI_TESTS_RUN_THROUGH_SCRIPT",
+                "CI runs a repository script whose source invokes the test runner; which tests the script selects is not read.",
+                {"count": len(through_scripts), "scripts": through_scripts[:20], "basis": "STATIC",
+                 "limitations": "one level, read statically: the script's arguments, conditions and failures are not interpreted"},
+                severity="info",
+            )
+        )
+    elif (tests or materializations) and not ci and not unittest_ci:
         findings.append(
             Finding(
                 "CI_PYTEST_NOT_OBSERVED",
@@ -686,7 +747,8 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
             )
         )
     if tests and (ci or unittest_ci):
-        missing = sorted({test.path for test in tests if not path_selected_by_ci(test.path, ci + unittest_ci)})
+        indirect = indirect_invocations(root, "pytest") + indirect_invocations(root, "unittest")  # scope unknown: no gap claimed
+        missing = sorted({test.path for test in tests if not path_selected_by_ci(test.path, ci + unittest_ci + indirect)})
         if missing:
             findings.append(
                 Finding(

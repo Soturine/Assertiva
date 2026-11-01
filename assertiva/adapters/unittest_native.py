@@ -23,7 +23,7 @@ from assertiva.process import execution_refusal, module_available, run_command
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
-from .python_discovery import declared_runners, python_runners
+from .python_discovery import declared_invocations, declared_runners, python_runners
 from .python_static import PythonStatic, measured_coverage
 
 _MODULE = "assertiva_unittest_evidence"
@@ -128,14 +128,66 @@ class _RecordingRunner(PythonStatic):
         self.python = python or sys.executable
         self.timeout_s = timeout_s
 
+    def _declared_plan(self, root: Path) -> list[dict]:
+        """The project's declared invocations of this runner, each with its arguments and directory, one per distinct
+        (arguments, directory): the same suite declared by two steps runs once. Empty when nothing is declared or a
+        declaration cannot be read (then the defaults run)."""
+        plan, seen = [], set()
+        for inv in declared_invocations(root).get(self.runner, []):
+            args = self._args_from(inv["command"])
+            if args is None:
+                return []
+            key = (tuple(_strip_cosmetic(args)), inv["directory"])
+            if key not in seen:
+                seen.add(key)
+                plan.append({"command": inv["command"], "args": args, "directory": inv["directory"], "source": inv["source"]})
+        return plan
+
     def _declared_args(self, root: Path) -> tuple[list[str], str | None]:
         """Arguments of the project's single declared invocation of this runner (otherwise the defaults)."""
-        commands = sorted(set(declared_runners(root).get(self.runner, [])))
-        if len(commands) == 1:
-            args = self._args_from(commands[0])
-            if args is not None:
-                return args, commands[0]
+        plan = self._declared_plan(root)
+        if len(plan) == 1 and not plan[0]["directory"]:
+            return plan[0]["args"], plan[0]["command"]
         return self.default_args(), None
+
+    def _run_plan(self, root: Path, plan: list[dict], coverage: bool) -> RunEvidence:
+        """Several declared invocations (AXF-05: CI runs `unittest discover -s` once per suite directory): each is run as
+        declared, in the copy, and the evidence keeps which ran, how many tests each executed and its exit status. The
+        combined status is the worst part's; a part that executed nothing, or could not be reproduced, keeps the whole
+        run from passing. A local run of a declared command is not proof that CI ran it."""
+        merged = RunEvidence(adapter_id=self.adapter_id, mode="execute", status=StageStatus.UNKNOWN)
+        parts, statuses = [], []
+        for part in plan:
+            record = {"command": part["command"], "declared_in": part["source"], "directory": part["directory"] or "."}
+            if part["directory"]:
+                record |= {"status": "NOT_RUN", "reason": "runs in another working directory, which is not reproduced"}
+                statuses.append(StageStatus.UNKNOWN)
+                parts.append(record)
+                continue
+            run = self.run(root, args=part["args"], coverage=False)
+            merged.invocations += run.invocations
+            merged.collection_errors += run.collection_errors
+            for key in ("error_sources", "load_errors"):
+                merged.metadata.setdefault(key, {}).update(run.metadata.get(key) or {})
+            merged.limitations += [f"{part['command']}: {lim}" for lim in run.limitations if lim != self.collect_limit()]
+            merged.wall_clock_s = (merged.wall_clock_s or 0) + (run.wall_clock_s or 0)
+            merged.command = merged.command or run.command
+            merged.exit_code = run.exit_code if merged.exit_code in (None, 0) else merged.exit_code
+            record |= {"status": run.status.value, "argv": list(run.command), "exit_code": run.exit_code,
+                       "invocations": len(run.invocations), "collection_errors": len(run.collection_errors)}
+            statuses.append(run.status)
+            parts.append(record)
+        merged.status = next((s for s in (StageStatus.FAIL, StageStatus.BLOCKED, StageStatus.UNKNOWN) if s in statuses), StageStatus.PASS)
+        if any(p["status"] == "NOT_RUN" for p in parts):
+            merged.limitations.append("some declared invocations were not reproduced; the run covers the others only")
+        if any(p.get("invocations") == 0 and p["status"] != "NOT_RUN" for p in parts):
+            merged.limitations.append("a declared invocation executed no test; this is not evidence of a passing suite")
+        if coverage:  # one coverage file per part would need combining: not measured rather than measured partially
+            merged.limitations.append("coverage was not measured: combining several declared invocations is not implemented")
+        merged.limitations += [lim for lim in [self.collect_limit()] if lim]
+        merged.metadata["arguments_from"] = f"{len(plan)} declared invocations"
+        merged.metadata["declared_invocations"] = parts
+        return merged
 
     def _command(self, root: Path, args: list[str], plugin_dir: Path, coverage: bool) -> list[str]:
         raise NotImplementedError
@@ -150,6 +202,9 @@ class _RecordingRunner(PythonStatic):
             return RunEvidence(adapter_id=self.adapter_id, mode="execute", status=StageStatus.BLOCKED, limitations=[refusal])
         declared_from = None
         if args is None:
+            plan = self._declared_plan(root)
+            if len(plan) > 1:
+                return self._run_plan(root, plan, coverage)
             args, declared_from = self._declared_args(root)
         with tempfile.TemporaryDirectory(prefix=f"assertiva-{self.adapter_id}-") as tmp:
             plugin_dir = Path(tmp)

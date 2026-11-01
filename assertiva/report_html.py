@@ -590,7 +590,6 @@ def _scope(report: dict) -> list[dict]:
     return sorted(rows, key=lambda row: order[row["level"]])
 
 
-_STRENGTH = {"VERIFIED": 4, "EXECUTED": 4, "FAILED": 4, "MEASURED": 3, "INGESTED": 3, "PARTIAL": 2, "INSPECTED": 2, "DECLARED": 1, "NOT_EVIDENCED": 0}
 
 
 # --- shared pieces ---------------------------------------------------------------------
@@ -1832,6 +1831,10 @@ def _run_facts(r: _R, run: dict) -> str:
     limits = run.get("limits") or {}
     if limits.get("timeout_s") is not None:
         parts.append(f'{r.t("runs.limit")} <code>{float(limits["timeout_s"]):g} s</code> ({_e(limits.get("timeout_source"))})')
+    declared = run.get("declared_invocations") or []
+    if declared:  # several declared commands reproduced one by one (AXF-05): each with its status and test count
+        each = ", ".join(f'<code>{_e(p["status"])}</code> {_e(p.get("invocations", "—"))}' for p in declared)
+        parts.append(f'{r.t("runs.declared", n=len(declared))}: {each}')
     return f'<p class="run-how">{" · ".join(parts)}</p>' if parts else ""
 
 
@@ -1918,6 +1921,9 @@ def _negative(r: _R) -> str:
     return _panel(r, "negative-paths", "neg.title", r.t("neg.summary", n=len(tests)), table, "neg.lead")
 
 
+_SITES_SHOWN = 50
+
+
 def _mutation(r: _R) -> str:
     rows = []
     for key, state in _states(r.report):
@@ -1925,8 +1931,10 @@ def _mutation(r: _R) -> str:
             counts = ", ".join(f"{k.lower()}: {v}" for k, v in sorted(run["counts"].items())) or "—"
             status = (f'{r.t("mut.unreadable")}: <span class="raw-text" lang="en">{_e(run["error"])}</span>' if run["error"]
                       else r.t("mut.mismatch") if run["matches_state"] is False else f"<code>{_e(counts)}</code>")
-            sites = [f'{s["mutant"]} — {s["original"]}' for s in run.get("survivor_sites") or [] if s.get("original")]
-            survivors = (r.items(sites + run["survivors"][len(sites):], kind="code") if sites
+            sites = [f'{s["mutant"]} — {s["original"]}' if s.get("original") else s["mutant"] for s in run.get("survivor_sites") or []]
+            if len(sites) > _SITES_SHOWN:  # the page stays readable; the JSON report keeps every undetected mutant
+                sites = sites[:_SITES_SHOWN] + [r.t("mut.more", n=len(sites) - _SITES_SHOWN)]
+            survivors = (r.items(sites, kind="code") if sites
                          else r.items(run["survivors"], kind="code") if run["survivors"]
                          else r.t("mut.none_listed" if run["per_mutant"] else "mut.no_identity", tag="p", cls="muted"))
             rows.append(f'<tr><th scope="row">{r.state(key)}</th><td {r.label_attr("mut.tool")}><code>{_e(run["tool"] or "unknown")}</code></td>'

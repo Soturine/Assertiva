@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import os
 import re
+from dataclasses import replace
 from pathlib import Path
 
 from assertiva.effectiveness import TestFacts
@@ -134,13 +135,33 @@ def _arguments(clean: str, opening: int) -> tuple[list[tuple[int, int]], int] | 
     return None
 
 
+# A check that compares a call with the same call (inline, or through a name assigned from it just before): it runs the
+# code twice and fails only on nondeterminism. A marker between the smell readers and the fact builders, never a smell.
+DETERMINISM_CHECK = "DETERMINISM_CHECK"
+
+
+def _calls_code(text: str, span: tuple[int, int]) -> bool:
+    return "(" in text[span[0]:span[1]]
+
+
+def _determinism_oracles(oracles: list[str], smells: list[str], checks: int) -> tuple[list[str], list[str]]:
+    """Python's reading (AG-05, AXF-03) for the lexical readers (DG-0101-09): when every check of the test is a
+    determinism check, its oracle is DETERMINISM; the marker never reaches the reported smells."""
+    marked = smells.count(DETERMINISM_CHECK)
+    smells = [s for s in smells if s != DETERMINISM_CHECK]
+    if marked and marked >= checks and set(oracles) <= {"VALUE"}:
+        oracles = ["DETERMINISM"]
+    return oracles, smells
+
+
 def _same(text: str, a: tuple[int, int], b: tuple[int, int]) -> bool:
     return _norm(text[a[0]:a[1]]) == _norm(text[b[0]:b[1]])
 
 
 def _expected_from_same_call(text: str, clean: str, start: int, actual: tuple[int, int], expected: tuple[int, int]) -> bool:
     """`const expected = total(cart)` (or `val`/`var`/a typed local) on the line just before an assertion of
-    `total(cart)` against `expected`: the expected value is the actual one (as `_self_referential` for Python)."""
+    `total(cart)` against `expected`: the same call twice, a weak determinism check in every language (AXF-03 for
+    Python, DG-0101-09 here)."""
     before = clean.rfind("\n", 0, start)
     previous = clean.rfind("\n", 0, max(before, 0))
     if before < 0:
@@ -217,9 +238,9 @@ def _js_assertion_smells(text: str, clean: str) -> list[str]:
             if found and len(found[0]) == 1:
                 expected = found[0][0]
                 if _same(text, args[0], expected):
-                    smells.append("TAUTOLOGY")
+                    smells.append(DETERMINISM_CHECK if _calls_code(text, args[0]) else "TAUTOLOGY")
                 elif _expected_from_same_call(text, clean, start, args[0], expected):
-                    smells.append("SELF_REFERENTIAL_ORACLE")
+                    smells.append(DETERMINISM_CHECK)
     return smells
 
 
@@ -233,9 +254,9 @@ def _jvm_assertion_smells(text: str, clean: str) -> list[str]:
             # JUnit 4 puts an optional message first, JUnit 5 last
             pair = args[1:3] if len(args) == 3 and text[args[0][0]:args[0][1]].strip().startswith('"') else args[:2]
             if len(pair) == 2 and _same(text, *pair):
-                smells.append("TAUTOLOGY")
+                smells.append(DETERMINISM_CHECK if _calls_code(text, pair[0]) else "TAUTOLOGY")
             elif len(pair) == 2 and _expected_from_same_call(text, clean, start, pair[1], pair[0]):
-                smells.append("SELF_REFERENTIAL_ORACLE")
+                smells.append(DETERMINISM_CHECK)
     for start, args, after in _calls(text, clean, "assertThat"):
         if len(args) != 1:
             continue
@@ -247,9 +268,9 @@ def _jvm_assertion_smells(text: str, clean: str) -> list[str]:
             found = _arguments(clean, after + chain.start("call"))
             if found and len(found[0]) == 1:
                 if _same(text, args[0], found[0][0]):
-                    smells.append("TAUTOLOGY")
+                    smells.append(DETERMINISM_CHECK if _calls_code(text, args[0]) else "TAUTOLOGY")
                 elif _expected_from_same_call(text, clean, start, args[0], found[0][0]):
-                    smells.append("SELF_REFERENTIAL_ORACLE")
+                    smells.append(DETERMINISM_CHECK)
     return smells
 
 
@@ -320,7 +341,7 @@ _PY_ORACLES = {"BEHAVIORAL_ASSERTION": "VALUE", "EXISTENCE_ONLY": "EXISTENCE", "
                "ERROR_STATUS_ONLY": "STATUS_ONLY", "BROAD_ERROR_EXPECTATION": "BROAD_ERROR", "EXPECTED_ERROR_CONTRACT": "SPECIFIC_ERROR",
                "INTERACTION_ASSERTION": "INTERACTION", "FORBIDDEN_CALL_GUARD": "GUARD", "HELPER_ASSERTION": "HELPER",
                "EXPLICIT_FAIL": "VALUE", "EXPECTED_WARNING": "SPECIFIC_ERROR",
-               "NO_RAISE_CONTRACT": "NO_RAISE"}
+               "NO_RAISE_CONTRACT": "NO_RAISE", "TYPED_ERROR_BOUNDARY": "TYPED_ERROR"}
 _PY_NETWORK = ("requests", "httpx", "urllib", "urlopen", "socket", "smtplib", "boto", "aiohttp", "http.client")
 _PY_DB = (".objects", "session", "cursor", "database", ".db.", "repository")
 
@@ -347,8 +368,54 @@ def _python_facts(root: Path) -> list[TestFacts]:
                 for child in node.body:
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test"):
                         functions.append((f"{rel}::{node.name}::{child.name}", child, helpers.get(node.name, helpers[None])))
+        imported = _imported_files(tree, path, root)
         for test_id, node, scope in functions:
-            out.append(_python_test(test_id, rel, node, scope, node in contracts))
+            facts = _python_test(test_id, rel, node, scope, node in contracts)
+            used = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+            out.append(replace(facts, subjects=tuple(sorted({imported[name] for name in used if name in imported}))))
+    return out
+
+
+def _module_file(base: Path, dotted: str, root: Path) -> str | None:
+    parts = [p for p in dotted.split(".") if p]
+    if not parts:
+        return None
+    for candidate in (base.joinpath(*parts).with_suffix(".py"), base.joinpath(*parts, "__init__.py")):
+        if candidate.is_file() and (root == candidate.parent or root in candidate.parents):
+            return candidate.relative_to(root).as_posix()
+    return None
+
+
+def _imported_files(tree, path: Path, root: Path) -> dict[str, str]:
+    """Local name -> the project file it is imported from, for the imports of a test module that resolve inside the
+    project (the test's directory and its parents up to the root, then `src/`, the way a rootdir-relative or
+    `-t`-relative import would find them). Names from elsewhere (standard library, installed packages) are left out:
+    they say nothing about which project code a test exercises (AXF-07)."""
+    root = root.resolve()
+    here = path.resolve().parent
+    bases = [here, *[p for p in here.parents if p == root or root in p.parents], root / "src"]
+    out: dict[str, str] = {}
+
+    def find(dotted: str, level: int = 0) -> str | None:
+        if level:
+            base = here
+            for _ in range(level - 1):
+                base = base.parent
+            return _module_file(base, dotted, root)
+        return next((f for b in bases if (f := _module_file(b, dotted, root))), None)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                target = find(alias.name if alias.asname else alias.name.split(".")[0])
+                if target:
+                    out[alias.asname or alias.name.split(".")[0]] = target
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                module = f"{node.module}.{alias.name}" if node.module else alias.name
+                target = find(module, node.level) or (find(node.module, node.level) if node.module else None)
+                if target:
+                    out[alias.asname or alias.name] = target
     return out
 
 
@@ -364,17 +431,14 @@ def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) 
     # a snapshot fixture (syrupy, snapshottest) is a parameter; a local variable named snapshot is not one
     if "snapshot" in {a.arg for a in node.args.args} and re.search(r"==\s*snapshot\b|\bsnapshot\.assert_match\s*\(", ast.unparse(node)):
         basis = (*basis, "SNAPSHOT")
-    if _self_referential(node):
-        smells.append("SELF_REFERENTIAL_ORACLE")
+    repeated = _assigned_repetitions(node)
     for item in ast.walk(node):
         if _mock_no_op(item):
             smells.append("NO_OP_ASSERTION")
         if isinstance(item, ast.Assert):
             asserts.append(item)
             signature.append(ast.unparse(item.test))
-            if isinstance(item.test, ast.Constant) and item.test.value:
-                smells.append("TAUTOLOGY")
-            if isinstance(item.test, ast.Tuple) and item.test.elts:  # `assert (check, "message")`: a non-empty tuple is always true
+            if always_true(item.test):
                 smells.append("TAUTOLOGY")
             if isinstance(item.test, ast.Compare) and len(item.test.comparators) == 1 and _same_value(item.test.left, item.test.comparators[0]):
                 smells.append("TAUTOLOGY")
@@ -388,7 +452,7 @@ def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) 
                 signature.append(ast.unparse(item))
                 if len(item.args) == 2 and _same_value(item.args[0], item.args[1]):
                     smells.append("TAUTOLOGY")
-                if leaf in ("assertTrue",) and item.args and isinstance(item.args[0], ast.Constant):
+                if leaf in ("assertTrue",) and item.args and always_true(item.args[0]):
                     smells.append("TAUTOLOGY")
             if name in ("time.sleep", "sleep", "asyncio.sleep") and not _time_is_subject(test_id, ast.unparse(node)):
                 smells.append("SLEEP")
@@ -446,7 +510,9 @@ def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) 
         for handler in item.handlers:
             ignores = all(isinstance(s, (ast.Pass, ast.Continue)) or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant))
                           for s in handler.body)
-            if ignores and (inside or not outside) and not _expects_error(item, handler):
+            # a typed handler with no assertion inside the try is a limited error-type oracle (AXF-06): any other
+            # exception still fails the test; `except Exception`, bare `except` and AssertionError swallow everything
+            if ignores and (inside or not outside) and not _expects_error(item, handler) and not (typed_handler(handler) and not inside):
                 smells.append("SWALLOWED_EXCEPTION")
     if asserts and all(any(isinstance(p, ast.If) and not _checks(p.orelse) and not _condition_holds(p, parents, node)
                            for p in _ancestors(a, parents, node)) for a in asserts):
@@ -462,7 +528,7 @@ def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) 
         smells.append("SNAPSHOT_ONLY")
     if not oracles and "BROWSER" in boundaries and re.search(r"\.click\(", ast.unparse(node)):
         smells.append("ACTION_WITHOUT_CHECK")
-    if asserts and all(_determinism(a) for a in asserts) and set(oracles) <= {"VALUE"}:
+    if asserts and all(_determinism(a) or id(a) in repeated for a in asserts) and set(oracles) <= {"VALUE"}:
         oracles = ("DETERMINISM",)  # every check compares a call with the same call: falsifiable, but only by nondeterminism
     markers = " ".join(ast.unparse(d) for d in getattr(node, "decorator_list", []))
     parameters, expressions = _python_rows(node, _expr_name)
@@ -472,6 +538,27 @@ def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) 
                      rungs=_rungs(ast.unparse(node), boundaries, simulated),
                      oracle_signature=" ; ".join(sorted(_norm(s) for s in signature)), parameters=tuple(parameters),
                      parameter_expressions=tuple(expressions), body_signature=_python_body(node))
+
+
+def always_true(test) -> bool:
+    """An assertion expression that holds whatever the code does: a truthy literal, a non-empty tuple or collection
+    display (`assert (check, "message")`), an f-string with literal text, `not` of a falsy literal, an `or` with any
+    always-true operand (`assert add(1, 2) == 4 or True`: AXF-M2-01) and an `and` whose operands all are. The left
+    side of an `or` still runs (it can raise), but no wrong value can make the assertion fail."""
+    if isinstance(test, ast.Constant):
+        return bool(test.value)
+    if isinstance(test, (ast.Tuple, ast.List, ast.Set)):
+        return bool(test.elts)
+    if isinstance(test, ast.Dict):
+        return bool(test.keys)
+    if isinstance(test, ast.JoinedStr):
+        return any(isinstance(v, ast.Constant) and v.value for v in test.values)
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        return isinstance(test.operand, ast.Constant) and not test.operand.value
+    if isinstance(test, ast.BoolOp):
+        parts = [always_true(v) for v in test.values]
+        return any(parts) if isinstance(test.op, ast.Or) else all(parts)
+    return False
 
 
 def _same_value(left, right) -> bool:
@@ -510,6 +597,18 @@ def _vacuous(test) -> bool:
 
 
 _ASSERTION_ERRORS = frozenset({"AssertionError", "Exception", "BaseException"})
+
+
+def typed_handler(handler) -> bool:
+    """`except (DecodeError, TypeError):` — named exception classes, none of which catches a failed assertion or every
+    error (bare `except`, Exception, BaseException, AssertionError)."""
+    from assertiva.pytest_audit import _expr_name
+
+    if handler.type is None:
+        return False
+    caught = handler.type.elts if isinstance(handler.type, ast.Tuple) else [handler.type]
+    names = [(_expr_name(t) or "").split(".")[-1] for t in caught]
+    return bool(names) and all(names) and not any(n in _ASSERTION_ERRORS for n in names)
 
 
 def _expects_error(try_node, handler) -> bool:
@@ -631,11 +730,13 @@ def _literal_row(value, expr_name) -> bool:
     return True
 
 
-def _self_referential(node) -> bool:
-    """An assertion whose expected value is the same call as its actual value, made just before it: `expected =
-    total(cart)` immediately followed by `assert total(cart) == expected`. Nothing happens in between, so the test passes
-    whatever the code returns. The same call before and after an action is a state check (a fingerprint before and
-    after a run), not this; a name assigned more than once is not resolved."""
+def _assigned_repetitions(node) -> set[int]:
+    """Assertions comparing a name with the same call that produced it just before: `a = f(x)` immediately followed by
+    `assert a == f(x)` runs f twice, exactly like `assert f(x) == f(x)`. Both are the same weak determinism oracle
+    (falsifiable only by nondeterminism, never by a wrong value): AXF-03, consistent with AG-05. The same call before
+    and after an action is a state check (a fingerprint before and after a run), not this; a name assigned more than
+    once is not resolved. Returns the ids of those assertion nodes."""
+    found: set[int] = set()
     def compared(statement):
         if isinstance(statement, ast.Assert) and isinstance(statement.test, ast.Compare) and len(statement.test.comparators) == 1 \
                 and isinstance(statement.test.ops[0], (ast.Eq, ast.Is)):
@@ -655,8 +756,8 @@ def _self_referential(node) -> bool:
         name, value = first.targets[0].id, ast.dump(first.value)
         sides = [ast.dump(side) for side in pair]
         if any(isinstance(side, ast.Name) and side.id == name for side in pair) and value in sides:
-            return True
-    return False
+            found.add(id(second.value if isinstance(second, ast.Expr) else second))
+    return found
 
 
 _MOCK_ASSERTS = frozenset({"assert_called", "assert_called_once", "assert_not_called", "assert_called_with",
@@ -829,6 +930,7 @@ def _js_test(test_id, rel, body, body_clean, file_doubles, level, msw, retries) 
         else:
             surfaces.add("RETURN")
     smells += _js_assertion_smells(body, body_clean)
+    oracles, smells = _determinism_oracles(oracles, smells, len(signature))
     if _swallowed(body_clean, _JS_ASSERTION):
         smells.append("SWALLOWED_EXCEPTION")
     if re.search(r"waitForTimeout\(|new Promise\(\s*\(?\w*\)?\s*=>\s*setTimeout", body) and not _time_is_subject(test_id, body):
@@ -974,6 +1076,7 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
         if re.search(r"assertTrue\(\s*true\s*\)", statement):
             smells.append("TAUTOLOGY")
     smells += _jvm_assertion_smells(body, body_clean)
+    oracles, smells = _determinism_oracles(oracles, smells, len(signature))
     doubles = [*class_doubles, *re.findall(r"\bmockk<(\w+)>|\bmock\(\s*(\w+)(?:::class|\.class)", body)]
     doubles = [d if isinstance(d, str) else next(x for x in d if x) for d in doubles]
     boundaries, simulated, surfaces = set(), set(), set()
@@ -1031,7 +1134,6 @@ def _jvm_test(test_id, rel, body, body_clean, rows, class_doubles, level, instru
 
 def collect(root: str | Path) -> tuple[list[TestFacts], dict[str, list[str]]]:
     """Facts for every language with tests in the project, and each extractor's limits."""
-    from dataclasses import replace
 
     root = Path(root)
     facts, limits = [], {}

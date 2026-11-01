@@ -1,0 +1,135 @@
+{
+ "assertiva": "0.10.1 candidate ec5c796 (source tree)",
+ "python": "3.12.10 Windows",
+ "probe": "benchmarks/derivanta_probes.py",
+ "results": {
+  "AXF-02/c1-multiline-both": {
+   "exit": 0,
+   "gap": null,
+   "redundancy_candidates": []
+  },
+  "AXF-02/c1-multiline-only-a": {
+   "exit": 0,
+   "gap": [
+    "b/tests/test_b.py"
+   ],
+   "redundancy_candidates": []
+  },
+  "AXF-02/c1-multiline-b-second": {
+   "exit": 0,
+   "gap": null,
+   "redundancy_candidates": []
+  },
+  "AXF-03": {
+   "exit": 0,
+   "false_green": [],
+   "weak": [
+    [
+     {
+      "DETERMINISM": 2
+     },
+     [
+      "tests/test_det.py::test_direct",
+      "tests/test_det.py::test_assigned"
+     ]
+    ]
+   ]
+  },
+  "AXF-M2-01": {
+   "exit": 0,
+   "false_green": [
+    [
+     "TAUTOLOGY",
+     [
+      "tests/test_add.py::test_always_passes",
+      "tests/test_add.py::test_existing_positive"
+     ]
+    ]
+   ]
+  },
+  "AXF-06": {
+   "exit": 0,
+   "codes": [
+    "CI_PYTEST_NOT_OBSERVED",
+    "FALSE_GREEN_CANDIDATE",
+    "NO_DELIVERY_PIPELINE_OBSERVED",
+    "WEAK_ORACLE_SIGNAL"
+   ],
+   "false_green": [
+    [
+     "SWALLOWED_EXCEPTION",
+     [
+      "tests/test_decode.py::test_swallows_everything"
+     ]
+    ]
+   ],
+   "no_assertion": null
+  },
+  "AXF-M3-01/m3-indirect": {
+   "exit": 0,
+   "ci_pytest_not_observed": false
+  },
+  "AXF-M3-01/m3-direct": {
+   "exit": 0,
+   "ci_pytest_not_observed": false
+  },
+  "AXF-M3-01/m3-indirect-no-pytest": {
+   "exit": 0,
+   "ci_pytest_not_observed": true
+  },
+  "AXF-M3-02": {
+   "exit": 0,
+   "summary": "Other tests assert a machine code, field or context of these errors; these tests do not (what each one asserts about the error is listed).",
+   "evidence": {
+    "asserted": {
+     "tests/test_err.py::test_exit_code_only": [
+      "exit_code"
+     ]
+    },
+    "count": 2,
+    "detail_asserted_elsewhere": [
+     "MACHINE_CODE"
+    ],
+    "error_types": [
+     "AppError"
+    ],
+    "tests": [
+     "tests/test_err.py::test_exit_code_only",
+     "tests/test_err.py::test_type_only"
+    ]
+   }
+  },
+  "AXF-01/relative": {
+   "exit": 0,
+   "report": true,
+   "stderr_tail": []
+  },
+  "AXF-01/absolute": {
+   "exit": 0,
+   "report": true
+  },
+  "AXF-01/missing": {
+   "exit": 2,
+   "report": false,
+   "stderr_tail": [
+    "assertiva audit: error: argument --python: no interpreter at <probe-dir>\\fixtures\\axf01-deps\\missing\\python.exe"
+   ]
+  },
+  "AXF-05": {
+   "exit": 0,
+   "status": "FINDINGS",
+   "runs": [
+    {
+     "adapter": "unittest",
+     "status": "FAIL",
+     "invocations": 6,
+     "exit_code": 1,
+     "limitations": [
+      "coverage was not measured: combining several declared invocations is not implemented",
+      "unittest collects TestCase methods only; plain test functions are not run by this runner"
+     ]
+    }
+   ]
+  }
+ }
+}

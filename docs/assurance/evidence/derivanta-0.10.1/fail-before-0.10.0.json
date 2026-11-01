@@ -1,0 +1,153 @@
+{
+ "assertiva": "0.10.0 2e34542 (source tree)",
+ "python": "3.12.10 Windows",
+ "probe": "scratch repro.py (synthetic fixtures, rebuilt from the M1 C1/C2 descriptions)",
+ "results": {
+  "AXF-02/c1-multiline-both": {
+   "exit": 0,
+   "gap": [
+    "b/tests/test_b.py"
+   ],
+   "redundancy_candidates": [
+    [
+     "a/tests/test_a.py::T::test_add",
+     "b/tests/test_b.py::T::test_add"
+    ]
+   ]
+  },
+  "AXF-02/c1-multiline-only-a": {
+   "exit": 0,
+   "gap": [
+    "b/tests/test_b.py"
+   ],
+   "redundancy_candidates": [
+    [
+     "a/tests/test_a.py::T::test_add",
+     "b/tests/test_b.py::T::test_add"
+    ]
+   ]
+  },
+  "AXF-02/c1-multiline-b-second": {
+   "exit": 0,
+   "gap": [
+    "a/tests/test_a.py"
+   ],
+   "redundancy_candidates": [
+    [
+     "a/tests/test_a.py::T::test_add",
+     "b/tests/test_b.py::T::test_add"
+    ]
+   ]
+  },
+  "AXF-03": {
+   "exit": 0,
+   "false_green": [
+    [
+     "SELF_REFERENTIAL_ORACLE",
+     [
+      "tests/test_det.py::test_assigned"
+     ]
+    ]
+   ],
+   "weak": [
+    [
+     {
+      "DETERMINISM": 1
+     },
+     [
+      "tests/test_det.py::test_direct"
+     ]
+    ]
+   ]
+  },
+  "AXF-M2-01": {
+   "exit": 0,
+   "false_green": [
+    [
+     "TAUTOLOGY",
+     [
+      "tests/test_add.py::test_existing_positive"
+     ]
+    ]
+   ]
+  },
+  "AXF-06": {
+   "exit": 0,
+   "codes": [
+    "CI_PYTEST_NOT_OBSERVED",
+    "FALSE_GREEN_CANDIDATE",
+    "NO_DELIVERY_PIPELINE_OBSERVED",
+    "WEAK_ORACLE_SIGNAL"
+   ],
+   "false_green": [
+    [
+     "SWALLOWED_EXCEPTION",
+     [
+      "tests/test_decode.py::test_never_escapes_typed_errors",
+      "tests/test_decode.py::test_swallows_everything"
+     ]
+    ]
+   ],
+   "no_assertion": null
+  },
+  "AXF-M3-01/m3-indirect": {
+   "exit": 0,
+   "ci_pytest_not_observed": true
+  },
+  "AXF-M3-01/m3-direct": {
+   "exit": 0,
+   "ci_pytest_not_observed": false
+  },
+  "AXF-M3-01/m3-indirect-no-pytest": {
+   "exit": 0,
+   "ci_pytest_not_observed": true
+  },
+  "AXF-M3-02": {
+   "exit": 0,
+   "summary": "Other tests show these errors carry a machine code/field/context, but these tests only check the type.",
+   "evidence": {
+    "error_types": [
+     "AppError"
+    ],
+    "tests": [
+     "tests/test_err.py::test_exit_code_only",
+     "tests/test_err.py::test_type_only"
+    ]
+   }
+  },
+  "AXF-01/relative": {
+   "exit": 1,
+   "report": false,
+   "stderr_tail": [
+    "FileNotFoundError: [WinError 2] O sistema não pode encontrar o arquivo especificado"
+   ]
+  },
+  "AXF-01/absolute": {
+   "exit": 0,
+   "report": true
+  },
+  "AXF-01/missing": {
+   "exit": 1,
+   "report": false,
+   "stderr_tail": [
+    "FileNotFoundError: [WinError 2] O sistema não pode encontrar o arquivo especificado"
+   ]
+  },
+  "AXF-05": {
+   "exit": 0,
+   "status": "FINDINGS",
+   "runs": [
+    {
+     "adapter": "unittest",
+     "status": "UNKNOWN",
+     "invocations": 0,
+     "exit_code": 5,
+     "limitations": [
+      "no test was executed; this is not evidence of a passing suite",
+      "unittest collects TestCase methods only; plain test functions are not run by this runner"
+     ]
+    }
+   ]
+  }
+ }
+}

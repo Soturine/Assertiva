@@ -137,6 +137,21 @@ def surface_findings(surface: VerificationSurface) -> list:
             "NESTED_SCRIPT_REPETITION",
             "CI invokes package scripts that run the same script more than once through nested scripts; the repeats add cost, not distinct evidence.",
             {"repeated": repeated, "basis": "DECLARED: package.json scripts and CI steps, not execution"}, severity="info"))
+    masked = []
+    for check in delivery:
+        ignored = any(i.get("status_ignored") and i.get("kind") == VerificationKind.TEST.value for i in check.metadata.get("invocations") or [])
+        how = ("`|| true` (or an equivalent) after the test command" if ignored
+               else "a pipe in a shell without pipefail" if check.metadata.get("status_masked_by_pipe") else None)  # adapter-decided
+        if how:
+            masked.append({"check": check.check_id, "source": check.source, "command": check.command, "how": how})
+    if masked:
+        findings.append(Finding(
+            "CI_TEST_STATUS_MASKED",
+            "A CI step runs tests in a way that discards their exit status; the step can pass while tests fail.",
+            {"count": len(masked), "steps": masked[:20], "basis": "DECLARED: the step's shell and command, not a run"},
+            severity="medium",
+            recommendation="Let the test command's status fail the step: drop `|| true`, set pipefail (an explicit bash shell or "
+                           "`set -o pipefail`), or stop piping the runner's output."))
     missing = [check.check_id for check in local if not any(_covers(ci, check) for ci in delivery)]
     if missing:
         findings.append(
@@ -260,5 +275,5 @@ def artifact_lineage(surface: VerificationSurface, artifacts, delivered: dict[st
     if deliveries:
         findings.append(Finding("ARTIFACT_LINEAGE_UNKNOWN",
                                 "Delivery steps are declared, but no evidence ties the published or deployed bytes to a tested artifact.",
-                                {"deliveries": [c.command or c.tool or c.check_id for c in deliveries][:10]}))
+                                {"count": len(deliveries), "deliveries": [c.command or c.tool or c.check_id for c in deliveries][:10]}))
     return lineage, findings

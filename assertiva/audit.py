@@ -26,7 +26,7 @@ from contextlib import ExitStack
 
 from . import environment
 from .adapters.provisioning import plan, prepare
-from .process import passthrough, scoped, traced_stage, withheld_variables
+from .process import passthrough, resolve_interpreter, scoped, traced_stage, withheld_variables
 from .reproduction import reproduce_check
 from .history import record_state
 from .adapters.ci_runs import green, identity, load_ci_run
@@ -43,7 +43,7 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
     invocations = [inv for run in own for inv in run.invocations]
     errors = [e for run in own for e in run.collection_errors]
     if errors:
-        findings.append(Finding("NATIVE_COLLECTION_ERRORS", "The native runner could not collect some tests.", {"errors": errors[:20]}))
+        findings.append(Finding("NATIVE_COLLECTION_ERRORS", "The native runner could not collect some tests.", {"count": len(errors), "errors": errors[:20]}))
     failed = [inv for inv in invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
     failing = [inv.invocation_id for inv in failed]
     if failing:
@@ -64,7 +64,7 @@ def _native_findings(current: StateEvidence, static_total: int, reported: tuple 
         findings.append(Finding(
             "SOURCE_IDENTITY_MISMATCH",
             "The tests imported the project's own modules from an installed copy instead of the source tree under test.",
-            {"modules": modules[:20], "files": {m: f for run in shadowed for m, f in run.metadata["source_identity"]["modules"].items()
+            {"count": len(modules), "modules": modules[:20], "files": {m: f for run in shadowed for m, f in run.metadata["source_identity"]["modules"].items()
                                                 if m in modules}, "adapters": [run.adapter_id for run in shadowed],
              "unexpected_count": sum(run.metadata["source_identity"].get("unexpected") or 0 for run in shadowed),
              "names_truncated": any(run.metadata["source_identity"].get("names_truncated") for run in shadowed),
@@ -193,17 +193,25 @@ def _boundary_findings(report: dict) -> list[Finding]:
         findings.append(Finding(
             "PROJECT_LINK_ESCAPES_ROOT",
             "Project links point outside the project root; they are not followed or copied, but executions can reach their targets.",
-            {"links": report["external_links"][:30], "kinds": {link: kinds.get(link, "UNKNOWN") for link in report["external_links"][:30]}},
+            {"count": len(report["external_links"]), "links": report["external_links"][:30], "kinds": {link: kinds.get(link, "UNKNOWN") for link in report["external_links"][:30]}},
             # an agent's or editor's own tool install is a fact worth stating, not a risk of the product
             severity="info" if tooling_only else None,
         ))
     if report["broken_links"]:
-        findings.append(Finding("BROKEN_PROJECT_LINK", "Some project links point to nothing.", {"links": report["broken_links"][:30]}))
+        findings.append(Finding("BROKEN_PROJECT_LINK", "Some project links point to nothing.", {"count": len(report["broken_links"]), "links": report["broken_links"][:30]}))
+    if report.get("unreadable"):
+        findings.append(Finding(
+            "PROJECT_ENTRIES_UNREADABLE",
+            "Some project entries exist but could not be read; they are missing from the inventory, the copies and every result.",
+            {"count": len(report["unreadable"]), "paths": report["unreadable"][:30], "basis": "OBSERVED",
+             "hint": "on Windows, paths longer than 260 characters need long paths enabled (LongPathsEnabled) or a shorter location"},
+            severity="high",
+        ))
     if report["nested_repositories"]:
         findings.append(Finding(
             "NESTED_REPOSITORY",
             "Nested repositories or submodules are included from the working tree; their own history is not inspected.",
-            {"paths": report["nested_repositories"][:30]},
+            {"count": len(report["nested_repositories"]), "paths": report["nested_repositories"][:30]},
         ))
     return findings
 
@@ -223,9 +231,27 @@ def _artifact_findings(current: StateEvidence) -> list[Finding]:
         if a.omitted_files:
             findings.append(
                 Finding("ARTIFACT_OMITS_SOURCE_FILES", "Files inside packaged directories are not in the artifact (they may be intentionally excluded).",
-                        {"artifact": a.artifact, "files": a.omitted_files[:30]})
+                        {"artifact": a.artifact, "count": len(a.omitted_files), "files": a.omitted_files[:30]})
             )
     return findings
+
+
+MUTANTS_LISTED = 20
+
+
+def _undetected(run) -> dict:
+    """The mutants no test detected (survived and not covered), counted completely: `count` is what an assessment's
+    review scope is checked against (AXF-04), the list is bounded and says so, and every mutant keeps its id."""
+    undetected = [m for m in run.mutants if m.status in (MutantStatus.SURVIVED, MutantStatus.NO_COVERAGE)]
+    listed = undetected[:MUTANTS_LISTED]
+    return {
+        "count": len(undetected),
+        "survivors": [mutant_label(m) + (" [no coverage]" if m.status is MutantStatus.NO_COVERAGE else "") for m in listed],
+        "mutant_ids": [m.mutant_id for m in listed],
+        "listed": len(listed), "truncated": len(undetected) > len(listed),
+        "sites": len({(m.path, m.line) if m.path else m.mutant_id for m in undetected}),
+        "complete_list": "the report's mutation evidence (survivor_sites) lists every undetected mutant of the run",
+    }
 
 
 def _mutation_findings(current: StateEvidence) -> list[Finding]:
@@ -239,7 +265,7 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
             findings.append(Finding("MUTATION_REPORT_UNTIED", "A mutation report cannot be tied to the audited code and tests; its results are leads, not this state's evidence.",
                                     {"tool": run.tool, "source": run.source, "evaluated": run.evaluated,
                                      "survived": run.count(MutantStatus.SURVIVED), "no_coverage": run.count(MutantStatus.NO_COVERAGE),
-                                     "survivors": [mutant_label(m) for m in run.survivors()[:20]], "limitations": run.limitations}))
+                                     **_undetected(run), "limitations": run.limitations}))
         elif run.count(MutantStatus.SURVIVED) or run.count(MutantStatus.NO_COVERAGE):
             findings.append(
                 Finding(
@@ -248,7 +274,7 @@ def _mutation_findings(current: StateEvidence) -> list[Finding]:
                     {
                         "tool": run.tool, "source": run.source,
                         "survived": run.count(MutantStatus.SURVIVED), "no_coverage": run.count(MutantStatus.NO_COVERAGE),
-                        "evaluated": run.evaluated, "survivors": [mutant_label(m) for m in run.survivors()[:20]],
+                        "evaluated": run.evaluated, **_undetected(run),
                     },
                 )
             )
@@ -340,6 +366,7 @@ def run_audit(
     dependencies: bool = False,
 ) -> dict:
     root = Path(root).resolve()
+    python = resolve_interpreter(python) if python else python  # once, before any child runs elsewhere (AXF-01)
     started = _now()
     selection = None
     findings: list[Finding] = []

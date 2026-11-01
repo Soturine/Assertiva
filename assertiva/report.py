@@ -18,6 +18,7 @@ from .identity import runtime_identity
 from .candidate import DeltaState, StageStatus
 from .process import MAX_DEPTH, current_depth
 from .evidence import StateEvidence, compare_states, mutant_label, state_metrics, to_jsonable
+from .models import MutantStatus
 from .report_html import render_html  # noqa: F401  (presentation lives in report_html; re-exported for callers)
 
 REPORT_VERSION = "1"
@@ -54,6 +55,7 @@ _RECOMMENDATION = {
     "DEPENDENCY_USAGE_NOT_REACHED_STATICALLY": "Check whether a test exercises the code that uses the dependency (a run, coverage of that code); add one before upgrading if none does.",
     "NESTED_SCRIPT_REPETITION": "Run each script once in CI (or call the leaf scripts directly); keep every gate, only drop the repeats.",
     "SOURCE_IDENTITY_MISMATCH": "Run the tests against the source tree (an editable install or the src path first) or qualify the installed package on purpose as an artifact; until then the green run proves another copy of the code.",
+    "PROJECT_ENTRIES_UNREADABLE": "Make the listed entries readable (on Windows, enable long paths or move the project to a shorter path) and audit again.",
     "MUTATION_SURVIVORS": "Add or strengthen tests that fail for the listed surviving mutants, or document why a mutant is equivalent.",
     "MUTATION_REPORT_SOURCE_MISMATCH": "Regenerate the mutation report for the audited revision.",
     "MUTATION_REPORT_UNTIED": "Run the mutation tool through the engine (--execute --mutate FILE), or import a report that includes the source it mutated and the tests it ran.",
@@ -104,6 +106,8 @@ def state_summary(state: StateEvidence | None) -> dict | None:
                 "interpreter": run.metadata.get("interpreter"), "limits": run.metadata.get("limits"),
                 # each invocation's outcome, so one test's evidence can be read back (assertiva explain)
                 "outcomes_by_invocation": {inv.invocation_id: inv.outcome.value for inv in run.invocations if inv.outcome is not None},
+                # several declared invocations reproduced one by one (AXF-05): each with its status and test count
+                "declared_invocations": run.metadata.get("declared_invocations"),
             }
             for run in state.runs
         ],
@@ -117,17 +121,20 @@ def state_summary(state: StateEvidence | None) -> dict | None:
     }
 
 
-def survivor_sites(run, limit: int = 20) -> list[dict]:
-    """Where each surviving mutant of a run tied to its state changed the code: the original line, as the run saw it,
-    and the change. The material for a witness (an input on which original and mutant differ), not the witness."""
+def survivor_sites(run) -> list[dict]:
+    """Every mutant of a run tied to its state that no test detected (survived, or not covered), with its id, where it
+    changed the code (the original line as the run saw it) and the change: the material for a witness, not the witness.
+    Complete, never cut (AXF-04): a reviewer must be able to see every mutant the counts include."""
     if run.matches_state is not True:
         return []
     out = []
-    for m in run.survivors()[:limit]:
+    for m in run.mutants:
+        if m.status not in (MutantStatus.SURVIVED, MutantStatus.NO_COVERAGE):
+            continue
         lines = (run.sources.get(m.path or "") or "").splitlines()
         original = lines[m.line - 1].strip()[:200] if m.line and 0 < m.line <= len(lines) else None
-        out.append({"mutant": mutant_label(m), "path": m.path, "line": m.line, "original": original,
-                    "change": m.replacement or m.description or m.operator, "operator": m.operator})
+        out.append({"mutant": mutant_label(m), "mutant_id": m.mutant_id, "status": m.status.value, "path": m.path, "line": m.line,
+                    "original": original, "change": m.replacement or m.description or m.operator, "operator": m.operator})
     return out
 
 

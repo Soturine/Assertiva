@@ -210,6 +210,10 @@ class TestDefinition:
     negative_dims: tuple[str, ...] = ()
     error_types: tuple[str, ...] = ()
     async_unobserved: bool = False
+    # what the test's assertions read from the raised error (`exit_code`, `payload`): AXF-M3-02
+    error_fields: tuple[str, ...] = ()
+    # every expected rejection happens while constructing a value, before any object exists: no state to check after
+    rejects_construction: bool = False
 
 
 @dataclass(frozen=True)

@@ -132,12 +132,16 @@ def entry_digest(root: Path, rel: str) -> str | None:
 class _Listing:
     files: list[str] = field(default_factory=list)
     nested: list[str] = field(default_factory=list)
+    # entries that exist but could not be read (a Windows path past MAX_PATH, a refused permission): left out of the
+    # inventory, the fingerprint and every copy, so they are reported, never dropped in silence (DG-0101-06)
+    unreadable: list[str] = field(default_factory=list)
 
 
 def _walk(root: Path, base: Path, listing: _Listing) -> None:
     try:
         entries = sorted(os.scandir(base), key=lambda e: e.name)
     except OSError:
+        listing.unreadable.append(base.relative_to(root).as_posix() if base != root else ".")
         return
     for entry in entries:
         if entry.name == ".git":
@@ -185,7 +189,10 @@ def _listing(root: Path) -> _Listing:
             elif path.is_dir():  # nested repository or submodule: its working tree, not its .git
                 listing.nested.append(rel)
                 _walk(root, path, listing)
+            else:  # Git lists it, but it cannot be reached here (MAX_PATH, permissions)
+                listing.unreadable.append(rel)
     listing.files = sorted(set(listing.files))
+    listing.unreadable = sorted(set(listing.unreadable))
     return listing
 
 
@@ -234,7 +241,8 @@ def boundary_report(root: str | Path) -> dict:
     listed = _git(root, "ls-files", "-z", "--cached") if external else None
     tracked = {p for p in listed.split("\0") if p} if listed is not None else None
     kinds = {rel: link_kind(root, rel, tracked) for rel in external}
-    return {"external_links": external, "broken_links": broken, "nested_repositories": listing.nested, "external_link_kinds": kinds}
+    return {"external_links": external, "broken_links": broken, "nested_repositories": listing.nested, "external_link_kinds": kinds,
+            "unreadable": listing.unreadable}
 
 
 @contextmanager

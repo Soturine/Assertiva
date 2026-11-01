@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "title": "Derivanta Engine M2 -> Assertiva 0.10.0 follow-up feedback",
+  "status": "INTAKE_ONLY_NOT_IMPLEMENTED",
+  "observation_date": "2026-11-01",
+  "assertiva_tested_revision": "2e34542b4d04f2553618875498cd0e71842b9196",
+  "engine_final_revision": "0be2a3827991398e5a8b37c13281e3140b8e4c03",
+  "related_pr": 3,
+  "historical_intake": "docs/assurance/DERIVANTA_ENGINE_M1_FEEDBACK.json",
+  "canonical_narrative": "docs/assurance/DERIVANTA_ENGINE_M2_DOGFOOD_INTAKE.md",
+  "authority": "Derived from revision-pinned Engine evidence. Not a new independent audit, not repaired in Assertiva.",
+  "sources": {
+    "dogfood": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/ASSERTIVA_DOGFOOD.md",
+    "feedback": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/ASSERTIVA_FEEDBACK.md",
+    "ledger": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/FINDINGS.md",
+    "cp7_mutations": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/assertiva/cp7-mutation.json",
+    "cp2_mutations": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/assertiva/cp2-assurance-mutation.json",
+    "cp7_six_repositories": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/dogfood-cp7.json",
+    "cp7_probes": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/probes-cp7.json",
+    "run_manifest": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/audits/m2/RUN_MANIFEST.json",
+    "m2_report": "https://github.com/Soturine/Derivanta-Engine/blob/0be2a3827991398e5a8b37c13281e3140b8e4c03/docs/milestones/M2_REPORT.md"
+  },
+  "findings": [
+    {
+      "id": "AXF-01",
+      "priority": "P1",
+      "m2_status": "REPRODUCED_M2",
+      "summary": "relative python interpreter crashes in dependencies probe",
+      "acceptance": "canonicalize before cwd changes; use relative/absolute/invalid controls",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-02",
+      "priority": "P1",
+      "m2_status": "REPRODUCED_M2",
+      "summary": "multiline GitHub Actions unittest discover undercounts scopes",
+      "acceptance": "both suites counted; order-independent; omitted one still flagged",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-03",
+      "priority": "P2",
+      "m2_status": "REPRODUCED_M2",
+      "summary": "assigned determinism oracle false positive",
+      "acceptance": "classify repeatability without asserting full behavioral correctness",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-04",
+      "priority": "P1",
+      "m2_status": "REPRODUCED_M2",
+      "summary": "mutation survivor truncation hides unreviewed mutants",
+      "acceptance": "70 raw survivors vs 50 listed names/20 sites; assessment cannot mark complete on truncated listing",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-05",
+      "priority": "P1",
+      "m2_status": "NOT_REEXECUTED_M2",
+      "summary": "unittest multiple start directories misrepresented",
+      "acceptance": "rerun M1 historical root-selection fixtures",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-06",
+      "priority": "P2",
+      "m2_status": "NOT_REEXECUTED_M2",
+      "summary": "typed exception expectation misclassified as no assertion",
+      "acceptance": "rerun M1 exception semantics fixtures",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-07",
+      "priority": "P2",
+      "m2_status": "REPRODUCED_M2",
+      "summary": "same text test different imported subject falsely redundant",
+      "acceptance": "scope by imported subject with real-positive/negative controls",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-08",
+      "priority": "P1",
+      "m2_status": "SEMANTIC_REVIEW_NOT_RERUN",
+      "summary": "skill venv/copy language risks implying sandbox guarantees",
+      "acceptance": "independent semantic safety evaluation; do not convert REVIEW into PASS",
+      "kind": "PREVIOUSLY_REGISTERED_AXF",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-M2-01",
+      "priority": "P1",
+      "m2_status": "NEW_REPRODUCED_M2",
+      "summary": "assert expression or True false-green missed",
+      "acceptance": "detect constant truthy OR with nested and false-positive controls",
+      "kind": "NEW_ASSERTIVA_FALSE_NEGATIVE",
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    }
+  ],
+  "mutation_runs": [
+    {
+      "module": "core/assurance.py",
+      "first": {
+        "killed": 191,
+        "evaluated": 261
+      },
+      "retest": {
+        "killed": 227,
+        "evaluated": 261
+      },
+      "note": "Targeted; truncated survivor list at first"
+    },
+    {
+      "module": "core/sarif.py",
+      "first": {
+        "killed": 178,
+        "evaluated": 216
+      },
+      "retest": {
+        "killed": 196,
+        "evaluated": 214
+      },
+      "note": "Two redundant conditions removed; denominators differ"
+    },
+    {
+      "module": "core/policy.py",
+      "first": {
+        "killed": 43,
+        "evaluated": 54
+      },
+      "retest": {
+        "killed": 48,
+        "evaluated": 54
+      }
+    },
+    {
+      "module": "core/lockfiles.py",
+      "first": {
+        "killed": 36,
+        "evaluated": 68
+      },
+      "retest": {
+        "killed": 56,
+        "evaluated": 68
+      }
+    },
+    {
+      "module": "core/traceability.py",
+      "first": {
+        "killed": 79,
+        "evaluated": 114
+      },
+      "retest": {
+        "killed": 92,
+        "evaluated": 114
+      }
+    },
+    {
+      "module": "core/maintainability.py",
+      "first": {
+        "status": "NOT_EXECUTED",
+        "planned": 594,
+        "budget": 300
+      },
+      "retest": null,
+      "note": "No score. Do not split/shrink target merely to manufacture a percentage"
+    }
+  ],
+  "proposals": [
+    {
+      "id": "AXO-M2-01",
+      "priority": "P1",
+      "disposition": "ADOPT",
+      "description": "Report complete mutation denominator, truncation and assessment completeness"
+    },
+    {
+      "id": "AXO-M2-02",
+      "priority": "P1",
+      "disposition": "ADOPT",
+      "description": "Detect always-pass OR/True assertions with negative controls"
+    },
+    {
+      "id": "AXO-M2-03",
+      "priority": "P2",
+      "disposition": "EXPERIMENT",
+      "description": "Budget-aware mutation selection with honest partial status"
+    },
+    {
+      "id": "AXO-M2-04",
+      "priority": "P2",
+      "disposition": "ADAPT",
+      "description": "Imported-subject-aware redundancy"
+    },
+    {
+      "id": "AXO-M2-05",
+      "priority": "P2",
+      "disposition": "ADAPT",
+      "description": "Explicit and evidence-backed oracle strength distinctions"
+    },
+    {
+      "id": "AXO-M2-06",
+      "priority": "P2",
+      "disposition": "ADAPT",
+      "description": "Dogfood evaluation validity and independent judge protocol"
+    },
+    {
+      "id": "AXO-M2-07",
+      "priority": "P3",
+      "disposition": "EXPERIMENT",
+      "description": "Triage maintainability suggestions rather than blindly refactor"
+    },
+    {
+      "id": "AXO-M2-08",
+      "priority": "P3",
+      "disposition": "EXPERIMENT",
+      "description": "Optional SARIF cross-dogfood candidate intake"
+    },
+    {
+      "id": "AXO-M2-09",
+      "priority": "P2",
+      "disposition": "ADAPT",
+      "description": "Stable AXF/AFB lineage and no duplicate feedback routing"
+    }
+  ],
+  "candidate_code_observations": [
+    {
+      "target": "assertiva/report_html.py::_STRENGTH",
+      "status": "LIKELY_DEAD_CANDIDATE",
+      "evidence": "Engine followed up with repository-wide git grep; owner review still needed"
+    },
+    {
+      "target": "assertiva/environment.py::ISOLATION_SANDBOX",
+      "status": "SPECIFIED_ONLY_DO_NOT_DELETE"
+    },
+    {
+      "target": "four test _run helpers",
+      "status": "DUPLICATION_CANDIDATE"
+    },
+    {
+      "target": "150 functions >15 decision paths",
+      "status": "TRIAGE_SIGNAL_NOT_DEFECT"
+    }
+  ],
+  "caveats": [
+    "M2 dogfood on six repositories describes Engine inspection, not Assertiva being executed on all six",
+    "Same-model audit is not independent",
+    "Engine 57 hand-written mutants separate from Assertiva mutation counts",
+    "AXF-05/06 not rerun; AXF-08 semantic eval not rerun",
+    "Engine report says 62 ledger entries while current ledger has 63; Engine documentation drift, not Assertiva error",
+    "Historical Engine CI billing block resolved at closing revisions, not retroactively",
+    "No Assertiva implementation, release, tag or merge authorized by this intake"
+  ]
+}

@@ -302,17 +302,17 @@ def findings(data: dict) -> list:
     outside = [d for d in data["dependencies"] if d["lock_state"] == "LOCK_OUTSIDE_RANGE"]
     if outside:
         out.append(Finding("DEPENDENCY_LOCK_OUTSIDE_RANGE", "A lockfile resolves dependencies to versions their declared range does not accept.",
-                           {"dependencies": [{"name": d["name"], "declared": d["declared_range"], "locked": d["locked"]} for d in outside][:20]}))
+                           {"count": len(outside), "dependencies": [{"name": d["name"], "declared": d["declared_range"], "locked": d["locked"]} for d in outside][:20]}))
     drift = [d for d in data["dependencies"] if d["install_state"] == "INSTALLED_DIFFERS_FROM_LOCK"]
     if drift:
         out.append(Finding("DEPENDENCY_INSTALLED_DIFFERS_FROM_LOCK", "The installed versions differ from the locked ones; local runs test other dependencies than the lock.",
-                           {"dependencies": [{"name": d["name"], "locked": d["locked"], "installed": d["installed"]} for d in drift][:20]}))
+                           {"count": len(drift), "dependencies": [{"name": d["name"], "locked": d["locked"], "installed": d["installed"]} for d in drift][:20]}))
     unreached = [d for d in data["dependencies"] if d["usage"].get("product_files") and not d["usage"].get("dynamic_imports")
                  and not d["usage"].get("tests_importing_directly") and not d["usage"].get("tests_reaching_transitively")]
     if unreached:
         out.append(Finding("DEPENDENCY_USAGE_NOT_REACHED_STATICALLY",
                            "No static import path leads from a test to the code that uses these dependencies; an upgrade may be unverified.",
-                           {"dependencies": [{"name": d["name"], "product_files": d["usage"]["product_files"][:5]} for d in unreached][:20],
+                           {"count": len(unreached), "dependencies": [{"name": d["name"], "product_files": d["usage"]["product_files"][:5]} for d in unreached][:20],
                             "basis": "STATIC", "limitations": "dynamic imports with computed names, plugins and entry points, "
                             "fixtures and subprocesses are not followed: a test may still reach this code"}, severity="info"))
     return out

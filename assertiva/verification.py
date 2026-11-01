@@ -260,5 +260,5 @@ def artifact_lineage(surface: VerificationSurface, artifacts, delivered: dict[st
     if deliveries:
         findings.append(Finding("ARTIFACT_LINEAGE_UNKNOWN",
                                 "Delivery steps are declared, but no evidence ties the published or deployed bytes to a tested artifact.",
-                                {"deliveries": [c.command or c.tool or c.check_id for c in deliveries][:10]}))
+                                {"count": len(deliveries), "deliveries": [c.command or c.tool or c.check_id for c in deliveries][:10]}))
     return lineage, findings

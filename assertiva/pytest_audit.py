@@ -615,7 +615,7 @@ def _negative_path_findings(tests: list[TestDefinition]) -> list[Finding]:
         findings.append(Finding(
             "ERROR_CONTRACT_FIELD_NOT_OBSERVED",
             "Other tests show these errors carry a machine code/field/context, but these tests only check the type.",
-            {"tests": [t.node_id for t in type_only][:20], "error_types": sorted({e for t in type_only for e in t.error_types} & detailed_types)},
+            {"count": len(type_only), "tests": [t.node_id for t in type_only][:20], "error_types": sorted({e for t in type_only for e in t.error_types} & detailed_types)},
         ))
     raising = [t for t in tests if "ERROR_TYPE" in t.negative_dims]
     if any("STATE_AFTER_REJECTION" in t.negative_dims for t in raising):
@@ -624,14 +624,14 @@ def _negative_path_findings(tests: list[TestDefinition]) -> list[Finding]:
             findings.append(Finding(
                 "STATE_AFTER_REJECTION_NOT_EVIDENCED",
                 "Some tests check state after a rejection; these do not, so partial writes would go unnoticed (static E3 signal).",
-                {"tests": missing[:20]},
+                {"count": len(missing), "tests": missing[:20]},
             ))
     unobserved = [t.node_id for t in tests if t.async_unobserved]
     if unobserved:
         findings.append(Finding(
             "ASYNC_FAILURE_NOT_OBSERVED",
             "An async task is created but never awaited, so its failure cannot fail the test.",
-            {"tests": unobserved[:20]},
+            {"count": len(unobserved), "tests": unobserved[:20]},
         ))
     return findings
 

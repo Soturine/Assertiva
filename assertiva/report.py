@@ -18,6 +18,7 @@ from .identity import runtime_identity
 from .candidate import DeltaState, StageStatus
 from .process import MAX_DEPTH, current_depth
 from .evidence import StateEvidence, compare_states, mutant_label, state_metrics, to_jsonable
+from .models import MutantStatus
 from .report_html import render_html  # noqa: F401  (presentation lives in report_html; re-exported for callers)
 
 REPORT_VERSION = "1"
@@ -117,17 +118,20 @@ def state_summary(state: StateEvidence | None) -> dict | None:
     }
 
 
-def survivor_sites(run, limit: int = 20) -> list[dict]:
-    """Where each surviving mutant of a run tied to its state changed the code: the original line, as the run saw it,
-    and the change. The material for a witness (an input on which original and mutant differ), not the witness."""
+def survivor_sites(run) -> list[dict]:
+    """Every mutant of a run tied to its state that no test detected (survived, or not covered), with its id, where it
+    changed the code (the original line as the run saw it) and the change: the material for a witness, not the witness.
+    Complete, never cut (AXF-04): a reviewer must be able to see every mutant the counts include."""
     if run.matches_state is not True:
         return []
     out = []
-    for m in run.survivors()[:limit]:
+    for m in run.mutants:
+        if m.status not in (MutantStatus.SURVIVED, MutantStatus.NO_COVERAGE):
+            continue
         lines = (run.sources.get(m.path or "") or "").splitlines()
         original = lines[m.line - 1].strip()[:200] if m.line and 0 < m.line <= len(lines) else None
-        out.append({"mutant": mutant_label(m), "path": m.path, "line": m.line, "original": original,
-                    "change": m.replacement or m.description or m.operator, "operator": m.operator})
+        out.append({"mutant": mutant_label(m), "mutant_id": m.mutant_id, "status": m.status.value, "path": m.path, "line": m.line,
+                    "original": original, "change": m.replacement or m.description or m.operator, "operator": m.operator})
     return out
 
 

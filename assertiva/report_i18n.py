@@ -444,6 +444,8 @@ UI: dict[str, tuple[str, str]] = {
     "mut.unreadable": ("unreadable", "ilegível"),
     "mut.mismatch": ("report produced for other source", "relatório produzido para outro código"),
     "mut.none_listed": ("none listed", "nenhum listado"),
+    "mut.more": ("… and {n} more undetected mutants (every one is listed in the JSON report)",
+                 "… e mais {n} mutantes não detectados (todos estão listados no relatório JSON)"),
     "mut.no_identity": ("this format does not identify each mutant", "este formato não identifica cada mutante"),
     "art.title": ("Built artifact", "Artefato construído"),
     "art.summary.one": ("{n} artifact", "{n} artefato"),

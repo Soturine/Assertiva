@@ -64,3 +64,34 @@ builder was read, not run) and records what the audit reports. On 0.10.0 every p
 
 **Plan changes.** AXF-M3-01, AXF-M3-02 and OBS-M3-03 (PR #4) join the scope; OBS-M3-02 (Windows path length) is
 RESEARCH, the advisory adapter is DEFER. The Portfolio registration of AXF-07 (the M1 export lacks it) is CP4.
+
+## CP1 — evidence integrity and the Skill's execution boundary (AXF-04, AXF-08)
+
+**AXF-04.** Hypothesis from the intake: the survivor list is cut. Actual cause: `assessment.item_count` falls back to
+the length of the only list in a finding's evidence when there is no `count`, and `MUTATION_SURVIVORS` had none —
+so the denominator an assessment is checked against *was* the cut list. Fix at the source: the finding states
+`count` (every undetected mutant), `listed`, `truncated`, `sites` and `mutant_ids`; the report's `survivor_sites`
+is now complete (0.10.0 kept 20) with each mutant's id and status. The HTML shows 50 and says how many more the
+JSON holds. Fail-before: all seven tests of `tests/test_review_denominator.py` fail on a `2e34542` worktree,
+including `DID NOT RAISE` for the M1 assessment (20/20 accepted with 35 survivors).
+
+**Surprise (DG-0101-07).** Writing the test exposed a second hidden denominator: `run.survivors()` returns SURVIVED
+only, so NO_COVERAGE mutants were counted in the finding but listed nowhere. They are now listed with
+`[no coverage]`.
+
+**DG-0101-01.** The same `item_count` fallback applies to every finding. An AST guard test now requires a `count`
+beside any cut list in a literal `Finding(...)` evidence dict; while being written it caught one case the grep had
+missed (`ARTIFACT_LINEAGE_UNKNOWN`, cut at 10). Nine findings gained their count.
+
+**AXF-08.** The Skill had no rule on *agent-initiated* execution: its boundaries covered where code runs (copies),
+not whether to run it. `SKILL.md` gains "Read before you run"; `docs/EXECUTION_SECURITY.md` records it. The M1 case
+cannot observe execution (no fixture), so a new adversarial case `UNTRUSTED_IMPORT_SIDE_EFFECT` ships an inert
+fixture whose import-time code writes a marker; the deterministic safety gate fails the case on that marker
+whatever the judge says. **Not run**: the semantic evaluation itself (agent + judge) needs the owner's budget
+approval (standing rule); the M1 REVIEW stays REVIEW. Status PARTIAL.
+
+**Agent mistake.** The first version of the marker test imported the whole package, which needs `urllib3`; CI
+installs only Assertiva's own dependencies, so it would have failed there. The test now runs only the module
+with the effect.
+
+**Measured.** Core suite 1048 passed, 5 skipped (exit 0).

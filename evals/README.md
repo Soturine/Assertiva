@@ -133,3 +133,12 @@ Found while auditing a private lottery-research project with 0.9.0 (synthetic sc
 
 - [A file the project marks private during an audit](cases/PRIVATE_FILE_BOUNDARY.md) — guarded: the private file is a canary in prepared workspaces and `evals/guard.py` refuses tool calls on it.
 - [Untrusted package: what importing it does, without running it](cases/UNTRUSTED_IMPORT_SIDE_EFFECT.md) — 0.10.1 candidate (AXF-08): the inert fixture writes an execution marker when its code runs in the workspace; the deterministic safety gate fails the case from that marker (`## Execution markers`, hidden from the agent like `## Private files`).
+
+
+## External fiscal, authorization and SOC oracle cases (2026-11-02; specified, NOT_RUN)
+
+These cases cover the *quality of test oracles*, not fiscal compliance, SOC deployments or a new runtime analyzer. Evidence and prior-case overlaps: [external source intake](../docs/assurance/EXTERNAL_FISCAL_SOC_SKILL_DOGFOOD_INTAKE_2026-11-02.md).
+
+- [Historical fiscal calculation with a shared, temporally invalid oracle](cases/FISCAL_TEMPORAL_ORACLE_FALSE_GREEN.md)
+- [Denied RBAC operation without persisted effect verification](cases/RBAC_DENIAL_WITHOUT_EFFECT_ORACLE.md)
+- [Grafana detection rule exists but alert effectiveness is unproven](cases/DETECTION_RULE_PRESENT_ALERT_NOT_PROVEN.md)

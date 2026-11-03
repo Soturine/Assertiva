@@ -150,3 +150,11 @@ These semantic cases do not add executable browser/Android adapters. [Source and
 
 - [Headless browser unsupported action counted as E2E pass](cases/BROWSER_ALTERNATIVE_CAPABILITY_FALSE_GREEN.md)
 - [Working preview / generated APK parity not proven](cases/ANDROID_PREVIEW_EXPORT_PARITY_FALSE_GREEN.md)
+
+
+## Agent memory and project relocation (2026-11-03; specified NOT_RUN)
+
+[Source review and overlap analysis](../docs/assurance/EXTERNAL_AI_GOAT_AGENTROOT_DOGFOOD_2026-11-03.md) — code-level AIGoat/agentroot inspection, Tandrio and HackerTube evidence boundaries.
+
+- [Indirect injection persisted in memory and downstream unauthorized effects](cases/AGENT_MEMORY_DEFENSE_OUTPUT_ONLY_FALSE_GREEN.md)
+- [Agent profile move: unverified indexes, failed undo and new work](cases/AGENT_PROFILE_MOVE_UNDO_FALSE_GREEN.md)

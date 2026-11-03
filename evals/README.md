@@ -142,3 +142,11 @@ These cases cover the *quality of test oracles*, not fiscal compliance, SOC depl
 - [Historical fiscal calculation with a shared, temporally invalid oracle](cases/FISCAL_TEMPORAL_ORACLE_FALSE_GREEN.md)
 - [Denied RBAC operation without persisted effect verification](cases/RBAC_DENIAL_WITHOUT_EFFECT_ORACLE.md)
 - [Grafana detection rule exists but alert effectiveness is unproven](cases/DETECTION_RULE_PRESENT_ALERT_NOT_PROVEN.md)
+
+
+## Browser and Android APK false-green candidates (2026-11-03; NOT_RUN)
+
+These semantic cases do not add executable browser/Android adapters. [Source and overlap audit](../docs/assurance/EXTERNAL_BROWSER_MARKET_ANDROID_SKILLS_DOGFOOD_2026-11-03.md).
+
+- [Headless browser unsupported action counted as E2E pass](cases/BROWSER_ALTERNATIVE_CAPABILITY_FALSE_GREEN.md)
+- [Working preview / generated APK parity not proven](cases/ANDROID_PREVIEW_EXPORT_PARITY_FALSE_GREEN.md)

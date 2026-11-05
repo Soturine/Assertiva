@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "title": "VozNativa v0.4 hardening / v0.5 -> Assertiva 0.10.1 dogfood feedback",
+  "status": "INTAKE_ONLY_NOT_IMPLEMENTED",
+  "observation_date": "2026-11-05",
+  "assertiva_tested_revision": "2618d95",
+  "project": "https://github.com/Soturine/VozNativa",
+  "project_revisions": {"first": "4044cfc", "ledger": "5d7ae603b3ecc715da66cc5c7e8fa8d72e04c9db"},
+  "canonical_narrative": "docs/assurance/VOZNATIVA_V05_DOGFOOD_INTAKE.md",
+  "authority": "Assertiva executed directly by the VozNativa round on Windows 11; same model family built, audited and judged. Not an independent qualification; nothing repaired in Assertiva.",
+  "sources": {
+    "ledger": "https://github.com/Soturine/VozNativa/blob/5d7ae603b3ecc715da66cc5c7e8fa8d72e04c9db/evals/assurance/DOGFOOD.md",
+    "cp0_run": "https://github.com/Soturine/VozNativa/tree/5d7ae603b3ecc715da66cc5c7e8fa8d72e04c9db/evals/assurance/runs/2026-11-05-cp0-baseline",
+    "cp4_mutation": "https://github.com/Soturine/VozNativa/tree/5d7ae603b3ecc715da66cc5c7e8fa8d72e04c9db/evals/assurance/runs/2026-11-05-cp4-mutation"
+  },
+  "findings": [
+    {"id": "AXF-VN-01", "priority": "P1", "kind": "DEFECT", "rule": "--mutate-tests (unittest adapter)", "summary": "a test file given to --mutate-tests becomes 'unittest discover -s FILE' (ImportError); no mutant runs and the finding says MUTATION_REPORT_UNREADABLE", "reproducer": "synthetic calc/ + tests/test_calc.py with CI declaring unittest discover; --mutate calc/__init__.py --mutate-tests tests/test_calc.py", "control": "--mutate-tests tests -> 18 mutants, 17 killed", "acceptance": "a file selection runs that file for baseline and mutants; a selection that cannot run is reported as a selection failure", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-VN-02", "priority": "P3", "kind": "RECOMMENDATION_PRECISION", "rule": "FALSE_GREEN_CANDIDATE/CONDITIONAL_ASSERTION", "summary": "a filter inside a loop over fixed data is told to 'make the check unconditional'; the effective fix is a non-vacuity assertion", "reproducer": "loop over CASES with if expected: assertTrue(...)", "control": "breaking the function under test makes the test fail", "acceptance": "filtered-loop shape gets resolve_with = non-vacuity count or a negative control on the selection", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-VN-03", "priority": "P2", "kind": "EVIDENCE_GAP", "rule": "execution record (unittest)", "summary": "unittest runs record source_identity, interpreter and temp_root as null; pytest runs record them", "acceptance": "unittest evidence names where project modules were imported from", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-VN-04", "priority": "P2", "kind": "GAP", "rule": "artifact qualification", "summary": "installed-wheel tests NOT_RUN ('no test runner adapter for this project') on a project the unittest adapter ran", "acceptance": "the unittest adapter runs the suite against the installed artifact", "owner_repo": "Soturine/Assertiva", "implemented": false},
+    {"id": "AXF-VN-05", "priority": "P3", "kind": "OBSERVATION", "rule": "runner detection", "summary": "a stdlib-only TestCase project without CI or config is treated as pytest and BLOCKED", "acceptance": "fallback to unittest discovery, or the runner reported as unknown", "owner_repo": "Soturine/Assertiva", "implemented": false}
+  ],
+  "true_positives": [
+    "CONDITIONAL_ASSERTION led to one confirmed false green in VozNativa (fixed in ada5aa6)",
+    "native unittest execution with coverage and wheel build/install in a disposable copy",
+    "TAUTOLOGY and a real Cosmic Ray survivor in the reproducer"
+  ],
+  "project_contribution_summary": {
+    "real_test_improvements_from_assertiva": 1,
+    "new_instrument_findings": 5,
+    "project_defects_found_by_assertiva": 1
+  }
+}

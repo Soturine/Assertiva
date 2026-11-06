@@ -78,3 +78,13 @@ The reproducer without `.github/` produced `pytest-native BLOCKED` and `ENVIRONM
 ## 4. Not a defect
 
 A machine-global editable install answered `assertiva 0.10.1` while pip metadata said `0.5.5` (stale editable install). The round used its own venv from the tag; recorded as environment hygiene only.
+
+
+## Update 2026-11-06 — VozNativa v0.7.0 round
+
+| Item | State | Evidence |
+|---|---|---|
+| AXF-VN-01 | **fixed on this branch** (not released) | `assertiva/adapters/cosmic_ray.py::test_command_for`; tests in `tests/test_cosmic_ray.py` (5, including a negative control that runs the old command and sees "not importable") and `tests/test_mutation_tools.py::test_cosmic_ray_runs_only_a_selected_unittest_file` (Cosmic Ray 8.7.0, ASSERTIVA_REQUIRE_MUTATION=1: 3/3 cosmic-ray integration tests pass); full suite 1273 passed, 19 skipped (Windows, CPython 3.12.10) |
+| AXF-VN-02, 03, 05 | open | unchanged |
+| AXF-VN-04 | open, reproduced | `assertiva audit --execute` on VozNativa `3fb4163`: unittest PASS (660 invocations), "python-package tests against the installed wheel: NOT_RUN — no test runner adapter for this project" |
+| New observation | not a defect | an `--execute` run aborted with `READ-ONLY VIOLATION` when the auditor edited the project during the run: the guard worked (no partial report) |

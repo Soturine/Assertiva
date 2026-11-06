@@ -76,6 +76,37 @@ def describe(root: Path, python: str, origin: Path) -> dict:
 SELECTS_TESTS = True  # the baseline and every mutant can run only the tests the auditor names (--mutate-tests)
 
 
+def test_command_for(python: str, runner: str, test_paths: list[str], root: Path | None = None) -> list[str]:
+    """The runner's command limited to ``test_paths``.
+
+    ``unittest discover`` reads its first positional argument as the *start
+    directory*, so ``discover tests/test_calc.py`` failed with "Start directory
+    is not importable" and planned no mutant (VozNativa dogfood AXF-VN-01).
+    For unittest, test files become dotted module names (run without
+    ``discover``) and one directory becomes ``discover -s DIR -t .``; a mix of
+    files and directories is refused instead of guessed."""
+    base = [_posix(python), *_COMMANDS[runner]]
+    if runner != "unittest" or not test_paths:
+        return [*base, *[_posix(t) for t in test_paths]]
+    root = Path(root) if root else None
+    dirs = [t for t in test_paths if (root / t).is_dir()] if root else [t for t in test_paths if not t.endswith(".py")]
+    files = [t for t in test_paths if t not in dirs]
+    if (dirs and files) or len(dirs) > 1:
+        raise ValueError("unittest selection: name test files, or one test directory, not a mix")
+    if dirs:
+        # "-t ." needs the directory to be an importable package; a plain folder is its own top level
+        # (python -m keeps the project root on sys.path, so the code under test still imports).
+        package = bool(root) and (root / dirs[0] / "__init__.py").is_file()
+        return [*base, "-s", _posix(dirs[0]), *(["-t", "."] if package else [])]
+    modules = []
+    for t in files:
+        path = Path(_posix(t))
+        if path.suffix != ".py" or path.is_absolute() or ".." in path.parts:
+            raise ValueError(f"unittest selection: {t} is not a test file inside the project")
+        modules.append(".".join(path.with_suffix("").parts))
+    return [_posix(python), "-m", "unittest", "--failfast", *modules]
+
+
 def execute(state_root: Path, python: str, targets: list[str], origin: Path, option: dict) -> MutationRun:
     return run(state_root, python, targets, test_paths=list(option.get("tests") or []), runner=option["runner"])
 
@@ -114,7 +145,11 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
             if runner not in _COMMANDS:
                 result.error = f"{TOOL} cannot run the {runner} runner"
                 return result
-            test_command = [_posix(python), *_COMMANDS[runner], *[_posix(t) for t in test_paths]]
+            try:
+                test_command = test_command_for(python, runner, test_paths, copy)
+            except ValueError as error:
+                result.error = str(error)
+                return result
             baseline = run_command(test_command, copy, timeout_s=budget_s)
             scope = "the selected tests" if test_paths else "the tests"
             if not baseline.ok:

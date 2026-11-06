@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **`--mutate-tests FILE` works under unittest** (AXF-VN-01, reported by the VozNativa dogfood, reproduced again in
+  its v0.7.0 round): the selection was appended to `unittest discover`, which reads it as the start directory, so a test
+  file gave "Start directory is not importable" and no mutant was planned. `cosmic_ray.test_command_for` now runs test
+  files as dotted module names (no `discover`), a test directory as `discover -s DIR` (with `-t .` only for a package),
+  and refuses a mix of files and directories or a path outside the project. Fail-before control:
+  `test_negative_control_the_old_command_cannot_start`; end to end with Cosmic Ray:
+  `test_cosmic_ray_runs_only_a_selected_unittest_file`. Not released; no version bump.
+
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 
 Published as the GitHub Release `v0.10.1` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on

@@ -424,6 +424,25 @@ def remove_tree(path: str | Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
 
 
+@contextmanager
+def disposable_dir(prefix: str, limitations: list[str]) -> Iterator[Path]:
+    """A temporary directory whose failed cleanup is declared, never raised.
+
+    Dogfood (Prescripta, 2026-11): on Windows a ``python.exe`` of a throwaway venv was still locked when
+    ``TemporaryDirectory`` cleaned up, and the ``PermissionError`` ended the whole audit without a report. The
+    evidence already gathered must survive; what was left behind is stated in ``limitations``.
+    """
+    path = Path(tempfile.mkdtemp(prefix=prefix))
+    try:
+        yield path
+    finally:
+        remove_tree(path)
+        if os.path.lexists(path):
+            limitations.append(
+                f"a temporary workspace could not be fully removed (a file was still in use); it was left at {path}"
+            )
+
+
 def _unlink_link(path: Path) -> None:
     try:
         os.unlink(path)

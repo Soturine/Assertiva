@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Evidence integrity
+- **A failed cleanup no longer loses the audit** (Prescripta dogfood, 2026-11): on Windows, `audit --execute`
+  on a Python package ended with `PermissionError: [WinError 5]` while the artifact qualification's
+  `TemporaryDirectory` removed a throwaway venv's `python.exe` that was still locked; no report was written. The
+  qualification now uses `workspace.disposable_dir`, which removes the directory without following links and, when
+  something stays behind, states it as a localized limitation instead of raising. Tests cover a clean exit, an error
+  in the body, a file still open on Windows (with the standard library's crash as negative control) and an
+  undeletable entry on POSIX.
+
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 
 Published as the GitHub Release `v0.10.1` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on

@@ -68,6 +68,19 @@ def test_collection_errors_are_failures_not_zero_tests(tmp_path):
     assert [error.split("::")[0] for error in evidence.collection_errors] == ["tests/test_broken.py"]
 
 
+def test_collection_error_keeps_its_cause_in_the_evidence(tmp_path):
+    """Dogfood feedback (Prescripta, 2026-11): a monorepo audited from its root failed collection with
+    ``ModuleNotFoundError: No module named 'app'``; the report kept only the path, so the FAIL read like a product
+    failure. The plugin already sends pytest's message; the adapter must keep its cause."""
+    write(tmp_path / "tests" / "test_broken.py", "import does_not_exist_anywhere\n\ndef test_x():\n    assert True\n")
+    evidence = ADAPTER.collect(tmp_path)
+    assert evidence.status is StageStatus.FAIL
+    causes = evidence.metadata["collection_error_causes"]
+    assert list(causes) == evidence.collection_errors
+    assert "No module named 'does_not_exist_anywhere'" in next(iter(causes.values()))
+    assert any("does_not_exist_anywhere" in limitation for limitation in evidence.limitations)
+
+
 def test_no_tests_collected_is_unknown_not_pass(tmp_path):
     write(tmp_path / "tests" / "test_empty.py", "X = 1\n")
     evidence = ADAPTER.collect(tmp_path)

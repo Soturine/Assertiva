@@ -68,6 +68,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "os testes não foram executados; --execute coleta evidência nativa executando o código do projeto em uma cópia isolada"),
     ("{n} tests were deselected by the run's own filters; they are not evidenced",
      "{n} testes foram desselecionados pelos filtros da própria execução; não são evidenciados"),
+    ("tests under these paths were not collected, so they did not run: {causes}",
+     "os testes nestes caminhos não foram coletados, portanto não rodaram: {causes}"),
     # state evidence
     ("report source does not match the {state} state: {files}", "a origem do relatório não corresponde ao estado {state}: {files}"),
     ("project links point outside its root ({links}); executions may reach their targets",

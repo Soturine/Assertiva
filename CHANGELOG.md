@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Evidence integrity
+- **A collection error keeps its cause** (Prescripta dogfood, 2026-11): a monorepo audited from its root failed
+  pytest collection with `ModuleNotFoundError: No module named 'app'`, and the report kept only the path, so the FAIL
+  read like a product failure. The pytest-native adapter now stores each error's cause (the last exception line pytest
+  sent, at most 300 characters) in `collection_error_causes` and states it in a localized limitation. Fail-before test:
+  `tests/test_pytest_native.py::test_collection_error_keeps_its_cause_in_the_evidence`.
+
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 
 Published as the GitHub Release `v0.10.1` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on

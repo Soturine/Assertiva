@@ -186,40 +186,77 @@ def scripts_running(root: str | Path, tool: str) -> list[dict]:
     root = Path(root).resolve()
     found = []
     for check in discover_surface(root).by_origin(VerificationOrigin.CI):
-        if not check.command:
-            continue
-        directory = root / str(check.metadata.get("working_directory") or "")
-        cls = classify_command(check.command)
-        segments = [(s, None) for s in (cls.unclassified or ((check.command,) if cls.kind.value == "UNKNOWN" else ()))]
-        # AXR-03: one hop through the project's package scripts (npm run verify -> python tools/verify.py); the graph
-        # of scripts is cycle-safe, and only commands written in package.json are read, never run
-        scripts = _package_scripts(directory)
-        if scripts:
-            from .adapters.package_scripts import invoked
-
-            for name in invoked(check.command, scripts):
-                inner = classify_command(str(scripts[name]))
-                own = inner.unclassified or ((str(scripts[name]),) if inner.kind.value == "UNKNOWN" else ())
-                segments += [(s, name) for s in own]
-        for segment, via in segments:
-            tokens = _tokens(segment)
-            if not tokens:
-                continue
-            path = tokens[1] if tokens[0] in _SCRIPT_RUNNERS and len(tokens) > 1 else tokens[0]
-            script = (directory / path).resolve()
-            if not (script.is_file() and root in script.parents) or script.suffix not in (".py", ".sh", ".bash", ".ps1", ""):
-                continue
-            try:
-                text = script.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            basis = _python_script_basis(text, tool) if script.suffix == ".py" else "STATIC" if any(
+        for reached in reached_scripts(root, check):
+            text, suffix = reached["text"], Path(reached["script"]).suffix
+            basis = _python_script_basis(text, tool) if suffix == ".py" else "STATIC" if any(
                 _SHELL_RUNS[tool].search(line) for line in text.splitlines() if not line.lstrip().startswith("#")) else None
             if basis:
-                found.append({"workflow": check.source.split("#")[0], "command": segment,
-                              "script": script.relative_to(root).as_posix(), "basis": basis,
-                              **({"via_package_script": via} if via else {})})
+                found.append({"workflow": check.source.split("#")[0], "command": reached["command"],
+                              "script": reached["script"], "basis": basis,
+                              **({"via_package_script": reached["via"]} if reached["via"] else {})})
     return found
+
+
+def reached_scripts(root: str | Path, check) -> list[dict]:
+    """Repository scripts a declared step runs: the step's own unclassified commands, and one hop through the project's
+    package scripts (AXR-03: npm run verify -> python tools/verify.py). The graph of scripts is cycle-safe; only what
+    package.json and the step declare is read, nothing is run. Each entry: the command, the package script it came
+    through (or None), the script's path relative to the root and its text."""
+    from .adapters.commands import _tokens, classify_command
+
+    root = Path(root).resolve()
+    if not check.command:
+        return []
+    directory = root / str(check.metadata.get("working_directory") or "")
+    cls = classify_command(check.command)
+    segments = [(s, None) for s in (cls.unclassified or ((check.command,) if cls.kind.value == "UNKNOWN" else ()))]
+    scripts = _package_scripts(directory)
+    if scripts:
+        from .adapters.package_scripts import invoked
+
+        for name in invoked(check.command, scripts):
+            inner = classify_command(str(scripts[name]))
+            own = inner.unclassified or ((str(scripts[name]),) if inner.kind.value == "UNKNOWN" else ())
+            segments += [(s, name) for s in own]
+    out = []
+    for segment, via in segments:
+        tokens = _tokens(segment)
+        if not tokens:
+            continue
+        path = tokens[1] if tokens[0] in _SCRIPT_RUNNERS and len(tokens) > 1 else tokens[0]
+        script = (directory / path).resolve()
+        if not (script.is_file() and root in script.parents) or script.suffix not in (".py", ".sh", ".bash", ".ps1", ""):
+            continue
+        try:
+            text = script.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        out.append({"command": segment, "via": via, "script": script.relative_to(root).as_posix(), "text": text})
+    return out
+
+
+def script_literals(script: str, text: str) -> set[str]:
+    """The strings a script states: string constants of a Python script (never executed), words of a shell script
+    outside comments. Paths are normalized (no leading ./, forward slashes)."""
+    import ast
+    import shlex
+
+    words: set[str] = set()
+    if script.endswith(".py"):
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            return set()
+        words = {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+    else:
+        for line in text.splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            try:
+                words.update(shlex.split(line, posix=True))
+            except ValueError:
+                words.update(line.split())
+    return {w.replace("\\", "/").removeprefix("./") for w in words}
 
 
 def _package_scripts(directory: Path) -> dict:

@@ -1438,6 +1438,17 @@ FINDINGS: dict[str, dict] = {
                  "Um relatório de mutação não pôde ser lido; ele não fornece evidência."),
         why=("Mutation strength stays not evidenced.", "A força contra mutação continua não evidenciada."),
         close=("A readable mutation report for this revision is ingested.", "Um relatório de mutação legível desta revisão é ingerido.")),
+    "LOCAL_CHECK_POSSIBLY_RUN_BY_CI_SCRIPT": F(
+        category="delivery", tier="E2",
+        title=("Local check possibly run by a CI script", "Verificação local possivelmente executada por script de CI"),
+        summary=("Local checks are not run by name in CI, but a script CI runs names the files they run; coverage is possible, not shown.",
+                 "Verificações locais não são executadas pelo nome na CI, mas um script executado pela CI cita os arquivos que elas executam; a cobertura é possível, não demonstrada."),
+        why=("The link is read from the script's source: whether it runs those files, with which arguments, and whether its failures fail the step is unknown.",
+             "O vínculo é lido do código do script: se ele executa esses arquivos, com quais argumentos e se suas falhas reprovam a etapa é desconhecido."),
+        close=("A CI log or a run of the step shows the check ran, or CI runs it by name.",
+               "Um log de CI ou uma execução da etapa mostra que a verificação rodou, ou a CI a executa pelo nome."),
+        rec=("Confirm that the CI script really runs these checks (its log or a run of the step), or run them in CI by name.",
+             "Confirme que o script de CI realmente executa essas verificações (log ou execução da etapa), ou execute-as na CI pelo nome.")),
     "MUTATION_RUN_NOT_COMPLETED": F(
         category="mutation", tier="E1",
         title=("Mutation run did not complete", "Execução de mutação não concluída"),

@@ -22,7 +22,7 @@ from assertiva.candidate import StageStatus
 from assertiva.models import ArtifactCheck, ArtifactEvidence
 from assertiva.process import CommandResult, active_target, execution_refusal, is_active, module_available, run_command, scoped
 from assertiva.verification import SupportLevel
-from assertiva.workspace import project_files, snapshot
+from assertiva.workspace import disposable_dir, project_files, snapshot
 
 _IMPORT_PROBE = (
     "import importlib, json, sys\n"
@@ -307,7 +307,7 @@ class PythonPackageAdapter:
         return evidence
 
     def _qualify_into(self, root: Path, evidence: ArtifactEvidence) -> None:
-        with tempfile.TemporaryDirectory(prefix="assertiva-artifact-") as tmp:
+        with disposable_dir("assertiva-artifact-", evidence.limitations) as tmp:
             tmp = Path(tmp)
             work, dist, outside = snapshot(root, tmp / "src"), tmp / "dist", tmp / "outside"
             outside.mkdir()

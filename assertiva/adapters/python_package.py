@@ -307,7 +307,7 @@ class PythonPackageAdapter:
         return evidence
 
     def _qualify_into(self, root: Path, evidence: ArtifactEvidence) -> None:
-        with disposable_dir("assertiva-artifact-", evidence.limitations) as tmp:
+        with disposable_dir("assertiva-artifact-", evidence.limitations, evidence.environment) as tmp:
             tmp = Path(tmp)
             work, dist, outside = snapshot(root, tmp / "src"), tmp / "dist", tmp / "outside"
             outside.mkdir()
@@ -319,7 +319,7 @@ class PythonPackageAdapter:
             else:
                 command = [self.python, "-m", "pip", "wheel", "--no-deps", "--disable-pip-version-check", "-w", dist] + (
                     ["--no-build-isolation"] if local_backend else []) + [work]
-            evidence.environment = {"build_tool": "build" if has_build else "pip wheel", "build_isolation": not local_backend}
+            evidence.environment.update({"build_tool": "build" if has_build else "pip wheel", "build_isolation": not local_backend})
             if not local_backend:
                 evidence.limitations.append("build backend not importable locally: isolated build may need network access")
             result = self._run(command, work)

@@ -68,8 +68,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "os testes não foram executados; --execute coleta evidência nativa executando o código do projeto em uma cópia isolada"),
     ("{n} tests were deselected by the run's own filters; they are not evidenced",
      "{n} testes foram desselecionados pelos filtros da própria execução; não são evidenciados"),
-    ("a temporary workspace could not be fully removed (a file was still in use); it was left at {path}",
-     "um espaço de trabalho temporário não pôde ser removido por completo (um arquivo ainda estava em uso); ficou em {path}"),
+    ("a temporary workspace could not be fully removed ({causes} on {n} entries); {name} was left in the system temporary directory: delete it once no process uses it",
+     "um espaço de trabalho temporário não pôde ser removido por completo ({causes} em {n} entradas); {name} ficou no diretório temporário do sistema: apague-o quando nenhum processo o usar"),
     ("tests under these paths were not collected, so they did not run: {causes}",
      "os testes nestes caminhos não foram coletados, portanto não rodaram: {causes}"),
     # state evidence

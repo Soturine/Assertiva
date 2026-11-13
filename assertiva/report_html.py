@@ -1692,7 +1692,7 @@ def _metrics_tables(r: _R) -> str:
         groups.setdefault(group, []).append(name)
     head = "".join(f'<th scope="col" class="num-col">{r.state(k)}</th>' for k, _ in states)
     tables = []
-    for group in ("execution", "coverage", "static", "negative", "fault", "artifact", "other"):
+    for group in ("execution", "imported", "coverage", "static", "negative", "fault", "artifact", "other"):
         if group not in groups:
             continue
         rows = []

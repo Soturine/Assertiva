@@ -107,7 +107,8 @@ def test_audit_of_unknown_toolchain_uses_portable_results(tmp_path, capsys):
     cli.main(["audit", str(project), "--junit-xml", str(junit), "--output", "json"])
     report = json.loads(capsys.readouterr().out)
     assert report["status"] != "UNKNOWN"
-    assert report["states"]["current"]["metrics"]["test_invocations"]["value"] == 5
+    assert report["states"]["current"]["metrics"]["imported_invocations"]["value"] == 5  # v1.0: counted as imported
+    assert "test_invocations" not in report["states"]["current"]["metrics"]
     assert report["states"]["current"]["runs"][0]["adapter"] == "junit-xml"
     assert any(f["code"] == "NATIVE_TESTS_FAILING" for f in report["findings"])
     assert any("junit-xml" in item and "not executed by Assertiva" in item for item in report["claim_boundary"]["observed"])
@@ -130,3 +131,19 @@ def test_imported_surefire_reruns_keep_their_failed_attempts(tmp_path):
     assert by_name["totals"].outcome is Outcome.FAILED and by_name["totals"].attempts == 3
     assert by_name["plain"].attempts is None  # JUnit XML alone does not say how many attempts ran
     assert any("passed only after earlier failed attempts" in lim for lim in run.limitations)
+
+
+def test_imported_cases_never_add_to_executed_counts(tmp_path):
+    """Randomizer dogfood (AXR-02): one host test executed natively plus N cases read from a JUnit file are two
+    sources; the executed counters stay the host's, and the cases are counted as imported."""
+    from assertiva.evidence import StateEvidence, state_metrics
+    from assertiva.models import Outcome, RunEvidence, TestInvocation
+    from assertiva.candidate import StageStatus
+
+    host = RunEvidence(adapter_id="pytest-native", mode="execute", status=StageStatus.PASS,
+                       invocations=[TestInvocation("tests/test_host.py::test_lua", "d", "m", outcome=Outcome.PASSED)])
+    imported = load_junit(write(tmp_path / "lua.xml", NESTED))
+    metrics = state_metrics(StateEvidence("current", "copy", runs=[host, imported]))
+    assert metrics["test_invocations"].value == 1 and metrics["passed"].value == 1
+    assert metrics["imported_invocations"].value == len(imported.invocations) == 5
+    assert metrics["imported_failed"].value == sum(inv.outcome is Outcome.FAILED for inv in imported.invocations)

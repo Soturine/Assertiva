@@ -114,7 +114,12 @@ def test_only_the_java_job_needs_a_jdk_and_its_tests_cannot_skip():
 def test_windows_runs_the_same_suites_and_the_real_provisioning_paths():
     _, jobs = _ci()
     windows = [job for job in jobs.values() if str(job.get("runs-on", "")).startswith("windows") and "if" not in job]
-    assert len(windows) == 1, "Windows compatibility is qualified on every commit"
+    assert len(windows) == 1, "Windows compatibility is checked on every pull request commit"
+    # v1.0 CI economy: the core suite runs on every commit; the full suites wait for main, tags and dispatch, and are
+    # never skipped there (their steps are gated only on the event, not on changed paths)
+    full = [s for s in windows[0]["steps"] if s.get("if") == "github.event_name != 'pull_request'"]
+    assert {s.get("name") for s in full} >= {"Integration and artifact suites", "Provisioning, PostgreSQL and Gradle on Windows"}
+    assert not any(s.get("if") for s in windows[0]["steps"] if s.get("name") == "Fast/core suite")
     script = _script(windows[0])
     assert '-m "not integration and not artifact"' in script
     assert '-m "(integration or artifact) and not browser and not jvm"' in script

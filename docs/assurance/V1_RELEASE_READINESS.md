@@ -1,25 +1,25 @@
 # v1.0 release readiness
 
-**Candidate:** `integration/v1.0-foundation`, PR [#9](https://github.com/Soturine/Assertiva/pull/9). **Verdict and
+**Candidate:** `integration/v1.0-foundation`, PR [#9](https://github.com/Soturine/Assertiva/pull/9) (requalified after the v1.0 addendum). **Verdict and
 remote CI:** see the end of this page. **READY is not an authorization to publish.** Tag, GitHub Release and any
 announcement wait for the owner's decision.
 
-## Gates
+## Gates (requalified after the v1.0 addendum, code SHA `874eeab`)
 
 | # | Gate | Result | Evidence |
 |---|---|---|---|
-| 1 | `validate_repo.py` + core suite on the integration SHA | PASS | Windows 1146 passed / 6 skipped; Linux 3.12 1146 / 5; Linux 3.11 1146 / 6 |
-| 2 | Integration and artifact suites with `ASSERTIVA_REQUIRE_*` | PASS locally (Windows, JS + Django + mutation required: 196 passed, 5 skipped); Linux 3.12: 190 passed, 1 environmental failure (StrykerJS fixtures not installed in the container; the requirement flag made it fail instead of skip) | remote run below |
-| 3 | Fail-before/pass-after for the P1/P2 fixes | PASS | 25/27 fail on base `bb36fe1`, 27/27 pass on HEAD ([V1_REMEDIATION](V1_REMEDIATION.md)) |
+| 1 | `validate_repo.py`, ruff, core suite | PASS | Windows 1149 passed / 6 skipped; Linux 3.12 1149 / 5; Linux 3.11 1149 / 6 |
+| 2 | Integration and artifact suites with `ASSERTIVA_REQUIRE_*` | PASS on Windows (JS + Django + mutation required: 199 passed, 6 skipped: the symlink test that this Windows machine cannot run (it passes on Linux), 4 Gradle and 1 services test that need downloads; CI runs them). Linux 3.12: 192 passed, 1 environmental failure, `test_stryker_proves_…`: the StrykerJS fixtures are not installed in the container, and the requirement flag made it fail instead of skip. CI runs it | remote run below |
+| 3 | Fail-before/pass-after | PASS | first round: 25/27 fail on `bb36fe1`; addendum: 6/7 fail on `0f3f5cc` (the control passes on both) ([V1_REMEDIATION](V1_REMEDIATION.md)) |
 | 4 | Windows and Linux, PermissionError, links, packages, installed artifacts | PASS | open-handle cleanup (Windows), unwritable directory and venv symlink (Linux), wheel runs on both |
-| 5 | A real mutation cycle with scope and counts | PASS | Cosmic Ray on VozNativa: 72 mutants, selection of 13 tests, whole suite NOT_RUN |
-| 6 | No overclaiming of PASS | PASS | identity required for wheel PASS; imported results not counted as executed; empty selections refused |
-| 7 | Contracts and docs, with migration | PASS | [MIGRATION_V1](../MIGRATION_V1.md), schema updated for `gate` |
-| 8 | Skill does not change user configuration | PASS by inspection (the Skill is files; nothing installs it automatically) | Skill bundle: DEFERRED, see below |
-| 9 | Agent-led evals executed, with holdout and recorded cost | PASS with caveats | 8 cases: 6 PASS, 2 REVIEW, 0 FAIL; same model family ([V1_AGENT_EVALS](V1_AGENT_EVALS.md)) |
-| 10 | Full remote CI | PASS on `e6fdc74` | [dispatch run 43491656694](https://github.com/Soturine/Assertiva/actions/runs/43491656694): validate (integration + artifact, `ASSERTIVA_REQUIRE_*`), Windows full, browser, java, Gradle/Android, services, Python 3.11 and runtime self-qualification all succeeded. [PR run 43491658829](https://github.com/Soturine/Assertiva/actions/runs/43491658829): fast jobs succeeded, heavy jobs skipped by design |
+| 5 | A real mutation cycle with scope and counts | PASS | Cosmic Ray on VozNativa (72 mutants, 13 selected tests) and in the suites |
+| 6 | No overclaiming of PASS | PASS | wheel PASS needs INSTALLED_ARTIFACT; imported results are counted and reported as imported (metrics and findings, CP-B); an opaque CI step cannot lower a gap (CP-A) |
+| 7 | Contracts and docs, with migration | PASS | [MIGRATION_V1](../MIGRATION_V1.md); schema updated for `gate` |
+| 8 | Packaging | PASS on the branch build | wheel `e3412c92…f715` and sdist `28027853…68f9` (version **0.10.1**: no bump yet) built from `e44573f`, the same code as `874eeab`; each installed into a clean venv and imported from site-packages, with the new modules present; the sdist has 180 files |
+| 9 | Agent-led evals | **2 REVIEW open** | 6 PASS, 2 REVIEW, 0 FAIL by the judge; operator reading: FISCAL REVIEW, PROFILE does not meet its pass condition ([V1_AGENT_EVALS](V1_AGENT_EVALS.md)) |
+| 10 | Full remote CI of the final code SHA | PASS | [dispatch 43499037205](https://github.com/Soturine/Assertiva/actions/runs/43499037205) on `874eeab`: validate, Windows, Python 3.11, browser, java, Gradle/Android, services and runtime self-qualification succeeded; [PR run 43499048379](https://github.com/Soturine/Assertiva/actions/runs/43499048379) fast jobs succeeded |
 | 11 | No secrets, private files or personal paths | PASS | scans before each commit; eval paths redacted |
-| 12 | Git state and `main` untouched | PASS | `main` = `2618d95`; nothing force-pushed; no tag |
+| 12 | Git state and `main` untouched | PASS | `main` = `2618d95`; PR #9 is a draft; nothing force-pushed; no tag, Release or ruleset |
 
 ## Residual risks (by severity)
 
@@ -42,17 +42,24 @@ announcement wait for the owner's decision.
 
 ## Proposed protection for `main` (not applied)
 
-The repository has no rulesets, and branch protection is off. Proposal for a solo maintainer: a ruleset on `main` that
-requires a pull request (zero approvals), the `validate`, `Python 3.11 compatibility` and `Windows` checks, linear
-history off (merge commits keep contributor SHAs) and no force pushes. Applying it is the owner's decision.
+There are no rulesets, and branch protection is off. The check names below were read from the check runs of a real
+commit, all from the `github-actions` app: `validate`, `Windows`, `Python 3.11 compatibility`. These are the three
+jobs that run on every pull request, so a version-bump PR satisfies them. The heavy jobs report `skipped` on pull
+requests and must not be required. Proposal for a solo maintainer: a ruleset on `main` that requires a pull request
+with **zero** approvals, those three checks, and no force push or deletion; merge commits stay allowed, so
+contributors' SHAs are kept. Bypass goes to the repository-admin role, for emergencies only. Applying it needs the
+owner's authorization.
 
 ## Verdict
 
-**READY (release candidate), pending the owner's decision.** Every technical gate above passed, and no blocker is
-open. The residual risks are recorded and none of them is critical. The commit after `e6fdc74` changes only
-documentation (this page and `docs/README.md`), so the full qualification of `e6fdc74` covers the code and tests of
-the final SHA; the pull-request run checks the final SHA again.
+**CONDITIONAL.** The code at `874eeab` passed every technical gate, including the full remote qualification of that
+exact SHA, and no evidence-integrity blocker is open. It is not READY for publication because:
 
-Publication (`1.0.0` version bump, annotated tag, GitHub Release with wheel, sdist and SHA-256) is **not** done and is
-**not** authorized by this verdict. It needs the owner's explicit approval, then a fresh check of base, SHA and checks.
-Before tagging, the two REVIEW eval verdicts should also be decided by a human.
+1. **The version is still 0.10.1.** The 1.0.0 artifact has not been built or qualified. The release step (after
+   approval) bumps the version, merges PR #9, qualifies the merge commit on `main`, tags `v1.0.0` (annotated), builds
+   wheel and sdist from the tagged SHA, writes `SHA256SUMS.txt`, smoke-installs in isolation and publishes the GitHub
+   Release (not PyPI). Each step needs its own SHA and digest evidence.
+2. **Two agent-eval REVIEWs** need the owner's decision (accept as known risk, or fund a re-evaluation after a Skill
+   change).
+
+The commit after `874eeab` changes only this page; its pull-request run is the record for it.

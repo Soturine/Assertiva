@@ -205,3 +205,60 @@ def test_a_tied_runs_survivors_show_the_original_line_and_the_change():
     assert site["original"] == "return a + b" and site["change"] == "a - b"
     run.matches_state = None  # an untied report: its lines may not be this state's
     assert survivor_sites(run) == []
+
+
+# --- AXF-VN-01 (VozNativa v0.5/v0.7 dogfood): --mutate-tests with a unittest file ---------------------------------
+
+def _unittest_project(root):
+    write(root / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(root / "tests" / "test_calc.py", "import unittest\nfrom calc import add\n\n"
+                                            "class T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n")
+    write(root / "tests" / "test_other.py", "import unittest\n\nclass U(unittest.TestCase):\n    def test_x(self):\n        self.assertTrue(True)\n")
+
+
+def _run(argv, cwd):
+    import subprocess
+
+    return subprocess.run(argv, cwd=cwd, capture_output=True, text=True)
+
+
+def test_a_selected_unittest_file_becomes_a_module_name_that_runs(tmp_path):
+    _unittest_project(tmp_path)
+    command = cosmic_ray.test_command_for(sys.executable, "unittest", ["tests/test_calc.py"], tmp_path)
+    assert command[1:] == ["-m", "unittest", "--failfast", "tests.test_calc"]
+    done = _run(command, tmp_path)
+    assert done.returncode == 0 and "Ran 1 test" in done.stderr
+
+
+def test_negative_control_the_old_command_cannot_start(tmp_path):
+    _unittest_project(tmp_path)
+    old = [sys.executable, "-m", "unittest", "discover", "--failfast", "tests/test_calc.py"]
+    done = _run(old, tmp_path)
+    assert done.returncode != 0 and "not importable" in done.stderr
+
+
+def test_a_selected_unittest_directory_is_discovered_from_the_project_root(tmp_path):
+    _unittest_project(tmp_path)
+    command = cosmic_ray.test_command_for(sys.executable, "unittest", ["tests"], tmp_path)
+    assert command[-2:] == ["-s", "tests"]
+    done = _run(command, tmp_path)
+    assert done.returncode == 0 and "Ran 2 tests" in done.stderr
+    write(tmp_path / "tests" / "__init__.py", "")           # a package keeps the project root as top level
+    command = cosmic_ray.test_command_for(sys.executable, "unittest", ["tests"], tmp_path)
+    assert command[-4:] == ["-s", "tests", "-t", "."]
+    done = _run(command, tmp_path)
+    assert done.returncode == 0 and "Ran 2 tests" in done.stderr
+
+
+def test_files_and_directories_are_not_mixed_and_paths_stay_inside(tmp_path):
+    import pytest
+
+    _unittest_project(tmp_path)
+    for selection in (["tests", "tests/test_calc.py"], ["../x/test_y.py"]):
+        with pytest.raises(ValueError):
+            cosmic_ray.test_command_for(sys.executable, "unittest", selection, tmp_path)
+
+
+def test_other_runners_and_no_selection_keep_their_commands(tmp_path):
+    assert cosmic_ray.test_command_for("py", "pytest-native", ["tests/test_a.py"])[-1] == "tests/test_a.py"
+    assert cosmic_ray.test_command_for("py", "unittest", []) == ["py", "-m", "unittest", "discover", "--failfast"]

@@ -335,3 +335,80 @@ def test_report_states_artifact_fidelity_dimensions(tmp_path, capsys):
     assert artifact["fidelity"]["DECLARED_DEPENDENCY_CLOSURE"] == "FAIL"
     html = open(report["report_path"], encoding="utf-8").read()
     assert "declared dependency closure FAIL" in html and "sdist NOT_RUN" in html
+
+
+# --- AXF-VN-04: a unittest project's tests run against the installed wheel by its own runner -----------------------
+
+UNITTEST_PYPROJECT = """[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tally"
+version = "0.1.0"
+
+[tool.setuptools]
+packages = {packages}
+"""
+
+
+def _unittest_package(root, packages='["tally", "tally.parts"]', test_imports_package=True):
+    write(root / "pyproject.toml", UNITTEST_PYPROJECT.format(packages=packages))
+    write(root / "tally" / "__init__.py", "from tally.parts import total\n")
+    write(root / "tally" / "parts" / "__init__.py", "def total(xs):\n    return sum(xs)\n")
+    write(root / "tests" / "__init__.py", "")
+    body = ("import unittest\nfrom tally import total\n\nclass T(unittest.TestCase):\n    def test_total(self):\n"
+            "        self.assertEqual(total([1, 2]), 3)\n") if test_imports_package else (
+            "import unittest\n\nclass T(unittest.TestCase):\n    def test_nothing(self):\n        self.assertTrue(True)\n")
+    write(root / "tests" / "test_tally.py", body)
+    write(root / ".github" / "workflows" / "ci.yml",
+          "on: push\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python -m unittest discover -s tests -t .\n")
+    return root
+
+
+def test_unittest_tests_run_against_the_installed_wheel_and_prove_it(tmp_path):
+    evidence = ADAPTER.qualify(_unittest_package(tmp_path / "p"))
+    tests = next(c for c in evidence.checks if c.name == "tests")
+    assert tests.status is StageStatus.PASS, tests.detail
+    assert "runner unittest" in tests.detail and "code identity INSTALLED_ARTIFACT" in tests.detail
+    assert "assertiva_unittest_evidence" in tests.command
+
+
+def test_negative_control_a_wheel_missing_a_subpackage_fails_while_the_tree_passes(tmp_path):
+    from assertiva.adapters.unittest_native import UnittestAdapter
+
+    root = _unittest_package(tmp_path / "p", packages='["tally"]')  # tally.parts is left out of the wheel
+    assert UnittestAdapter(python=sys.executable).run(root).status is StageStatus.PASS  # the source tree is green
+    evidence = ADAPTER.qualify(root)
+    assert evidence.status is StageStatus.FAIL
+    failed = [c.name for c in evidence.checks if c.status is StageStatus.FAIL]
+    assert failed == ["import"]  # the broken wheel is caught before its tests could pass from the source tree
+
+
+def test_green_tests_that_never_import_the_wheel_do_not_qualify_it(tmp_path):
+    evidence = ADAPTER.qualify(_unittest_package(tmp_path / "p", test_imports_package=False))
+    tests = next(c for c in evidence.checks if c.name == "tests")
+    assert tests.status is StageStatus.UNKNOWN and "code identity UNKNOWN" in tests.detail
+    assert any("did not provably import the installed artifact" in lim for lim in evidence.limitations)
+    assert evidence.status is not StageStatus.PASS
+
+
+def test_pytest_runs_against_the_wheel_are_now_tied_to_it(tmp_path):
+    """Before v1.0 the installed run's identity was always UNKNOWN (the observer could not know the wheel's names)."""
+    make_package(tmp_path / "p")
+    evidence = ADAPTER.qualify(tmp_path / "p")
+    tests = next(c for c in evidence.checks if c.name == "tests")
+    assert "runner pytest-native" in tests.detail and "code identity INSTALLED_ARTIFACT" in tests.detail, tests.detail
+
+
+def test_negative_control_only_the_tests_against_the_wheel_see_a_lazy_import_break(tmp_path):
+    """The import probe passes (the top level imports); the tests run by unittest against the wheel fail."""
+    from assertiva.adapters.unittest_native import UnittestAdapter
+
+    root = _unittest_package(tmp_path / "p", packages='["tally"]')
+    write(root / "tally" / "__init__.py", "def total(xs):\n    from tally.parts import total as inner\n    return inner(xs)\n")
+    assert UnittestAdapter(python=sys.executable).run(root).status is StageStatus.PASS  # the source tree is green
+    evidence = ADAPTER.qualify(root)
+    checks = {c.name: c.status for c in evidence.checks}
+    assert checks["import"] is StageStatus.PASS and checks["tests"] is StageStatus.FAIL
+    assert evidence.status is StageStatus.FAIL

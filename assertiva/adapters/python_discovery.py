@@ -173,4 +173,69 @@ def python_runners(root: str | Path) -> set[str]:
         runners.add("pytest")
     if runners:
         return runners
-    return {"django"} if django_manage(root) else {"pytest"}
+    if django_manage(root):
+        return {"django"}
+    return {"unittest"} if unittest_inferred(root) else {"pytest"}
+
+
+_PYTEST_MENTION = ("pytest",)
+
+
+def _declares_pytest(root: Path) -> bool:
+    """Whether the project's own dependency or tool files name pytest (then pytest is the plausible runner)."""
+    names = ["pyproject.toml", "setup.cfg", "setup.py", "tox.ini", "noxfile.py", "Pipfile"]
+    names += [p.name for p in root.glob("requirements*.txt")] + [f"requirements/{p.name}" for p in root.glob("requirements/*.txt")]
+    for name in names:
+        try:
+            text = (root / name).read_text(encoding="utf-8", errors="replace").lower()
+        except OSError:
+            continue
+        if "pytest" in text:
+            return True
+    return False
+
+
+def unittest_inferred(root: str | Path) -> str | None:
+    """Why a project with no declared runner is a stdlib unittest project, or None (AXF-VN-05).
+
+    Static and conservative, never importing project code: every candidate test file defines ``TestCase`` classes
+    (directly, through an alias or through a class of the same file), none imports pytest or defines a plain
+    module-level ``test_*`` function, there is no ``conftest.py`` and no dependency or tool file names pytest.
+    Anything else keeps pytest, which also runs TestCases."""
+    import ast
+
+    root = Path(root)
+    if _declares_pytest(root):
+        return None
+    files = test_files(root, DiscoveryConfig(python_files=("test*.py", "*_test.py")))
+    if not files or len(files) > 2000:
+        return None
+    for current, dirs, names in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "venv", "build", "dist")
+                   and not _is_venv(Path(current) / d)]
+        if "conftest.py" in names:
+            return None
+    for path in files:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, SyntaxError, ValueError):
+            return None
+        aliases, cases = {"TestCase", "IsolatedAsyncioTestCase"}, set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(a.name.split(".")[0] in ("pytest", "_pytest") for a in node.names):
+                return None
+            if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in ("pytest", "_pytest"):
+                return None
+            if isinstance(node, ast.ImportFrom) and node.module == "unittest":
+                aliases |= {a.asname or a.name for a in node.names if a.name.endswith("TestCase")}
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+                return None  # unittest would not run it
+            if isinstance(node, ast.ClassDef):
+                bases = {b.attr if isinstance(b, ast.Attribute) else getattr(b, "id", "") for b in node.bases}
+                if bases & (aliases | cases):
+                    cases.add(node.name)
+        if not cases:
+            return None
+    return (f"no runner is declared; all {len(files)} test files define unittest.TestCase classes, none uses pytest, "
+            "and no dependency file names pytest")

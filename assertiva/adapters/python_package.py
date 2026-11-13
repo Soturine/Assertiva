@@ -451,15 +451,24 @@ class PythonPackageAdapter:
 
     def _tests_against_artifact(self, evidence: ArtifactEvidence, work: Path, tops: list[str], vpy: Path, tmp: Path) -> None:
         from .pytest_native import PytestNativeAdapter
+        from .unittest_native import UnittestAdapter
 
         copy = snapshot(work, tmp / "tests-copy")
         for name in tops:
             for base in (copy, copy / "src"):
                 shutil.rmtree(base / name, ignore_errors=True)
                 (base / f"{name}.py").unlink(missing_ok=True)
-        runner = PytestNativeAdapter(python=str(vpy), timeout_s=self.timeout_s, expect_installed=True)
-        if runner.supports(copy) is not SupportLevel.SUPPORTED:
-            evidence.checks.append(ArtifactCheck("tests", StageStatus.NOT_RUN, detail="no test runner adapter for this project"))
+        # the observer in the test process is told the wheel's names and the artifact's environment: the run proves
+        # it imported the installed artifact only when every project module it loaded came from there (AXF-VN-04)
+        venv_root = str(Path(vpy).resolve().parent.parent)
+        identity_env = {"ASSERTIVA_PROJECT_NAMES": ",".join(tops), "ASSERTIVA_ARTIFACT_ROOT": venv_root}
+        # the project's own runner, as for the source tree: pytest, else unittest (never converted to pytest)
+        candidates = [PytestNativeAdapter(python=str(vpy), timeout_s=self.timeout_s, expect_installed=True, identity_env=identity_env),
+                      UnittestAdapter(python=str(vpy), timeout_s=self.timeout_s, expect_installed=True, identity_env=identity_env)]
+        runner = next((c for c in candidates if c.supports(copy) is SupportLevel.SUPPORTED), None)
+        if runner is None:
+            evidence.checks.append(ArtifactCheck("tests", StageStatus.NOT_RUN, detail="no test runner adapter for this project "
+                                                 "(pytest and unittest are supported against an installed artifact; Django is not)"))
             evidence.limitations.append("only build, install and import were verified; no tests ran against the artifact")
             return
         run = runner.run(copy)
@@ -470,8 +479,16 @@ class PythonPackageAdapter:
         if run.collection_errors:
             detail += "; collection errors: " + ", ".join(run.collection_errors[:5])
         status = run.status
+        identity = run.metadata.get("source_identity") or {}
+        detail += f"; runner {runner.adapter_id}; code identity {identity.get('status', 'UNKNOWN')}"
+        if identity.get("status") != "INSTALLED_ARTIFACT" and status is StageStatus.PASS:
+            # green tests that did not (provably) import the wheel do not qualify it
+            status = StageStatus.UNKNOWN
+            evidence.limitations.append(
+                "the tests passed but did not provably import the installed artifact (code identity "
+                f"{identity.get('status', 'UNKNOWN')}): they do not qualify the wheel")
         evidence.checks.append(ArtifactCheck("tests", status, " ".join(run.command), run.wall_clock_s, detail))
-        if status is StageStatus.UNKNOWN:
+        if run.status is StageStatus.UNKNOWN:
             evidence.limitations.append("no tests were collected against the installed artifact")
         if status is not StageStatus.PASS and evidence.status is StageStatus.PASS:
             evidence.status = status

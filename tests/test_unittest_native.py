@@ -159,3 +159,111 @@ def test_audit_executes_unittest_natively_and_reports_tests_unittest_never_runs(
     assert run["adapter"] == "unittest" and run["outcomes"]["FAILED"] == 2
     finding = next(f for f in report["findings"] if f["code"] == "CI_RUNS_PYTHON_UNITTEST")
     assert finding["evidence"]["not_collected_by_unittest"] == ["tests/test_shop.py::test_plain_function_unittest_never_runs"]
+
+
+# --- AXF-VN-03: the identity of the code a unittest run imported, observed inside the test process ------------------
+
+_CALC_TEST = "import unittest\nfrom calc import add\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n"
+
+
+def _calc(root: Path, test: str = _CALC_TEST) -> Path:
+    write(root / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(root / "tests" / "__init__.py", "")
+    write(root / "tests" / "test_calc.py", test)
+    write(root / ".github" / "workflows" / "ci.yml",
+          "on: push\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python -m unittest discover -s tests -t .\n")
+    return root
+
+
+def test_a_clean_unittest_run_records_where_the_code_came_from(tmp_path):
+    root = _calc(tmp_path / "with space")  # a path with a space
+    run = ADAPTER.run(root)
+    assert run.status is StageStatus.PASS
+    identity = run.metadata["source_identity"]
+    assert identity["status"] == "SOURCE_TREE" and identity["loaded"] >= 1 and identity["unexpected"] == 0
+    assert identity["basis"].startswith("OBSERVED")
+    assert Path(run.metadata["interpreter"]["python"]).name.lower().startswith("python")
+    assert run.metadata["temp_root"]["writable"] is True
+
+
+def test_a_shadowing_copy_of_the_project_is_a_mismatch(tmp_path):
+    """Contaminated on purpose: the test puts another tree first on sys.path, as an installed copy would."""
+    shadow = tmp_path / "elsewhere"
+    write(shadow / "calc.py", "def add(a, b):\n    return a + b\n")
+    contaminated = ("import sys\nsys.path.insert(0, " + repr(str(shadow)) + ")\nsys.modules.pop('calc', None)\n" + _CALC_TEST)
+    run = ADAPTER.run(_calc(tmp_path / "p", contaminated))
+    identity = run.metadata["source_identity"]
+    assert identity["status"] == "MISMATCH" and identity["from_outside_the_copy"] == ["calc"]
+    assert any("from outside the tested copy" in lim for lim in run.limitations)
+
+
+def test_a_process_that_dies_before_its_end_has_no_verified_identity(tmp_path):
+    dies = _CALC_TEST + "\n    def test_zz_exit(self):\n        import os\n        os._exit(0)\n"
+    run = ADAPTER.run(_calc(tmp_path / "p", dies))
+    assert run.metadata["source_identity"]["status"] == "UNKNOWN"
+    assert run.metadata["source_identity"]["basis"].startswith("UNKNOWN")
+
+
+def test_a_namespace_package_is_not_claimed_as_verified(tmp_path):
+    """No __init__.py: the observer cannot tell the project's namespace from any other, so nothing is verified."""
+    root = tmp_path / "p"
+    write(root / "ns" / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(root / "tests" / "__init__.py", "")
+    write(root / "tests" / "test_calc.py", _CALC_TEST.replace("from calc import", "from ns.calc import"))
+    run = ADAPTER.run(root, args=["discover", "-s", "tests", "-t", "."])
+    assert run.status is StageStatus.PASS
+    assert run.metadata["source_identity"]["status"] == "UNKNOWN"  # loaded 0 project modules it could recognize
+
+
+def test_the_json_report_carries_the_unittest_identity(tmp_path, capsys):
+    root = _calc(tmp_path / "p")
+    cli.main(["audit", str(root), "--execute", "--python", sys.executable, "--output", "json"])
+    payload = json.loads(capsys.readouterr().out)
+    runs = payload["states"]["current"]["runs"]
+    unittest_run = next(r for r in runs if r["adapter"] == "unittest")
+    assert unittest_run["source_identity"]["status"] == "SOURCE_TREE"
+    assert unittest_run["interpreter"]["python"] and unittest_run["temp_root"]["path"]
+
+
+# --- AXF-VN-05: a stdlib-only TestCase project without CI or configuration -------------------------------------------
+
+def _stdlib_project(root: Path, *, tests_package: bool = False) -> Path:
+    write(root / "calc.py", "def add(a, b):\n    return a + b\n")
+    if tests_package:
+        write(root / "tests" / "__init__.py", "")
+    write(root / "tests" / "test_calc.py", "import unittest as ut\nfrom calc import add\n\nclass Base(ut.TestCase):\n"
+                                            "    pass\n\nclass T(Base):\n    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n")
+    return root
+
+
+def test_a_stdlib_testcase_project_without_declarations_runs_under_unittest(tmp_path):
+    from assertiva.adapters.python_discovery import python_runners
+
+    for package in (False, True):
+        root = _stdlib_project(tmp_path / f"p{package}", tests_package=package)
+        assert python_runners(root) == {"unittest"}
+        assert [a.adapter_id for a in runner_adapters(root, sys.executable)] == ["unittest"]
+        run = UnittestAdapter(python=sys.executable).run(root)
+        assert run.status is StageStatus.PASS and len(run.invocations) == 1, run.limitations
+        assert run.metadata["arguments_from"].startswith("INFERRED (no declared runner)")
+
+
+def test_controls_anything_that_points_to_pytest_keeps_pytest(tmp_path):
+    from assertiva.adapters.python_discovery import python_runners
+
+    cases = {
+        "imports_pytest": lambda r: write(r / "tests" / "test_more.py", "import pytest\n\ndef test_x():\n    assert True\n"),
+        "plain_function": lambda r: write(r / "tests" / "test_more.py", "def test_x():\n    assert True\n"),
+        "conftest": lambda r: write(r / "tests" / "sub" / "conftest.py", ""),
+        "declared_dependency": lambda r: write(r / "pyproject.toml", '[project]\nname = "x"\nversion = "0"\n'
+                                                                    '[project.optional-dependencies]\ntest = ["pytest>=8"]\n'),
+        "requirements": lambda r: write(r / "requirements-dev.txt", "pytest==9.0\n"),
+        "no_testcase": lambda r: write(r / "tests" / "test_calc.py", "from calc import add\nX = add(1, 2)\n"),
+    }
+    for name, change in cases.items():
+        root = _stdlib_project(tmp_path / name)
+        change(root)
+        assert python_runners(root) == {"pytest"}, name
+    django = _stdlib_project(tmp_path / "django")
+    write(django / "manage.py", "import django\n")
+    assert python_runners(django) == {"django"}

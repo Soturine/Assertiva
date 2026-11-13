@@ -24,7 +24,7 @@ from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
 from .python_discovery import declared_invocations, declared_runners, python_runners
-from .python_static import PythonStatic, measured_coverage
+from .python_static import PythonStatic, copy_identity_module, measured_coverage, session_facts
 
 _MODULE = "assertiva_unittest_evidence"
 _SOURCE = Path(__file__).with_name("_unittest_evidence.py")
@@ -55,9 +55,16 @@ def _strip_cosmetic(args: list[str]) -> list[str]:
     return out
 
 
-def normalize(records: list[dict], adapter_id: str, exit_code: int | None) -> RunEvidence:
+def normalize(records: list[dict], adapter_id: str, exit_code: int | None, expect_installed: bool = False) -> RunEvidence:
     """Records written by the recording result -> run evidence (no execution)."""
     run = RunEvidence(adapter_id=adapter_id, mode="execute", status=StageStatus.UNKNOWN, exit_code=exit_code)
+    # AXF-VN-03: the identity observed inside the test process; without that record it is UNKNOWN, never verified
+    identity = next((r for r in records if r.get("type") == "identity"), {})
+    session_facts(run, identity, expect_installed)
+    if not identity:
+        failed = next((r.get("message") for r in records if r.get("type") == "identity_error"), None)
+        run.metadata["source_identity"]["basis"] = ("UNKNOWN: the test process recorded no identity"
+                                                    + (f" ({failed})" if failed else " (it may have stopped before its end)"))
     items: dict[str, dict] = {}
     own: dict[str, list[dict]] = {}
     subtests: dict[str, list[dict]] = {}
@@ -119,14 +126,34 @@ def normalize(records: list[dict], adapter_id: str, exit_code: int | None) -> Ru
     return run
 
 
+def _merged_identity(parts: list[dict], expect_installed: bool) -> dict:
+    """One identity for several runs: the worst status wins (MISMATCH, then UNKNOWN), counts add up, and nothing is
+    verified when no part ran."""
+    expected = "INSTALLED_ARTIFACT" if expect_installed else "SOURCE_TREE"
+    found = [p.get("source_identity") or {} for p in parts]
+    statuses = [f.get("status") or "UNKNOWN" for f in found]
+    status = "MISMATCH" if "MISMATCH" in statuses else "UNKNOWN" if (not found or "UNKNOWN" in statuses) else expected
+    modules = {m: path for f in found for m, path in (f.get("modules") or {}).items()}
+    total = lambda key: sum(f.get(key) or 0 for f in found) if found and all(f.get(key) is not None for f in found) else None
+    first = next((p for p in parts if (p.get("interpreter") or {}).get("python")), parts[0] if parts else {})
+    return {"source_identity": {"expected": expected, "status": status, "modules": modules, "from_outside_the_copy": sorted(modules),
+                                "loaded": total("loaded"), "inspected": total("loaded"), "unexpected": total("unexpected"),
+                                "names_truncated": any(f.get("names_truncated") for f in found),
+                                "basis": f"combined from {len(found)} declared invocations; the worst part decides"},
+            "temp_root": first.get("temp_root"), "interpreter": first.get("interpreter")}
+
+
 class _RecordingRunner(PythonStatic):
     """Shared execution for runners driven through the recording result."""
 
     adapter_id = "unittest"
 
-    def __init__(self, python: str | None = None, timeout_s: float = 900.0):
+    def __init__(self, python: str | None = None, timeout_s: float = 900.0, expect_installed: bool = False,
+                 identity_env: dict[str, str] | None = None):
         self.python = python or sys.executable
         self.timeout_s = timeout_s
+        self.expect_installed = expect_installed  # tests run against an installed artifact, not the source tree
+        self.identity_env = dict(identity_env or {})  # what the in-process observer needs to know (installed runs)
 
     def _declared_plan(self, root: Path) -> list[dict]:
         """The project's declared invocations of this runner, each with its arguments and directory, one per distinct
@@ -148,6 +175,9 @@ class _RecordingRunner(PythonStatic):
         plan = self._declared_plan(root)
         if len(plan) == 1 and not plan[0]["directory"]:
             return plan[0]["args"], plan[0]["command"]
+        return self.inferred_args(root)
+
+    def inferred_args(self, root: Path) -> tuple[list[str], str | None]:
         return self.default_args(), None
 
     def _run_plan(self, root: Path, plan: list[dict], coverage: bool) -> RunEvidence:
@@ -156,7 +186,7 @@ class _RecordingRunner(PythonStatic):
         combined status is the worst part's; a part that executed nothing, or could not be reproduced, keeps the whole
         run from passing. A local run of a declared command is not proof that CI ran it."""
         merged = RunEvidence(adapter_id=self.adapter_id, mode="execute", status=StageStatus.UNKNOWN)
-        parts, statuses = [], []
+        parts, statuses, identities = [], [], []
         for part in plan:
             record = {"command": part["command"], "declared_in": part["source"], "directory": part["directory"] or "."}
             if part["directory"]:
@@ -165,6 +195,7 @@ class _RecordingRunner(PythonStatic):
                 parts.append(record)
                 continue
             run = self.run(root, args=part["args"], coverage=False)
+            identities.append(run.metadata)
             merged.invocations += run.invocations
             merged.collection_errors += run.collection_errors
             for key in ("error_sources", "load_errors"):
@@ -178,6 +209,7 @@ class _RecordingRunner(PythonStatic):
             statuses.append(run.status)
             parts.append(record)
         merged.status = next((s for s in (StageStatus.FAIL, StageStatus.BLOCKED, StageStatus.UNKNOWN) if s in statuses), StageStatus.PASS)
+        merged.metadata.update(_merged_identity(identities, self.expect_installed))
         if any(p["status"] == "NOT_RUN" for p in parts):
             merged.limitations.append("some declared invocations were not reproduced; the run covers the others only")
         if any(p.get("invocations") == 0 and p["status"] != "NOT_RUN" for p in parts):
@@ -209,9 +241,11 @@ class _RecordingRunner(PythonStatic):
         with tempfile.TemporaryDirectory(prefix=f"assertiva-{self.adapter_id}-") as tmp:
             plugin_dir = Path(tmp)
             (plugin_dir / f"{_MODULE}.py").write_text(_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")
+            copy_identity_module(plugin_dir)
             evidence_file = plugin_dir / "evidence.jsonl"
             env = dict(os.environ)
             env["ASSERTIVA_EVIDENCE_FILE"] = str(evidence_file)
+            env.update(self.identity_env)
             env.pop("PYTHONDONTWRITEBYTECODE", None)
             env["PYTHONPYCACHEPREFIX"] = str(Path(tempfile.gettempdir()) / "assertiva-pycache")
             env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(plugin_dir), env.get("PYTHONPATH")]))
@@ -229,7 +263,7 @@ class _RecordingRunner(PythonStatic):
                 return evidence
             records = [json.loads(line) for line in evidence_file.read_text(encoding="utf-8").splitlines()] if evidence_file.exists() else []
             coverage_summary = measured_coverage(self.python, root, env, plugin_dir, self.timeout_s) if measure and records else None
-        run = normalize(records, self.adapter_id, result.returncode)
+        run = normalize(records, self.adapter_id, result.returncode, self.expect_installed)
         sources = run.metadata.get("error_sources", {})
         for name in list(sources):  # unittest names a module relative to its start directory
             suffix = name.replace(".", "/") + ".py"
@@ -284,6 +318,26 @@ class UnittestAdapter(_RecordingRunner):
 
     def default_args(self) -> list[str]:
         return ["discover"]
+
+    def inferred_args(self, root: Path) -> tuple[list[str], str | None]:
+        """Without a declaration: ``discover`` from the root, or from the one top-level folder holding every test file
+        when that folder is not a package (``discover`` only recurses into packages, so from the root it would find
+        nothing there and the run would be UNKNOWN). Recorded as inferred, never as the project's command."""
+        from .python_discovery import unittest_inferred
+
+        why = unittest_inferred(root)
+        if not why:
+            return self.default_args(), None
+        from .python_discovery import DiscoveryConfig, test_files
+
+        files = test_files(root, DiscoveryConfig(python_files=("test*.py",)))
+        tops = {p.relative_to(root).parts[0] for p in files if len(p.relative_to(root).parts) > 1}
+        at_root = any(len(p.relative_to(root).parts) == 1 for p in files)
+        if len(tops) == 1 and not at_root:
+            top = next(iter(tops))
+            if not (root / top / "__init__.py").is_file():
+                return ["discover", "-s", top], f"INFERRED (no declared runner): python -m unittest discover -s {top}; {why}"
+        return ["discover"], f"INFERRED (no declared runner): python -m unittest discover; {why}"
 
     def _args_from(self, command: str) -> list[str] | None:
         try:

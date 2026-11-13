@@ -61,69 +61,11 @@ def pytest_collection_finish(session):
         )
 
 
-def _project_names(root):
-    """Top-level modules and packages the project itself provides (at the root or under src/), tests excluded."""
-    names = set()
-    for base in (root, os.path.join(root, "src")):
-        try:
-            entries = os.listdir(base)
-        except OSError:
-            continue
-        for entry in entries:
-            path = os.path.join(base, entry)
-            if entry.endswith(".py") and entry not in ("conftest.py", "setup.py") and not entry.startswith("test"):
-                names.add(entry[:-3])
-            elif os.path.isfile(os.path.join(path, "__init__.py")) and not entry.startswith(("test", ".")):
-                names.add(entry)
-    return names
-
-
-def _inside(path, root, real_root=None):
-    real_root = real_root or os.path.realpath(root)
-    try:
-        return os.path.commonpath([os.path.realpath(path), real_root]) == real_root
-    except ValueError:  # another drive
-        return False
-
-
-LISTED = 50  # names reported per side; every loaded module is inspected and counted whatever this is
-
-
 def pytest_sessionfinish(session):
-    """What the run really used: where the project's own modules were imported from (the copy, or an installed copy
-    that shadows it), the temporary directory tests get, and site directories borrowed from another environment."""
-    import site
-    import sys
-    import tempfile
+    """What the run really used (see assertiva_session_identity, copied next to this plugin)."""
+    from assertiva_session_identity import session_record
 
-    root = str(session.config.rootpath)
-    names, real_root = _project_names(root), os.path.realpath(root)
-    # every loaded module of the project's packages, not only the top level: an import hook (an editable install's
-    # finder, a __path__ extension) can serve a submodule from another tree while the package itself comes from here.
-    # All of them are inspected; only the names listed in the record are bounded (counts are always complete).
-    inside, outside = {}, {}
-    for name in sorted(n for n in list(sys.modules) if n.split(".")[0] in names):
-        location = getattr(sys.modules.get(name), "__file__", None)
-        if location:
-            (inside if _inside(location, root, real_root) else outside)[name] = location
-    identity = {"loaded": len(inside) + len(outside), "inside": len(inside), "outside": len(outside),
-                "inside_listed": dict(list(inside.items())[:LISTED]), "outside_listed": dict(list(outside.items())[:LISTED]),
-                "names_truncated": len(inside) > LISTED or len(outside) > LISTED}
-    temp = tempfile.gettempdir()
-    try:
-        with tempfile.TemporaryFile(dir=temp):
-            writable = True
-    except OSError:
-        writable = False
-    prefixes = {os.path.realpath(p) for p in (sys.prefix, sys.base_prefix, getattr(sys, "exec_prefix", sys.prefix))}
-    sites = [p for p in sys.path if os.path.basename(p.rstrip("/\\")) in ("site-packages", "dist-packages")]
-    user_site = site.getusersitepackages() if getattr(site, "ENABLE_USER_SITE", False) else None
-    # the per-user site directory belongs to this interpreter; another environment's site-packages does not
-    borrowed = [p for p in sites if not any(_inside(p, prefix) for prefix in prefixes)
-                and not (user_site and os.path.realpath(p) == os.path.realpath(user_site))]
-    _emit({"type": "session", "root": root, "identity": identity, "tempdir": temp, "tempdir_writable": writable,
-           "python": sys.executable, "prefix": sys.prefix, "borrowed_site_dirs": borrowed,
-           "user_site": user_site if user_site in sys.path else None})
+    _emit({"type": "session", **session_record(str(session.config.rootpath))})
 
 
 def pytest_runtest_logreport(report):

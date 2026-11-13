@@ -15,6 +15,26 @@
  },
  "items": [
   {
+   "id": "CP-A",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "81dc54b",
+    "6e99766",
+    "811c747"
+   ],
+   "real_project_evidence": "Randomizer fccc561: test:ui POSSIBLY_COVERED with a traceable chain; the global downgrade of 517ce4b removed"
+  },
+  {
+   "id": "CP-B",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "e44573f"
+   ],
+   "real_project_evidence": "real CLI on synthetic native PASS + imported JUnit FAIL: only IMPORTED_TEST_RESULTS_FAILING; failed 0, imported_failed 1"
+  },
+  {
    "id": "AXF-VN-01",
    "priority": "P1",
    "status": "FIXED",
@@ -228,5 +248,13 @@
    "commits": [],
    "real_project_evidence": "over the 300-run budget"
   }
- ]
+ ],
+ "addendum_fail_before": {
+  "base": "0f3f5cc",
+  "new_or_updated_tests": 7,
+  "failed_on_base": 6,
+  "passed_on_base": [
+   "test_control_a_native_run_that_fails_is_still_native (control)"
+  ]
+ }
 }

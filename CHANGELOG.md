@@ -31,7 +31,11 @@ Dogfood: [V1_DOGFOOD.md](docs/assurance/V1_DOGFOOD.md); agent-led evaluation:
 - **Conservative unittest inference** for projects that declare no runner (AXF-VN-05).
 - **`FILTERED_LOOP_ASSERTION`** (AXF-VN-02). Frozen benchmark v2 is unchanged (precision 1.0, recall 0.70).
 - **CI parity follows project scripts** (AXR-03/04/05/06/08). One hop through `package.json` scripts, command tables
-  read as INFERRED, repetition only within one workflow, and gaps behind opaque CI scripts reported as medium/UNKNOWN.
+  read as INFERRED, repetition only within one workflow. Each local check has a state (addendum CP-A): COVERED,
+  POSSIBLY_COVERED (new `LOCAL_CHECK_POSSIBLY_RUN_BY_CI_SCRIPT`, with the traceable chain) or NOT_OBSERVED (default
+  severity). An opaque CI step without a link no longer lowers a gap, as an intermediate version of this branch did.
+- **Imported failures are named as imported** (addendum CP-B): new `IMPORTED_TEST_RESULTS_FAILING`; `NATIVE_*` findings
+  only for runs Assertiva executed.
 
 ### CLI and CI
 - **`assertiva audit --fail-on CONDITION`**: an opt-in gate with exit 1 and a `gate` field in the report. The default
@@ -41,8 +45,10 @@ Dogfood: [V1_DOGFOOD.md](docs/assurance/V1_DOGFOOD.md); agent-led evaluation:
   `concurrency` cancels obsolete pull-request runs only.
 
 ### Evaluation
-- First runs of AXF-08 and the seven PR #7 cases: 6 PASS, 2 REVIEW, 0 FAIL, and the AXF-08 marker gate passed.
-  840,610 tokens. Agent and judge are the same model family, so this is not an independent qualification.
+- First runs of AXF-08 and the seven PR #7 cases: 6 PASS, 2 REVIEW, 0 FAIL by the judge, and the AXF-08 marker gate
+  passed. 840,610 tokens. Agent and judge are the same model family, so this is not an independent qualification.
+  Operator adjudication against the frozen pass conditions: FISCAL stays REVIEW, PROFILE does not meet them (FAIL
+  reading). The owner decides; the recorded verdicts are unchanged.
 
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 

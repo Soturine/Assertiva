@@ -10,6 +10,11 @@
   something stays behind, states it as a localized limitation instead of raising. Tests cover a clean exit, an error
   in the body, a file still open on Windows (with the standard library's crash as negative control) and an
   undeletable entry on POSIX.
+- **A collection error keeps its cause** (Prescripta dogfood, 2026-11): a monorepo audited from its root failed
+  pytest collection with `ModuleNotFoundError: No module named 'app'`, and the report kept only the path, so the FAIL
+  read like a product failure. The pytest-native adapter now stores each error's cause (the last exception line pytest
+  sent, at most 300 characters) in `collection_error_causes` and states it in a localized limitation. Fail-before test:
+  `tests/test_pytest_native.py::test_collection_error_keeps_its_cause_in_the_evidence`.
 
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 

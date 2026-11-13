@@ -45,6 +45,14 @@ def _declaration(item: dict) -> tuple[str, bool]:
     return declaration, inherited
 
 
+def _collection_cause(message: str | None) -> str:
+    """The last meaningful line of pytest's collection report (usually ``ExceptionType: detail``), bounded."""
+    lines = [line.strip().removeprefix("E").strip() for line in (message or "").splitlines() if line.strip()]
+    errors = [line for line in lines if "Error" in line.split(":", 1)[0] or "Exception" in line.split(":", 1)[0]]
+    cause = (errors or lines or ["unknown cause (pytest sent no message)"])[-1]
+    return cause[:300]
+
+
 def _outcome(reports: dict[str, dict]) -> Outcome:
     setup, call, teardown = reports.get("setup"), reports.get("call"), reports.get("teardown")
     if setup and setup["outcome"] == "failed":
@@ -247,8 +255,10 @@ class PytestNativeAdapter(PythonStatic):
         reports: dict[str, dict[str, dict]] = {}
         for record in records:
             if record["type"] == "collect_error":
-                evidence.collection_errors.append(record["nodeid"] or "<session>")
-                evidence.metadata.setdefault("error_sources", {})[record["nodeid"] or "<session>"] = (record["nodeid"] or "").split("::", 1)[0]
+                node = record["nodeid"] or "<session>"
+                evidence.collection_errors.append(node)
+                evidence.metadata.setdefault("error_sources", {})[node] = (record["nodeid"] or "").split("::", 1)[0]
+                evidence.metadata.setdefault("collection_error_causes", {})[node] = _collection_cause(record.get("message"))
             elif record["type"] == "deselected":
                 evidence.deselected.append(record["nodeid"])
             elif record["type"] == "report":
@@ -286,6 +296,12 @@ class PytestNativeAdapter(PythonStatic):
         if any("<locals>" in inv.declaration_id for inv in evidence.invocations):
             evidence.limitations.append("dynamically generated tests: declaration is a runtime factory, not a source definition")
 
+        if evidence.collection_errors:
+            causes = evidence.metadata["collection_error_causes"]
+            evidence.limitations.append(
+                "tests under these paths were not collected, so they did not run: "
+                + "; ".join(f"{node}: {cause}" for node, cause in list(causes.items())[:3])
+            )
         bad = {Outcome.FAILED, Outcome.ERROR}
         if evidence.collection_errors or any(inv.outcome in bad for inv in evidence.invocations):
             evidence.status = StageStatus.FAIL

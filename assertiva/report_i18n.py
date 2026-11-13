@@ -1449,6 +1449,17 @@ FINDINGS: dict[str, dict] = {
                "Um log de CI ou uma execução da etapa mostra que a verificação rodou, ou a CI a executa pelo nome."),
         rec=("Confirm that the CI script really runs these checks (its log or a run of the step), or run them in CI by name.",
              "Confirme que o script de CI realmente executa essas verificações (log ou execução da etapa), ou execute-as na CI pelo nome.")),
+    "IMPORTED_TEST_RESULTS_FAILING": F(
+        category="execution", tier="E2",
+        title=("Imported results report failures", "Resultados importados relatam falhas"),
+        summary=("Imported test results report failures; Assertiva did not run these tests.",
+                 "Resultados de teste importados relatam falhas; o Assertiva não executou esses testes."),
+        why=("A file reports failing tests; which revision and environment produced it is not verified.",
+             "Um arquivo relata testes com falha; qual revisão e ambiente o produziram não é verificado."),
+        close=("Results for this revision report no failure, or the failures are fixed and a run shows it.",
+               "Resultados desta revisão não relatam falha, ou as falhas são corrigidas e uma execução o mostra."),
+        rec=("Check which revision and environment produced the imported results, then triage their failures; reproduce them with --execute where an adapter exists.",
+             "Verifique qual revisão e ambiente produziram os resultados importados e depois trate as falhas; reproduza-as com --execute quando houver adaptador.")),
     "MUTATION_RUN_NOT_COMPLETED": F(
         category="mutation", tier="E1",
         title=("Mutation run did not complete", "Execução de mutação não concluída"),

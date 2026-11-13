@@ -2,6 +2,9 @@
 
 import json
 
+import pytest
+import sys
+
 from assertiva.adapters.junit import load_junit
 from assertiva.candidate import StageStatus
 from assertiva.models import Outcome
@@ -110,7 +113,10 @@ def test_audit_of_unknown_toolchain_uses_portable_results(tmp_path, capsys):
     assert report["states"]["current"]["metrics"]["imported_invocations"]["value"] == 5  # v1.0: counted as imported
     assert "test_invocations" not in report["states"]["current"]["metrics"]
     assert report["states"]["current"]["runs"][0]["adapter"] == "junit-xml"
-    assert any(f["code"] == "NATIVE_TESTS_FAILING" for f in report["findings"])
+    # v1.0 addendum CP-B: the file reports failures; Assertiva's runner did not run them, so they are not native
+    assert not any(f["code"] in ("NATIVE_TESTS_FAILING", "NATIVE_COLLECTION_ERRORS") for f in report["findings"])
+    imported = next(f for f in report["findings"] if f["code"] == "IMPORTED_TEST_RESULTS_FAILING")
+    assert imported["evidence"]["provenance"] == "EXTERNAL_UNVERIFIED" and imported["evidence"]["count"] >= 1
     assert any("junit-xml" in item and "not executed by Assertiva" in item for item in report["claim_boundary"]["observed"])
     assert any(f["code"] == "NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED" for f in report["findings"])
 
@@ -147,3 +153,45 @@ def test_imported_cases_never_add_to_executed_counts(tmp_path):
     assert metrics["test_invocations"].value == 1 and metrics["passed"].value == 1
     assert metrics["imported_invocations"].value == len(imported.invocations) == 5
     assert metrics["imported_failed"].value == sum(inv.outcome is Outcome.FAILED for inv in imported.invocations)
+
+
+# --- v1.0 addendum CP-B: failures read from a file are not the native runner's failures ----------------------------
+
+def _findings(report):
+    return {f["code"]: f for f in report["findings"]}
+
+
+@pytest.mark.integration
+def test_imported_failures_next_to_a_passing_native_run_are_named_as_imported(tmp_path, capsys):
+    from assertiva import cli
+
+    project = tmp_path / "py"
+    write(project / "lib.py", "def two():\n    return 2\n")
+    write(project / "conftest.py", "")
+    write(project / "tests" / "test_lib.py", "from lib import two\n\ndef test_two():\n    assert two() == 2\n")
+    junit = write(tmp_path / "secret-ci-export" / "external.xml", NESTED)
+    cli.main(["audit", str(project), "--execute", "--python", sys.executable, "--junit-xml", str(junit), "--output", "json",
+              "--report-dir", str(tmp_path / "r")])
+    report = json.loads(capsys.readouterr().out)
+    codes = _findings(report)
+    assert "NATIVE_TESTS_FAILING" not in codes  # the native run passed; Assertiva's runner did not fail
+    imported = codes["IMPORTED_TEST_RESULTS_FAILING"]["evidence"]
+    assert imported["provenance"] == "EXTERNAL_UNVERIFIED" and imported["count"] >= 1
+    assert imported["sources"] == [{"adapter": "junit-xml", "file": "external.xml"}]  # never the absolute path
+    assert "secret-ci-export" not in json.dumps(codes["IMPORTED_TEST_RESULTS_FAILING"])
+    assert "not verified" in imported["revision"]
+    metrics = report["states"]["current"]["metrics"]
+    assert metrics["failed"]["value"] == 0 and metrics["imported_failed"]["value"] >= 1
+
+
+@pytest.mark.integration
+def test_control_a_native_run_that_fails_is_still_native(tmp_path, capsys):
+    from assertiva import cli
+
+    project = tmp_path / "py"
+    write(project / "lib.py", "def two():\n    return 2\n")
+    write(project / "conftest.py", "")
+    write(project / "tests" / "test_lib.py", "from lib import two\n\ndef test_two():\n    assert two() == 3\n")
+    cli.main(["audit", str(project), "--execute", "--python", sys.executable, "--output", "json", "--report-dir", str(tmp_path / "r")])
+    codes = _findings(json.loads(capsys.readouterr().out))
+    assert "NATIVE_TESTS_FAILING" in codes and "IMPORTED_TEST_RESULTS_FAILING" not in codes

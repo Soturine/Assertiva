@@ -1428,6 +1428,17 @@ FINDINGS: dict[str, dict] = {
                  "Um relatório de mutação não pôde ser lido; ele não fornece evidência."),
         why=("Mutation strength stays not evidenced.", "A força contra mutação continua não evidenciada."),
         close=("A readable mutation report for this revision is ingested.", "Um relatório de mutação legível desta revisão é ingerido.")),
+    "MUTATION_RUN_NOT_COMPLETED": F(
+        category="mutation", tier="E1",
+        title=("Mutation run did not complete", "Execução de mutação não concluída"),
+        summary=("A mutation run stopped before producing results; it provides no evidence.",
+                 "Uma execução de mutação parou antes de produzir resultados; ela não fornece evidência."),
+        why=("The stage that stopped it (test selection, baseline, tool, planning, budget) says what to fix; mutation strength stays not evidenced.",
+             "O estágio em que parou (seleção de testes, baseline, ferramenta, planejamento, orçamento) diz o que corrigir; a força contra mutação continua não evidenciada."),
+        close=("A mutation run of this revision completes, or the stage's cause is fixed and the run repeated.",
+               "Uma execução de mutação desta revisão é concluída, ou a causa do estágio é corrigida e a execução repetida."),
+        rec=("Read the stage and error: fix the test selection or the failing baseline, install the tool, or narrow the targets, then rerun.",
+             "Leia o estágio e o erro: corrija a seleção de testes ou o baseline que falha, instale a ferramenta ou reduza os alvos, e execute de novo.")),
     "MUTATION_REPORT_SOURCE_MISMATCH": F(
         category="mutation", tier="E1",
         title=("Mutation report is for other source", "Relatório de mutação é de outro código"),

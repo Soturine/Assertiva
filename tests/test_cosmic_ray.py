@@ -262,3 +262,61 @@ def test_files_and_directories_are_not_mixed_and_paths_stay_inside(tmp_path):
 def test_other_runners_and_no_selection_keep_their_commands(tmp_path):
     assert cosmic_ray.test_command_for("py", "pytest-native", ["tests/test_a.py"])[-1] == "tests/test_a.py"
     assert cosmic_ray.test_command_for("py", "unittest", []) == ["py", "-m", "unittest", "discover", "--failfast"]
+
+
+# --- AXF-VN-01 qualification (v1.0): layouts, refusals, empty selections and the finding's label ----------------------
+
+_CASE = ("import unittest\nfrom calc import add\n\nclass T(unittest.TestCase):\n"
+         "    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n")
+
+
+def test_layouts_a_selected_file_runs_from_as_a_module(tmp_path):
+    """Root file, nested folders without any __init__.py (namespace packages), and a package only at the leaf."""
+    import pytest
+
+    write(tmp_path / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(tmp_path / "test_root.py", _CASE)
+    write(tmp_path / "tests" / "unit" / "test_deep.py", _CASE)
+    write(tmp_path / "suite" / "inner" / "__init__.py", "")
+    write(tmp_path / "suite" / "inner" / "test_leaf.py", _CASE)
+    for selected, module in (("test_root.py", "test_root"), ("tests/unit/test_deep.py", "tests.unit.test_deep"),
+                             ("suite/inner/test_leaf.py", "suite.inner.test_leaf")):
+        command = cosmic_ray.test_command_for(sys.executable, "unittest", [selected], tmp_path)
+        assert command[-1] == module
+        done = _run(command, tmp_path)
+        assert done.returncode == 0 and "Ran 1 test" in done.stderr, (selected, done.stderr)
+    both = cosmic_ray.test_command_for(sys.executable, "unittest", ["test_root.py", "tests/unit/test_deep.py"], tmp_path)
+    done = _run(both, tmp_path)
+    assert both[-2:] == ["test_root", "tests.unit.test_deep"] and "Ran 2 tests" in done.stderr
+    assert cosmic_ray.tests_ran("unittest", done) == 2
+    for refused in (["tests/my-tests/test_x.py"], ["tests/test_calc.txt"], ["/abs/test_x.py"], ["C:/abs/test_x.py"],
+                    ["tests", "suite"]):
+        with pytest.raises(ValueError):
+            cosmic_ray.test_command_for(sys.executable, "unittest", refused, tmp_path)
+
+
+class _Done:
+    def __init__(self, returncode, stderr="", stdout=""):
+        self.returncode, self.stderr, self.stdout = returncode, stderr, stdout
+
+
+def test_an_empty_selection_is_counted_not_trusted():
+    """Python 3.11's unittest exits 0 after "Ran 0 tests" (3.12+ exits 5): the count, not the exit code, decides."""
+    assert cosmic_ray.tests_ran("unittest", _Done(0, "\n----\nRan 0 tests in 0.000s\n\nOK\n")) == 0
+    assert cosmic_ray.tests_ran("unittest", _Done(5, "\nRan 0 tests in 0.000s\n\nNO TESTS RAN\n")) == 0
+    assert cosmic_ray.tests_ran("django", _Done(0, "Ran 3 tests in 0.1s\n")) == 3
+    assert cosmic_ray.tests_ran("pytest-native", _Done(5)) == 0
+    assert cosmic_ray.tests_ran("pytest-native", _Done(0, stdout="1 passed")) is None  # no count: exit code only
+    assert cosmic_ray.tests_ran("unittest", _Done(0, "nothing printed")) is None
+
+
+def test_a_run_that_stopped_is_not_an_unreadable_report():
+    from assertiva.audit import _mutation_findings
+    from assertiva.models import MutationRun
+
+    state = StateEvidence(label="current", observed_in="copy")
+    state.mutation = [MutationRun(source="Cosmic Ray run by Assertiva on calc.py", tool="Cosmic Ray", orchestrated=True,
+                                  targets=("calc.py",), error="the selected tests ran no test on this state", stage="selection"),
+                      MutationRun(source="m.json", error="ValueError: unsupported mutation report format")]
+    codes = [(f.code, f.evidence.get("stage")) for f in _mutation_findings(state)]
+    assert codes == [("MUTATION_RUN_NOT_COMPLETED", "selection"), ("MUTATION_REPORT_UNREADABLE", None)]

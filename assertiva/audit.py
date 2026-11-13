@@ -257,7 +257,11 @@ def _undetected(run) -> dict:
 def _mutation_findings(current: StateEvidence) -> list[Finding]:
     findings = []
     for run in current.mutation:
-        if run.error:
+        if run.error and run.stage:  # AXF-VN-01: a run that never produced results is not an unreadable report
+            findings.append(Finding("MUTATION_RUN_NOT_COMPLETED", "A mutation run stopped before producing results; it provides no evidence.",
+                                    {"tool": run.tool, "stage": run.stage, "error": run.error, "targets": list(run.targets),
+                                     "selected_tests": list((run.config.get("test_selection") or {}).get("tests") or [])}))
+        elif run.error:
             findings.append(Finding("MUTATION_REPORT_UNREADABLE", "A mutation report could not be read; it provides no evidence.", {"source": run.source, "error": run.error}))
         elif run.matches_state is False:
             findings.append(Finding("MUTATION_REPORT_SOURCE_MISMATCH", "A mutation report was produced for different source than the audited project.", {"source": run.source, "limitations": run.limitations}))

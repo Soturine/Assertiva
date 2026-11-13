@@ -14,6 +14,7 @@ sources and tests it ran are recorded from the copy, which ties the run to the m
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import tempfile
 from pathlib import Path
@@ -101,10 +102,30 @@ def test_command_for(python: str, runner: str, test_paths: list[str], root: Path
     modules = []
     for t in files:
         path = Path(_posix(t))
-        if path.suffix != ".py" or path.is_absolute() or ".." in path.parts:
+        if path.suffix != ".py" or path.is_absolute() or ".." in path.parts or path.drive or path.anchor:
             raise ValueError(f"unittest selection: {t} is not a test file inside the project")
-        modules.append(".".join(path.with_suffix("").parts))
+        parts = path.with_suffix("").parts
+        if not all(part.isidentifier() for part in parts):
+            # a dotted name cannot spell it; a discover pattern could match other files of that name: refuse, not guess
+            raise ValueError(f"unittest selection: {t} cannot be named as a module (each path part must be a Python "
+                             "identifier); select its directory instead")
+        modules.append(".".join(parts))
     return [_posix(python), "-m", "unittest", "--failfast", *modules]
+
+
+# how each runner says it could not load a selected test module (as opposed to a test that failed)
+_LOAD_FAILURES = ("unittest.loader._FailedTest", "Failed to import test module", "Start directory is not importable",
+                  "ERROR collecting", "ImportError while importing test module", "file or directory not found")
+_RAN = re.compile(r"^Ran (\d+) tests? in ", re.MULTILINE)
+
+
+def tests_ran(runner: str, result) -> int | None:
+    """How many tests a runner says it ran (None when its output does not say). unittest on Python 3.11 exits 0 after
+    "Ran 0 tests", so the exit code alone cannot tell an empty selection from a passing one."""
+    if runner == "pytest-native":
+        return 0 if result.returncode == 5 else None
+    found = _RAN.findall((result.stderr or "") + "\n" + (result.stdout or ""))
+    return sum(int(n) for n in found) if found else None
 
 
 def execute(state_root: Path, python: str, targets: list[str], origin: Path, option: dict) -> MutationRun:
@@ -143,20 +164,32 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
                 result.error = "mutation targets are not plain files in the copy: " + "; ".join(f"{t}: {why}" for t, why in in_copy.items())
                 return result
             if runner not in _COMMANDS:
-                result.error = f"{TOOL} cannot run the {runner} runner"
+                result.error, result.stage = f"{TOOL} cannot run the {runner} runner", "runner"
                 return result
             try:
                 test_command = test_command_for(python, runner, test_paths, copy)
             except ValueError as error:
-                result.error = str(error)
+                result.error, result.stage = str(error), "selection"
                 return result
             baseline = run_command(test_command, copy, timeout_s=budget_s)
             scope = "the selected tests" if test_paths else "the tests"
-            if not baseline.ok:
-                result.error = f"{scope} do not pass on this state before mutation ({baseline.summary()}); no mutant was run"
+            ran = tests_ran(runner, baseline) if baseline.ok or baseline.returncode == 5 else None
+            if ran == 0:  # an empty selection would let every mutant "survive": never a baseline
+                result.error = (f"{scope} ran no test on this state ({' '.join(_posix(p) for p in test_command[1:])}); "
+                                "no mutant was run")
+                result.stage = "selection"
                 return result
+            if not baseline.ok:
+                output = (baseline.stderr or "") + "\n" + (baseline.stdout or "")
+                loading = any(marker in output for marker in _LOAD_FAILURES)  # the runner could not load the selection
+                result.error = f"{scope} do not pass on this state before mutation ({baseline.summary()}); no mutant was run"
+                result.stage = "selection" if (test_paths and loading) else "baseline"
+                return result
+            result.config["baseline"] = {"tests_ran": ran, "duration_s": baseline.duration_s,
+                                         "basis": "the runner's own count" if ran is not None else "exit code only (the runner did not print a count)"}
             if test_paths:  # AG-11: the auditor's selection, kept with the run; never presented as the whole suite
                 result.config["test_selection"] = {"tests": list(test_paths), "baseline": "the selected tests passed",
+                                                   "baseline_tests_ran": ran,
                                                    "baseline_duration_s": baseline.duration_s, "whole_suite": "NOT_RUN"}
                 result.limitations.append(
                     "only the selected tests ran for each mutant (" + ", ".join(test_paths[:5]) + "): a survivor may be "
@@ -174,17 +207,17 @@ def run(state_root: str | Path, python: str, targets: list[str], test_paths: lis
                 "[cosmic-ray.distributor]\nname = \"local\"\n", encoding="utf-8")
             init = run_command(_cli(python, "init", str(config), str(db)), copy, timeout_s=600)
             if not init.ok:
-                result.error = f"{TOOL} could not plan the mutants: {init.summary()}"
+                result.error, result.stage = f"{TOOL} could not plan the mutants: {init.summary()}", "planning"
                 return result
             planned = run_command(_cli(python, "dump", str(db)), copy, timeout_s=600, output_limit=1 << 26)
             count = len([line for line in planned.stdout.splitlines() if line.strip()])
             if count > MAX_MUTANTS:
-                result.error = f"{count} mutants planned exceed the budget of {MAX_MUTANTS} test-suite runs; name fewer or smaller targets"
+                result.error, result.stage = f"{count} mutants planned exceed the budget of {MAX_MUTANTS} test-suite runs; name fewer or smaller targets", "budget"
                 return result
             executed = run_command(_cli(python, "exec", str(config), str(db)), copy, timeout_s=budget_s)
             dumped = run_command(_cli(python, "dump", str(db)), copy, timeout_s=600, output_limit=1 << 26)
             if not dumped.ok:
-                result.error = f"{TOOL} results could not be read: {dumped.summary()}"
+                result.error, result.stage = f"{TOOL} results could not be read: {dumped.summary()}", "results"
                 return result
             result.mutants = cosmic_ray_dump(dumped.stdout)
             if not executed.ok:

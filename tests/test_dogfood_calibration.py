@@ -4,7 +4,6 @@ on controls that look alike but must keep their earlier classification.
 AXF-M2-01 always-true `or`; AXF-03 assigned determinism; AXF-06 typed error boundary; AXF-07 redundancy over
 different modules; AXF-M3-02 what an error test asserts; DG-0101-04 rejection at construction."""
 
-import pytest
 
 from assertiva.adapters.test_facts import collect
 from assertiva.effectiveness import candidates

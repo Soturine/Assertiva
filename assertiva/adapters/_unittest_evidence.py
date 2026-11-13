@@ -127,10 +127,25 @@ def recording(base):
     return type("Recording" + base.__name__, (_Recording, base), {})
 
 
+def _identity():
+    """What the test process used, observed when its tests have run (see assertiva_session_identity)."""
+    try:
+        from assertiva_session_identity import session_record
+    except ImportError:  # the observer was not copied: the identity stays unknown, never assumed
+        return
+    try:
+        _write({"type": "identity", **session_record(os.getcwd())})
+    except Exception as error:  # noqa: BLE001 - never change the run's outcome over its observation
+        _write({"type": "identity_error", "message": repr(error)[:300]})
+
+
 def main():
     _write({"type": "session", "runner": "unittest", "python": sys.version.split()[0]})
     runner = unittest.TextTestRunner(resultclass=recording(unittest.TextTestResult))
-    unittest.main(module=None, argv=["python -m unittest", *sys.argv[1:]], testRunner=runner)
+    try:
+        unittest.main(module=None, argv=["python -m unittest", *sys.argv[1:]], testRunner=runner)
+    finally:  # unittest.main exits with the run's own status; the observation happens first and changes nothing
+        _identity()
 
 
 def __getattr__(name):
@@ -145,6 +160,12 @@ def __getattr__(name):
         def get_resultclass(self):
             parent = getattr(super(), "get_resultclass", lambda: None)() or unittest.TextTestResult
             return recording(parent)
+
+        def run_tests(self, *args, **kwargs):
+            try:
+                return super().run_tests(*args, **kwargs)
+            finally:
+                _identity()
 
     import django
 

@@ -71,11 +71,44 @@ def repeated_scripts(checks: list, delivery: list) -> dict[str, list[str]]:
                         and tokens[len(r)] in graph), None)
         for script in [invoked, *graph[invoked].get("reaches", [])] if invoked else ():
             runs.setdefault(script, []).append(check.check_id)
-    return {script: steps for script, steps in sorted(runs.items()) if len(steps) > 1}
+    # AXR-05: the same script in two workflow files is not one run repeated (a push gate and a tag release run on
+    # different events); only steps of one workflow file are compared
+    out = {}
+    for script, steps in sorted(runs.items()):
+        by_file: dict[str, list[str]] = {}
+        for step in steps:
+            by_file.setdefault(_workflow_of(step), []).append(step)
+        repeated = [s for group in by_file.values() if len(group) > 1 for s in group]
+        if repeated:
+            out[script] = repeated
+    return out
+
+
+def _workflow_of(check_id: str) -> str:
+    """The configuration file a CI check id names (gha:.github/workflows/ci.yml:job:3 -> that file)."""
+    parts = check_id.split(":")
+    return parts[1] if len(parts) > 2 else check_id
+
+
+def invoked(command: str, scripts: dict) -> list[str]:
+    """Scripts a command runs, directly and through nested scripts, in order; cycles stop."""
+    graph = script_graph(scripts)
+    out = []
+    for name in script_calls(command, scripts):
+        out += [name, *graph.get(name, {}).get("reaches", [])]
+    return list(dict.fromkeys(out))
 
 
 class PackageScriptsAdapter:
     adapter_id = "package-scripts"
+
+    def invoked_scripts(self, root: Path, check: VerificationCheck) -> list[str]:
+        """The package.json scripts a declared step runs (npm run verify -> verify and what it calls)."""
+        try:
+            scripts = json.loads((Path(root) / "package.json").read_text(encoding="utf-8")).get("scripts") or {}
+        except (OSError, ValueError):
+            return []
+        return invoked(check.command or "", scripts) if check.command else []
 
     def effective_tool(self, root: Path, check: VerificationCheck) -> str | None:
         """The tool a declared `npm test` / `npm run lint` / `yarn lint` step really runs, read from package.json.

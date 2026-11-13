@@ -266,26 +266,39 @@ def state_metrics(state: StateEvidence) -> dict[str, MetricObservation]:
     def add(name: str, value: Any, direction: MetricDirection, unit: str | None = None, tier: str = "E1") -> None:
         metrics[name] = MetricObservation(name, value, direction, unit, tier, f"{state.label}:{state.observed_in}")
 
-    if state.runs:
-        invocations = [inv for run in state.runs for inv in run.invocations]
+    # v1.0 (AXR-02): the counters describe runs Assertiva executed; results read from files (JUnit, CTRF, Allure) are
+    # counted apart as imported_*, so 458 ingested cases never add to the 51 a native run executed
+    executed_runs = [run for run in state.runs if run.mode != "report"]
+    imported_runs = [run for run in state.runs if run.mode == "report"]
+    if imported_runs:
+        cases = [inv for run in imported_runs for inv in run.invocations]
+        add("imported_invocations", len(cases), MetricDirection.CONTEXTUAL, tier="E2")
+        for name, outcome in (("passed", Outcome.PASSED), ("failed", Outcome.FAILED), ("errors", Outcome.ERROR),
+                              ("skipped", Outcome.SKIPPED)):
+            add(f"imported_{name}", sum(inv.outcome is outcome for inv in cases), MetricDirection.CONTEXTUAL, tier="E2")
+        reported = [run.metadata.get("cases_duration_sum_s") for run in imported_runs if run.metadata.get("cases_duration_sum_s") is not None]
+        if reported:  # what the files say their cases took; never a wall clock (a parallel run overlaps its cases)
+            add("imported_time_accumulated_s", round(sum(reported), 3), MetricDirection.CONTEXTUAL, "s", tier="E2")
+    if executed_runs:
+        invocations = [inv for run in executed_runs for inv in run.invocations]
         add("test_invocations", len(invocations), MetricDirection.CONTEXTUAL)
-        deselected = sum(len(run.deselected) for run in state.runs)
+        deselected = sum(len(run.deselected) for run in executed_runs)
         if deselected:
             add("deselected", deselected, MetricDirection.CONTEXTUAL)
-        known = [inv for run in state.runs if run.metadata.get("declaration_identity") != "UNKNOWN" for inv in run.invocations]
+        known = [inv for run in executed_runs if run.metadata.get("declaration_identity") != "UNKNOWN" for inv in run.invocations]
         if known:  # a format that names cases, not declarations, never yields a declaration count
             add("test_declarations", len({inv.declaration_id for inv in known}), MetricDirection.CONTEXTUAL)
         add("inherited_materializations", sum(inv.inherited for inv in invocations), MetricDirection.CONTEXTUAL)
         add("passed", sum(inv.outcome is Outcome.PASSED for inv in invocations), MetricDirection.CONTEXTUAL)
         add("failed", sum(inv.outcome is Outcome.FAILED for inv in invocations), MetricDirection.LOWER_IS_BETTER)
         add("errors", sum(inv.outcome is Outcome.ERROR for inv in invocations), MetricDirection.LOWER_IS_BETTER)
-        add("collection_errors", sum(len(run.collection_errors) for run in state.runs), MetricDirection.LOWER_IS_BETTER)
+        add("collection_errors", sum(len(run.collection_errors) for run in executed_runs), MetricDirection.LOWER_IS_BETTER)
         add("skipped", sum(inv.outcome is Outcome.SKIPPED for inv in invocations), MetricDirection.CONTEXTUAL)
         add("xfailed", sum(inv.outcome is Outcome.XFAILED for inv in invocations), MetricDirection.CONTEXTUAL)
         add("xpassed", sum(inv.outcome is Outcome.XPASSED for inv in invocations), MetricDirection.LOWER_IS_BETTER)
-        wall = [run.wall_clock_s for run in state.runs]
+        wall = [run.wall_clock_s for run in executed_runs]
         add("wall_clock_s", round(sum(wall), 3) if None not in wall else None, MetricDirection.CONTEXTUAL, "s")
-        accumulated = [run.metadata.get("cases_duration_sum_s") for run in state.runs if run.metadata.get("cases_duration_sum_s") is not None]
+        accumulated = [run.metadata.get("cases_duration_sum_s") for run in executed_runs if run.metadata.get("cases_duration_sum_s") is not None]
         if accumulated:
             add("test_time_accumulated_s", round(sum(accumulated), 3), MetricDirection.CONTEXTUAL, "s")
     coverage = _coverage(state)

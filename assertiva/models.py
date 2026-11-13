@@ -78,6 +78,9 @@ class MutationRun:
     provenance: str | None = None
     targets: tuple[str, ...] = ()  # the files an orchestrated run mutated
     config: dict = field(default_factory=dict)  # how an orchestrated run was configured (timeout, test command, …)
+    # where an attempted run stopped before producing results (tool_selection, selection, baseline, runner, planning,
+    # budget, copy, results, …); None for a report read from a file (its error is about the report itself)
+    stage: str | None = None
 
     @property
     def inputs_digest(self) -> str | None:

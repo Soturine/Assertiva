@@ -13,6 +13,10 @@ def test_no_file_is_the_default_and_detection_decides(tmp_path):
     write(tmp_path / "tests" / "test_x.py", _CASE)
     config = load_config(tmp_path)
     assert config.source is None and not config.runners and not config.problems
+    # v1.0 (AXF-VN-05): a TestCase-only project that declares nothing and never names pytest is a stdlib unittest
+    # project; before, detection fell back to pytest and the run was BLOCKED where pytest was not installed
+    assert [a.adapter_id for a in runner_adapters(tmp_path, sys.executable)] == ["unittest"]
+    write(tmp_path / "requirements-dev.txt", "pytest\n")  # naming pytest anywhere keeps pytest, which also runs TestCases
     assert [a.adapter_id for a in runner_adapters(tmp_path, sys.executable)] == ["pytest-native"]
 
 

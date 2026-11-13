@@ -514,9 +514,16 @@ def _python_test(test_id: str, rel: str, node, helpers, no_raise: bool = False) 
             # exception still fails the test; `except Exception`, bare `except` and AssertionError swallow everything
             if ignores and (inside or not outside) and not _expects_error(item, handler) and not (typed_handler(handler) and not inside):
                 smells.append("SWALLOWED_EXCEPTION")
-    if asserts and all(any(isinstance(p, ast.If) and not _checks(p.orelse) and not _condition_holds(p, parents, node)
-                           for p in _ancestors(a, parents, node)) for a in asserts):
-        smells.append("CONDITIONAL_ASSERTION")
+    guards = [[p for p in _ancestors(a, parents, node)
+               if isinstance(p, ast.If) and not _checks(p.orelse) and not _condition_holds(p, parents, node)] for a in asserts]
+    if asserts and all(guards):
+        # AXF-VN-02: a filter over loop data (`for case in CASES: if case.expected: assert ...`) usually protects the
+        # behavior; its risk is vacuity (no case reaches the assertion), not the condition itself
+        # a literal loop whose condition never holds is proven vacuous: that stays a plain conditional assertion
+        in_loop = all(any(any(isinstance(q, (ast.For, ast.AsyncFor)) for q in _ancestors(g, parents, node))
+                          and _condition_decided(g, parents, node) is None for g in found)
+                      for found in guards)
+        smells.append("FILTERED_LOOP_ASSERTION" if in_loop else "CONDITIONAL_ASSERTION")
     if _mocks_subject(node):
         smells.append("MOCKED_SUBJECT")
     _, _, unobserved = negative_path_evidence(node)
@@ -637,28 +644,33 @@ _DECIDABLE = (ast.Expression, ast.Compare, ast.BinOp, ast.BoolOp, ast.UnaryOp, a
               ast.operator, ast.cmpop, ast.boolop, ast.unaryop)
 
 
-def _condition_holds(if_node, parents, stop) -> bool:
-    """Whether an `if` inside `for i in range(<literals>)` tests only the loop variable and literals, and holds for at
-    least one value: then its assertions run on every execution of the test, whatever the data."""
+def _condition_decided(if_node, parents, stop) -> bool | None:
+    """For an `if` inside `for i in range(<literals>)` that tests only the loop variable and literals: whether it holds
+    for at least one value (True: its assertions run on every execution, whatever the data; False: they never run).
+    None when that cannot be decided from the source."""
     loop = next((p for p in _ancestors(if_node, parents, stop) if isinstance(p, ast.For)), None)
     if loop is None or not isinstance(loop.target, ast.Name) or not isinstance(loop.iter, ast.Call):
-        return False
+        return None
     if not (isinstance(loop.iter.func, ast.Name) and loop.iter.func.id == "range" and not loop.iter.keywords):
-        return False
+        return None
     try:
         values = range(*[ast.literal_eval(a) for a in loop.iter.args])
     except (ValueError, TypeError, SyntaxError):
-        return False
+        return None
     test = ast.Expression(body=if_node.test)
     if len(values) > _LOOP_LIMIT or not all(isinstance(n, _DECIDABLE) for n in ast.walk(test)):
-        return False
+        return None
     if any(isinstance(n, ast.Name) and n.id != loop.target.id for n in ast.walk(test)):
-        return False
+        return None
     code = compile(ast.fix_missing_locations(test), "<condition>", "eval")  # only the loop variable, literals, operators
     try:
         return any(eval(code, {"__builtins__": {}}, {loop.target.id: v}) for v in values)  # noqa: S307
     except (ArithmeticError, TypeError, ValueError):
-        return False
+        return None
+
+
+def _condition_holds(if_node, parents, stop) -> bool:
+    return _condition_decided(if_node, parents, stop) is True
 
 
 def _patch_targets(node) -> set[tuple[str, str]]:

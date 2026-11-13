@@ -1,11 +1,22 @@
 name: CI
+# Pull requests get the fast validation (lint, repository contract, core suite on 3.12 and 3.11, wheel smoke).
+# The full qualification (integration and artifact suites, Windows, browser, JVM, Gradle/Android, services) runs on
+# main, on release tags and on demand (workflow_dispatch), so one SHA is never qualified twice by push + pull_request.
+# A release candidate is qualified by dispatching this workflow on its final branch SHA.
 on:
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# A newer push to the same pull request cancels its obsolete run; runs on main, tags and dispatches are never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -17,20 +28,25 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: python -m pip install -e . pytest pytest-xdist coverage build setuptools django cosmic-ray -c constraints.txt
+      - run: python -m pip install -e . pytest pytest-xdist coverage build setuptools django cosmic-ray ruff -c constraints.txt
+      - name: Lint (correctness rules in pyproject.toml)
+        run: ruff check .
       - uses: actions/setup-node@v7
+        if: github.event_name != 'pull_request'
         with:
           node-version: "24"
           package-manager-cache: false
       - name: Prepare the JS adapter fixtures once (lockfiles, no package hooks)
+        if: github.event_name != 'pull_request'
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-jest
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-vitest
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-stryker
       - run: python scripts/validate_repo.py
       - name: Fast/core suite
-        run: pytest -q -m "not integration and not artifact"
+        run: pytest -q -n auto -m "not integration and not artifact"
       - name: Integration and artifact suites
+        if: github.event_name != 'pull_request'
         env:
           ASSERTIVA_REQUIRE_JS: "1"
           ASSERTIVA_REQUIRE_DJANGO: "1"
@@ -48,6 +64,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           test "$before" = "$(git status --porcelain)"
       - name: Read-only invariant and qualification from the installed CLI
+        if: github.event_name != 'pull_request'
         run: |
           A="$GITHUB_WORKSPACE/.wheel-smoke/bin/assertiva"
           PY="$(command -v python)"
@@ -79,6 +96,7 @@ jobs:
   browser:
     # Real browser evidence in its own slice: the only job that downloads a browser, and only
     # Chromium's headless shell. Other declared projects are evidence of configuration, not runs.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -103,6 +121,7 @@ jobs:
 
   java:
     # Real JVM evidence in its own slice: the only job that needs a JDK and Maven's local repository.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -135,6 +154,7 @@ jobs:
     # Isolated provisioning with real downloads: a virtual environment from PyPI and a disposable PostgreSQL from
     # portable binaries (Maven Central, sha256-verified), then Django tests on it. Nothing is installed globally.
     name: Provisioning and disposable services
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -153,6 +173,7 @@ jobs:
     # Kotlin/JVM, Java, Kotlin Multiplatform (JVM target) and Android local tests through the Gradle adapter: a Gradle
     # distribution is provisioned (sha256-verified, never the wrapper jar); the runner image provides the Android SDK.
     name: Gradle, Kotlin and Android
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -174,7 +195,7 @@ jobs:
         run: pytest -q tests/test_gradle.py
 
   windows:
-    # The same suites on Windows: paths (260-character limit, case, junctions), process trees and signals, file
+    # The core suite on every pull request commit; the same full suites as Linux on main, tags and dispatch: paths (260-character limit, case, junctions), process trees and signals, file
     # leases, PostgreSQL's Windows binaries and a JDK and Gradle provisioned by the engine itself (no setup-java).
     name: Windows
     runs-on: windows-latest
@@ -187,23 +208,27 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -e . pytest pytest-xdist coverage build setuptools django cosmic-ray -c constraints.txt
       - uses: actions/setup-node@v7
+        if: github.event_name != 'pull_request'
         with:
           node-version: "24"
           package-manager-cache: false
       - name: Prepare the JS adapter fixtures once (lockfiles, no package hooks)
+        if: github.event_name != 'pull_request'
         run: |
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-jest
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-vitest
           npm ci --ignore-scripts --no-audit --no-fund --prefix tests/fixtures/js-stryker
       - name: Fast/core suite
-        run: pytest -q -m "not integration and not artifact"
+        run: pytest -q -n auto -m "not integration and not artifact"
       - name: Integration and artifact suites
+        if: github.event_name != 'pull_request'
         env:
           ASSERTIVA_REQUIRE_JS: "1"
           ASSERTIVA_REQUIRE_DJANGO: "1"
           ASSERTIVA_REQUIRE_MUTATION: "1"
         run: pytest -q -n auto -m "(integration or artifact) and not browser and not jvm"
       - name: Provisioning, PostgreSQL and Gradle on Windows
+        if: github.event_name != 'pull_request'
         env:
           ASSERTIVA_RUN_SERVICES: "1"
           ASSERTIVA_RUN_GRADLE: "1"

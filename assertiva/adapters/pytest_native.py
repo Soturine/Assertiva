@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -23,7 +24,7 @@ from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
 from .python_discovery import python_runners
-from .python_static import PythonStatic, measured_coverage
+from .python_static import PythonStatic, copy_identity_module, measured_coverage, session_facts
 
 _PLUGIN_MODULE = "assertiva_pytest_evidence"
 _PLUGIN_SOURCE = Path(__file__).with_name("_pytest_evidence_plugin.py")
@@ -43,6 +44,49 @@ def _declaration(item: dict) -> tuple[str, bool]:
     inherited = item.get("cls") is not None and owner != item["cls"]
     inherited = inherited or declared_file != nodeid.split("::", 1)[0]
     return declaration, inherited
+
+
+# pytest prefixes the explanation lines of a report with "E" and spaces; only that marker is removed (a bare
+# removeprefix("E") turned "Exception: x" into "xception: x").
+_PYTEST_E_MARKER = re.compile(r"^E(?:\s+|$)")
+# an exception line: a dotted type name ending like an exception class, then ":" or the end of the line
+_EXCEPTION_LINE = re.compile(r"^((?:[A-Za-z_]\w*\.)*(?:[A-Za-z_]\w*)?(?:Error|Exception|Exit|Interrupt|Warning|Failure))(?::\s?(.*))?$")
+_IMPORT_TYPES = {"ModuleNotFoundError", "ImportError"}
+_SYNTAX_TYPES = {"SyntaxError", "IndentationError", "TabError"}
+
+
+def collection_cause(message: str | None) -> dict:
+    """What pytest said about a collection error, sanitized and bounded.
+
+    ``cause`` is the last exception line pytest reported (the one that ended collection); ``chain`` keeps the distinct
+    exception lines in order (a chained ``raise ... from`` names its origin first), at most three: the first and
+    the last two. ``kind`` is decided
+    from the exception type only: IMPORT_FAILURE (a missing or unimportable module: environment, path or product,
+    not decided here), SYNTAX_ERROR, COLLECTION_EXCEPTION (another exception while importing), UNKNOWN (no message
+    or no exception line). It never claims a product defect: no test ran."""
+    from assertiva.sanitize import SANITIZER_VERSION, sanitize_message
+
+    lines = [_PYTEST_E_MARKER.sub("", line.strip()).strip() for line in (message or "").splitlines()]
+    lines = [line for line in lines if line]
+    chain: list[tuple[str, str]] = []
+    for line in lines:
+        match = _EXCEPTION_LINE.match(line)
+        if match and (match.group(2) is not None or line == match.group(1)) and (match.group(1), line) not in chain:
+            chain.append((match.group(1), line))
+    if chain:
+        exc_type, cause = chain[-1]
+        short = exc_type.rsplit(".", 1)[-1]
+        kind = ("IMPORT_FAILURE" if short in _IMPORT_TYPES else "SYNTAX_ERROR" if short in _SYNTAX_TYPES
+                else "COLLECTION_EXCEPTION")
+    else:
+        exc_type, kind = None, "UNKNOWN"
+        cause = lines[-1] if lines else "unknown cause (pytest sent no message)"
+    return {"cause": sanitize_message(cause, 300), "type": exc_type, "kind": kind,
+            "chain": [sanitize_message(line, 300) for _, line in (chain if len(chain) <= 3 else [chain[0], *chain[-2:]])], "sanitizer": SANITIZER_VERSION}
+
+
+def _collection_cause(message: str | None) -> str:
+    return collection_cause(message)["cause"]
 
 
 def _outcome(reports: dict[str, dict]) -> Outcome:
@@ -79,11 +123,13 @@ def declared_test_extras(root: Path) -> list[str]:
 class PytestNativeAdapter(PythonStatic):
     adapter_id = "pytest-native"
 
-    def __init__(self, python: str | None = None, timeout_s: float = 900.0, expect_installed: bool = False):
+    def __init__(self, python: str | None = None, timeout_s: float = 900.0, expect_installed: bool = False,
+                 identity_env: dict[str, str] | None = None):
         self.python = python or sys.executable
         self.timeout_s = timeout_s
         # artifact qualification runs the tests against the installed wheel on purpose; otherwise the copy is the subject
         self.expect_installed = expect_installed
+        self.identity_env = dict(identity_env or {})  # what the in-process observer needs to know (installed runs)
 
     def supports(self, root: Path) -> SupportLevel:
         from assertiva.pytest_audit import has_pytest_surface
@@ -164,10 +210,12 @@ class PytestNativeAdapter(PythonStatic):
         with tempfile.TemporaryDirectory(prefix="assertiva-pytest-") as tmp:
             plugin_dir = Path(tmp)
             (plugin_dir / f"{_PLUGIN_MODULE}.py").write_text(_PLUGIN_SOURCE.read_text(encoding="utf-8"), encoding="utf-8")
+            copy_identity_module(plugin_dir)
             evidence_file = plugin_dir / "evidence.jsonl"
             env = dict(os.environ)
             env.pop("PYTEST_CURRENT_TEST", None)
             env["ASSERTIVA_EVIDENCE_FILE"] = str(evidence_file)
+            env.update(self.identity_env)
             # Bytecode is read from and written to a prefix outside the tree: nothing lands in
             # the project, and a copied __pycache__ (which carries the original's file paths)
             # is never loaded. The prefix is stable so interpreter/site-packages bytecode is reused.
@@ -206,49 +254,18 @@ class PytestNativeAdapter(PythonStatic):
         return evidence
 
     def _session_facts(self, evidence: RunEvidence, record: dict) -> None:
-        """Code identity (AX-E02), the temp root (AG-08) and borrowed site directories (AG-09) of this run."""
-        identity = record.get("identity")
-        expected = "INSTALLED_ARTIFACT" if self.expect_installed else "SOURCE_TREE"
-        if not isinstance(identity, dict) or not isinstance(identity.get("loaded"), int):
-            status, wrong, counts = "UNKNOWN", {}, {}  # nothing recorded: never read as verified
-        else:
-            # the modules on the unexpected side are the evidence: outside the copy for a source run, inside it for an
-            # installed-artifact run. Counts cover every loaded module; only the listed names may be truncated.
-            wrong_count = identity["inside"] if self.expect_installed else identity["outside"]
-            wrong = identity["inside_listed"] if self.expect_installed else identity["outside_listed"]
-            counts = {k: identity.get(k) for k in ("loaded", "inside", "outside", "names_truncated")}
-            status = ("UNKNOWN" if not identity["loaded"] else "MISMATCH" if wrong_count else expected)
-        evidence.metadata["source_identity"] = {
-            "expected": expected, "status": status, "modules": dict(wrong), "from_outside_the_copy": sorted(wrong),
-            "loaded": counts.get("loaded"), "inspected": counts.get("loaded"),
-            "unexpected": (counts.get("inside") if self.expect_installed else counts.get("outside")) if counts else None,
-            "names_truncated": counts.get("names_truncated"),
-            "basis": "OBSERVED: every module of the project's packages the test process had imported when the session "
-                     "finished; listed names are bounded, counts are complete",
-        }
-        outside = sorted(wrong)
-        if status == "MISMATCH" and not self.expect_installed:
-            evidence.limitations.append(
-                "the tests imported the project's own modules from outside the tested copy (" + ", ".join(outside[:5])
-                + "): an installed copy shadows the source tree, so this run does not prove the source under test")
-        evidence.metadata["temp_root"] = {"path": record.get("tempdir"), "writable": record.get("tempdir_writable")}
-        if record.get("tempdir_writable") is False:
-            evidence.limitations.append(f"the test process's temporary directory ({record.get('tempdir')}) is not writable: "
-                                        "tests that use temporary paths fail for the machine, not for the product")
-        borrowed = record.get("borrowed_site_dirs") or []
-        evidence.metadata["interpreter"] = {"python": record.get("python"), "prefix": record.get("prefix"),
-                                            "borrowed_site_dirs": borrowed}
-        if borrowed:
-            evidence.limitations.append("the interpreter also loads packages from site directories outside its own "
-                                        "environment (" + ", ".join(borrowed[:3]) + "): the run's dependencies are not "
-                                        "only that environment's")
+        session_facts(evidence, record, self.expect_installed)
 
     def _normalize(self, evidence: RunEvidence, records: list[dict]) -> None:
         reports: dict[str, dict[str, dict]] = {}
         for record in records:
             if record["type"] == "collect_error":
-                evidence.collection_errors.append(record["nodeid"] or "<session>")
-                evidence.metadata.setdefault("error_sources", {})[record["nodeid"] or "<session>"] = (record["nodeid"] or "").split("::", 1)[0]
+                node = record["nodeid"] or "<session>"
+                evidence.collection_errors.append(node)
+                evidence.metadata.setdefault("error_sources", {})[node] = (record["nodeid"] or "").split("::", 1)[0]
+                detail = collection_cause(record.get("message"))
+                evidence.metadata.setdefault("collection_error_causes", {})[node] = detail["cause"]
+                evidence.metadata.setdefault("collection_error_details", {})[node] = detail
             elif record["type"] == "deselected":
                 evidence.deselected.append(record["nodeid"])
             elif record["type"] == "report":
@@ -286,6 +303,12 @@ class PytestNativeAdapter(PythonStatic):
         if any("<locals>" in inv.declaration_id for inv in evidence.invocations):
             evidence.limitations.append("dynamically generated tests: declaration is a runtime factory, not a source definition")
 
+        if evidence.collection_errors:
+            causes = evidence.metadata["collection_error_causes"]
+            listed = "; ".join(f"{node}: {cause}" for node, cause in list(causes.items())[:3])
+            if len(causes) > 3:
+                listed += f"; and {len(causes) - 3} more (all in collection_error_details)"
+            evidence.limitations.append(f"tests under these paths were not collected, so they did not run: {listed}")
         bad = {Outcome.FAILED, Outcome.ERROR}
         if evidence.collection_errors or any(inv.outcome in bad for inv in evidence.invocations):
             evidence.status = StageStatus.FAIL

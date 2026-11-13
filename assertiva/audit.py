@@ -36,10 +36,37 @@ from .verification import GateMode, VerificationKind, artifact_lineage, delivery
 from .workspace import boundary_report, capture_baseline, read_only_guard, remove_tree
 
 
+def _imported_findings(imported: list) -> list[Finding]:
+    """Failures and errors that imported result files report: their source (the file's name, never its path), their
+    trust (EXTERNAL_UNVERIFIED: the revision and environment that produced them are not verified) and the cases."""
+    failed = [(run, inv) for run in imported for inv in run.invocations if inv.outcome in (Outcome.FAILED, Outcome.ERROR)]
+    errors = [e for run in imported for e in run.collection_errors]
+    if not failed and not errors:
+        return []
+    bad = [run for run in imported if run.collection_errors or any(r is run for r, _ in failed)]
+    sources = []
+    for run in bad:
+        read = next((c for c in run.command if str(c).startswith("read ")), "")
+        name = Path(str(read).removeprefix("read ").strip()).name if read else None
+        entry = {"adapter": run.adapter_id, "file": name}
+        if entry not in sources:
+            sources.append(entry)
+    return [Finding(
+        "IMPORTED_TEST_RESULTS_FAILING",
+        "Imported test results report failures; Assertiva did not run these tests.",
+        {"count": len(failed), "tests": [inv.invocation_id for _, inv in failed][:20], "collection_errors": len(errors),
+         "sources": sources, "provenance": "EXTERNAL_UNVERIFIED",
+         "revision": "not verified: the file does not prove which revision or environment produced it"})]
+
+
 def _native_findings(current: StateEvidence, static_total: int, reported: tuple = ()) -> list[Finding]:
     """``reported``: runs whose failures a declared-check finding already reports (one cause, one finding)."""
     findings = []
-    own = [run for run in current.runs if not any(run is r for r in reported)]
+    considered = [run for run in current.runs if not any(run is r for r in reported)]
+    # CP-B (v1.0): results read from files (JUnit, CTRF, Allure) are another source; their failures are reported as
+    # such and never as the native runner's
+    own = [run for run in considered if run.mode != "report"]
+    findings += _imported_findings([run for run in considered if run.mode == "report"])
     invocations = [inv for run in own for inv in run.invocations]
     errors = [e for run in own for e in run.collection_errors]
     if errors:
@@ -257,7 +284,11 @@ def _undetected(run) -> dict:
 def _mutation_findings(current: StateEvidence) -> list[Finding]:
     findings = []
     for run in current.mutation:
-        if run.error:
+        if run.error and run.stage:  # AXF-VN-01: a run that never produced results is not an unreadable report
+            findings.append(Finding("MUTATION_RUN_NOT_COMPLETED", "A mutation run stopped before producing results; it provides no evidence.",
+                                    {"tool": run.tool, "stage": run.stage, "error": run.error, "targets": list(run.targets),
+                                     "selected_tests": list((run.config.get("test_selection") or {}).get("tests") or [])}))
+        elif run.error:
             findings.append(Finding("MUTATION_REPORT_UNREADABLE", "A mutation report could not be read; it provides no evidence.", {"source": run.source, "error": run.error}))
         elif run.matches_state is False:
             findings.append(Finding("MUTATION_REPORT_SOURCE_MISMATCH", "A mutation report was produced for different source than the audited project.", {"source": run.source, "limitations": run.limitations}))

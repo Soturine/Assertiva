@@ -58,6 +58,8 @@ def test_a_django_project_runs_through_manage_py_test_with_per_test_outcomes(tmp
     assert {"test_the_live_server_answers", "test_health_answers_asynchronously", "test_a_duplicate_code_rolls_back_the_whole_pair"} <= set(names)
     assert run.coverage is not None and run.coverage.counts["line"]["covered"] > 0
     assert not (root / "db.sqlite3").exists()  # the runner created its own test database
+    # AXF-VN-03: the Django run observes where the project's apps were imported from, like pytest and unittest
+    assert run.metadata["source_identity"]["status"] == "SOURCE_TREE" and run.metadata["source_identity"]["loaded"] > 0
 
 
 def test_failures_skips_subtests_and_load_errors_are_distinct(tmp_path):

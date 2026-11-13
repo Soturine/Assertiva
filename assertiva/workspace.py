@@ -17,7 +17,9 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -410,18 +412,68 @@ def remove_workspace(baseline: Baseline | None, workspace: str | Path) -> None:
     remove_tree(workspace)
 
 
-def remove_tree(path: str | Path) -> None:
-    """Delete a directory without following links inside it (junctions included)."""
+def remove_tree(path: str | Path) -> list[str]:
+    """Delete a directory without following links inside it (junctions included).
+
+    Never raises; returns what could not be removed, as ``ErrorType: relative/path`` (empty when everything went)."""
     path = Path(path)
     if not os.path.lexists(path):
-        return
+        return []
     for root, dirs, files in os.walk(path, topdown=True):
         for name in [*dirs]:
             child = Path(root) / name
             if is_link(child):
                 dirs.remove(name)
                 _unlink_link(child)
-    shutil.rmtree(path, ignore_errors=True)
+    failures: list[str] = []
+
+    def _failed(function, failed_path, error):
+        error = error[1] if isinstance(error, tuple) else error
+        try:
+            where = Path(failed_path).relative_to(path).as_posix() or "."
+        except ValueError:
+            where = Path(failed_path).name
+        failures.append(f"{type(error).__name__}: {where}")
+
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_failed)
+    else:  # pragma: no cover - Python 3.11
+        shutil.rmtree(path, onerror=_failed)
+    return failures
+
+
+@contextmanager
+def disposable_dir(prefix: str, limitations: list[str], record: dict | None = None) -> Iterator[Path]:
+    """A temporary directory whose failed cleanup is declared, never raised.
+
+    Dogfood (Prescripta, 2026-11): on Windows a ``python.exe`` of a throwaway venv was still locked when
+    ``TemporaryDirectory`` cleaned up, and the ``PermissionError`` ended the whole audit without a report. The
+    evidence already gathered must survive; what was left behind is stated in ``limitations`` and, when ``record`` is
+    given, as ``record["cleanup"]`` (status REMOVED or INCOMPLETE, residue, error types). Exported text names the
+    directory, never its absolute path (it contains the user's name on most systems).
+    """
+    path = Path(tempfile.mkdtemp(prefix=prefix))
+    try:
+        yield path
+    finally:
+        # Cleanup never replaces an error of the body (that one propagates) and never claims success when something
+        # stayed. One short second attempt covers a handle released a moment late (a scanner, a child exiting); no
+        # loop. Only this directory, created here, is removed; links inside it are unlinked, never followed.
+        failures = remove_tree(path)
+        if failures and os.path.lexists(path):
+            time.sleep(0.2)
+            failures = remove_tree(path) or failures
+        left = os.path.lexists(path)
+        if record is not None:
+            record["cleanup"] = {"status": "INCOMPLETE" if left else "REMOVED", "residue": left,
+                                 "directory": path.name, "location": "the system temporary directory",
+                                 "errors": failures[:5] if left else [], "error_count": len(failures) if left else 0}
+        if left:
+            causes = ", ".join(sorted({f.split(":", 1)[0] for f in failures})) or "unknown cause"
+            limitations.append(
+                f"a temporary workspace could not be fully removed ({causes} on {len(failures)} entries); "
+                f"{path.name} was left in the system temporary directory: delete it once no process uses it"
+            )
 
 
 def _unlink_link(path: Path) -> None:

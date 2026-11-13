@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assertiva"
-version = "0.10.1"
+version = "1.0.0"
 description = "Adaptive Test Intelligence & Assurance for coding agents"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -28,3 +28,15 @@ markers = [
     "browser: drives a real browser (needs an installed browser build; runs in its own CI job)",
     "jvm: runs a real JVM build (needs a JDK, Maven and resolved dependencies; runs in its own CI job)",
 ]
+
+[tool.ruff]
+# Correctness gate, not a formatter: pyflakes and statement/syntax errors. Fixtures are labeled inputs of the tests
+# (some are invalid on purpose) and are not linted. The codebase's style choices (one-line compound statements, named
+# lambdas, short loop names) are kept. Bugbear (B) has 23 findings left for a later, reviewed pass.
+target-version = "py311"
+line-length = 140
+extend-exclude = ["tests/fixtures", "build"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = ["E702", "E731", "E741"]

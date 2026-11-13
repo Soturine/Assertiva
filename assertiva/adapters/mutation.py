@@ -267,34 +267,36 @@ def run_mutation_tool(state_root: str | Path, python: str, targets: list[str], t
     adapters = {adapter.KEY: adapter for adapter in _adapters()}
     options = mutation_tools(state_root, python, origin)
     if tool is not None and tool not in adapters:
-        return MutationRun(source="mutation tool", error=f"unknown mutation tool {tool!r}; integrated: {', '.join(adapters)}")
+        return MutationRun(source="mutation tool", error=f"unknown mutation tool {tool!r}; integrated: {', '.join(adapters)}", stage="tool_selection")
     named = [o for o in options if tool is None or o["tool"] == tool]
     applicable = [o for o in named if o["applies"]]
     if not applicable:
         why = "; ".join(f"{o['name']}: {o['why']}" for o in named)
         return MutationRun(source="mutation tool", error=f"no integrated mutation tool applies to this project ({why}); "
-                                                        "import a report with --mutation-report")
+                                                        "import a report with --mutation-report", stage="tool_selection")
     if len(applicable) > 1:
         return MutationRun(source="mutation tool", error="several mutation tools apply ("
-                           + "; ".join(f"{o['tool']}: {o['why']}" for o in applicable) + "); choose one with --mutation-tool")
+                           + "; ".join(f"{o['tool']}: {o['why']}" for o in applicable) + "); choose one with --mutation-tool", stage="tool_selection")
     chosen = applicable[0]
     if chosen["blocked"]:
-        return MutationRun(source="mutation tool", tool=chosen["name"], error=chosen["blocked"])
+        return MutationRun(source="mutation tool", tool=chosen["name"], error=chosen["blocked"], stage="environment")
     if tests:
         adapter = adapters[chosen["tool"]]
         if not getattr(adapter, "SELECTS_TESTS", False):
             return MutationRun(source="mutation tool", tool=chosen["name"],
-                               error=f"{chosen['name']} cannot be limited to selected tests here; run without --mutate-tests")
+                               error=f"{chosen['name']} cannot be limited to selected tests here; run without --mutate-tests", stage="selection")
         bad = {t: why for t in tests if (why := unsafe_test_path(Path(state_root), t))}
         if bad:
             return MutationRun(source="mutation tool", tool=chosen["name"], error="selected tests must be files or folders "
-                               "inside the project, reached without links: " + "; ".join(f"{t}: {w}" for t, w in bad.items()))
+                               "inside the project, reached without links: " + "; ".join(f"{t}: {w}" for t, w in bad.items()), stage="selection")
         chosen = {**chosen, "tests": list(tests)}
     try:
         run = adapters[chosen["tool"]].execute(Path(state_root), python, list(targets), Path(origin or state_root), chosen)
     except OSError as exc:  # the copy could not be made or read (a path too long, a file in use): nothing was concluded
         return MutationRun(source="mutation tool", tool=chosen["name"], orchestrated=True, targets=tuple(targets),
-                           error=f"the run could not use a copy of this state ({type(exc).__name__}: {exc})"[:300])
+                           error=f"the run could not use a copy of this state ({type(exc).__name__}: {exc})"[:300], stage="copy")
+    if run.error and run.stage is None:  # an engine-run tool that stopped: never presented as an unreadable report
+        run.stage = "execution"
     run.config = {**run.config, "selected": chosen["tool"],
                   "selected_because": chosen["why"] + (" (named by the user)" if tool else "")}
     return run

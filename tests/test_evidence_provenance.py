@@ -30,7 +30,8 @@ def test_a_parallel_report_is_not_given_a_wall_clock_from_summed_cases(tmp_path)
     assert run.metadata["cases_duration_sum_s"] == 22.5 and run.metadata["reported_root_time_s"] == 12.0
     assert [s["reported_time_s"] for s in run.metadata["suites"]] == [11.5, 11.8]
     metrics = state_metrics(StateEvidence("current", "report", runs=[run]))
-    assert metrics["wall_clock_s"].value is None and metrics["test_time_accumulated_s"].value == 22.5
+    # v1.0: an imported report is counted apart from executed runs, and still never given a wall clock
+    assert "wall_clock_s" not in metrics and metrics["imported_time_accumulated_s"].value == 22.5
 
 
 def test_cases_are_not_declarations_but_parameter_suffixes_group_them(tmp_path):
@@ -39,7 +40,8 @@ def test_cases_are_not_declarations_but_parameter_suffixes_group_them(tmp_path):
     params = [inv for inv in run.invocations if inv.parameters_id]
     assert {inv.parameters_id for inv in params} == {"10", "20"} and len({inv.declaration_id for inv in params}) == 1
     metrics = state_metrics(StateEvidence("current", "report", runs=[run]))
-    assert "test_declarations" not in metrics and metrics["test_invocations"].value == 5  # cases, never declarations
+    assert "test_declarations" not in metrics and metrics["imported_invocations"].value == 5  # cases, never declarations
+    assert "test_invocations" not in metrics  # v1.0: ingested cases are not executions (AXR-02)
 
 
 def test_an_incomplete_or_invalid_report_is_not_evidence(tmp_path):

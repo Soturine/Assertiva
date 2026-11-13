@@ -154,3 +154,50 @@ def test_a_copy_that_cannot_be_made_is_an_explained_error_not_a_crash(tmp_path, 
     monkeypatch.setattr(stryker, "run", too_long)
     run = run_mutation_tool(tmp_path, sys.executable, ["src/a.js"])
     assert "could not use a copy" in run.error and run.counts == {} and run.orchestrated
+
+
+@pytest.mark.integration
+def test_cosmic_ray_runs_only_a_selected_unittest_file(tmp_path):
+    """AXF-VN-01 end to end: --mutate-tests with one unittest file plans and kills mutants (it planned none before)."""
+    import subprocess
+
+    python = os.environ.get("ASSERTIVA_MUTATION_PYTHON") or sys.executable
+    if subprocess.run([python, "-c", "import cosmic_ray"], capture_output=True).returncode != 0:
+        if os.environ.get("ASSERTIVA_REQUIRE_MUTATION"):
+            pytest.fail("needs an interpreter with cosmic-ray (this one, or ASSERTIVA_MUTATION_PYTHON)")
+        pytest.skip("needs an interpreter with cosmic-ray (this one, or ASSERTIVA_MUTATION_PYTHON)")
+    write(tmp_path / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(tmp_path / "tests" / "test_calc.py", "import unittest\nfrom calc import add\n\n"
+                                                "class T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n")
+    write(tmp_path / "tests" / "test_slow.py", "import unittest\n\nclass S(unittest.TestCase):\n    def test_s(self):\n        self.assertTrue(True)\n")
+    write(tmp_path / ".assertiva.toml", '[tests]\nrunners = ["unittest"]\n')
+    run = run_mutation_tool(tmp_path, python, ["calc.py"], tests=["tests/test_calc.py"])
+    assert run.error is None, run.error
+    assert run.config["test_command"][-1] == "tests.test_calc"
+    assert run.config["test_selection"]["whole_suite"] == "NOT_RUN"
+    assert run.counts.get("KILLED", 0) > 0
+
+
+@pytest.mark.integration
+def test_cosmic_ray_refuses_a_selection_that_runs_no_test(tmp_path):
+    """A selected unittest file without tests must not become a baseline (every mutant would 'survive' on 3.11)."""
+    import subprocess
+
+    python = os.environ.get("ASSERTIVA_MUTATION_PYTHON") or sys.executable
+    if subprocess.run([python, "-c", "import cosmic_ray"], capture_output=True).returncode != 0:
+        if os.environ.get("ASSERTIVA_REQUIRE_MUTATION"):
+            pytest.fail("needs an interpreter with cosmic-ray (this one, or ASSERTIVA_MUTATION_PYTHON)")
+        pytest.skip("needs an interpreter with cosmic-ray (this one, or ASSERTIVA_MUTATION_PYTHON)")
+    write(tmp_path / "calc.py", "def add(a, b):\n    return a + b\n")
+    write(tmp_path / "tests" / "test_calc.py", "import unittest\nfrom calc import add\n\n"
+                                                "class T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(1, 2), 3)\n")
+    write(tmp_path / "tests" / "test_empty.py", "HELPER = 1\n")
+    write(tmp_path / "tests" / "test_broken.py", "import does_not_exist_anywhere\n")
+    write(tmp_path / ".assertiva.toml", '[tests]\nrunners = ["unittest"]\n')
+    empty = run_mutation_tool(tmp_path, python, ["calc.py"], tests=["tests/test_empty.py"])
+    assert empty.stage == "selection" and "ran no test" in empty.error and empty.mutants == []
+    broken = run_mutation_tool(tmp_path, python, ["calc.py"], tests=["tests/test_broken.py"])
+    assert broken.stage == "selection" and "no mutant was run" in broken.error and broken.mutants == []
+    good = run_mutation_tool(tmp_path, python, ["calc.py"], tests=["tests/test_calc.py"])
+    assert good.error is None and good.config["baseline"]["tests_ran"] == 1
+    assert good.config["test_selection"]["baseline_tests_ran"] == 1

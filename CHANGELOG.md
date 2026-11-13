@@ -1,5 +1,59 @@
 # Changelog
 
+## [1.0.0] — 2026-11-13 — Evidence-Grounded Test Assurance
+
+Published as the GitHub Release `v1.0.0` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on
+2026-11-13 with two semantic-evaluation REVIEWs accepted as documented limitations. Release notes:
+[docs/releases/v1.0.0.md](docs/releases/v1.0.0.md).
+
+Integrated on `integration/v1.0-foundation` from `main` (`2618d95`, v0.10.1): PR #8 (VozNativa intake and the
+AXF-VN-01 fix), PR #7 (seven semantic eval cases), PR #6 (Randomizer intake) and the two Prescripta branches, each
+merged without squash. Contract changes are in [docs/MIGRATION_V1.md](docs/MIGRATION_V1.md). Each item's reproducer,
+fail-before test and real-project evidence are in [docs/assurance/V1_REMEDIATION.md](docs/assurance/V1_REMEDIATION.md).
+Dogfood: [V1_DOGFOOD.md](docs/assurance/V1_DOGFOOD.md); agent-led evaluation:
+[V1_AGENT_EVALS.md](docs/assurance/V1_AGENT_EVALS.md); readiness:
+[V1_RELEASE_READINESS.md](docs/assurance/V1_RELEASE_READINESS.md). Merged through PR #9 with a merge commit (no squash).
+
+### Evidence integrity
+- **unittest and Django runs record their code identity** (AXF-VN-03). The pytest plugin's in-process observer is now
+  shared by every Python runner. A run that records nothing stays UNKNOWN.
+- **Tests against the installed wheel use the project's runner and must prove they imported it** (AXF-VN-04).
+  unittest projects are qualified against the wheel. Two defects found along the way are fixed: the installed run's
+  identity was always UNKNOWN (the observer could not know the wheel's names), and on POSIX the venv interpreter
+  symlink was resolved to the base installation.
+- **Imported results are counted apart from executed runs** (AXR-02): `imported_*` metrics. This is a contract change.
+- **A mutation run that stopped says where** (AXF-VN-01). Building on PR #8's fix: an empty or unloadable test
+  selection is a selection failure (on Python 3.11, unittest exits 0 after "Ran 0 tests"), recorded as
+  `MUTATION_RUN_NOT_COMPLETED` with its stage instead of `MUTATION_REPORT_UNREADABLE`.
+- **Collection causes are kept, sanitized and classified** (Prescripta). The `removeprefix("E")` defect of the first
+  fix (`Exception:` became `xception:`) is fixed. A versioned sanitizer runs before the bound; unittest load errors are
+  sanitized too.
+- **A failed cleanup is declared with its real cause and never exports the temp path** (Prescripta). The errors that
+  `ignore_errors=True` hid are reported, and the cleanup status is recorded separately.
+
+### Detection
+- **Conservative unittest inference** for projects that declare no runner (AXF-VN-05).
+- **`FILTERED_LOOP_ASSERTION`** (AXF-VN-02). Frozen benchmark v2 is unchanged (precision 1.0, recall 0.70).
+- **CI parity follows project scripts** (AXR-03/04/05/06/08). One hop through `package.json` scripts, command tables
+  read as INFERRED, repetition only within one workflow. Each local check has a state (addendum CP-A): COVERED,
+  POSSIBLY_COVERED (new `LOCAL_CHECK_POSSIBLY_RUN_BY_CI_SCRIPT`, with the traceable chain) or NOT_OBSERVED (default
+  severity). An opaque CI step without a link no longer lowers a gap, as an intermediate version of this branch did.
+- **Imported failures are named as imported** (addendum CP-B): new `IMPORTED_TEST_RESULTS_FAILING`; `NATIVE_*` findings
+  only for runs Assertiva executed.
+
+### CLI and CI
+- **`assertiva audit --fail-on CONDITION`**: an opt-in gate with exit 1 and a `gate` field in the report. The default
+  exit codes are unchanged.
+- **ruff correctness gate** (E4/E7/E9/F, zero baseline; ruff 0.17.3 pinned).
+- **CI economy:** fast validation on pull requests; full qualification on `main`, `v*` tags and `workflow_dispatch`;
+  `concurrency` cancels obsolete pull-request runs only.
+
+### Evaluation
+- First runs of AXF-08 and the seven PR #7 cases: 6 PASS, 2 REVIEW, 0 FAIL by the judge, and the AXF-08 marker gate
+  passed. 840,610 tokens. Agent and judge are the same model family, so this is not an independent qualification.
+  Operator adjudication against the frozen pass conditions: FISCAL stays REVIEW, PROFILE does not meet them (FAIL
+  reading). The owner decides; the recorded verdicts are unchanged.
+
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 
 Published as the GitHub Release `v0.10.1` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on

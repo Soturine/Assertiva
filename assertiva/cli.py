@@ -89,6 +89,8 @@ def _audit(args: argparse.Namespace) -> int:
         raise UsageError("--mutate-tests selects the tests for --mutate; name the files to mutate with --mutate")
     directory = _report_dir(root, args.report_dir)
     if args.assessment:
+        if args.fail_on:
+            raise UsageError("--fail-on gates a new audit; it cannot be combined with --assessment")
         return _attach(root, directory, args)
     report = run_audit(root, execute=args.execute, python=args.python, mutation_reports=args.mutation_report or [],
                        junit_reports=args.junit_xml or [], coverage_reports=args.coverage_report or [], changed_since=args.changed_since,
@@ -99,13 +101,21 @@ def _audit(args: argparse.Namespace) -> int:
                        mutation_tool=args.mutation_tool, mutation_tests=args.mutate_tests or [],
                        dependencies=args.dependencies)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
+    if args.fail_on:  # opt-in: without it the exit status keeps meaning "the audit completed"
+        from .gate import evaluate
+
+        report["gate"] = evaluate(report, args.fail_on)
     report["report_path"] = str(write_report(report, directory, "audit"))
     lines = [f"Assertiva audit: {report['status']} ({root})"]
     lines += [f"[{f['severity'].upper()}] {f['code']}: {f['summary']}" for f in report["findings"]]
     lines += ["Not evidenced:"] + [f"  - {item}" for item in report["claim_boundary"]["not_evidenced"]]
     lines.append(f"Report: {report['report_path']}")
+    gate = report.get("gate")
+    if gate:
+        lines.append(f"Gate (--fail-on {' '.join(c['condition'] for c in gate['conditions'])}): {gate['result']}")
+        lines += [f"  - {c['condition']}: {', '.join(c['because'])}" for c in gate["conditions"] if c["result"] == "FAIL"]
     _emit(report, args.output, lines)
-    return 0
+    return gate["exit_code_on_fail"] if gate and gate["result"] == "FAIL" else 0
 
 
 def _controls(path: str | None) -> list[NegativeControl]:
@@ -310,6 +320,11 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--run-check", action="append", metavar="CHECK_ID",
                        help="reproduce a discovered verification check (see verification_surface) in a disposable copy; "
                             "deploy/publish checks never run")
+    audit.add_argument("--fail-on", action="append", metavar="CONDITION",
+                       choices=["test-failure", "not-passing", "imported-failure", "artifact", "high-findings", "findings"],
+                       help="opt-in CI gate (repeatable): exit 1 when the report meets CONDITION (test-failure, not-passing, "
+                            "imported-failure, artifact, high-findings, findings); the decision is written to the report's "
+                            "'gate'. Without it, exit 0 only means the audit completed")
     audit.add_argument("--assessment", metavar="FILE", help="attach the auditing agent's assessment (JSON) to the last audit run "
                                                             "and re-render its report; executes nothing")
     audit.set_defaults(handler=_audit)

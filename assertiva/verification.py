@@ -99,7 +99,58 @@ def discover_surface(root) -> VerificationSurface:
         tool = next((t for a in resolvers if (t := a.effective_tool(Path(root), check))), None)
         if tool and tool != check.tool:
             check.metadata["effective_tool"] = tool
+    # which declared project scripts a step runs, directly or through nested scripts (AXR-03): matching only
+    scripted = [a for a in supported if hasattr(a, "invoked_scripts")]
+    for check in surface.by_origin(VerificationOrigin.CI) + surface.by_origin(VerificationOrigin.HOOK):
+        invoked = [s for a in scripted for s in a.invoked_scripts(Path(root), check)]
+        if invoked:
+            check.metadata["invokes_scripts"] = invoked
+    _link_possible_runs(Path(root), surface)
     return surface
+
+
+def _link_tokens(root, check: VerificationCheck) -> list[str]:
+    """The project files a local check's command names (``node tests/js/ui.test.mjs`` -> that file): the only evidence
+    accepted to tie the check to a script CI runs. Tool names alone are too common to tie anything."""
+    import shlex
+
+    try:
+        tokens = shlex.split(check.command or "", posix=True)
+    except ValueError:
+        tokens = (check.command or "").split()
+    out = []
+    for token in tokens:
+        rel = token.replace("\\", "/").removeprefix("./")
+        if "/" not in rel and "." not in rel:
+            continue
+        path = (root / rel)
+        try:
+            if path.is_file() and root.resolve() in path.resolve().parents and rel not in out:
+                out.append(rel)
+        except OSError:
+            continue
+    return out
+
+
+def _link_possible_runs(root, surface: "VerificationSurface") -> None:
+    """CP-A (v1.0): a local check not run by name may still run inside a script CI reaches. It is POSSIBLY_COVERED only
+    when that script names one of the project files the check's command names; an unrelated opaque step proves
+    nothing and changes nothing. Read statically; nothing runs."""
+    from .ci import reached_scripts, script_literals
+
+    delivery = surface.by_origin(VerificationOrigin.CI)
+    reached = {ci.check_id: [(r, script_literals(r["script"], r["text"])) for r in reached_scripts(root, ci)] for ci in delivery}
+    for local in surface.by_origin(VerificationOrigin.HOOK) + surface.by_origin(VerificationOrigin.LOCAL):
+        tokens = _link_tokens(root, local)
+        links = []
+        for ci in delivery if tokens else ():
+            for entry, words in reached[ci.check_id]:
+                hit = next((t for t in tokens if t in words), None)
+                if hit:
+                    links.append({"ci": ci.check_id, "via_package_script": entry["via"], "script": entry["script"],
+                                  "command": entry["command"], "matched": hit})
+        if links:
+            local.metadata["possibly_run_by"] = links[:5]
 
 
 def _tool(check: VerificationCheck) -> str | None:
@@ -108,6 +159,9 @@ def _tool(check: VerificationCheck) -> str | None:
 
 def _covers(delivery: VerificationCheck, local: VerificationCheck) -> bool:
     if _tool(local) and _tool(delivery) == _tool(local):
+        return True
+    script = local.metadata.get("script")  # a project script the step runs, by name or through another script
+    if script and script in (delivery.metadata.get("invokes_scripts") or []):
         return True
     runs = delivery.metadata.get("runs_hooks") or []
     return "*" in runs or local.metadata.get("hook_id") in runs
@@ -136,7 +190,9 @@ def surface_findings(surface: VerificationSurface) -> list:
         findings.append(Finding(
             "NESTED_SCRIPT_REPETITION",
             "CI invokes package scripts that run the same script more than once through nested scripts; the repeats add cost, not distinct evidence.",
-            {"repeated": repeated, "basis": "DECLARED: package.json scripts and CI steps, not execution"}, severity="info"))
+            {"repeated": repeated, "basis": "DECLARED: package.json scripts and CI steps, not execution",
+             "scope": "within one workflow file; steps of different workflows may run on different events and are not compared"},
+            severity="info"))
     masked = []
     for check in delivery:
         ignored = any(i.get("status_ignored") and i.get("kind") == VerificationKind.TEST.value for i in check.metadata.get("invocations") or [])
@@ -152,13 +208,39 @@ def surface_findings(surface: VerificationSurface) -> list:
             severity="medium",
             recommendation="Let the test command's status fail the step: drop `|| true`, set pipefail (an explicit bash shell or "
                            "`set -o pipefail`), or stop piping the runner's output."))
-    missing = [check.check_id for check in local if not any(_covers(ci, check) for ci in delivery)]
+    uncovered = [check for check in local if not any(_covers(ci, check) for ci in delivery)]
+    # one state per check (CP-A): COVERED (run by tool identity or by script name), POSSIBLY_COVERED (a script CI
+    # reaches names a file the check's command runs: a traceable chain, INFERRED), NOT_OBSERVED (no link). An opaque
+    # CI step without such a link is listed for the reader and never changes a check's state or the severity.
+    possible = [check for check in uncovered if check.metadata.get("possibly_run_by")]
+    missing = [check.check_id for check in uncovered if not check.metadata.get("possibly_run_by")]
+    opaque = [ci.check_id for ci in delivery if ci.kind is VerificationKind.UNKNOWN and ci.command]
     if missing:
         findings.append(
             Finding(
                 "LOCAL_CHECK_NOT_OBSERVED_IN_CI",
                 "Local/hook checks were not observed in CI; a green pipeline does not cover them.",
-                {"checks": missing, "matching": "by tool identity or CI hook runner; renamed tools may be missed"},
+                {"checks": missing, "state": "NOT_OBSERVED",
+                 "matching": "by tool identity, CI hook runner, script name, or a project file a CI-reached script names; "
+                             "renamed tools may be missed",
+                 **({"unlinked_opaque_ci_steps": opaque[:20],
+                     "opaque_note": "CI also runs commands nothing classifies; none of them names a file these checks run, "
+                                    "so they are not counted as coverage and do not change the severity"} if opaque else {})},
+            )
+        )
+    if possible:
+        findings.append(
+            Finding(
+                "LOCAL_CHECK_POSSIBLY_RUN_BY_CI_SCRIPT",
+                "Local checks are not run by name in CI, but a script CI runs names the files they run; coverage is possible, not shown.",
+                {"count": len(possible),
+                 "checks": [{"check": check.check_id, "state": "POSSIBLY_COVERED", "matched": check.metadata["possibly_run_by"][0]["matched"],
+                             "chain": [{k: v for k, v in link.items() if k != "matched"} for link in check.metadata["possibly_run_by"]],
+                             "basis": "INFERRED: the script's source names the file; whether, how and with which arguments it "
+                                      "runs it is not interpreted"} for check in possible],
+                 "basis": "STATIC reading of the CI step, package.json and the reached scripts; nothing was run"},
+                severity="medium",
+                recommendation="Confirm that the CI script really runs these checks (its log or a run of the step), or run them in CI by name.",
             )
         )
     if local:
@@ -166,7 +248,7 @@ def surface_findings(surface: VerificationSurface) -> list:
             check.command or check.tool or check.check_id
             for check in delivery
             if check.kind is not VerificationKind.UNKNOWN or check.command
-            if not any(_tool(check) == _tool(item) for item in local) and not check.metadata.get("runs_hooks")
+            if not any(_tool(check) == _tool(item) or _covers(check, item) for item in local) and not check.metadata.get("runs_hooks")
         ]
         if ci_only:
             findings.append(

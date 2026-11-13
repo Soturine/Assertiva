@@ -141,12 +141,19 @@ _SHELL_RUNS = {"pytest": re.compile(r"(?:^|[\s;&|(])(?:python[\d.]*\s+-m\s+)?pyt
 def _python_script_runs(text: str, tool: str) -> bool:
     """Whether a Python script's source invokes ``tool``: `pytest.main(...)`, `unittest.main(...)`, or the runner's
     name as a literal argument of a call (`subprocess.run([sys.executable, "-m", "pytest"])`). Read, never run."""
+    return _python_script_basis(text, tool) is not None
+
+
+def _python_script_basis(text: str, tool: str) -> str | None:
+    """How a script's source shows it runs ``tool`` (STATIC: in the launching call itself; INFERRED: an argument list
+    ``[..., "-m", tool, ...]`` kept in a table and launched elsewhere through a variable), or None."""
     import ast
 
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
-        return False
+        return None
+    launches = False
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -156,44 +163,108 @@ def _python_script_runs(text: str, tool: str) -> bool:
         leaf = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
         if leaf not in _LAUNCHERS:  # `print("pytest")` mentions the runner; it does not run it
             continue
+        launches = True
         literals = [n.value for arg in node.args for n in ast.walk(arg) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
         if any(value == tool or value.split()[:1] == [tool] or f"-m {tool}" in value for value in literals):
-            return True
-    return False
+            return "STATIC"
+    if launches:  # Randomizer dogfood: commands kept as data (`("tests", [python, "-m", "unittest", ...])`), run later
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.List, ast.Tuple)):
+                items = [e.value if isinstance(e, ast.Constant) else None for e in node.elts]
+                if any(items[i] == "-m" and items[i + 1] == tool for i in range(len(items) - 1)):
+                    return "INFERRED"
+    return None
 
 
 def scripts_running(root: str | Path, tool: str) -> list[dict]:
     """CI steps that run a repository script whose source invokes ``tool`` (AXF-M3-01): `python tools/gate.py`, `bash
     ci/test.sh`, `./run-tests.sh`. One level, read statically: the script's own arguments to the runner (which tests
     it selects) are not interpreted, so the scope stays unknown. A script that does not mention the runner is not one."""
-    from .adapters.commands import _tokens, classify_command
     from .verification import VerificationOrigin, discover_surface
 
     root = Path(root).resolve()
     found = []
     for check in discover_surface(root).by_origin(VerificationOrigin.CI):
-        if not check.command:
+        for reached in reached_scripts(root, check):
+            text, suffix = reached["text"], Path(reached["script"]).suffix
+            basis = _python_script_basis(text, tool) if suffix == ".py" else "STATIC" if any(
+                _SHELL_RUNS[tool].search(line) for line in text.splitlines() if not line.lstrip().startswith("#")) else None
+            if basis:
+                found.append({"workflow": check.source.split("#")[0], "command": reached["command"],
+                              "script": reached["script"], "basis": basis,
+                              **({"via_package_script": reached["via"]} if reached["via"] else {})})
+    return found
+
+
+def reached_scripts(root: str | Path, check) -> list[dict]:
+    """Repository scripts a declared step runs: the step's own unclassified commands, and one hop through the project's
+    package scripts (AXR-03: npm run verify -> python tools/verify.py). The graph of scripts is cycle-safe; only what
+    package.json and the step declare is read, nothing is run. Each entry: the command, the package script it came
+    through (or None), the script's path relative to the root and its text."""
+    from .adapters.commands import _tokens, classify_command
+
+    root = Path(root).resolve()
+    if not check.command:
+        return []
+    directory = root / str(check.metadata.get("working_directory") or "")
+    cls = classify_command(check.command)
+    segments = [(s, None) for s in (cls.unclassified or ((check.command,) if cls.kind.value == "UNKNOWN" else ()))]
+    scripts = _package_scripts(directory)
+    if scripts:
+        from .adapters.package_scripts import invoked
+
+        for name in invoked(check.command, scripts):
+            inner = classify_command(str(scripts[name]))
+            own = inner.unclassified or ((str(scripts[name]),) if inner.kind.value == "UNKNOWN" else ())
+            segments += [(s, name) for s in own]
+    out = []
+    for segment, via in segments:
+        tokens = _tokens(segment)
+        if not tokens:
             continue
-        directory = root / str(check.metadata.get("working_directory") or "")
-        cls = classify_command(check.command)
-        for segment in (cls.unclassified or ((check.command,) if cls.kind.value == "UNKNOWN" else ())):
-            tokens = _tokens(segment)
-            if not tokens:
-                continue
-            path = tokens[1] if tokens[0] in _SCRIPT_RUNNERS and len(tokens) > 1 else tokens[0]
-            script = (directory / path).resolve()
-            if not (script.is_file() and root in script.parents) or script.suffix not in (".py", ".sh", ".bash", ".ps1", ""):
+        path = tokens[1] if tokens[0] in _SCRIPT_RUNNERS and len(tokens) > 1 else tokens[0]
+        script = (directory / path).resolve()
+        if not (script.is_file() and root in script.parents) or script.suffix not in (".py", ".sh", ".bash", ".ps1", ""):
+            continue
+        try:
+            text = script.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        out.append({"command": segment, "via": via, "script": script.relative_to(root).as_posix(), "text": text})
+    return out
+
+
+def script_literals(script: str, text: str) -> set[str]:
+    """The strings a script states: string constants of a Python script (never executed), words of a shell script
+    outside comments. Paths are normalized (no leading ./, forward slashes)."""
+    import ast
+    import shlex
+
+    words: set[str] = set()
+    if script.endswith(".py"):
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            return set()
+        words = {n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+    else:
+        for line in text.splitlines():
+            if line.lstrip().startswith("#"):
                 continue
             try:
-                text = script.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            runs = _python_script_runs(text, tool) if script.suffix == ".py" else any(
-                _SHELL_RUNS[tool].search(line) for line in text.splitlines() if not line.lstrip().startswith("#"))
-            if runs:
-                found.append({"workflow": check.source.split("#")[0], "command": segment,
-                              "script": script.relative_to(root).as_posix(), "basis": "STATIC"})
-    return found
+                words.update(shlex.split(line, posix=True))
+            except ValueError:
+                words.update(line.split())
+    return {w.replace("\\", "/").removeprefix("./") for w in words}
+
+
+def _package_scripts(directory: Path) -> dict:
+    import json
+
+    try:
+        return json.loads((directory / "package.json").read_text(encoding="utf-8")).get("scripts") or {}
+    except (OSError, ValueError, AttributeError):
+        return {}
 
 
 def indirect_invocations(root: str | Path, tool: str) -> list[CiPytestInvocation]:

@@ -243,3 +243,61 @@ def test_calls_a_product_validator():
     validate_total(3)
 ''', {"shop/checks.py": "def validate_total(x):\n    assert x >= 0\n    return x\n"})
     assert definitions(tmp_path)["test_calls_a_product_validator"].smoke_like
+
+
+def test_axf_vn02_a_filter_over_loop_cases_is_a_vacuity_risk_not_a_conditional_check(tmp_path):
+    """VozNativa dogfood: `for value, expected in CASES: if expected: assertTrue(...)` protects the behavior (a negative
+    control on the function fails it); the advice "make the check unconditional" was wrong for it."""
+    got = facts(tmp_path, '''import unittest
+from shop.pricing import discount
+
+CASES = [(1, True), (0, False), (5, True)]
+
+
+def test_filtered_cases():
+    for value, expected in CASES:
+        if expected:
+            assert discount(value) == value
+
+
+def test_filtered_with_non_vacuity():
+    reached = 0
+    for value, expected in CASES:
+        if expected:
+            reached += 1
+            assert discount(value) == value
+    assert reached > 0
+
+
+class T(unittest.TestCase):
+    def test_filtered_subtests(self):
+        for value, expected in CASES:
+            with self.subTest(value=value):
+                if expected:
+                    self.assertEqual(discount(value), value)
+
+
+def test_guard_without_loop():
+    if CASES:
+        assert discount(1) == 1
+
+
+def test_literal_loop_never_true():
+    for i in range(3):
+        if i > 10:
+            assert discount(i) == i
+''')
+    assert got["test_filtered_cases"].smells == ("FILTERED_LOOP_ASSERTION",)
+    assert got["test_filtered_subtests"].smells == ("FILTERED_LOOP_ASSERTION",)
+    assert "FILTERED_LOOP_ASSERTION" not in got["test_filtered_with_non_vacuity"].smells  # the count makes it non-vacuous
+    assert "CONDITIONAL_ASSERTION" not in got["test_filtered_with_non_vacuity"].smells
+    assert got["test_guard_without_loop"].smells == ("CONDITIONAL_ASSERTION",)
+    assert got["test_literal_loop_never_true"].smells == ("CONDITIONAL_ASSERTION",)  # proven vacuous, not a filter
+
+    from assertiva.effectiveness import candidates
+
+    by_pattern = {c.detail["pattern"]: c for c in candidates(list(got.values())) if c.kind == "FALSE_GREEN"}
+    filtered, plain = by_pattern["FILTERED_LOOP_ASSERTION"], by_pattern["CONDITIONAL_ASSERTION"]
+    assert "unconditional" not in filtered.recommendation and "at least one case reached" in filtered.recommendation
+    assert "selection" in filtered.resolve_with and filtered.basis == "INFERRED"
+    assert "unconditional" in plain.recommendation

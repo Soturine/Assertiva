@@ -21,6 +21,8 @@ WEAK_ORACLES = frozenset({"EXISTENCE", "TRUTHY", "STATUS_ONLY", "BROAD_ERROR", "
 FALSE_GREEN_SMELLS = {
     "SWALLOWED_EXCEPTION": "an exception is caught and ignored, so the test passes whether or not the code fails",
     "CONDITIONAL_ASSERTION": "every assertion sits behind a condition, so a run where it is false asserts nothing",
+    "FILTERED_LOOP_ASSERTION": "every assertion sits behind a filter over the loop's cases: it protects the behavior for the "
+                               "cases that match, and asserts nothing if no case matches (vacuity)",
     "TAUTOLOGY": "an assertion compares a value with itself or a constant with a constant: it cannot fail",
     "UNAWAITED_ASYNC": "asynchronous work is started but never awaited, so its failure cannot fail the test",
     "ACTION_WITHOUT_CHECK": "a user action is performed and nothing checks what it did",
@@ -32,6 +34,16 @@ FALSE_GREEN_SMELLS = {
     "SELF_REFERENTIAL_ORACLE": "the expected value is computed by the same call as the actual one: the test passes whatever "
                                "the code returns",
 }
+# How to settle and fix a pattern when the generic advice is wrong for it (AXF-VN-02); others use the default.
+_RESOLUTION = {
+    "FILTERED_LOOP_ASSERTION": (
+        "a negative control on the behavior (does the test fail?) and one on the selection (with the filter matching "
+        "no case, does the test still pass?)",
+        "keep the filter; assert that at least one case reached the assertion (count the matching cases, or assert the "
+        "filtered list is not empty) so an emptied selection fails instead of passing"),
+}
+_DEFAULT_RESOLUTION = ("a deliberate behavior break (negative control or mutant) in a disposable copy: does the test fail?",
+                       "make the check unconditional and specific to the behavior; await what the test starts")
 SMELL_NOTES = {
     "SLEEP": "a fixed sleep stands in for synchronization (slow, and flaky when the wait is too short)",
     "FIXED_WAIT": "a fixed wait stands in for waiting on a condition",
@@ -100,10 +112,9 @@ def candidates(facts: list[TestFacts]) -> list[Candidate]:
         for smell, why in FALSE_GREEN_SMELLS.items():
             hit = [f for f in group if smell in f.smells]
             if hit:
+                resolve, recommendation = _RESOLUTION.get(smell, _DEFAULT_RESOLUTION)
                 out.append(Candidate("FALSE_GREEN", _ids(hit), f"{len(hit)} test(s) show the pattern {smell} in their source",
-                                     why, "a deliberate behavior break (negative control or mutant) in a disposable copy: does the test fail?",
-                                     "make the check unconditional and specific to the behavior; await what the test starts",
-                                     language=language, detail={"pattern": smell, "count": len(hit)}))
+                                     why, resolve, recommendation, language=language, detail={"pattern": smell, "count": len(hit)}))
         weak = [f for f in group if f.oracles and set(f.oracles) <= WEAK_ORACLES]
         if weak:
             kinds = Counter(o for f in weak for o in f.oracles)

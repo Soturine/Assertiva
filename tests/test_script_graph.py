@@ -95,3 +95,32 @@ def test_tests_run_through_a_package_script_are_not_reported_missing_from_ci(tmp
     assert "CI_PYTEST_NOT_OBSERVED" not in codes
     assert codes["CI_TESTS_RUN_THROUGH_SCRIPT"]["severity"] == "info"
     assert codes["CI_TESTS_RUN_THROUGH_SCRIPT"]["evidence"]["scripts"][0]["via_package_script"] == "verify"
+
+
+def test_a_command_table_launched_through_a_variable_is_inferred_not_static():
+    """Randomizer dogfood: tools/verify.py keeps `[python, "-m", "unittest", ...]` in a table and runs `subprocess.run(command)`."""
+    from assertiva.ci import _python_script_basis
+
+    table = ("import subprocess, sys\nSTEPS = [('unit', [sys.executable, '-m', 'unittest', 'discover'])]\n"
+             "for name, command in STEPS:\n    subprocess.run(command)\n")
+    assert _python_script_basis(table, "unittest") == "INFERRED"
+    assert _python_script_basis(table, "pytest") is None
+    direct = "import subprocess, sys\nsubprocess.run([sys.executable, '-m', 'pytest'])\n"
+    assert _python_script_basis(direct, "pytest") == "STATIC"
+    # controls: a table that is never launched, and a launcher whose lists do not name the runner
+    assert _python_script_basis("STEPS = [['python', '-m', 'unittest']]\nprint(STEPS)\n", "unittest") is None
+    assert _python_script_basis("import subprocess\nsubprocess.run(['node', 'x.mjs'])\nX = ['-m', 'other']\n", "unittest") is None
+
+
+def test_a_local_check_that_may_run_inside_an_opaque_ci_script_is_not_a_high_gap(tmp_path):
+    root = _wrapped(tmp_path / "opaque", workflows={"ci.yml": "on: push\n"})
+    write(root / ".github" / "workflows" / "ci.yml", "on: push\njobs:\n  v:\n    runs-on: ubuntu-latest\n    steps:\n"
+                                                     "      - run: npm run verify\n      - run: ./tools/custom-gate\n")
+    found = next(f for f in surface_findings(discover_surface(root)) if f.code == "LOCAL_CHECK_NOT_OBSERVED_IN_CI")
+    assert found.severity == "medium" and found.evidence["basis"].startswith("UNKNOWN") and found.evidence["may_run_inside"]
+    # control: when every CI step is classified, the gap is shown and keeps its default severity
+    plain = _wrapped(tmp_path / "plain", workflows={"ci.yml": "on: push\n"})
+    write(plain / ".github" / "workflows" / "ci.yml", "on: push\njobs:\n  v:\n    runs-on: ubuntu-latest\n    steps:\n"
+                                                      "      - run: npm ci\n      - run: python -m unittest discover -s tests\n")
+    shown = next(f for f in surface_findings(discover_surface(plain)) if f.code == "LOCAL_CHECK_NOT_OBSERVED_IN_CI")
+    assert shown.severity != "medium" and "may_run_inside" not in shown.evidence

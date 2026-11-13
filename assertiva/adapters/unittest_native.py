@@ -20,6 +20,7 @@ from pathlib import Path
 from assertiva.candidate import StageStatus
 from assertiva.models import Outcome, RunEvidence, TestInvocation
 from assertiva.process import execution_refusal, module_available, run_command
+from assertiva.sanitize import sanitize_message
 from assertiva.verification import SupportLevel
 
 from .base import AdapterCapability
@@ -78,7 +79,8 @@ def normalize(records: list[dict], adapter_id: str, exit_code: int | None, expec
             name = record["id"].removeprefix("unittest.loader._FailedTest.")
             run.collection_errors.append(name)
             run.metadata.setdefault("error_sources", {})[name] = name.replace(".", "/") + ".py"
-            run.metadata.setdefault("load_errors", {})[name] = record.get("message")
+            # exported text: sanitized like pytest's collection causes (credentials, tokens, e-mails, absolute paths)
+            run.metadata.setdefault("load_errors", {})[name] = sanitize_message(record.get("message"), 1000)
         elif kind == "fixture":
             outcome = _OUTCOMES.get(record.get("outcome"), Outcome.ERROR)
             run.invocations.append(TestInvocation(

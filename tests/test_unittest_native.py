@@ -267,3 +267,11 @@ def test_controls_anything_that_points_to_pytest_keeps_pytest(tmp_path):
     django = _stdlib_project(tmp_path / "django")
     write(django / "manage.py", "import django\n")
     assert python_runners(django) == {"django"}
+
+
+def test_a_load_error_message_is_sanitized_before_it_is_exported():
+    secret = "ghp_" + "b" * 36
+    run = normalize([{"type": "session"}, {"type": "load_error", "id": "unittest.loader._FailedTest.tests.test_x",
+                                            "message": f"ModuleNotFoundError: token={secret} in /home/someone/p/x.py"}], "unittest", 1)
+    message = run.metadata["load_errors"]["tests.test_x"]
+    assert secret not in message and "someone" not in message and message.startswith("ModuleNotFoundError")

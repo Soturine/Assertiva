@@ -165,11 +165,18 @@ def surface_findings(surface: VerificationSurface) -> list:
                            "`set -o pipefail`), or stop piping the runner's output."))
     missing = [check.check_id for check in local if not any(_covers(ci, check) for ci in delivery)]
     if missing:
+        # CI steps that run commands nothing classifies (a repository script) may run these checks inside them: then
+        # the gap is not shown, only possible (Randomizer dogfood: `npm run verify` -> tools/verify.py runs vitest)
+        opaque = [ci.check_id for ci in delivery if ci.kind is VerificationKind.UNKNOWN and ci.command]
         findings.append(
             Finding(
                 "LOCAL_CHECK_NOT_OBSERVED_IN_CI",
                 "Local/hook checks were not observed in CI; a green pipeline does not cover them.",
-                {"checks": missing, "matching": "by tool identity or CI hook runner; renamed tools may be missed"},
+                {"checks": missing, "matching": "by tool identity or CI hook runner; renamed tools may be missed",
+                 **({"may_run_inside": opaque[:20],
+                     "basis": "UNKNOWN: CI runs commands whose contents are not classified; these checks may run inside them"}
+                    if opaque else {})},
+                **({"severity": "medium"} if opaque else {}),
             )
         )
     if local:

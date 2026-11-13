@@ -141,12 +141,19 @@ _SHELL_RUNS = {"pytest": re.compile(r"(?:^|[\s;&|(])(?:python[\d.]*\s+-m\s+)?pyt
 def _python_script_runs(text: str, tool: str) -> bool:
     """Whether a Python script's source invokes ``tool``: `pytest.main(...)`, `unittest.main(...)`, or the runner's
     name as a literal argument of a call (`subprocess.run([sys.executable, "-m", "pytest"])`). Read, never run."""
+    return _python_script_basis(text, tool) is not None
+
+
+def _python_script_basis(text: str, tool: str) -> str | None:
+    """How a script's source shows it runs ``tool`` (STATIC: in the launching call itself; INFERRED: an argument list
+    ``[..., "-m", tool, ...]`` kept in a table and launched elsewhere through a variable), or None."""
     import ast
 
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
-        return False
+        return None
+    launches = False
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -156,10 +163,17 @@ def _python_script_runs(text: str, tool: str) -> bool:
         leaf = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
         if leaf not in _LAUNCHERS:  # `print("pytest")` mentions the runner; it does not run it
             continue
+        launches = True
         literals = [n.value for arg in node.args for n in ast.walk(arg) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
         if any(value == tool or value.split()[:1] == [tool] or f"-m {tool}" in value for value in literals):
-            return True
-    return False
+            return "STATIC"
+    if launches:  # Randomizer dogfood: commands kept as data (`("tests", [python, "-m", "unittest", ...])`), run later
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.List, ast.Tuple)):
+                items = [e.value if isinstance(e, ast.Constant) else None for e in node.elts]
+                if any(items[i] == "-m" and items[i + 1] == tool for i in range(len(items) - 1)):
+                    return "INFERRED"
+    return None
 
 
 def scripts_running(root: str | Path, tool: str) -> list[dict]:
@@ -199,11 +213,11 @@ def scripts_running(root: str | Path, tool: str) -> list[dict]:
                 text = script.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            runs = _python_script_runs(text, tool) if script.suffix == ".py" else any(
-                _SHELL_RUNS[tool].search(line) for line in text.splitlines() if not line.lstrip().startswith("#"))
-            if runs:
+            basis = _python_script_basis(text, tool) if script.suffix == ".py" else "STATIC" if any(
+                _SHELL_RUNS[tool].search(line) for line in text.splitlines() if not line.lstrip().startswith("#")) else None
+            if basis:
                 found.append({"workflow": check.source.split("#")[0], "command": segment,
-                              "script": script.relative_to(root).as_posix(), "basis": "STATIC",
+                              "script": script.relative_to(root).as_posix(), "basis": basis,
                               **({"via_package_script": via} if via else {})})
     return found
 

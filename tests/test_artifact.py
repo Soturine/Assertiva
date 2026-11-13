@@ -412,3 +412,22 @@ def test_negative_control_only_the_tests_against_the_wheel_see_a_lazy_import_bre
     checks = {c.name: c.status for c in evidence.checks}
     assert checks["import"] is StageStatus.PASS and checks["tests"] is StageStatus.FAIL
     assert evidence.status is StageStatus.FAIL
+
+
+def test_the_artifact_environment_is_the_venv_directory_not_its_interpreters_target(tmp_path):
+    """Found by the VozNativa dogfood on Linux: a venv's python is a symlink to the base interpreter, so resolving it
+    named the base installation and every module installed in the venv looked foreign (identity MISMATCH)."""
+    import os
+
+    from assertiva.adapters.python_package import venv_root_of
+
+    base = tmp_path / "usr" / "bin"
+    base.mkdir(parents=True)
+    (base / "python3").write_text("", encoding="utf-8")
+    venv_bin = tmp_path / "venv" / "bin"
+    venv_bin.mkdir(parents=True)
+    try:
+        os.symlink(base / "python3", venv_bin / "python")
+    except OSError:
+        pytest.skip("this machine cannot create symbolic links")
+    assert Path(venv_root_of(venv_bin / "python")) == (tmp_path / "venv").resolve()

@@ -244,6 +244,12 @@ def _clean_env() -> dict:
     return env
 
 
+def venv_root_of(python: Path | str) -> str:
+    """The environment directory of a venv interpreter: its directory resolved, never the interpreter itself, which on
+    POSIX is a symlink to the base Python (resolving it named /usr/local and made every installed module look foreign)."""
+    return str(Path(python).parent.parent.resolve())
+
+
 class PythonPackageAdapter:
     adapter_id = "python-package"
 
@@ -460,7 +466,7 @@ class PythonPackageAdapter:
                 (base / f"{name}.py").unlink(missing_ok=True)
         # the observer in the test process is told the wheel's names and the artifact's environment: the run proves
         # it imported the installed artifact only when every project module it loaded came from there (AXF-VN-04)
-        venv_root = str(Path(vpy).resolve().parent.parent)
+        venv_root = venv_root_of(vpy)
         identity_env = {"ASSERTIVA_PROJECT_NAMES": ",".join(tops), "ASSERTIVA_ARTIFACT_ROOT": venv_root}
         # the project's own runner, as for the source tree: pytest, else unittest (never converted to pytest)
         candidates = [PytestNativeAdapter(python=str(vpy), timeout_s=self.timeout_s, expect_installed=True, identity_env=identity_env),

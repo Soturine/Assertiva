@@ -193,3 +193,51 @@ def test_tests_deselected_by_the_runs_own_filters_are_declared_not_evidenced(tmp
     report = run_audit(tmp_path, execute=True, python=sys.executable)
     assert report["states"]["current"]["metrics"]["deselected"]["value"] == 1
     assert any("1 tests were deselected" in item for item in report["claim_boundary"]["limitations"])
+
+
+# --- collection causes (v1.0 review of the Prescripta fix) ----------------------------------------------------------
+
+def test_collection_cause_strips_only_pytests_marker_and_classifies_conservatively():
+    from assertiva.adapters.pytest_native import collection_cause
+
+    plain = collection_cause("tests/test_a.py:1: in <module>\n    raise Exception('boom')\nE   Exception: boom")
+    assert plain["cause"] == "Exception: boom" and plain["kind"] == "COLLECTION_EXCEPTION"  # not "xception: boom"
+    error = collection_cause("E   Error: bare name")
+    assert error["cause"] == "Error: bare name"
+    missing = collection_cause("ImportError while importing test module 'x'.\nE   ModuleNotFoundError: No module named 'app'")
+    assert missing["type"] == "ModuleNotFoundError" and missing["kind"] == "IMPORT_FAILURE"
+    syntax = collection_cause("E     File \"t.py\", line 1\nE       def (:\nE   SyntaxError: invalid syntax")
+    assert syntax["kind"] == "SYNTAX_ERROR"
+    chained = collection_cause("E   KeyError: 'cfg'\n\nThe above exception was the direct cause of the following exception:\n"
+                               "E   RuntimeError: settings could not load\nE   pkg.errors.ConfigError: bad config")
+    assert chained["cause"] == "pkg.errors.ConfigError: bad config"
+    assert chained["chain"][0] == "KeyError: 'cfg'" and len(chained["chain"]) == 3  # the origin is kept, not only the last
+    for empty in (None, "", "   \n  "):
+        assert collection_cause(empty)["kind"] == "UNKNOWN" and "no message" in collection_cause(empty)["cause"]
+    odd = collection_cause("something went sideways without a type")
+    assert odd["kind"] == "UNKNOWN" and odd["cause"] == "something went sideways without a type"
+    localized = collection_cause("E   ModuleNotFoundError: Nenhum módulo chamado 'aplicação' — ünïcødé")
+    assert "aplicação" in localized["cause"] and localized["kind"] == "IMPORT_FAILURE"
+
+
+def test_collection_cause_is_sanitized_before_it_is_bounded():
+    from assertiva.adapters.pytest_native import collection_cause
+
+    secret = "ghp_" + "a" * 36
+    text = (f"E   RuntimeError: token={secret} at C:\\Users\\someone\\proj\\app.py and /home/someone/x.py "
+            "mail someone@example.org Bearer abcdefghijklmnop")
+    cause = collection_cause(text)["cause"]
+    for leaked in (secret, "someone", "abcdefghijklmnop"):
+        assert leaked not in cause
+    assert "<path>" in cause and "<email>" in cause
+    long = collection_cause("E   ValueError: " + "x" * 1000)["cause"]
+    assert len(long) == 300
+
+
+def test_many_collection_errors_say_how_many_more(tmp_path):
+    for i in range(5):
+        write(tmp_path / "tests" / f"test_broken_{i}.py", f"import missing_module_{i}\n")
+    evidence = ADAPTER.collect(tmp_path)
+    assert len(evidence.collection_errors) == 5 and len(evidence.metadata["collection_error_details"]) == 5
+    assert any("and 2 more" in limitation for limitation in evidence.limitations)
+    assert {d["kind"] for d in evidence.metadata["collection_error_details"].values()} == {"IMPORT_FAILURE"}

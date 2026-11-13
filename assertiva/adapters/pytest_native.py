@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -45,12 +46,47 @@ def _declaration(item: dict) -> tuple[str, bool]:
     return declaration, inherited
 
 
+# pytest prefixes the explanation lines of a report with "E" and spaces; only that marker is removed (a bare
+# removeprefix("E") turned "Exception: x" into "xception: x").
+_PYTEST_E_MARKER = re.compile(r"^E(?:\s+|$)")
+# an exception line: a dotted type name ending like an exception class, then ":" or the end of the line
+_EXCEPTION_LINE = re.compile(r"^((?:[A-Za-z_]\w*\.)*(?:[A-Za-z_]\w*)?(?:Error|Exception|Exit|Interrupt|Warning|Failure))(?::\s?(.*))?$")
+_IMPORT_TYPES = {"ModuleNotFoundError", "ImportError"}
+_SYNTAX_TYPES = {"SyntaxError", "IndentationError", "TabError"}
+
+
+def collection_cause(message: str | None) -> dict:
+    """What pytest said about a collection error, sanitized and bounded.
+
+    ``cause`` is the last exception line pytest reported (the one that ended collection); ``chain`` keeps the distinct
+    exception lines in order (a chained ``raise ... from`` names its origin first), at most three: the first and
+    the last two. ``kind`` is decided
+    from the exception type only: IMPORT_FAILURE (a missing or unimportable module: environment, path or product,
+    not decided here), SYNTAX_ERROR, COLLECTION_EXCEPTION (another exception while importing), UNKNOWN (no message
+    or no exception line). It never claims a product defect: no test ran."""
+    from assertiva.process import SANITIZER_VERSION, sanitize_message
+
+    lines = [_PYTEST_E_MARKER.sub("", line.strip()).strip() for line in (message or "").splitlines()]
+    lines = [line for line in lines if line]
+    chain: list[tuple[str, str]] = []
+    for line in lines:
+        match = _EXCEPTION_LINE.match(line)
+        if match and (match.group(2) is not None or line == match.group(1)) and (match.group(1), line) not in chain:
+            chain.append((match.group(1), line))
+    if chain:
+        exc_type, cause = chain[-1]
+        short = exc_type.rsplit(".", 1)[-1]
+        kind = ("IMPORT_FAILURE" if short in _IMPORT_TYPES else "SYNTAX_ERROR" if short in _SYNTAX_TYPES
+                else "COLLECTION_EXCEPTION")
+    else:
+        exc_type, kind = None, "UNKNOWN"
+        cause = lines[-1] if lines else "unknown cause (pytest sent no message)"
+    return {"cause": sanitize_message(cause, 300), "type": exc_type, "kind": kind,
+            "chain": [sanitize_message(line, 300) for _, line in (chain if len(chain) <= 3 else [chain[0], *chain[-2:]])], "sanitizer": SANITIZER_VERSION}
+
+
 def _collection_cause(message: str | None) -> str:
-    """The last meaningful line of pytest's collection report (usually ``ExceptionType: detail``), bounded."""
-    lines = [line.strip().removeprefix("E").strip() for line in (message or "").splitlines() if line.strip()]
-    errors = [line for line in lines if "Error" in line.split(":", 1)[0] or "Exception" in line.split(":", 1)[0]]
-    cause = (errors or lines or ["unknown cause (pytest sent no message)"])[-1]
-    return cause[:300]
+    return collection_cause(message)["cause"]
 
 
 def _outcome(reports: dict[str, dict]) -> Outcome:
@@ -258,7 +294,9 @@ class PytestNativeAdapter(PythonStatic):
                 node = record["nodeid"] or "<session>"
                 evidence.collection_errors.append(node)
                 evidence.metadata.setdefault("error_sources", {})[node] = (record["nodeid"] or "").split("::", 1)[0]
-                evidence.metadata.setdefault("collection_error_causes", {})[node] = _collection_cause(record.get("message"))
+                detail = collection_cause(record.get("message"))
+                evidence.metadata.setdefault("collection_error_causes", {})[node] = detail["cause"]
+                evidence.metadata.setdefault("collection_error_details", {})[node] = detail
             elif record["type"] == "deselected":
                 evidence.deselected.append(record["nodeid"])
             elif record["type"] == "report":
@@ -298,10 +336,10 @@ class PytestNativeAdapter(PythonStatic):
 
         if evidence.collection_errors:
             causes = evidence.metadata["collection_error_causes"]
-            evidence.limitations.append(
-                "tests under these paths were not collected, so they did not run: "
-                + "; ".join(f"{node}: {cause}" for node, cause in list(causes.items())[:3])
-            )
+            listed = "; ".join(f"{node}: {cause}" for node, cause in list(causes.items())[:3])
+            if len(causes) > 3:
+                listed += f"; and {len(causes) - 3} more (all in collection_error_details)"
+            evidence.limitations.append(f"tests under these paths were not collected, so they did not run: {listed}")
         bad = {Outcome.FAILED, Outcome.ERROR}
         if evidence.collection_errors or any(inv.outcome in bad for inv in evidence.invocations):
             evidence.status = StageStatus.FAIL

@@ -6,7 +6,7 @@ import json
 import sys
 
 from assertiva.adapters import cosmic_ray
-from assertiva.adapters.mutation import cosmic_ray_dump, load_mutation_report, run_mutation_tool
+from assertiva.adapters.mutation import cosmic_ray_dump, load_mutation_report
 from assertiva.evidence import StateEvidence, attach_mutation
 from assertiva.models import MutantStatus as S
 

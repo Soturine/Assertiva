@@ -1,6 +1,6 @@
 # VozNativa v0.4 hardening / v0.5 — Assertiva 0.10.1 dogfood intake
 
-**Status:** DOCUMENTED / NOT IMPLEMENTED IN ASSERTIVA. **Observation date:** 2026-11-05.
+**Status:** DOCUMENTED / NOT IMPLEMENTED IN ASSERTIVA *(as written on 2026-11-05; see the reconciliation index at the end)*. **Observation date:** 2026-11-05.
 **Subject:** VozNativa (Python library, CLI and Agent Skill; tests run by stdlib `unittest`), revisions `4044cfc` → `5d7ae60`.
 **Instrument:** Assertiva **0.10.1**, wheel built from tag `v0.10.1` (`2618d95`) into its own venv; project venv with PyYAML, coverage 7.17.2, build 1.6.1, Cosmic Ray 8.7.0; Windows 11, CPython 3.12.10.
 **Provenance:** the same model family built VozNativa, ran Assertiva and judged the results: self-review plus tool evidence, not an independent qualification. Nothing in Assertiva was changed for this round.
@@ -88,3 +88,16 @@ A machine-global editable install answered `assertiva 0.10.1` while pip metadata
 | AXF-VN-02, 03, 05 | open | unchanged |
 | AXF-VN-04 | open, reproduced | `assertiva audit --execute` on VozNativa `3fb4163`: unittest PASS (660 invocations), "python-package tests against the installed wheel: NOT_RUN — no test runner adapter for this project" |
 | New observation | not a defect | an `--execute` run aborted with `READ-ONLY VIOLATION` when the auditor edited the project during the run: the guard worked (no partial report) |
+
+
+## Reconciliation index (2026-11-13, v1.0 candidate)
+
+The text above is kept as the intake recorded it. Where each item was closed:
+
+| Item | Commit on `integration/v1.0-foundation` | Tests | Re-run on VozNativa `3fb4163` (v0.10.1 → candidate) | Released in |
+|---|---|---|---|---|
+| AXF-VN-01 | `3415828` (PR #8), hardened in `485df1d` | `tests/test_cosmic_ray.py`, `tests/test_mutation_tools.py` | 0 → 72 mutants (40 killed, 32 survived); baseline 13 tests of the selection | not yet (1.0.0 candidate) |
+| AXF-VN-02 | `de10503` | `tests/test_oracle_calibration.py` | not re-run | not yet |
+| AXF-VN-03 | `161d705` | `tests/test_unittest_native.py`, `tests/test_django.py` | null → SOURCE_TREE (48 modules) | not yet |
+| AXF-VN-04 | `161d705`, `ab38227` | `tests/test_artifact.py` | NOT_RUN → 645 invocations against the wheel, INSTALLED_ARTIFACT; FAIL from two tests tied to the source tree ([V1_DOGFOOD](V1_DOGFOOD.md)) | not yet |
+| AXF-VN-05 | `161d705` | `tests/test_unittest_native.py`, `tests/test_config.py` | not applicable (VozNativa declares its runner in CI) | not yet |

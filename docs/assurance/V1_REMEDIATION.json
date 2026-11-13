@@ -1,0 +1,232 @@
+{
+ "schema_version": 1,
+ "title": "Assertiva v1.0 remediation ledger",
+ "branch": "integration/v1.0-foundation",
+ "base": "2618d95",
+ "fail_before": {
+  "base": "bb36fe1",
+  "new_tests": 27,
+  "failed_on_base": 25,
+  "passed_on_head": 27,
+  "passed_on_base": [
+   "test_controls_anything_that_points_to_pytest_keeps_pytest (control)",
+   "test_the_gate_decision_matrix (new module loaded from the main checkout by the editable finder)"
+  ]
+ },
+ "items": [
+  {
+   "id": "AXF-VN-01",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "485df1d",
+    "3415828"
+   ],
+   "real_project_evidence": "VozNativa 3fb4163: 0 -> 72 mutants (40 killed, 32 survived), baseline 13 tests of the selection"
+  },
+  {
+   "id": "AXF-VN-02",
+   "priority": "P3",
+   "status": "FIXED",
+   "commits": [
+    "de10503"
+   ],
+   "real_project_evidence": "frozen v2 unchanged: precision 1.0, recall 0.70"
+  },
+  {
+   "id": "AXF-VN-03",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "161d705"
+   ],
+   "real_project_evidence": "VozNativa: null -> SOURCE_TREE (48 modules)"
+  },
+  {
+   "id": "AXF-VN-04",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "161d705",
+    "ab38227"
+   ],
+   "real_project_evidence": "tomli 43a86ad: NOT_RUN -> PASS 760 invocations INSTALLED_ARTIFACT; VozNativa: NOT_RUN -> FAIL (source-bound tests), INSTALLED_ARTIFACT 48/48"
+  },
+  {
+   "id": "AXF-VN-05",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "161d705"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "PRE-1",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "4bd6840",
+    "517ce4b",
+    "76f2370"
+   ],
+   "real_project_evidence": "idna d357725: cause ModuleNotFoundError hypothesis"
+  },
+  {
+   "id": "PRE-2",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "163c67f",
+    "3d24a90"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-02",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "e0ae1c8"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-03",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "2e4b437",
+    "517ce4b"
+   ],
+   "real_project_evidence": "Randomizer fccc561: high on 3 scripts -> medium on 1"
+  },
+  {
+   "id": "AXR-04",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "2e4b437",
+    "517ce4b"
+   ],
+   "real_project_evidence": "Randomizer: CI_PYTEST_NOT_OBSERVED -> CI_TESTS_RUN_THROUGH_SCRIPT (INFERRED)"
+  },
+  {
+   "id": "AXR-05",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "2e4b437"
+   ],
+   "real_project_evidence": "Randomizer: repetition across workflows no longer claimed"
+  },
+  {
+   "id": "AXR-06",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "2e4b437"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-08",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "2e4b437"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-01",
+   "priority": "P2",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-07",
+   "priority": "P3",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-09",
+   "priority": "P3",
+   "status": "NOT_CHANGED",
+   "commits": [],
+   "real_project_evidence": "already UNKNOWN"
+  },
+  {
+   "id": "AXR-10",
+   "priority": "P2",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-11",
+   "priority": "P2",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-12",
+   "priority": "P3",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-13",
+   "priority": "P3",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": null
+  },
+  {
+   "id": "AXR-14",
+   "priority": "P3",
+   "status": "DEFERRED",
+   "commits": [],
+   "real_project_evidence": "not reproduced"
+  },
+  {
+   "id": "GATE",
+   "priority": "P1",
+   "status": "FIXED",
+   "commits": [
+    "ac225de"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "LINT",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "c6af79f"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "CI",
+   "priority": "P2",
+   "status": "FIXED",
+   "commits": [
+    "90905cd"
+   ],
+   "real_project_evidence": null
+  },
+  {
+   "id": "CI_PY_MUTATION",
+   "priority": "P3",
+   "status": "ACCEPTED_LIMITATION",
+   "commits": [],
+   "real_project_evidence": "over the 300-run budget"
+  }
+ ]
+}

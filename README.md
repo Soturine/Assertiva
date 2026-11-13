@@ -204,9 +204,24 @@ Negative controls (deliberate, hand-made breaks of behavior) are a separate inst
 | `assertiva audit` / `assertiva improve` (the CLI, no agent) | the deterministic engine on its own: evidence, report and the approval flow, without an agent's judgment |
 | [`evals/semantic.py`](evals/semantic.py) | evaluation/benchmark of the Skill itself; its PASS/FAIL/REVIEW verdicts are never part of a normal audit |
 
-The Skill is this repository's `SKILL.md` and its [references](references/); put or link that directory where your agent loads skills. How the agent works, its boundaries and its claim classes live in [SKILL.md](SKILL.md). The engine is optional for the Skill and independent of it. The Skill's guidance is checked by deterministic tests of the engine it points to, not by behavioral evaluation with agents: that evaluation is planned for 1.0 (see [ROADMAP.md](ROADMAP.md)).
+The Skill is this repository's `SKILL.md` and its [references](references/); put or link that directory where your agent loads skills. How the agent works, its boundaries and its claim classes live in [SKILL.md](SKILL.md). The engine is optional for the Skill and independent of it. The Skill's guidance is checked by deterministic tests of the engine it points to; a first agent-led evaluation round (8 cases, same model family for agent and judge, so not independent) is recorded in [V1_AGENT_EVALS](docs/assurance/V1_AGENT_EVALS.md). Without the engine, the Skill still investigates, but nothing is executed by Assertiva and no Assertiva report exists: its conclusions rest on what the agent read and ran.
 
 ## Current status
+
+### Capabilities and what was executed (1.0 release candidate)
+
+| Ecosystem / capability | Level | Executed in qualification |
+|---|---|---|
+| Python: pytest, unittest, Django (runs, code identity, installed-wheel tests) | SUPPORTED | real runners in the suites (Windows and Linux); dogfood on VozNativa, tomli, idna in a confined container |
+| Python mutation (Cosmic Ray, including `--mutate-tests`) | SUPPORTED | Cosmic Ray 8.7.0 in the suites and on VozNativa |
+| JS/TS: Jest, Vitest, `node --test`, Playwright; StrykerJS | SUPPORTED | real tools in CI and in the local suites with `ASSERTIVA_REQUIRE_*` |
+| JVM: Maven (Surefire/Failsafe), PIT via Maven; Gradle (Kotlin/Java/Android local tests) | SUPPORTED | CI JVM and Gradle jobs |
+| PIT through Gradle | NOT_IMPLEMENTED | — |
+| JUnit XML, CTRF, Allure, mutation reports, coverage reports, Pact, axe-core | IMPORT_ONLY | parsed in the suites; counted as `imported_*`, never as executed |
+| CI providers (GitHub Actions, GitLab, Azure Pipelines, Jenkins), pre-commit, package scripts | DECLARED evidence (static) | static readers in the suites; dogfood on Randomizer |
+| .NET, Go, Rust, PHP, Ruby, Lua | UNKNOWN (portable results only) | — (executors deferred, see [ROADMAP](ROADMAP.md)) |
+
+Contract changes since 0.10.1: [docs/MIGRATION_V1.md](docs/MIGRATION_V1.md).
 
 `audit` and `improve` work end to end. Runners: pytest, unittest, Django, Jest, Vitest, Playwright, Maven (Surefire/Failsafe) and Gradle, with JUnit XML, CTRF and Allure results, mutation reports, coverage reports (coverage.py, istanbul, LCOV, Cobertura, JaCoCo), Pact contracts and verifications and axe-core results as portable evidence; unrecognized ecosystems report UNKNOWN rather than "0 tests". Milestone status and exact claim boundaries live in [STATUS.md](STATUS.md).
 

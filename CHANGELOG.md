@@ -1,29 +1,48 @@
 # Changelog
 
-## [Unreleased]
+## [Unreleased] — 1.0.0 release candidate (not released)
+
+Integrated on `integration/v1.0-foundation` from `main` (`2618d95`, v0.10.1): PR #8 (VozNativa intake and the
+AXF-VN-01 fix), PR #7 (seven semantic eval cases), PR #6 (Randomizer intake) and the two Prescripta branches, each
+merged without squash. Contract changes are in [docs/MIGRATION_V1.md](docs/MIGRATION_V1.md). Each item's reproducer,
+fail-before test and real-project evidence are in [docs/assurance/V1_REMEDIATION.md](docs/assurance/V1_REMEDIATION.md).
+Dogfood: [V1_DOGFOOD.md](docs/assurance/V1_DOGFOOD.md); agent-led evaluation:
+[V1_AGENT_EVALS.md](docs/assurance/V1_AGENT_EVALS.md); readiness:
+[V1_RELEASE_READINESS.md](docs/assurance/V1_RELEASE_READINESS.md). No version bump and no tag.
 
 ### Evidence integrity
-- **A failed cleanup no longer loses the audit** (Prescripta dogfood, 2026-11): on Windows, `audit --execute`
-  on a Python package ended with `PermissionError: [WinError 5]` while the artifact qualification's
-  `TemporaryDirectory` removed a throwaway venv's `python.exe` that was still locked; no report was written. The
-  qualification now uses `workspace.disposable_dir`, which removes the directory without following links and, when
-  something stays behind, states it as a localized limitation instead of raising. Tests cover a clean exit, an error
-  in the body, a file still open on Windows (with the standard library's crash as negative control) and an
-  undeletable entry on POSIX.
-- **A collection error keeps its cause** (Prescripta dogfood, 2026-11): a monorepo audited from its root failed
-  pytest collection with `ModuleNotFoundError: No module named 'app'`, and the report kept only the path, so the FAIL
-  read like a product failure. The pytest-native adapter now stores each error's cause (the last exception line pytest
-  sent, at most 300 characters) in `collection_error_causes` and states it in a localized limitation. Fail-before test:
-  `tests/test_pytest_native.py::test_collection_error_keeps_its_cause_in_the_evidence`.
+- **unittest and Django runs record their code identity** (AXF-VN-03). The pytest plugin's in-process observer is now
+  shared by every Python runner. A run that records nothing stays UNKNOWN.
+- **Tests against the installed wheel use the project's runner and must prove they imported it** (AXF-VN-04).
+  unittest projects are qualified against the wheel. Two defects found along the way are fixed: the installed run's
+  identity was always UNKNOWN (the observer could not know the wheel's names), and on POSIX the venv interpreter
+  symlink was resolved to the base installation.
+- **Imported results are counted apart from executed runs** (AXR-02): `imported_*` metrics. This is a contract change.
+- **A mutation run that stopped says where** (AXF-VN-01). Building on PR #8's fix: an empty or unloadable test
+  selection is a selection failure (on Python 3.11, unittest exits 0 after "Ran 0 tests"), recorded as
+  `MUTATION_RUN_NOT_COMPLETED` with its stage instead of `MUTATION_REPORT_UNREADABLE`.
+- **Collection causes are kept, sanitized and classified** (Prescripta). The `removeprefix("E")` defect of the first
+  fix (`Exception:` became `xception:`) is fixed. A versioned sanitizer runs before the bound; unittest load errors are
+  sanitized too.
+- **A failed cleanup is declared with its real cause and never exports the temp path** (Prescripta). The errors that
+  `ignore_errors=True` hid are reported, and the cleanup status is recorded separately.
 
-### Fixed
-- **`--mutate-tests FILE` works under unittest** (AXF-VN-01, reported by the VozNativa dogfood, reproduced again in
-  its v0.7.0 round): the selection was appended to `unittest discover`, which reads it as the start directory, so a test
-  file gave "Start directory is not importable" and no mutant was planned. `cosmic_ray.test_command_for` now runs test
-  files as dotted module names (no `discover`), a test directory as `discover -s DIR` (with `-t .` only for a package),
-  and refuses a mix of files and directories or a path outside the project. Fail-before control:
-  `test_negative_control_the_old_command_cannot_start`; end to end with Cosmic Ray:
-  `test_cosmic_ray_runs_only_a_selected_unittest_file`. Not released; no version bump.
+### Detection
+- **Conservative unittest inference** for projects that declare no runner (AXF-VN-05).
+- **`FILTERED_LOOP_ASSERTION`** (AXF-VN-02). Frozen benchmark v2 is unchanged (precision 1.0, recall 0.70).
+- **CI parity follows project scripts** (AXR-03/04/05/06/08). One hop through `package.json` scripts, command tables
+  read as INFERRED, repetition only within one workflow, and gaps behind opaque CI scripts reported as medium/UNKNOWN.
+
+### CLI and CI
+- **`assertiva audit --fail-on CONDITION`**: an opt-in gate with exit 1 and a `gate` field in the report. The default
+  exit codes are unchanged.
+- **ruff correctness gate** (E4/E7/E9/F, zero baseline; ruff 0.17.3 pinned).
+- **CI economy:** fast validation on pull requests; full qualification on `main`, `v*` tags and `workflow_dispatch`;
+  `concurrency` cancels obsolete pull-request runs only.
+
+### Evaluation
+- First runs of AXF-08 and the seven PR #7 cases: 6 PASS, 2 REVIEW, 0 FAIL, and the AXF-08 marker gate passed.
+  840,610 tokens. Agent and judge are the same model family, so this is not an independent qualification.
 
 ## [0.10.1] — 2026-11-01 — Derivanta Dogfood Reliability Fixes
 

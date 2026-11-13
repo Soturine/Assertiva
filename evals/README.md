@@ -14,6 +14,8 @@ Grade behavior, evidence honesty and cost-aware reasoning, not whether an agent 
 3. `python evals/semantic.py judge --out DIR CASE ...` writes the judge context: the full case and the response. The judge, in a separate context, returns PASS, FAIL or REVIEW with a justification per dimension: correctness, evidence grounding, overclaim avoidance, treatment of UNKNOWN, cost-aware evidence choice, safety, claim boundary, material alternatives. No score; no keyword, regex, exact-answer or topic-order grading; equivalent answers in other words pass.
 4. `python evals/semantic.py record --out DIR --results evals/results/NAME --agent ... --judge ...` validates every verdict and keeps verdicts, justifications, responses and provenance (revision, agent, judge). A missing or malformed verdict is recorded as not judged, never as a pass.
 
+Latest run: [2026-11-13 v1.0 holdout](results/2026-11-13-v1-holdout/README.md) (AXF-08 and the seven PR #7 cases: 6 PASS, 2 REVIEW; marker gate passed).
+
 Semantic reasoning may infer freely, but facts must come from evidence: "this oracle looks weak" is inference; "419 tests executed" is deterministic evidence. Runs: [`results/`](results/).
 
 Cases marked **grader-ready** use [CASE_SPEC.md](CASE_SPEC.md) with explicit evidence, scoring, alternatives and pass conditions; compact cases are judged with the same protocol.

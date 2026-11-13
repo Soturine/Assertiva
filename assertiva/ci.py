@@ -176,7 +176,18 @@ def scripts_running(root: str | Path, tool: str) -> list[dict]:
             continue
         directory = root / str(check.metadata.get("working_directory") or "")
         cls = classify_command(check.command)
-        for segment in (cls.unclassified or ((check.command,) if cls.kind.value == "UNKNOWN" else ())):
+        segments = [(s, None) for s in (cls.unclassified or ((check.command,) if cls.kind.value == "UNKNOWN" else ()))]
+        # AXR-03: one hop through the project's package scripts (npm run verify -> python tools/verify.py); the graph
+        # of scripts is cycle-safe, and only commands written in package.json are read, never run
+        scripts = _package_scripts(directory)
+        if scripts:
+            from .adapters.package_scripts import invoked
+
+            for name in invoked(check.command, scripts):
+                inner = classify_command(str(scripts[name]))
+                own = inner.unclassified or ((str(scripts[name]),) if inner.kind.value == "UNKNOWN" else ())
+                segments += [(s, name) for s in own]
+        for segment, via in segments:
             tokens = _tokens(segment)
             if not tokens:
                 continue
@@ -192,8 +203,18 @@ def scripts_running(root: str | Path, tool: str) -> list[dict]:
                 _SHELL_RUNS[tool].search(line) for line in text.splitlines() if not line.lstrip().startswith("#"))
             if runs:
                 found.append({"workflow": check.source.split("#")[0], "command": segment,
-                              "script": script.relative_to(root).as_posix(), "basis": "STATIC"})
+                              "script": script.relative_to(root).as_posix(), "basis": "STATIC",
+                              **({"via_package_script": via} if via else {})})
     return found
+
+
+def _package_scripts(directory: Path) -> dict:
+    import json
+
+    try:
+        return json.loads((directory / "package.json").read_text(encoding="utf-8")).get("scripts") or {}
+    except (OSError, ValueError, AttributeError):
+        return {}
 
 
 def indirect_invocations(root: str | Path, tool: str) -> list[CiPytestInvocation]:

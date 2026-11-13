@@ -99,6 +99,12 @@ def discover_surface(root) -> VerificationSurface:
         tool = next((t for a in resolvers if (t := a.effective_tool(Path(root), check))), None)
         if tool and tool != check.tool:
             check.metadata["effective_tool"] = tool
+    # which declared project scripts a step runs, directly or through nested scripts (AXR-03): matching only
+    scripted = [a for a in supported if hasattr(a, "invoked_scripts")]
+    for check in surface.by_origin(VerificationOrigin.CI) + surface.by_origin(VerificationOrigin.HOOK):
+        invoked = [s for a in scripted for s in a.invoked_scripts(Path(root), check)]
+        if invoked:
+            check.metadata["invokes_scripts"] = invoked
     return surface
 
 
@@ -108,6 +114,9 @@ def _tool(check: VerificationCheck) -> str | None:
 
 def _covers(delivery: VerificationCheck, local: VerificationCheck) -> bool:
     if _tool(local) and _tool(delivery) == _tool(local):
+        return True
+    script = local.metadata.get("script")  # a project script the step runs, by name or through another script
+    if script and script in (delivery.metadata.get("invokes_scripts") or []):
         return True
     runs = delivery.metadata.get("runs_hooks") or []
     return "*" in runs or local.metadata.get("hook_id") in runs
@@ -136,7 +145,9 @@ def surface_findings(surface: VerificationSurface) -> list:
         findings.append(Finding(
             "NESTED_SCRIPT_REPETITION",
             "CI invokes package scripts that run the same script more than once through nested scripts; the repeats add cost, not distinct evidence.",
-            {"repeated": repeated, "basis": "DECLARED: package.json scripts and CI steps, not execution"}, severity="info"))
+            {"repeated": repeated, "basis": "DECLARED: package.json scripts and CI steps, not execution",
+             "scope": "within one workflow file; steps of different workflows may run on different events and are not compared"},
+            severity="info"))
     masked = []
     for check in delivery:
         ignored = any(i.get("status_ignored") and i.get("kind") == VerificationKind.TEST.value for i in check.metadata.get("invocations") or [])
@@ -166,7 +177,7 @@ def surface_findings(surface: VerificationSurface) -> list:
             check.command or check.tool or check.check_id
             for check in delivery
             if check.kind is not VerificationKind.UNKNOWN or check.command
-            if not any(_tool(check) == _tool(item) for item in local) and not check.metadata.get("runs_hooks")
+            if not any(_tool(check) == _tool(item) or _covers(check, item) for item in local) and not check.metadata.get("runs_hooks")
         ]
         if ci_only:
             findings.append(

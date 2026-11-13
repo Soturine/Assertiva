@@ -10,6 +10,17 @@
     "claim_boundary"
   ],
   "properties": {
+    "gate": {
+      "description": "opt-in CI gate (--fail-on): the verdict over this report and its reasons; absent without --fail-on",
+      "type": "object",
+      "required": ["result", "conditions"],
+      "properties": {
+        "result": {"enum": ["PASS", "FAIL"]},
+        "conditions": {"type": "array"},
+        "exit_code_on_fail": {"type": "integer"},
+        "basis": {"type": "string"}
+      }
+    },
     "report_version": {
       "type": "string"
     },

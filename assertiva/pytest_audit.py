@@ -731,8 +731,11 @@ def audit_pytest_project(root: str | Path, coverage_json: str | Path | None = No
             Finding(
                 "CI_TESTS_RUN_THROUGH_SCRIPT",
                 "CI runs a repository script whose source invokes the test runner; which tests the script selects is not read.",
-                {"count": len(through_scripts), "scripts": through_scripts[:20], "basis": "STATIC",
-                 "limitations": "one level, read statically: the script's arguments, conditions and failures are not interpreted"},
+                {"count": len(through_scripts), "scripts": through_scripts[:20],
+                 # the weakest link decides: a runner seen only in a command table launched elsewhere is INFERRED
+                 "basis": "INFERRED" if any(s.get("basis") == "INFERRED" for s in through_scripts) else "STATIC",
+                 "limitations": "read statically, one hop through package.json scripts and one into each repository script: "
+                                "the script's arguments, conditions and failures are not interpreted"},
                 severity="info",
             )
         )

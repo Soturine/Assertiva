@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased] — 1.0.0 release candidate (not released)
+## [1.0.0] — 2026-11-13 — Evidence-Grounded Test Assurance
+
+Published as the GitHub Release `v1.0.0` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on
+2026-11-13 with two semantic-evaluation REVIEWs accepted as documented limitations. Release notes:
+[docs/releases/v1.0.0.md](docs/releases/v1.0.0.md).
 
 Integrated on `integration/v1.0-foundation` from `main` (`2618d95`, v0.10.1): PR #8 (VozNativa intake and the
 AXF-VN-01 fix), PR #7 (seven semantic eval cases), PR #6 (Randomizer intake) and the two Prescripta branches, each
@@ -8,7 +12,7 @@ merged without squash. Contract changes are in [docs/MIGRATION_V1.md](docs/MIGRA
 fail-before test and real-project evidence are in [docs/assurance/V1_REMEDIATION.md](docs/assurance/V1_REMEDIATION.md).
 Dogfood: [V1_DOGFOOD.md](docs/assurance/V1_DOGFOOD.md); agent-led evaluation:
 [V1_AGENT_EVALS.md](docs/assurance/V1_AGENT_EVALS.md); readiness:
-[V1_RELEASE_READINESS.md](docs/assurance/V1_RELEASE_READINESS.md). No version bump and no tag.
+[V1_RELEASE_READINESS.md](docs/assurance/V1_RELEASE_READINESS.md). Merged through PR #9 with a merge commit (no squash).
 
 ### Evidence integrity
 - **unittest and Django runs record their code identity** (AXF-VN-03). The pytest plugin's in-process observer is now

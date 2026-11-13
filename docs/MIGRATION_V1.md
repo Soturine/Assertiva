@@ -1,6 +1,6 @@
 # Migrating to Assertiva 1.0
 
-These are the contract changes since 0.10.1, as of the release candidate on `integration/v1.0-foundation`. Each one
+These are the contract changes from 0.10.1 to 1.0.0. Each one
 fixes a report that said more, or less, than its evidence. None changes a CLI default.
 
 ## Report JSON

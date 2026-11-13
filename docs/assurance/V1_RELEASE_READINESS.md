@@ -63,3 +63,13 @@ exact SHA, and no evidence-integrity blocker is open. It is not READY for public
    change).
 
 The commit after `874eeab` changes only this page; its pull-request run is the record for it.
+
+## Release decision (2026-11-13)
+
+The owner explicitly authorized finalizing 1.0.0: version bump, merge of PR #9 with a merge commit, tag `v1.0.0` and
+the GitHub Release (not PyPI). The two REVIEWs are **accepted as documented limitations**, not converted to PASS:
+FISCAL_TEMPORAL_ORACLE_FALSE_GREEN stays REVIEW, and AGENT_PROFILE_MOVE_UNDO_FALSE_GREEN does not meet its pass
+condition in the operator's reading. The record above (6 PASS, 2 REVIEW, 0 FAIL by the judge) is unchanged. The
+version bump is metadata and documentation only; the code is the one qualified at `874eeab`. The merge commit on `main`
+and the tag are qualified by their own CI runs, which are recorded in the GitHub Release notes. No commit is added after
+the tag. No ruleset was applied.

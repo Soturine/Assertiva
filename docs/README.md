@@ -51,7 +51,7 @@ This is the human documentation portal for Assertiva. Stable policy belongs in `
 ## Evidence, schemas and evals
 
 - [Research Index](../research/README.md) — dated evidence, not permanent policy.
-- 1.0.0 release candidate: [migration](MIGRATION_V1.md), [integration matrix](assurance/V1_INTEGRATION_MATRIX.md), [remediation](assurance/V1_REMEDIATION.md) ([JSON](assurance/V1_REMEDIATION.json)), [dogfood](assurance/V1_DOGFOOD.md), [agent evals](assurance/V1_AGENT_EVALS.md), [historical reconciliation](assurance/V1_HISTORICAL_RECONCILIATION.md), [release readiness](assurance/V1_RELEASE_READINESS.md).
+- 1.0.0: [release notes](releases/v1.0.0.md), [migration](MIGRATION_V1.md), [branch disposition](assurance/V1_BRANCH_DISPOSITION.md), [integration matrix](assurance/V1_INTEGRATION_MATRIX.md), [remediation](assurance/V1_REMEDIATION.md) ([JSON](assurance/V1_REMEDIATION.json)), [dogfood](assurance/V1_DOGFOOD.md), [agent evals](assurance/V1_AGENT_EVALS.md), [historical reconciliation](assurance/V1_HISTORICAL_RECONCILIATION.md), [release readiness](assurance/V1_RELEASE_READINESS.md).
 - Assurance of the 0.10.0 line: [entry audit](assurance/POST_DOGFOOD_ENTRY_AUDIT.md), [gap matrix](assurance/POST_DOGFOOD_GAP_MATRIX.md) (source: [JSON](assurance/POST_DOGFOOD_GAP_MATRIX.json)), [implementation report](assurance/POST_DOGFOOD_IMPLEMENTATION_REPORT.md), [self-dogfood](assurance/ASSERTIVA_SELF_DOGFOOD.md), [benchmarks and positioning](assurance/ASSERTIVA_COMPETITIVE_BENCHMARK.md), [release readiness](assurance/RELEASE_READINESS.md).
 - Dogfood records: [DrawLab M10](dogfood/drawlab-m10/README.md); TCC and Derivanta Engine reports in [research/](../research/README.md).
 - [Eval Catalog](../evals/README.md)

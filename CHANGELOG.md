@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Verification Surface: a pre-commit hook from a known remote hook repository (`astral-sh/ruff-pre-commit`:
+  `ruff`, `ruff-check`, `ruff-format`) is attributed to the tool it runs, so a project whose CI runs the same tool is
+  no longer reported with `LOCAL_CHECK_NOT_OBSERVED_IN_CI`. The command is inferred from the hook id, not read from
+  the hook definition, and the check carries that limitation (pt-BR narrative included). Found as a false positive
+  in the SotuHire dogfood (2026-11-14).
+- Two self-tests failed on Windows for test reasons: process cleanup used signal 1 (`CTRL_BREAK_EVENT`, which
+  needs a process group) and a lease-release assertion did not wait for the OS to free a killed process's lock.
+
 ## [1.0.0] — 2026-11-13 — Evidence-Grounded Test Assurance
 
 Published as the GitHub Release `v1.0.0` (wheel and sdist with SHA-256 checksums; not PyPI), approved by the owner on

@@ -14,6 +14,9 @@ from functools import lru_cache
 
 # (English template exactly as the engine writes it, pt-BR)
 NARRATIVE: list[tuple[str, str]] = [
+    # verification surface: pre-commit hooks
+    ("command '{command}' inferred from the hook id of a known hook repository; its hook definition was not read",
+     "comando '{command}' inferido do id do hook de um repositório de hooks conhecido; a definição do hook não foi lida"),
     # claim boundary: audit
     ("native {adapter} run in an isolated copy: {status:st} ({n} invocations)",
      "execução nativa {adapter} em cópia isolada: {status:st} ({n} invocações)"),

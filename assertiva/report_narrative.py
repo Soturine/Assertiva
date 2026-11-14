@@ -40,6 +40,8 @@ NARRATIVE: list[tuple[str, str]] = [
      "os resultados por teste são DESCONHECIDOS: as verificações de teste declaradas rodaram como comandos inteiros"),
     ("full-suite outcome: {n} mapped test files were not run",
      "resultado da suíte completa: {n} arquivos de teste mapeados não foram executados"),
+    ("all {n} collection errors are third-party modules missing from the interpreter ({modules}) while the environment was not prepared; prepare it (audit --provision) before reading them as test or product failures.",
+     "todos os {n} erros de coleta são módulos de terceiros ausentes do interpretador ({modules}) e o ambiente não foi preparado; prepare-o (audit --provision) antes de lê-los como falhas de teste ou de produto."),
     ("{n} of {total} failing invocations share one cause: {exception} at {site} (origin {origin}); triage that cause before the individual tests.",
      "{n} de {total} invocações com falha têm uma causa comum: {exception} em {site} (origem {origin}); trate essa causa antes dos testes individuais."),
     ("the tests imported the project's own modules from outside the tested copy ({modules}): an installed copy shadows the source tree, so this run does not prove the source under test",

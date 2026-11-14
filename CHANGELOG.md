@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- Collection errors that are only third-party modules missing from the interpreter, while the environment was not
+  prepared, are attributed to it: `NATIVE_COLLECTION_ERRORS` gets a `dominant_cause` with origin `ENVIRONMENT`, the
+  missing modules and the unprepared steps, and its recommendation says to prepare the environment before reading
+  them as test or product failures. A missing module that is one of the project's own packages, any other kind of
+  collection error, or a prepared environment leaves them undecided. Found in the SotuHire dogfood (2026-11-14): 47
+  files could not import `fastapi`, `streamlit` or `docx`, and the report showed a high-severity collection
+  failure next to an info-level ENVIRONMENT_NOT_PREPARED without linking them.
 - Verification Surface: a pre-commit hook from a known remote hook repository (`astral-sh/ruff-pre-commit`:
   `ruff`, `ruff-check`, `ruff-format`) is attributed to the tool it runs, so a project whose CI runs the same tool is
   no longer reported with `LOCAL_CHECK_NOT_OBSERVED_IN_CI`. The command is inferred from the hook id, not read from

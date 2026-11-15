@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- A disposable copy no longer lets a test runner write into the audited project through a linked dependency
+  directory. Found dogfooding SotuHire (Vite/Vitest with `--mutate`): Vitest wrote `node_modules/.vite` through the
+  link and the read-only guard rejected the whole audit after the run (exit 3, no report). Adapters now declare the
+  entries their runner writes inside installed dependencies (`tool_cache_entries()`; the Node adapters declare
+  `.vite`, `.vitest`, `.cache`, `.vite-temp`); a directory holding one becomes a real directory in the copy with its
+  other children linked, and the runner recreates the cache there. The core names no tool: `link_installed` takes the
+  entries as `local_only`.
 - Collection errors that are only third-party modules missing from the interpreter, while the environment was not
   prepared, are attributed to it: `NATIVE_COLLECTION_ERRORS` gets a `dominant_cause` with origin `ENVIRONMENT`, the
   missing modules and the unprepared steps, and its recommendation says to prepare the environment before reading

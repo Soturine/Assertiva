@@ -17,6 +17,7 @@ from assertiva.models import RunEvidence
 from assertiva.process import execution_refusal, run_command
 from assertiva.verification import SupportLevel
 
+from .node_caches import NODE_TOOL_CACHE_ENTRIES
 from .base import AdapterCapability
 from .coverage_reports import load_coverage_report
 from .jest import _package, node_executable, parse_jest_format
@@ -107,6 +108,9 @@ class VitestAdapter:
 
     def installed_dependencies(self) -> tuple[str, ...]:
         return ("node_modules",)
+
+    def tool_cache_entries(self) -> tuple[str, ...]:
+        return NODE_TOOL_CACHE_ENTRIES  # written inside node_modules; kept in the copy, not linked
 
     def declared_matrix(self, root) -> dict[str, dict]:
         from .jest import JestAdapter

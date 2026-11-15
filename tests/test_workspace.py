@@ -197,7 +197,7 @@ def test_tool_caches_in_linked_dependencies_stay_in_the_copy(tmp_path):
     copy = tmp_path / "copy"
     copy.mkdir()
 
-    assert link_installed(copy, origin, ["node_modules"]) == ["node_modules"]
+    assert link_installed(copy, origin, ["node_modules"], local_only=(".vite",)) == ["node_modules"]
 
     modules = copy / "node_modules"
     assert modules.is_dir() and not is_link(modules)
@@ -220,3 +220,29 @@ def test_dependency_directories_without_caches_are_still_linked_whole(tmp_path):
     copy.mkdir()
     link_installed(copy, origin, ["node_modules"])
     assert is_link(copy / "node_modules")
+
+
+def test_node_adapters_keep_their_caches_in_the_copy_through_runnable_copy(tmp_path):
+    """The core never names a tool: Node adapters declare the caches they write (Vite, Vitest)."""
+    from conftest import commit_all
+
+    from assertiva.adapters.vitest import VitestAdapter
+    from assertiva.evidence import local_cache_entries, runnable_copy
+    from assertiva.workspace import is_link, remove_tree, tree_fingerprint
+
+    origin = tmp_path / "project"
+    write(origin / "package.json", '{"devDependencies": {"vitest": "4.0.0"}}')
+    write(origin / ".gitignore", "node_modules/\n")
+    write(origin / "node_modules" / "vitest" / "index.js", "")
+    write(origin / "node_modules" / ".vite" / "deps" / "_metadata.json", "{}")
+    commit_all(origin)  # installed dependencies are ignored, so the copy links them instead of copying
+    before = tree_fingerprint(origin)
+    assert ".vite" in local_cache_entries([VitestAdapter()])
+
+    copy = runnable_copy(origin, [VitestAdapter()], origin)
+    try:
+        assert not is_link(copy / "node_modules") and is_link(copy / "node_modules" / "vitest")
+        write(copy / "node_modules" / ".vite" / "deps" / "_metadata.json", '{"changed": true}')
+    finally:
+        remove_tree(copy)
+    assert tree_fingerprint(origin) == before

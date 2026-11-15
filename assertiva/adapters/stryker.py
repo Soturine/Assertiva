@@ -15,6 +15,7 @@ import json
 import tempfile
 from pathlib import Path
 
+from assertiva.adapters.node_caches import NODE_TOOL_CACHE_ENTRIES
 from assertiva.models import MutationRun
 from assertiva.process import execution_refusal, run_command
 
@@ -109,7 +110,7 @@ def run(state_root: str | Path, targets: list[str], origin: str | Path | None = 
         tmp = Path(tmp)
         copy = snapshot(state_root, tmp / "state")
         try:
-            link_installed(copy, origin, ["node_modules"])  # the project's installed tooling, linked, never copied
+            link_installed(copy, origin, ["node_modules"], NODE_TOOL_CACHE_ENTRIES)  # linked, never copied; caches stay in the copy
             in_copy = {t: reason for t in targets if (reason := unsafe_target(copy, t))}
             if in_copy:
                 result.error = "mutation targets are not plain files in the copy: " + "; ".join(f"{t}: {why}" for t, why in in_copy.items())

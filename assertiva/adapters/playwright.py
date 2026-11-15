@@ -22,6 +22,7 @@ from assertiva.models import Outcome, RunEvidence, TestInvocation
 from assertiva.process import execution_refusal, run_command
 from assertiva.verification import SupportLevel
 
+from .node_caches import NODE_TOOL_CACHE_ENTRIES
 from .base import AdapterCapability
 from .jest import _relative, node_executable
 
@@ -263,6 +264,9 @@ class PlaywrightAdapter:
 
     def installed_dependencies(self) -> tuple[str, ...]:
         return ("node_modules",)  # browsers live in Playwright's own cache, outside the project
+
+    def tool_cache_entries(self) -> tuple[str, ...]:
+        return NODE_TOOL_CACHE_ENTRIES  # written inside node_modules; kept in the copy, not linked
 
     def _remote_targets(self, root: Path) -> list[str]:
         hosts = []

@@ -179,3 +179,44 @@ def test_git_worktree_is_cleaned_up(git_calc_project):
         remove_workspace(baseline, workspace)
     assert not workspace.exists()
     assert workspace.as_posix() not in worktrees()
+
+
+def test_tool_caches_in_linked_dependencies_stay_in_the_copy(tmp_path):
+    """Found dogfooding a Vite/Vitest project: linking node_modules whole let Vitest write
+    node_modules/.vite/deps/_metadata.json into the audited project through the link, and the
+    read-only guard then rejected the whole audit after the run (exit 3, no report)."""
+    from assertiva.workspace import is_link, link_installed, remove_tree, tree_fingerprint
+
+    origin = tmp_path / "project"
+    (origin / "node_modules" / "vitest").mkdir(parents=True)
+    (origin / "node_modules" / "vitest" / "index.js").write_text("export {}", encoding="utf-8")
+    (origin / "node_modules" / ".vite" / "deps").mkdir(parents=True)
+    (origin / "node_modules" / ".vite" / "deps" / "_metadata.json").write_text("{}", encoding="utf-8")
+    (origin / "node_modules" / ".package-lock.json").write_text("{}", encoding="utf-8")
+    before = tree_fingerprint(origin)
+    copy = tmp_path / "copy"
+    copy.mkdir()
+
+    assert link_installed(copy, origin, ["node_modules"]) == ["node_modules"]
+
+    modules = copy / "node_modules"
+    assert modules.is_dir() and not is_link(modules)
+    assert is_link(modules / "vitest") and (modules / "vitest" / "index.js").is_file()
+    assert (modules / ".package-lock.json").is_file()
+    assert not (modules / ".vite").exists()  # the tool recreates its cache in the copy
+    (modules / ".vite" / "deps").mkdir(parents=True)
+    (modules / ".vite" / "deps" / "_metadata.json").write_text('{"changed": true}', encoding="utf-8")
+    remove_tree(copy)
+
+    assert tree_fingerprint(origin) == before  # nothing reached the project, removal followed nothing
+
+
+def test_dependency_directories_without_caches_are_still_linked_whole(tmp_path):
+    from assertiva.workspace import is_link, link_installed
+
+    origin = tmp_path / "project"
+    (origin / "node_modules" / "jest").mkdir(parents=True)
+    copy = tmp_path / "copy"
+    copy.mkdir()
+    link_installed(copy, origin, ["node_modules"])
+    assert is_link(copy / "node_modules")

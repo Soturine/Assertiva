@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-11-16 — Dogfood Reliability Fixes
+
+[Release notes](docs/releases/v1.0.1.md).
+
 ### Fixed
 
 - A disposable copy no longer lets a test runner write into the audited project through a linked dependency

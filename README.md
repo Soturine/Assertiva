@@ -16,15 +16,15 @@ Assertiva audits whether a test suite provides meaningful evidence, selects the 
 
 *The Assurance Report from a real `assertiva audit --execute` run on [`tests/fixtures/django-site`](tests/fixtures/django-site): one self-contained, offline HTML page (English / Brazilian Portuguese, light / dark).*
 
-> **Assertiva v1.0.0** — Evidence-Grounded Test Assurance ([release notes](docs/releases/v1.0.0.md), [CHANGELOG](CHANGELOG.md), [migration from 0.10.x](docs/MIGRATION_V1.md)). It is distributed as its [GitHub Release](https://github.com/Soturine/Assertiva/releases/tag/v1.0.0) (wheel and sdist, with SHA-256 checksums) and from this repository's source. It is **not** published on PyPI or in any Skill marketplace. Python 3.11 or newer.
+> **Assertiva v1.0.1** — Evidence-Grounded Test Assurance ([release notes](docs/releases/v1.0.1.md), [CHANGELOG](CHANGELOG.md), [migration from 0.10.x](docs/MIGRATION_V1.md)). It is distributed as its [GitHub Release](https://github.com/Soturine/Assertiva/releases/tag/v1.0.1) (wheel and sdist, with SHA-256 checksums) and from this repository's source. It is **not** published on PyPI or in any Skill marketplace. Python 3.11 or newer.
 
 ## Quick start
 
 ```bash
 # 1. Install. From a clone of this repository, or from the wheel attached to the GitHub Release:
 python -m pip install -e .
-python -m pip install assertiva-1.0.0-py3-none-any.whl      # alternative: the release wheel
-assertiva --version                                          # assertiva 1.0.0
+python -m pip install assertiva-1.0.1-py3-none-any.whl      # alternative: the release wheel
+assertiva --version                                          # assertiva 1.0.1
 
 # 2. First audit: static. It reads the project, runs nothing and changes nothing.
 assertiva audit path/to/project

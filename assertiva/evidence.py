@@ -79,6 +79,11 @@ def installed_dependencies(adapters) -> list[str]:
     return sorted({name for a in adapters for name in (a.installed_dependencies() if hasattr(a, "installed_dependencies") else ())})
 
 
+def local_cache_entries(adapters) -> list[str]:
+    """Entries the runners write inside installed dependencies; kept in the copy, never linked."""
+    return sorted({name for a in adapters for name in (a.tool_cache_entries() if hasattr(a, "tool_cache_entries") else ())})
+
+
 def runnable_copy(source: str | Path, adapters, origin: str | Path | None = None) -> Path:
     """A disposable copy of the project plus links to the installed dependencies its runners need."""
     from . import environment
@@ -86,10 +91,11 @@ def runnable_copy(source: str | Path, adapters, origin: str | Path | None = None
     copy = snapshot(source)
     names = installed_dependencies(adapters)
     prepared = environment.ACTIVE.dirs if environment.ACTIVE else {}
+    local_only = local_cache_entries(adapters)
     for name in names:  # dependencies prepared for this run come from its workspace, never the project
         if name in prepared:
-            link_installed(copy, prepared[name].parent, [name])
-    link_installed(copy, Path(origin or source), [n for n in names if n not in prepared])
+            link_installed(copy, prepared[name].parent, [name], local_only)
+    link_installed(copy, Path(origin or source), [n for n in names if n not in prepared], local_only)
     return copy
 
 

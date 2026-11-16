@@ -383,7 +383,7 @@ def snapshot(source: str | Path, target: str | Path | None = None) -> Path:
     return target.resolve()
 
 
-def link_installed(copy: str | Path, origin: str | Path, names) -> list[str]:
+def link_installed(copy: str | Path, origin: str | Path, names, local_only=()) -> list[str]:
     """Link installed dependency directories from the origin into a copy.
 
     Installed dependencies are usually ignored, so copies never contain them; runners that need
@@ -399,6 +399,25 @@ def link_installed(copy: str | Path, origin: str | Path, names) -> list[str]:
         if not source.is_dir() or os.path.lexists(target):
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
+        keep_local = set(local_only)
+        if any(entry.name in keep_local for entry in os.scandir(source)):
+            # Linking the whole directory let runners write their caches into the project through
+            # the link, which the read-only guard then rejected after the run. A real directory
+            # whose children are linked keeps the installed packages shared while the entries the
+            # adapters declare (``local_only``) stay in the copy; the runner recreates them there.
+            target.mkdir()
+            for entry in os.scandir(source):
+                if entry.name in keep_local:
+                    continue
+                is_dir = entry.is_dir()
+                if _make_link(target / entry.name, Path(entry.path).resolve(), directory=is_dir):
+                    continue
+                if is_dir:
+                    break
+                shutil.copy2(entry.path, target / entry.name)  # file links need privileges on Windows
+            else:
+                linked.append(rel.as_posix())
+            continue
         if _make_link(target, source.resolve(), directory=True):
             linked.append(rel.as_posix())
     return linked

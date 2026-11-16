@@ -239,7 +239,10 @@ def test_a_command_that_leaves_a_server_running_returns_when_it_exits(tmp_path):
         assert result.ok and "started" in result.stdout and elapsed < 20
     finally:
         try:
-            os.kill(int(pid_file.read_text()), 9 if os.name != "nt" else 1)
+            # 9 is SIGKILL on POSIX; on Windows any value other than the two console events means
+            # TerminateProcess. Signal 1 there is CTRL_BREAK_EVENT, which needs a process group and
+            # makes CPython raise SystemError instead of OSError.
+            os.kill(int(pid_file.read_text()), 9)
         except (OSError, ValueError):
             pass
 

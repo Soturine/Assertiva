@@ -7,6 +7,8 @@ tests is opt-in and always happens in a disposable copy of the project.
 
 from __future__ import annotations
 
+import dataclasses
+import re
 import sys
 from pathlib import Path
 
@@ -57,6 +59,40 @@ def _imported_findings(imported: list) -> list[Finding]:
         {"count": len(failed), "tests": [inv.invocation_id for _, inv in failed][:20], "collection_errors": len(errors),
          "sources": sources, "provenance": "EXTERNAL_UNVERIFIED",
          "revision": "not verified: the file does not prove which revision or environment produced it"})]
+
+
+_MISSING_MODULE = re.compile(r"No module named '([^']+)'")
+
+
+def environment_collection_cause(runs, unprepared_steps, root: Path) -> dict | None:
+    """Attribute collection errors to the environment when that is the only explanation the evidence allows.
+
+    Decided only when part of the environment was not prepared and every collection error is a missing module that
+    is not one of the project's own top-level packages (``root/<name>`` or ``root/src/<name>``): then no test ran
+    because the interpreter lacks third-party code, which says nothing about the tests or the product. Any other
+    error, or a prepared environment, leaves the errors undecided (``None``)."""
+    if not unprepared_steps:
+        return None
+    missing: dict[str, int] = {}
+    total = 0
+    for run in runs:
+        details = run.metadata.get("collection_error_details", {})
+        for node in run.collection_errors:
+            total += 1
+            match = _MISSING_MODULE.search(str((details.get(node) or {}).get("cause", "")))
+            if match is None:
+                return None
+            top = match.group(1).split(".", 1)[0]
+            if any((base / top).exists() or (base / f"{top}.py").exists() for base in (root, root / "src")):
+                return None
+            missing[top] = missing.get(top, 0) + 1
+    if not total:
+        return None
+    return {"origin": "ENVIRONMENT", "count": total, "of": total,
+            "missing_modules": dict(sorted(missing.items(), key=lambda item: (-item[1], item[0]))),
+            "unprepared_steps": [step.step_id for step in unprepared_steps],
+            "basis": "every collection error is a module missing from the interpreter and not a project package, "
+                     "while the environment was not prepared"}
 
 
 def _native_findings(current: StateEvidence, static_total: int, reported: tuple = ()) -> list[Finding]:
@@ -520,6 +556,17 @@ def run_audit(
         findings.append(Finding("ENVIRONMENT_NOT_PREPARED",
                                 "Part of the environment the tests need could not be prepared; what depends on it was not executed.",
                                 {"steps": [{"step": s.step_id, "status": s.status, "why": s.detail} for s in unprepared]}, severity="info"))
+        collection = next((f for f in findings if f.code == "NATIVE_COLLECTION_ERRORS"), None)
+        own_runs = [run for run in current.runs if run.mode != "report"]
+        cause = environment_collection_cause(own_runs, unprepared, root) if collection is not None else None
+        if cause is not None:  # Finding is frozen: replace it in place in the list
+            modules = ", ".join(cause["missing_modules"])
+            findings[findings.index(collection)] = dataclasses.replace(
+                collection, evidence={**collection.evidence, "dominant_cause": cause},
+                recommendation=(
+                    f"all {cause['count']} collection errors are third-party modules missing from the interpreter "
+                    f"({modules}) while the environment was not prepared; prepare it (audit --provision) before reading "
+                    f"them as test or product failures."))
     observed_ci, ci_findings = _observed_ci(ci_runs, baseline)
     findings.extend(ci_findings)
     status = "UNKNOWN" if not adapters and not current.runs else ("FINDINGS" if findings else "NO_FINDINGS_IN_SCOPE")

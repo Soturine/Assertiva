@@ -35,6 +35,14 @@ Each check preserves:
 - evidence tier;
 - limitations and tool-specific metadata.
 
+## Remote pre-commit hooks
+
+A hook from a remote repository runs code Assertiva does not read. For a short list of well-known hook
+repositories (`adapters/pre_commit.py`, `KNOWN_HOOK_COMMANDS`) the hook id is mapped to the tool it runs, only for
+that repository, so local-vs-CI parity can match it with the same tool in CI. The check records that the command
+was inferred from the hook id and that the hook definition was not read. Any other remote hook keeps an unknown
+command.
+
 ## Unknown tooling
 
 Unknown does not mean unsupported project.

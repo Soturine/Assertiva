@@ -122,6 +122,12 @@ def test_a_workspace_held_by_another_process_survives_and_one_left_by_a_killed_r
     finally:
         holder.kill()  # killed: the OS releases its lease
         holder.wait(10)
+    # The release is asynchronous on Windows: a venv's python.exe is a launcher whose interpreter
+    # child ends only after the launcher does, and the OS frees a dead process's byte-range locks
+    # when it gets to it. Waiting on the launcher is not waiting on the lease.
+    deadline = time.monotonic() + 15
+    while environment.in_use(held) and time.monotonic() < deadline:
+        time.sleep(0.1)
     assert not environment.in_use(held)
     _age(held, 3600)
     environment.remove_workspace(environment.new_workspace())

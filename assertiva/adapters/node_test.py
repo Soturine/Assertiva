@@ -18,6 +18,7 @@ from assertiva.models import Outcome, RunEvidence
 from assertiva.process import execution_refusal, run_command
 from assertiva.verification import SupportLevel
 
+from .node_caches import NODE_TOOL_CACHE_ENTRIES
 from .base import AdapterCapability
 from .jest import _package, node_executable
 from .junit import load_junit
@@ -164,6 +165,9 @@ class NodeTestAdapter:
 
     def installed_dependencies(self) -> tuple[str, ...]:
         return ("node_modules",)
+
+    def tool_cache_entries(self) -> tuple[str, ...]:
+        return NODE_TOOL_CACHE_ENTRIES  # written inside node_modules; kept in the copy, not linked
 
     def declared_matrix(self, root) -> dict[str, dict]:
         from .jest import JestAdapter

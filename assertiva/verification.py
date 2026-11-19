@@ -324,8 +324,8 @@ def matrix_findings(surface: VerificationSurface, declared: dict[str, dict], cov
 
 
 def _build_label(artifact) -> str:
-    """What the build was, not what was requested: a disposable copy always; pip isolation only when the
-    environment did not override it (VozNativa dogfood, 2026-11-18)."""
+    """What the build was, not what was requested: a disposable copy always; build isolation only when the
+    environment did not override it (VozNativa dogfood, 2026-11-18). The adapter records the override."""
     env = getattr(artifact, "environment", None) or {}
     if env.get("build_isolation_env"):
         return f"build by Assertiva in a disposable copy; isolation overridden by the environment ({env['build_isolation_env']})"

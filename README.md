@@ -46,6 +46,8 @@ assertiva improve path/to/project --approve <change-id>      # your decision: on
 assertiva improve path/to/project --discard                  # or drop the candidate
 ```
 
+If `pip install -e .` fails with `No module named 'setuptools'`, check whether `PIP_NO_BUILD_ISOLATION` is set in the environment: pip reads it as *disable* build isolation and then needs the build backend in the current interpreter. Unset it for the install.
+
 A reproducible end-to-end example, with the numbers observed, is in [Proof of Protection](docs/PROOF_OF_PROTECTION.md). For how the agent uses all of this, see [SKILL.md](SKILL.md).
 
 ## Why

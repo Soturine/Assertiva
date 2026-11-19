@@ -326,6 +326,13 @@ class PythonPackageAdapter:
                 command = [self.python, "-m", "pip", "wheel", "--no-deps", "--disable-pip-version-check", "-w", dist] + (
                     ["--no-build-isolation"] if local_backend else []) + [work]
             evidence.environment.update({"build_tool": "build" if has_build else "pip wheel", "build_isolation": not local_backend})
+            # VozNativa dogfood (2026-11-18): PIP_NO_BUILD_ISOLATION in the environment is read by pip before this
+            # request, so "isolation requested" is not "isolation happened"; record what the environment said.
+            override = os.environ.get("PIP_NO_BUILD_ISOLATION") if not has_build and not local_backend else None
+            if override is not None:
+                evidence.environment["build_isolation_env"] = f"PIP_NO_BUILD_ISOLATION={override}"
+                evidence.limitations.append("PIP_NO_BUILD_ISOLATION is set in the environment: pip may have built "
+                                            "without isolation, in the project interpreter")
             if not local_backend:
                 evidence.limitations.append("build backend not importable locally: isolated build may need network access")
             result = self._run(command, work)

@@ -56,3 +56,42 @@ def test_a_real_packaging_failure_keeps_the_packaging_recommendation(tmp_path):
     finding = _artifact_findings(_current(_check("error: package directory 'src/mypkg' does not exist")), tmp_path)[0]
     assert "dominant_cause" not in finding.evidence
     assert finding.recommendation is None  # the code's default (fix packaging) applies
+
+
+# PR #11 review (VozNativa v0.10.5): a backend the project does not declare is not the environment's fault.
+
+def _project(tmp_path, requires):
+    (tmp_path / "pyproject.toml").write_text(
+        "[build-system]\nrequires = [" + ", ".join(f'"{r}"' for r in requires) + "]\n"
+        'build-backend = "setuptools.build_meta"\n', encoding="utf-8")
+    return tmp_path
+
+
+def test_declared_backend_missing_is_the_environment(tmp_path):
+    cause = environment_build_cause([_check(BACKEND)], _project(tmp_path, ["setuptools>=77"]))
+    assert cause["origin"] == "ENVIRONMENT"
+
+
+def test_undeclared_backend_is_the_project_configuration(tmp_path):
+    cause = environment_build_cause([_check(BACKEND)], _project(tmp_path, ["hatchling"]))
+    assert cause["origin"] == "PROJECT_CONFIGURATION"
+    assert cause["undeclared_build_backends"] == ["setuptools"]
+    finding = _artifact_findings(_current(_check(BACKEND)), tmp_path)[0]
+    assert "build-system.requires does not declare" in finding.recommendation
+
+
+def test_legacy_project_without_build_system_implies_setuptools(tmp_path):
+    (tmp_path / "setup.py").write_text("from setuptools import setup\nsetup()\n", encoding="utf-8")
+    assert environment_build_cause([_check(BACKEND)], tmp_path)["origin"] == "ENVIRONMENT"
+
+
+def test_lineage_says_when_the_environment_overrode_isolation():
+    # VozNativa v0.10.5 replay: the lineage said "isolated build by Assertiva" while PIP_NO_BUILD_ISOLATION=0 had
+    # made pip build in the project interpreter (the very failure the cause above explains).
+    from assertiva.verification import _build_label
+
+    overridden = SimpleNamespace(environment={"build_isolation": True, "build_isolation_env": "PIP_NO_BUILD_ISOLATION=0"})
+    assert "overridden by the environment" in _build_label(overridden)
+    assert "PIP_NO_BUILD_ISOLATION=0" in _build_label(overridden)
+    assert _build_label(SimpleNamespace(environment={"build_isolation": True})) == "isolated build by Assertiva"
+    assert "without isolation" in _build_label(SimpleNamespace(environment={"build_isolation": False}))

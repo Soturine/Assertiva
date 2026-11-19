@@ -323,6 +323,15 @@ def matrix_findings(surface: VerificationSurface, declared: dict[str, dict], cov
     return findings
 
 
+def _build_label(artifact) -> str:
+    """What the build was, not what was requested: a disposable copy always; pip isolation only when the
+    environment did not override it (VozNativa dogfood, 2026-11-18)."""
+    env = getattr(artifact, "environment", None) or {}
+    if env.get("build_isolation_env"):
+        return f"build by Assertiva in a disposable copy; isolation overridden by the environment ({env['build_isolation_env']})"
+    return "isolated build by Assertiva" if env.get("build_isolation", True) else "build by Assertiva in a disposable copy, without isolation"
+
+
 def artifact_lineage(surface: VerificationSurface, artifacts, delivered: dict[str, list[tuple[str, str]]], revision: str | None) -> tuple[list, list]:
     """SOURCE REVISION -> BUILD -> ARTIFACT -> TESTED -> PUBLISHED -> DEPLOYED, only as far as evidence goes."""
     from .models import Finding
@@ -333,7 +342,7 @@ def artifact_lineage(surface: VerificationSurface, artifacts, delivered: dict[st
     for artifact in artifacts:
         candidates = delivered.get(artifact.artifact or "", [])
         lineage.append({
-            "source_revision": revision, "build": "isolated build by Assertiva", "artifact": artifact.artifact, "sha256": artifact.sha256,
+            "source_revision": revision, "build": _build_label(artifact), "artifact": artifact.artifact, "sha256": artifact.sha256,
             "tested": artifact.status.value,
             "published": [c.check_id for c in deliveries if c.kind is VerificationKind.DEPLOY] or "NOT_DECLARED",
             "deployed": [c.check_id for c in deliveries if c.metadata.get("environment")] or "NOT_DECLARED",

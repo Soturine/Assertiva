@@ -2,7 +2,7 @@
 
 Branch `integration/v1.1-foundation` (PR #13), candidate `1.1.0rc1`, version `1.1.0` on this branch. The owner authorized merging everything into `main`, tagging and releasing on 2026-11-27; the final addendum (CP-FINAL-A/B/C) was applied before publication. The publication record (merge and tag SHAs, CI runs, asset checksums) is the GitHub Release `v1.1.0`, not this file.
 
-**Recommendation: CONDITIONAL** — engine, demos and CI qualification hold; the agent evaluations are NOT_RUN and need the owner's explicit decision (accept as a documented limitation, or approve a budget) before publication. The engine contracts, the demos and the local qualification hold; publishing 1.1.0 still needs (1) the GitHub CI full qualification of the final SHA green, (2) the owner's decision on the agent evaluations that were not run (blind multimodal reading, PR #12's cases), and (3) explicit authorization to merge, tag and release.
+**Recommendation: CONDITIONAL → READY on the owner's decision.** Engine, demos and CI qualification hold. The agent evaluations are NOT_RUN; on 2026-11-27 the owner accepted this as a documented limitation of 1.1.0 (no eval budget spent). Publication still requires the CI full qualification of the final SHA. The engine contracts, the demos and the local qualification hold; publishing 1.1.0 still needs (1) the GitHub CI full qualification of the final SHA green, (2) the owner's decision on the agent evaluations that were not run (blind multimodal reading, PR #12's cases), and (3) explicit authorization to merge, tag and release.
 
 ## Checkpoints
 
@@ -25,6 +25,7 @@ Branch `integration/v1.1-foundation` (PR #13), candidate `1.1.0rc1`, version `1.
 | `b615b13` (main, baseline) | `pytest -q -n auto -m "not browser and not jvm"` | 1349 passed, 19 skipped, 0 failed |
 | `bd50683` (candidate, first full run) | same | 1387 passed, 19 skipped, 3 failed — a missing pt-BR template for the new re-rooting limitation, and two tests pinning the report directory to two files; fixed in `978069e` |
 | `978069e` (candidate, final code) | same | **1391 passed, 19 skipped, 0 failed** (510 s); +42 tests over the baseline |
+| `fc3d8d7` (after the final addendum fixes) | same | **1399 passed, 20 skipped, 0 failed** (483 s); the new skip is the symlink case, which this Windows machine cannot create (it runs on Linux CI) |
 | `tests/test_installed_artifact_context.py` | wheel built and installed outside the checkout, self-tests run without git or source package | 2 passed |
 | Ruff (`ruff==0.17.3`) | `ruff check .` | All checks passed |
 | `scripts/validate_repo.py` | — | passed |

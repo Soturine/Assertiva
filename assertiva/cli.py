@@ -73,11 +73,19 @@ def _attach(root: Path, directory: Path, args: argparse.Namespace) -> int:
         current = capture_baseline(root).digest
     if current != digest:
         raise UsageError("the project changed since the audited run; run `assertiva audit` again and assess that run")
-    report = apply_assessment(report, load_assessment(args.assessment))
+    if report.get("assessment"):  # the replaced assessment stays as history, never silently lost
+        from .assessment import archive_assessment
+
+        archive_assessment(report, directory)
+    report = apply_assessment(report, load_assessment(args.assessment), root)
     report["report_path"] = str(write_report(report, directory, "audit"))
     a = report["assessment"]
     _emit(report, args.output, [
-        f"Assessment attached to audit run {report['run_id']}: {a['dispositions']} dispositions, {a['findings']} agent findings",
+        f"Assessment attached to audit run {report['run_id']}: {a['dispositions']} dispositions, {a['findings']} agent findings"
+        + (f", {len(report['context']['behaviors'])} behaviors from {len(report['context']['sources'])} sources" if report.get("context") else "")
+        + (f", {len(report['external_executions'])} external executions" if report.get("external_executions") else ""),
+        f"Feedback about Assertiva: {(report.get('dogfood') or {}).get('export')} "
+        f"({(report.get('dogfood') or {}).get('review_mode', '-')}, {(report.get('dogfood') or {}).get('feedback', 0)} entries)",
         f"Report: {report['report_path']}",
     ])
     return 0
@@ -101,6 +109,16 @@ def _audit(args: argparse.Namespace) -> int:
                        mutation_tool=args.mutation_tool, mutation_tests=args.mutate_tests or [],
                        dependencies=args.dependencies)
     report["provenance"]["trace"] = str(process.TRACE_PATH) if process.TRACE_PATH else None
+    previous = directory / "audit.json"
+    if previous.is_file():  # selective invalidation: which earlier traceability still rests on the same bytes
+        from .context import carry_over
+
+        try:
+            carried = carry_over(json.loads(previous.read_text(encoding="utf-8")), root)
+        except (OSError, ValueError):
+            carried = None
+        if carried:
+            report["previous_traceability"] = carried
     if args.fail_on:  # opt-in: without it the exit status keeps meaning "the audit completed"
         from .gate import evaluate
 
@@ -383,6 +401,13 @@ def _parser() -> argparse.ArgumentParser:
     p_mv.add_argument("state", choices=("OBSERVED", "REPRODUCED", "FIXED_IN_ASSERTIVA_BRANCH", "RETESTED_WITH_ASSERTIVA",
                                         "VERIFIED_AT_SHA", "BLOCKED", "NOT_SUPPORTED", "REOPENED", "REGRESSION"))
     p_mv.add_argument("--evidence", required=True)
+    p_mv.add_argument("--repo", metavar="PATH", help="a local Assertiva checkout where the evidence's commit must resolve "
+                                                     "(required for VERIFIED_AT_SHA; otherwise the reference stays CLAIMED)")
+    p_imp = acts.add_parser("import-feedback", help="import a portable dogfood file (audit.dogfood.json) from any installation; "
+                                                    "no project registration needed, nothing executed or fetched")
+    p_imp.add_argument("file")
+    p_imp.add_argument("--origin", help="alias for where the file came from (default: external:<report id>)")
+    p_imp.add_argument("--dry-run", action="store_true", help="show what would be created or added, write nothing")
     p_disc = acts.add_parser("discover", help="list an owner's GitHub repositories (metadata only; clones and adds nothing)")
     p_disc.add_argument("--owner", required=True)
     port.set_defaults(handler=_portfolio, root=".")
@@ -422,6 +447,7 @@ def _portfolio(args: argparse.Namespace) -> int:
         lines = [f"{args.project}: tests {payload['tests_status']} at {str(payload['revision'])[:12]}; report {payload['report']}"]
     elif action == "report":
         payload = portfolio.report(include_paths=False)
+        payload["feedback_overview"] = portfolio.feedback_overview()
         out = Path(args.html) if args.html else None
         if out:
             from .portfolio_html import render
@@ -434,8 +460,13 @@ def _portfolio(args: argparse.Namespace) -> int:
                                          args.engine_version or __version__, run_id=args.run_id, note=args.note or "")
         lines = [f"{payload['feedback_id']}: {payload['state']} ({len(payload['sightings'])} sightings)"]
     elif action == "move":
-        payload = portfolio.move_feedback(args.feedback_id, args.state, args.evidence)
-        lines = [f"{payload['feedback_id']}: {payload['state']}"]
+        payload = portfolio.move_feedback(args.feedback_id, args.state, args.evidence, repo=args.repo)
+        lines = [f"{payload['feedback_id']}: {payload['state']} ({payload['history'][-1].get('verification', 'n/a')})"]
+    elif action == "import-feedback":
+        payload = portfolio.import_feedback(args.file, origin=args.origin, dry_run=args.dry_run)
+        lines = [f"{payload['report_id']} from {payload['origin']}" + (" (dry run: nothing written)" if payload["dry_run"] else "")]
+        lines += [f"  {e['action']:<22} {e['feedback_id']} {e['title']} (reported {e['reported_status']})" for e in payload["entries"]]
+        lines += [] if payload["entries"] else ["  no feedback entries (" + str(payload.get("review_status")) + ")"]
     else:  # discover
         payload = {"owner": args.owner, "repositories": portfolio.discover(args.owner),
                    "note": "listed only: nothing was cloned or added; add a local checkout with `assertiva portfolio add PATH`"}

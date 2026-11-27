@@ -132,10 +132,15 @@ def _agent_finding(entry: Any) -> dict:
     return out
 
 
+AGENT_SECTIONS = ("assessment", "context", "external_executions", "reviews")
+
+
 def strip_assessment(report: dict) -> dict:
-    """The engine's own report for the run: agent findings, dispositions and restated priorities removed."""
+    """The engine's own report for the run: agent findings, dispositions, restated priorities and every section the
+    agent attached (context, external executions, reviews) removed."""
     base = copy.deepcopy(report)
-    base.pop("assessment", None)
+    for key in AGENT_SECTIONS:
+        base.pop(key, None)
     base["findings"] = [f for f in base["findings"] if f.get("origin") != "agent"]
     for finding in base["findings"]:
         finding.pop("assessment", None)
@@ -144,8 +149,13 @@ def strip_assessment(report: dict) -> dict:
     return base
 
 
-def apply_assessment(report: dict, data: Any) -> dict:
-    """A new report: the run's engine report plus this assessment. Raises AssessmentError when it does not fit the run."""
+def apply_assessment(report: dict, data: Any, root: Path | None = None) -> dict:
+    """A new report: the run's engine report plus this assessment. Raises AssessmentError when it does not fit the run.
+
+    Besides dispositions and findings, an assessment may carry (all optional, v1.1): ``sources`` and ``behaviors``
+    (documentary context and traceability, see context.py), ``external_executions`` (receipts of runs the agent made
+    outside the engine, see receipts.py), ``reviews`` (independent second opinions, see reviews.py) and ``dogfood``
+    (feedback about Assertiva itself, see dogfood.py)."""
     if not isinstance(data, dict):
         raise AssessmentError("the assessment must be a JSON object")
     if report.get("workflow") != "audit" or not report.get("run_id"):
@@ -180,6 +190,25 @@ def apply_assessment(report: dict, data: Any) -> dict:
     recs += [{"finding": f["code"], "finding_id": f["id"], "recommendation": f["recommendation"], "status": "PROPOSED", "origin": "agent"}
              for f in agent if f.get("recommendation")]
     out["recommendations"] = recs
+    root = Path(root or (report.get("project") or {}).get("root") or ".")
+    from .context import ContextError, apply_context
+    from .dogfood import DogfoodError, validate_agent_section
+    from .receipts import ReceiptError, apply_receipts, for_context
+    from .reviews import ReviewError, apply_reviews
+
+    try:
+        receipts = apply_receipts(out, data, root)
+        context = apply_context(out, data, root, for_context(receipts))
+        reviews = apply_reviews(data)
+        dogfood = validate_agent_section(data.get("dogfood"))
+    except (ContextError, ReceiptError, ReviewError, DogfoodError) as exc:
+        raise AssessmentError(str(exc)) from exc
+    if receipts:
+        out["external_executions"] = receipts
+    if context:
+        out["context"] = context
+    if reviews:
+        out["reviews"] = reviews
     out["assessment"] = {
         "source": "agent",
         "attached_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -189,6 +218,8 @@ def apply_assessment(report: dict, data: Any) -> dict:
         "dispositions": len(dispositions),
         "findings": len(agent),
     }
+    if dogfood:
+        out["assessment"]["dogfood"] = dogfood
     return out
 
 
@@ -197,3 +228,15 @@ def load_assessment(path: str | Path) -> dict:
         return json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise AssessmentError(f"cannot read the assessment {path}: {exc}") from exc
+
+
+def archive_assessment(report: dict, directory: Path) -> Path:
+    """Keep the assessment being replaced (with the sections it attached) under ``assessments/``: attaching again
+    replaces what the page shows, never the history."""
+    keep = {key: report[key] for key in AGENT_SECTIONS if key in report}
+    keep["run_id"] = report.get("run_id")
+    stamp = re.sub(r"[^0-9A-Za-z]", "", str((report.get("assessment") or {}).get("attached_at") or "unknown"))
+    target = directory / "assessments" / f"{report.get('run_id')}-{stamp}.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(keep, indent=1, ensure_ascii=False), encoding="utf-8")
+    return target

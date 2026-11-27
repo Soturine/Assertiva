@@ -1,0 +1,3 @@
+# binary fixtures must keep their exact bytes (digests are part of the evidence)
+*.pdf binary
+*.png binary

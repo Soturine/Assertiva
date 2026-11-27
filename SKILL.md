@@ -110,3 +110,5 @@ Audit first. Then drive `assertiva improve`: it measures the baseline in isolati
 - [references/ENGINE.md](references/ENGINE.md) — engine calls, what each costs and buys, reading its output, the assessment format, driving `improve`.
 - [references/TEST_QUALITY.md](references/TEST_QUALITY.md) — oracles and observation surfaces, test doubles, harness fidelity, data and fixtures, negative paths and error contracts, coverage, mutation, parameterized/property tests, UI and browser tests.
 - [references/DELIVERY.md](references/DELIVERY.md) — verification surface, CI and revision provenance, artifacts, test selection, flaky tests, failure diagnosis, refactor safety.
+
+When investigating oracle quality, migrated test assets, or source completeness, use [Evidence Contract: independent challenge](docs/EVIDENCE_CONTRACT.md#oracle-quality-source-completeness-and-independent-challenge).

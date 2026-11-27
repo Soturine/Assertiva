@@ -583,6 +583,153 @@
       "type": "string",
       "description": "Identity of one audit run; an attached assessment must name it."
     },
+    "context": {
+      "type": "object",
+      "description": "v1.1: sources the agent read and behaviors it traced to tests, verified against the run.",
+      "required": [
+        "schema",
+        "sources",
+        "behaviors",
+        "summary"
+      ],
+      "properties": {
+        "schema": {
+          "const": "assertiva-context/1"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "availability",
+              "authority",
+              "labels",
+              "verification"
+            ],
+            "properties": {
+              "labels": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "INVENTORIED",
+                    "NOT_READ",
+                    "READ_NATIVE",
+                    "READ_VISUAL",
+                    "READ_PARTIAL",
+                    "TEXT_ONLY",
+                    "UNSUPPORTED",
+                    "BLOCKED",
+                    "STALE",
+                    "PRIVATE",
+                    "OUT_OF_SCOPE",
+                    "SUPERSEDED"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "behaviors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "status",
+              "claimed_status",
+              "dimensions",
+              "tests"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "PROVEN_IN_SCOPE",
+                  "OBSERVED_PASS",
+                  "PARTIAL",
+                  "WEAK",
+                  "CHARACTERIZATION_ONLY",
+                  "NOT_EVIDENCED",
+                  "UNKNOWN",
+                  "BLOCKED",
+                  "NOT_APPLICABLE",
+                  "STALE"
+                ]
+              }
+            }
+          }
+        },
+        "summary": {
+          "type": "object"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "external_executions": {
+      "type": "array",
+      "description": "v1.1: receipts of runs the agent made outside the engine (record only; never ENGINE_EXECUTED).",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "purpose",
+          "provenance",
+          "tool",
+          "tool_version",
+          "status",
+          "link"
+        ],
+        "properties": {
+          "provenance": {
+            "const": "AGENT_EXTERNAL"
+          },
+          "link": {
+            "enum": [
+              "VERIFIED",
+              "UNVERIFIED"
+            ]
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "ERROR",
+              "NO_TESTS",
+              "UNKNOWN"
+            ]
+          }
+        }
+      }
+    },
+    "reviews": {
+      "type": "array",
+      "description": "v1.1: independent second opinions with their independence and transmission consent.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dogfood": {
+      "type": "object",
+      "description": "v1.1: the run's feedback about Assertiva as written beside the report.",
+      "required": [
+        "export"
+      ],
+      "properties": {
+        "export": {
+          "enum": [
+            "WRITTEN",
+            "DISABLED",
+            "BLOCKED"
+          ]
+        }
+      }
+    },
+    "previous_traceability": {
+      "type": "object",
+      "description": "v1.1: the previous run's behaviors, VALID_PENDING_REATTACH or STALE."
+    },
     "assessment": {
       "type": [
         "object",

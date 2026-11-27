@@ -237,3 +237,20 @@ def test_the_page_shows_context_without_executing_agent_text(warehouse, tmp_path
     assert cli.main(["audit", str(warehouse), "--assessment", str(path), "--output", "json"]) == 0
     page = Path(json.loads(capsys.readouterr().out)["report_path"]).read_text(encoding="utf-8")
     assert "Context and traceability" in page and "<script>alert(1)</script>" not in page and "&lt;script&gt;" in page
+
+
+def test_v11_reports_and_dogfood_files_stay_inside_their_schemas(warehouse, tmp_path, capsys):
+    root = Path(__file__).resolve().parents[1] / "schemas"
+    report_schema = json.loads((root / "assurance-report.schema.json").read_text(encoding="utf-8"))
+    dogfood_schema = json.loads((root / "assertiva-dogfood.schema.json").read_text(encoding="utf-8"))
+    report = _audit(warehouse, capsys)
+    path = tmp_path / "assessment.json"
+    path.write_text(json.dumps(_assess(report, sources=[_source()], behaviors=[APPROVAL])), encoding="utf-8")
+    assert cli.main(["audit", str(warehouse), "--assessment", str(path), "--output", "json"]) == 0
+    attached = json.loads(capsys.readouterr().out)
+    assert set(attached) <= set(report_schema["properties"])  # the schema forbids undeclared top-level keys
+    assert attached["context"]["schema"] == report_schema["properties"]["context"]["properties"]["schema"]["const"]
+    doc = json.loads((Path(attached["report_path"]).parent / "audit.dogfood.json").read_text(encoding="utf-8"))
+    assert set(dogfood_schema["required"]) <= set(doc) and doc["schema"] == dogfood_schema["properties"]["schema"]["const"]
+    for entry in doc["feedback"]:
+        assert set(dogfood_schema["properties"]["feedback"]["items"]["required"]) <= set(entry)

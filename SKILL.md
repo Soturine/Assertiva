@@ -17,6 +17,7 @@ Start from the user's question, not from a tool. "Audit my tests" means: how muc
 Work in a loop:
 
 1. **Orient cheaply.** Layout, test configuration, CI workflows, a few tests next to the code they protect. Form hypotheses about where assurance could be false.
+   Before judging whether tests protect the *intended* behavior, look for what defines it — requirements, acceptance criteria, ADRs, contracts and schemas, diagrams, test plans, documents the user names — in proportion to the question. Read originals with your host's own reading (text and, for figures, tables and formulas, vision) before any extractor; text extraction loses rules that live in a figure. Say what you read and how much (10 of 40 pages is 10/40, not "the spec"); a document present is not a document read, approved or current. No documents is a valid answer: the functional authority is then UNKNOWN, not the implementation. [references/DOCUMENTS.md](references/DOCUMENTS.md)
 2. **Acquire the evidence that would settle them.** Choose the instrument by what it can tell you:
 
    | Question | Evidence that answers it |
@@ -40,6 +41,10 @@ Work in a loop:
    - green CI + the workflow excludes the integration marker + integration tests exist = green proves nothing about integration.
 4. **Resolve what matters.** Engine findings are facts and leads, not conclusions. Confirm, contextualize or reject each material one by reading what it points at. A conclusion drawn from a sample covers that sample; when a finding is material and reviewing all of it is cheap, review all of it.
 5. **Find what no tool reported.** A gap the engine never raised is as valid as one it did; report it as a first-class finding with its evidence.
+
+### When no adapter fits
+
+`CUSTOM`, `UNKNOWN`, `NOT_SUPPORTED` or `NO_EXECUTABLE_TEST_ADAPTER_RECOGNIZED` means the engine cannot run this stack, not that it cannot be tested. Find the project's own runner (manifests, lockfiles, CI) and the smallest instrument that answers the question; check the current documentation of the version in use instead of guessing flags; with the user's consent, prepare it in real confinement (a container with no network for the run, separate from a download stage; never global installs, `sudo` or `curl | sh`); run it on a copy; keep the command, exit code, versions and raw output; import standard results (`--test-results`, `--mutation-report`, …) and record the run as an external execution receipt in your assessment. A lint is not a test run, zero tests is not a pass, and your run is never ENGINE_EXECUTED. When it cannot be done safely, say BLOCKED and what would unblock it. [references/ADAPTIVE_TOOLS.md](references/ADAPTIVE_TOOLS.md)
 
 ## Know when you are done
 
@@ -99,7 +104,11 @@ Lead with the answer to the question. Then what green proves and does not, the f
 
 Before answering, check that your opening sentence, your dispositions and any counts you give agree with each other, and say what is protected as well as what is not.
 
-When the engine wrote an Assurance Report for this run, the report must not contradict your answer. Write your assessment (conclusion, dispositions of engine findings, your own findings, unknowns) with the same dispositions and scope as your answer and attach it with `assertiva audit <project> --assessment <file>`; the engine validates it against that run and re-renders the same page, raw engine evidence intact. Never edit or render the HTML yourself. End with `Assurance Report: <report_path>`.
+When the engine wrote an Assurance Report for this run, the report must not contradict your answer. Write your assessment (conclusion, dispositions of engine findings, your own findings, unknowns) with the same dispositions and scope as your answer and attach it with `assertiva audit <project> --assessment <file>`; the engine validates it against that run and re-renders the same page, raw engine evidence intact. The same assessment carries the sources you read, the behaviors you traced, the external runs you made and your feedback about Assertiva; the engine refuses a citation outside what you read and a status stronger than its evidence. Never edit or render the HTML yourself. End with `Assurance Report: <report_path>`.
+
+## Close with feedback about Assertiva
+
+After an agent-led audit or improve, review your own process briefly: what Assertiva measured correctly, what it missed or misread, what needed another instrument, what was blocked. Put it in the assessment's `dogfood` section — expected versus observed, scope, evidence, a synthetic reproducer, hypotheses apart from proven causes — or `NO_ADDITIONAL_FEEDBACK` when the review found nothing. Never invent issues to fill it, never count an opportunity as a bug, and never copy the project's code or private details into it. The engine writes it next to the report (`audit.dogfood.json` / `.md`), local only; sharing it is the user's choice. This is about the tool, never a condition on the project's result. [references/DOGFOOD.md](references/DOGFOOD.md)
 
 ## Improve
 
@@ -110,5 +119,8 @@ Audit first. Then drive `assertiva improve`: it measures the baseline in isolati
 - [references/ENGINE.md](references/ENGINE.md) — engine calls, what each costs and buys, reading its output, the assessment format, driving `improve`.
 - [references/TEST_QUALITY.md](references/TEST_QUALITY.md) — oracles and observation surfaces, test doubles, harness fidelity, data and fixtures, negative paths and error contracts, coverage, mutation, parameterized/property tests, UI and browser tests.
 - [references/DELIVERY.md](references/DELIVERY.md) — verification surface, CI and revision provenance, artifacts, test selection, flaky tests, failure diagnosis, refactor safety.
+- [references/DOCUMENTS.md](references/DOCUMENTS.md) — documentary context: sources, reading methods and completeness, authority, behavior slices, traceability to tests and evidence, stale links.
+- [references/ADAPTIVE_TOOLS.md](references/ADAPTIVE_TOOLS.md) — stacks without an adapter: discovery, current-documentation research, consent and confinement, external execution receipts, reconciliation.
+- [references/DOGFOOD.md](references/DOGFOOD.md) — feedback about Assertiva, independent reviews and optional providers, sharing and Portfolio import.
 
 When investigating oracle quality, migrated test assets, or source completeness, use [Evidence Contract: independent challenge](docs/EVIDENCE_CONTRACT.md#oracle-quality-source-completeness-and-independent-challenge).

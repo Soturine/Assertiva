@@ -262,8 +262,11 @@ def test_an_old_report_does_not_reopen_a_fix_but_a_newer_engine_does(project, tm
     shipped = _colleague_file(tmp_path, project, monkeypatch, capsys)
     _port(capsys, "import-feedback", str(shipped))
     fid = portfolio.report()["assertiva_feedback"][0]["feedback_id"]
-    repo = Path(__file__).resolve().parents[1]
+    repo = tmp_path / "assertiva-checkout"  # a throwaway repository: the suite must hold in a copy without .git
+    write(repo / "fix.txt", "the fix\n")
+    commit_all(repo)
     head = __import__("subprocess").run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    assert len(head) == 40
     code, _, err = _port(capsys, "move", fid, "VERIFIED_AT_SHA", "--evidence", "fixed in deadbeefcafe")
     assert code == 2 and "--repo" in err
     code, _, err = _port(capsys, "move", fid, "FIXED_IN_ASSERTIVA_BRANCH", "--evidence", "fixed in 0123456789abcdef", "--repo", str(repo))

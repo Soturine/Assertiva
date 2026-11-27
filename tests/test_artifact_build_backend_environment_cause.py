@@ -95,3 +95,12 @@ def test_lineage_says_when_the_environment_overrode_isolation():
     assert "PIP_NO_BUILD_ISOLATION=0" in _build_label(overridden)
     assert _build_label(SimpleNamespace(environment={"build_isolation": True})) == "isolated build by Assertiva"
     assert "without isolation" in _build_label(SimpleNamespace(environment={"build_isolation": False}))
+
+
+def test_only_a_value_pip_reads_as_disabling_isolation_is_an_override():
+    # pip turns the value into build_isolation itself: "0"/"false" disable isolation, "1"/"true" keep it (pip 25.0.1).
+    from assertiva.adapters.python_package import pip_reads_isolation_disabled
+
+    assert pip_reads_isolation_disabled("0") is True and pip_reads_isolation_disabled("False") is True
+    assert pip_reads_isolation_disabled("1") is False and pip_reads_isolation_disabled("yes") is False
+    assert pip_reads_isolation_disabled("maybe") is None

@@ -149,11 +149,31 @@ def attach_mutation(state: StateEvidence, run: MutationRun, state_dir: str | Pat
         def norm(text: str) -> str:
             return text.replace("\r\n", "\n")
 
-        mismatched = [
-            path for path, source in {**run.sources, **run.test_sources}.items()
-            if not (Path(state_dir) / path).is_file()
-            or norm((Path(state_dir) / path).read_text(encoding="utf-8", errors="replace")) != norm(source)
-        ]
+        rerooted: list[str] = []
+
+        def local(path: str) -> Path | None:
+            """The state's file for a report path. A report produced in another root (a container, a CI checkout)
+            names absolute paths of that root: the file is the one whose trailing components match, when exactly one
+            does. The content comparison below still decides; re-rooting only finds the candidate (v1.1 dogfood)."""
+            direct = Path(state_dir) / path
+            if direct.is_file() and not Path(path).is_absolute():
+                return direct
+            parts = [p for p in path.replace("\\", "/").split("/") if p and not p.endswith(":")]
+            for start in range(1, len(parts)):
+                candidate = Path(state_dir).joinpath(*parts[start:])
+                if candidate.is_file():
+                    rerooted.append(f"{path} -> {'/'.join(parts[start:])}")
+                    return candidate
+            return direct if direct.is_file() else None
+
+        def same(path: str, source: str) -> bool:
+            found = local(path)
+            return found is not None and norm(found.read_text(encoding="utf-8", errors="replace")) == norm(source)
+
+        mismatched = [path for path, source in {**run.sources, **run.test_sources}.items() if not same(path, source)]
+        if rerooted and not mismatched:
+            run.limitations.append("report paths from another root were matched to the project by path suffix and identical "
+                                   "content: " + ", ".join(rerooted[:5]))
         if mismatched:
             run.matches_state = False
             run.limitations.append(f"report source does not match the {state.label} state: " + ", ".join(sorted(mismatched)[:5]))

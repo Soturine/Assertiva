@@ -250,6 +250,18 @@ def venv_root_of(python: Path | str) -> str:
     return str(Path(python).parent.parent.resolve())
 
 
+_PIP_FALSE = frozenset({"0", "false", "no", "off", "n", "f"})
+_PIP_TRUE = frozenset({"1", "true", "yes", "on", "y", "t"})
+
+
+def pip_reads_isolation_disabled(value: str) -> bool | None:
+    """How pip reads ``PIP_NO_BUILD_ISOLATION``: the value becomes ``build_isolation`` itself, so ``0``/``false`` turn
+    isolation OFF and ``1``/``true`` leave it on (checked with pip 25.0.1; the inverted name is a long-standing pip
+    quirk). None when the value is neither, and pip's reading is not assumed."""
+    text = value.strip().lower()
+    return True if text in _PIP_FALSE else False if text in _PIP_TRUE else None
+
+
 class PythonPackageAdapter:
     adapter_id = "python-package"
 
@@ -326,6 +338,13 @@ class PythonPackageAdapter:
                 command = [self.python, "-m", "pip", "wheel", "--no-deps", "--disable-pip-version-check", "-w", dist] + (
                     ["--no-build-isolation"] if local_backend else []) + [work]
             evidence.environment.update({"build_tool": "build" if has_build else "pip wheel", "build_isolation": not local_backend})
+            # VozNativa dogfood (2026-11-18): PIP_NO_BUILD_ISOLATION in the environment is read by pip before this
+            # request, so "isolation requested" is not "isolation happened"; record what the environment said.
+            override = os.environ.get("PIP_NO_BUILD_ISOLATION") if not has_build and not local_backend else None
+            if override is not None and pip_reads_isolation_disabled(override) is not False:
+                evidence.environment["build_isolation_env"] = f"PIP_NO_BUILD_ISOLATION={override}"
+                evidence.limitations.append("PIP_NO_BUILD_ISOLATION is set in the environment: pip may have built "
+                                            "without isolation, in the project interpreter")
             if not local_backend:
                 evidence.limitations.append("build backend not importable locally: isolated build may need network access")
             result = self._run(command, work)

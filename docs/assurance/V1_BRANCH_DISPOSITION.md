@@ -44,3 +44,7 @@ git push origin --delete docs/dogfood-beamng-randomizer-0712 docs/voznativa-v05-
 
 Never delete tags (`v0.7.1` … `v1.0.0`). DrawLab and TCC stay unless the owner decides otherwise after reading the
 table above.
+
+## v1.1.0 (2026-11-27)
+
+The owner asked to join every branch into `main` for 1.1.0. Every remote branch was checked against the release branch: all are ancestors except `docs/dogfood-drawlab-m10` and `docs/tcc-dogfood-evidence-20261025`. Re-verified by blob: all their content files (41 and 8) are byte-identical in the release tree; the remaining files are older indexes that would regress the current ones. Both were merged with strategy `ours` (`6e0c504`, `7349845`): their history becomes part of `main`, their stale indexes are not imported, and nothing was deleted. PR #11 and PR #12 are merged through PR #13. No branch was deleted and no ruleset changed.

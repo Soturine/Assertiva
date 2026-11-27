@@ -122,3 +122,12 @@ Qualification has five pillars — execution, behavioral assurance, fault sensit
 - `assertiva explain ROOT --test ID`: one test's chain of evidence from the last audit (oracle, what ran it and on which copy of the code, mutants it detected, unknowns); nothing re-runs.
 - `assertiva portfolio …`: a local registry of the projects you audit (`add`, `list`, `audit`, `report`), and `feedback`/`move` for issues of Assertiva itself, kept apart from project findings. Use `feedback` for a false positive or a miss of the engine with a synthetic reproducer; never copy the project's code into it.
 - Each pytest, unittest and Django run records `source_identity` (where the project's modules were imported from: SOURCE_TREE, INSTALLED_ARTIFACT, MISMATCH or UNKNOWN), `temp_root` and `interpreter.borrowed_site_dirs`; read them before trusting a green run. A run against the installed wheel passes only with INSTALLED_ARTIFACT. Counters (`test_invocations`, `passed`, ...) count executed runs; ingested results are `imported_*`.
+
+## 1.1 additions
+
+- The assessment may carry `sources` and `behaviors` (DOCUMENTS.md), `external_executions` (ADAPTIVE_TOOLS.md), `reviews` and `dogfood` (DOGFOOD.md). All optional; each is validated against the run and the files, and refused with the reason when it claims more than its evidence. Attaching again archives the replaced assessment under `assessments/` beside the report.
+- Every audit and improve also writes `<name>.dogfood.json` and `<name>.dogfood.md` beside its page, plus `dogfood/DF-<id>.json` per run (local only; `ASSERTIVA_DOGFOOD=off` disables it). `report.dogfood` says what was written.
+- A new audit of a project whose previous run carried traceability reports `previous_traceability`: each earlier behavior VALID_PENDING_REATTACH or STALE (a cited source or a linked test file changed).
+- `--mutation-report` ties a report written in another root (a container, a CI checkout) when its trailing paths match project files with identical content; the re-rooting is listed in the run's limitations.
+- `assertiva portfolio import-feedback FILE [--origin ALIAS] [--dry-run]`; `portfolio move … --repo PATH` resolves the commit (required for VERIFIED_AT_SHA); `portfolio report` includes `feedback_overview`.
+- An attached assessment written for 1.1 loses its new sections without warning on a 1.0.x engine; attach with the engine that will render it.

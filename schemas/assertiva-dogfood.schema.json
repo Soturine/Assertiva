@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Assertiva dogfood document (assertiva-dogfood/1)",
+  "description": "Portable feedback about Assertiva itself, written beside each report and importable with `assertiva portfolio import-feedback`. Local-only by default; review before sharing.",
+  "type": "object",
+  "required": [
+    "schema",
+    "report_id",
+    "run_id",
+    "review_mode",
+    "review_status",
+    "semantic_review",
+    "engine",
+    "feedback",
+    "sharing"
+  ],
+  "properties": {
+    "schema": {
+      "const": "assertiva-dogfood/1"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^DF-[0-9a-f]{12}$"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "review_mode": {
+      "enum": [
+        "AGENT_LED",
+        "ENGINE_ONLY",
+        "SKILL_ONLY"
+      ]
+    },
+    "review_status": {
+      "enum": [
+        "COMPLETED_IN_SCOPE",
+        "PARTIAL",
+        "NO_ADDITIONAL_FEEDBACK",
+        "NOT_RUN",
+        "BLOCKED"
+      ]
+    },
+    "semantic_review": {
+      "enum": [
+        "DONE",
+        "NOT_RUN"
+      ]
+    },
+    "engine": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "agent": {
+      "type": "object"
+    },
+    "feedback": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "component",
+          "observation_kind",
+          "status",
+          "title",
+          "rule",
+          "signature",
+          "expected",
+          "observed",
+          "scope",
+          "evidence",
+          "provenance"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "FALSE_POSITIVE",
+              "FALSE_NEGATIVE",
+              "MISSING_ANALYSIS",
+              "ADAPTER_ERROR",
+              "SECURITY",
+              "COST",
+              "EVIDENCE_INCONSISTENCY",
+              "UNSUPPORTED"
+            ]
+          },
+          "component": {
+            "enum": [
+              "engine",
+              "skill",
+              "host_provider",
+              "adapter",
+              "document_assurance",
+              "traceability",
+              "orchestration",
+              "tooling_discovery",
+              "environment",
+              "report",
+              "ux",
+              "performance",
+              "integration",
+              "packaging",
+              "security",
+              "regression"
+            ]
+          },
+          "observation_kind": {
+            "enum": [
+              "defect_candidate",
+              "capability_gap",
+              "improvement_opportunity",
+              "environmental_limit",
+              "inconclusive"
+            ]
+          },
+          "status": {
+            "enum": [
+              "OBSERVED",
+              "REPRODUCED",
+              "CONFIRMED"
+            ]
+          },
+          "feedback_id": {
+            "type": "string",
+            "pattern": "^AFB-[0-9a-f]{10}$"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "REPRODUCED",
+                    "CONFIRMED"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "reproducer"
+              ],
+              "properties": {
+                "evidence": {
+                  "minItems": 1
+                },
+                "reproducer": {
+                  "required": [
+                    "description",
+                    "command",
+                    "result"
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "mechanical_observations": {
+      "type": "array"
+    },
+    "confirmed_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capability",
+          "scope",
+          "evidence"
+        ]
+      }
+    },
+    "sharing": {
+      "type": "object",
+      "required": [
+        "classification",
+        "reviewed_for_export"
+      ],
+      "properties": {
+        "classification": {
+          "const": "LOCAL_ONLY"
+        },
+        "reviewed_for_export": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

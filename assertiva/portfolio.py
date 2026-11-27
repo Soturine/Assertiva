@@ -337,33 +337,230 @@ def add_feedback(project: str, kind: str, rule: str, signature: str, reproducer:
     fid = feedback_id(kind, rule, signature)
     entry = data["feedback"].get(fid) or {"feedback_id": fid, "kind": kind, "rule": rule, "signature": signature,
                                           "reproducer": reproducer, "state": "OBSERVED", "history": [], "sightings": []}
-    entry["sightings"].append({"project": project, "run_id": run_id, "engine_version": engine_version, "at": _now(), "note": note})
-    if entry["state"] in ("FIXED_IN_ASSERTIVA_BRANCH", "RETESTED_WITH_ASSERTIVA", "VERIFIED_AT_SHA"):
-        entry["history"].append({"from": entry["state"], "to": "REGRESSION", "at": _now(), "evidence": f"seen again in {project}"})
-        entry["state"] = "REGRESSION"
+    sighting = {"project": project, "run_id": run_id, "engine_version": engine_version, "at": _now(), "note": note}
+    entry["sightings"].append(sighting)
+    _resighted(entry, sighting, f"seen again in {project}")
     data["feedback"][fid] = entry
     _save(data)
     return entry
 
 
+FIXED_STATES = ("FIXED_IN_ASSERTIVA_BRANCH", "RETESTED_WITH_ASSERTIVA", "VERIFIED_AT_SHA")
+
+
+_PHASES = {"dev": 0, "a": 1, "alpha": 1, "b": 2, "beta": 2, "rc": 3, "c": 3, "": 4, "post": 5}
+
+
+def _version(text) -> tuple | None:
+    """An orderable key for a version: the release numbers padded, then the pre-release phase (dev < a < b < rc <
+    final < post) and its number, so 1.1.0rc1 < 1.1.0. None when the text is not a version."""
+    match = re.match(r"^v?(\d+(?:\.\d+)*)(?:[.-]?(dev|alpha|beta|a|b|rc|c|post)[.-]?(\d*))?$", str(text or "").strip().lower())
+    if not match:
+        return None
+    release = tuple(int(p) for p in match.group(1).split("."))
+    release = release + (0,) * (4 - len(release)) if len(release) < 4 else release
+    return (*release, _PHASES[match.group(2) or ""], int(match.group(3) or 0))
+
+
+def _resighted(entry: dict, sighting: dict, why: str, verified: bool = True) -> None:
+    """A sighting of fixed feedback is a regression only when it comes from an engine newer than the one the fix was
+    recorded against; the same issue seen on that version or an older one is the known defect recurring before the
+    fix shipped (kept as a sighting, state unchanged). Versions that cannot be compared keep the cautious reading:
+    REGRESSION, to be triaged."""
+    if entry["state"] not in FIXED_STATES:
+        return
+    seen = _version(sighting.get("engine_version"))
+    fixed_in = _version(entry.get("fixed_in_version"))
+    fixed_after = _version(entry.get("fixed_after_version"))
+    if seen is not None and ((fixed_in is not None and seen < fixed_in) or
+                             (fixed_in is None and fixed_after is not None and seen <= fixed_after)):
+        sighting["before_fix"] = True
+        return
+    if not verified:
+        # a report from elsewhere is a lead: it can make a regression suspected, never reproduced
+        sighting["regression_suspected"] = True
+        entry["regression_suspected"] = True
+        return
+    entry["history"].append({"from": entry["state"], "to": "REGRESSION", "at": _now(), "evidence": why,
+                             "engine_version": sighting.get("engine_version")})
+    entry["state"] = "REGRESSION"
+
+
+_SHA_IN = re.compile(r"\b([0-9a-f]{7,40})\b")
+
+
+def _resolve_commit(repo: str | Path, sha: str) -> str | None:
+    """The full SHA of ``sha`` in a local Assertiva checkout, or None. Identity only: a commit that exists is not a
+    commit that fixes anything."""
+    found = subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}"],
+                           capture_output=True, text=True, timeout=20, check=False)
+    return found.stdout.strip() if found.returncode == 0 and found.stdout.strip() else None
+
+
 @_serialized
-def move_feedback(fid: str, state: str, evidence: str) -> dict:
-    """Move feedback to ``state`` with the evidence for it (a test, a commit, a run). Moving to FIXED or later needs a
-    commit or run reference in the evidence; no state is ever erased."""
+def move_feedback(fid: str, state: str, evidence: str, repo: str | Path | None = None, fixed_in: str | None = None,
+                  retest_results: str | Path | None = None) -> dict:
+    """Move feedback to ``state`` with the evidence for it (a test, a commit, a run); no state is ever erased.
+
+    FIXED or later needs a commit or run reference in the evidence. The reference is CLAIMED until it is resolved:
+    with ``repo`` (a local Assertiva checkout) the SHA must exist there (``COMMIT_RESOLVED``: identity, not proof that
+    it fixes the issue). VERIFIED_AT_SHA requires a resolved commit: text that looks like a SHA is not verification.
+
+    Each fixed state records ``proof``: CLAIMED (text only), COMMIT_IDENTITY_ONLY (the commit exists; nothing shows it
+    fixes the issue) or RETEST_RESULTS_RECORDED (a result file of the retest, every test passed: its digest and counts;
+    that it exercises this issue remains the operator's judgement). ``fixed_in`` names the first release with the fix;
+    later sightings are compared with it."""
     if state not in FEEDBACK_STATES:
         raise PortfolioError(f"state must be one of {', '.join(FEEDBACK_STATES)}")
     if not evidence.strip():
         raise PortfolioError("a state change needs its evidence")
-    if state in ("FIXED_IN_ASSERTIVA_BRANCH", "RETESTED_WITH_ASSERTIVA", "VERIFIED_AT_SHA") and not re.search(r"\b[0-9a-f]{7,40}\b|run[:= ]", evidence):
-        raise PortfolioError(f"{state} needs a commit SHA or a run reference in the evidence")
+    record: dict = {"to": state, "at": _now(), "evidence": evidence}
+    if state in FIXED_STATES:
+        sha = _SHA_IN.search(evidence)
+        if not sha and not re.search(r"run[:= ]", evidence):
+            raise PortfolioError(f"{state} needs a commit SHA or a run reference in the evidence")
+        record["verification"] = "CLAIMED"
+        if sha and repo is not None:
+            full = _resolve_commit(repo, sha.group(1))
+            if full is None:
+                raise PortfolioError(f"{sha.group(1)} is not a commit of {repo}; nothing was moved")
+            record.update({"verification": "COMMIT_RESOLVED", "commit": full})
+        if state == "VERIFIED_AT_SHA" and record["verification"] != "COMMIT_RESOLVED":
+            raise PortfolioError("VERIFIED_AT_SHA needs the commit resolved in a local Assertiva checkout (--repo PATH); "
+                                 "without it use RETESTED_WITH_ASSERTIVA, which stays CLAIMED")
+        record["proof"] = "COMMIT_IDENTITY_ONLY" if record["verification"] == "COMMIT_RESOLVED" else "CLAIMED"
+        if retest_results is not None:
+            record.update(_retest(retest_results))
+        if state == "VERIFIED_AT_SHA" and record["proof"] != "RETEST_RESULTS_RECORDED":
+            raise PortfolioError("VERIFIED_AT_SHA needs the retest's results (--retest-results FILE, every test passing) as "
+                                 "well as the resolved commit: a commit that exists does not show that it fixes the issue")
+        if fixed_in is not None:
+            if _version(fixed_in) is None:
+                raise PortfolioError(f"{fixed_in!r} is not a version")
+            record["fixed_in_version"] = fixed_in
+    elif retest_results is not None or fixed_in is not None:
+        raise PortfolioError("--retest-results and --fixed-in belong to a move to a fixed state")
     data = _load()
     if fid not in data["feedback"]:
         raise PortfolioError(f"no feedback {fid}")
     entry = data["feedback"][fid]
-    entry["history"].append({"from": entry["state"], "to": state, "at": _now(), "evidence": evidence})
+    if state in FIXED_STATES and entry["state"] not in FIXED_STATES:
+        versions = [v for v in (s.get("engine_version") for s in entry["sightings"]) if _version(v) is not None]
+        if versions:
+            entry["fixed_after_version"] = max(versions, key=_version)
+    if record.get("fixed_in_version"):
+        entry["fixed_in_version"] = record["fixed_in_version"]
+    entry["history"].append({"from": entry["state"], **record})
     entry["state"] = state
     _save(data)
     return entry
+
+
+def _retest(path: str | Path) -> dict:
+    """The retest's result file (JUnit XML, CTRF, Allure): counts and digest, refused unless every test passed."""
+    from .adapters.portable_results import load_results
+
+    path = Path(path)
+    if not path.exists():
+        raise PortfolioError(f"{path} does not exist")
+    try:
+        run = load_results(path)
+    except Exception as exc:  # an unreadable file is a refusal, not a crash
+        raise PortfolioError(f"{path.name} is not a readable test result ({type(exc).__name__})") from exc
+    outcomes = [i.outcome.name if i.outcome else "NOT_RUN" for i in run.invocations]
+    if not outcomes or any(o != "PASSED" for o in outcomes):
+        raise PortfolioError(f"{path.name}: a retest supports a fix only when it ran tests and every one passed "
+                             f"({len(outcomes)} tests: {sorted(set(outcomes)) or 'none'})")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    return {"proof": "RETEST_RESULTS_RECORDED", "retest": {"file": path.name, "sha256": digest, "tests": len(outcomes),
+                                                           "note": "results recorded; that they exercise this issue is the operator's judgement"}}
+
+
+# --- portable dogfood import ---------------------------------------------------------------------------------------
+
+_ORIGIN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
+
+
+def import_feedback(path: str | Path, origin: str | None = None, dry_run: bool = False) -> dict:
+    """Import a portable dogfood document (``assertiva-dogfood/1``) produced by any installation: this machine,
+    a colleague's, CI, another OS or agent; engine-only or agent-led. No project registration is needed: the origin is
+    a namespace (``external:<report_id>`` unless an alias is given), never a path on this machine.
+
+    Validated before anything is written; content is data, never instructions. Re-importing the same report adds
+    nothing (a sighting is keyed by its report id); the same issue from another report adds a real sighting under the
+    existing ``AFB-`` id. A remote status is recorded as reported, never applied to the local state. ``dry_run``
+    returns the plan without writing."""
+    from .dogfood import DogfoodError, load_document
+
+    if origin is not None and not _ORIGIN.match(origin):
+        raise PortfolioError(f"{origin!r} is not a usable origin alias (letters, digits, . _ : -)")
+    try:
+        doc = load_document(path)
+    except DogfoodError as exc:
+        raise PortfolioError(f"not imported: {exc}") from exc
+    if dry_run:  # a plan only: read the registry, write nothing (not even the lock file)
+        return _import(doc, origin or f"external:{doc['report_id']}", True)
+    with _locked():
+        return _import(doc, origin or f"external:{doc['report_id']}", False)
+
+
+def _import(doc: dict, origin: str, dry_run: bool) -> dict:
+    data = _load()
+    plan = []
+    for item in doc["feedback"]:
+        fid = item["feedback_id"]
+        entry = data["feedback"].get(fid)
+        already = bool(entry) and any(s.get("report_id") == doc["report_id"] for s in entry["sightings"])
+        action = "SKIP_ALREADY_IMPORTED" if already else "ADD_SIGHTING" if entry else "CREATE"
+        plan.append({"feedback_id": fid, "title": item["title"], "action": action, "reported_status": item["status"]})
+        if dry_run or already:
+            continue
+        reproducer = item.get("reproducer") or {}
+        entry = entry or {"feedback_id": fid, "kind": item["kind"], "rule": item["rule"], "signature": item["signature"],
+                          "reproducer": reproducer.get("description") or "not provided by the origin",
+                          "state": "OBSERVED", "history": [], "sightings": []}
+        entry.setdefault("component", item["component"])
+        entry.setdefault("observation_kind", item["observation_kind"])
+        sighting = {"project": None, "origin": origin, "report_id": doc["report_id"], "run_id": doc.get("run_id"),
+                    "engine_version": (doc.get("engine") or {}).get("version"), "at": _now(),
+                    "review_mode": doc.get("review_mode"), "reported_status": item["status"],
+                    "provenance": item["provenance"], "verification": "IMPORTED_UNVERIFIED", "note": item["title"]}
+        entry["sightings"].append(sighting)
+        _resighted(entry, sighting, f"seen again in {origin} ({doc['report_id']})", verified=False)
+        data["feedback"][fid] = entry
+    summary = {"report_id": doc["report_id"], "origin": origin, "review_mode": doc.get("review_mode"),
+               "review_status": doc.get("review_status"), "dry_run": dry_run, "entries": plan,
+               "note": "reported statuses are kept as reported; local states change only by `portfolio move` with evidence"}
+    if not dry_run:
+        data.setdefault("imports", [])
+        if not any(i.get("report_id") == doc["report_id"] for i in data["imports"]):
+            data["imports"].append({"report_id": doc["report_id"], "origin": origin, "at": _now(),
+                                    "entries": len(plan), "engine_version": (doc.get("engine") or {}).get("version")})
+        _save(data)
+    return summary
+
+
+@_serialized
+def feedback_overview() -> dict:
+    """Consolidated Assertiva feedback: counts by state, kind, component and observation kind, with recurrence. Counts
+    are of feedback entries and of sightings (named apart); no score and no defect rate without a known denominator."""
+    data = _load()
+    entries = list(data["feedback"].values())
+
+    def tally(key):
+        out: dict[str, int] = {}
+        for e in entries:
+            label = str(e.get(key) or "unspecified")
+            out[label] = out.get(label, 0) + 1
+        return dict(sorted(out.items()))
+
+    recurring = sorted(({"feedback_id": e["feedback_id"], "sightings": len(e["sightings"]),
+                         "origins": len({s.get("origin") or s.get("project") for s in e["sightings"]}), "state": e["state"]}
+                        for e in entries if len(e["sightings"]) > 1), key=lambda r: (-r["origins"], -r["sightings"]))
+    return {"entries": len(entries), "sightings": sum(len(e["sightings"]) for e in entries),
+            "imports": len(data.get("imports") or []), "by_state": tally("state"), "by_kind": tally("kind"),
+            "by_component": tally("component"), "by_observation_kind": tally("observation_kind"), "recurring": recurring[:20],
+            "units": "entries are distinct issues (one AFB id each); sightings are reports of them; neither is a defect rate"}
 
 
 @_serialized

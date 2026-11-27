@@ -1306,7 +1306,9 @@ def _snapshot(r: _R) -> str:
 
 
 def _evidence_area(r: _R) -> str:
-    panels = (_metrics_panel(r) + _effectiveness(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
+    from .report_context_html import context_panel, external_panel
+
+    panels = (context_panel(r) + external_panel(r) + _metrics_panel(r) + _effectiveness(r) + _surface(r) + _runs(r) + _ci_runs(r) + _negative(r) + _mutation(r) + _artifacts(r)
               + _delivery(r) + _selection(r) + _history(r) + _contracts(r) + _accessibility(r))
     return (f'<section id="evidence" class="area" aria-labelledby="h-evidence"><div class="area-head"><p class="eyebrow">{r.icon("doc", "ic")}{r.t("evidence.eyebrow")}</p>'
             f'<h2 id="h-evidence">{r.t("evidence.title")}</h2>{r.t("evidence.lead", tag="p", cls="lead")}</div>{_snapshot(r)}'
@@ -1539,7 +1541,14 @@ def _raw(r: _R) -> str:
 def _details_area(r: _R) -> str:
     return (f'<section id="details" class="area area-tech" aria-labelledby="h-details"><div class="area-head"><p class="eyebrow">{r.icon("code", "ic")}{r.t("details.eyebrow")}</p>'
             f'<h2 id="h-details">{r.t("details.title")}</h2>'
-            f'{r.t("details.lead", tag="p", cls="lead")}</div>{_provenance(r)}{_claim(r)}{_unknowns(r)}<div class="panels-d">{_budget(r)}{_raw(r)}</div></section>')
+            f'{r.t("details.lead", tag="p", cls="lead")}</div>{_provenance(r)}{_claim(r)}{_unknowns(r)}<div class="panels-d">'
+            f'{_v11_details(r)}{_budget(r)}{_raw(r)}</div></section>')
+
+
+def _v11_details(r: _R) -> str:
+    from .report_context_html import dogfood_panel, previous_panel, reviews_panel
+
+    return dogfood_panel(r) + reviews_panel(r) + previous_panel(r)
 
 
 # --- retained evidence panels and helpers ------------------------------------------------

@@ -31,7 +31,8 @@ def test_audit_command_success_is_not_the_audited_suite_passing(tmp_path, capsys
 
     page = Path(report["report_path"]).read_text(encoding="utf-8")
     assert re.search(r'class="c-headline">.*?>Needs review<', page, re.S)  # the page concludes "needs review", not success
-    assert sorted(p.name for p in (tmp_path / "reports").iterdir()) == ["audit.html", "audit.json"]
+    assert sorted(p.name for p in (tmp_path / "reports").glob("audit.*")) == [  # one page; dogfood files are data (v1.1)
+        "audit.dogfood.json", "audit.dogfood.md", "audit.html", "audit.json"]
 
 
 # --- opt-in CI gate (v1.0): --fail-on, the decision matrix, and the default that does not change -------------------

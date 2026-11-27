@@ -160,6 +160,10 @@ def _mutation_summary(run) -> dict:
         "orchestrated": run.orchestrated, "targets": list(run.targets), "killers_complete": run.killers_complete,
         "provenance": run.provenance or ("ENGINE_EXECUTED" if run.orchestrated else "EXTERNAL_TOOL_REPORT"),
         "kills_by_test": _kills_by_test(run),
+        # per detected mutant: which tests the tool named (a lower bound unless killers_complete); lets a claim about one
+        # mutant be checked against that mutant, not against any kill (v1.1 addendum)
+        "detections": [{"mutant_id": m.mutant_id, "mutant": mutant_label(m), "status": m.status.value, "killed_by": list(m.killed_by)}
+                       for m in run.mutants if m.status in (MutantStatus.KILLED, MutantStatus.TIMEOUT)][:500],
         "reused": run.reused, "incremental": run.incremental, "finished": run.finished, "config": dict(run.config), "inputs_digest": run.inputs_digest,
         "limitations": list(run.limitations),
     }
@@ -434,6 +438,9 @@ def write_report(report: dict, directory: Path, name: str) -> Path:
         if isinstance(data, dict):
             (directory / f"{name}.{kind}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
             report["exported"][kind] = f"{name}.{kind}.json"
+    from .dogfood import write as write_dogfood
+
+    report["dogfood"] = write_dogfood(report, directory, name)  # feedback about Assertiva itself; never blocks the report
     (directory / f"{name}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     target = directory / f"{name}.html"
     target.write_text(render_html(report), encoding="utf-8")

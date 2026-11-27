@@ -522,11 +522,13 @@ def test_one_canonical_html_per_audit_run(calc_project, tmp_path, capsys):
     out = tmp_path / "reports"
     cli.main(["audit", str(calc_project), "--output", "json", "--report-dir", str(out)])
     report = json.loads(capsys.readouterr().out)
-    assert sorted(p.name for p in out.iterdir()) == ["audit.html", "audit.json"]
+    canonical = ["audit.dogfood.json", "audit.dogfood.md", "audit.html", "audit.json", "dogfood"]  # dogfood: v1.1 data files
+    assert sorted(p.name for p in out.iterdir()) == canonical
     assert Path(report["report_path"]) == out / "audit.html"
     cli.main(["audit", str(calc_project), "--output", "json", "--report-dir", str(out)])
     capsys.readouterr()
-    assert sorted(p.name for p in out.iterdir()) == ["audit.html", "audit.json"]  # a new run replaces, never adds pages
+    assert sorted(p.name for p in out.iterdir()) == canonical  # a new run replaces, never adds pages
+    assert len(list((out / "dogfood").iterdir())) == 2  # each run's feedback is archived, never overwritten by another run
 
 
 def _installed_package() -> bool:

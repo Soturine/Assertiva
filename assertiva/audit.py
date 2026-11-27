@@ -279,16 +279,96 @@ def _boundary_findings(report: dict) -> list[Finding]:
     return findings
 
 
-def _artifact_findings(current: StateEvidence) -> list[Finding]:
+# Build backends named by PEP 517 projects; a build that cannot import one never reached the project's packaging.
+BUILD_BACKENDS = frozenset({"setuptools", "hatchling", "flit_core", "poetry", "pdm", "mesonpy", "scikit_build_core",
+                            "maturin", "wheel", "enscons", "sipbuild"})
+
+
+# Distribution names of the backends (as written in ``build-system.requires``) for each importable module.
+_BACKEND_DISTS = {"setuptools": {"setuptools"}, "hatchling": {"hatchling"}, "flit_core": {"flit-core", "flit_core"},
+                  "poetry": {"poetry-core", "poetry_core", "poetry"}, "pdm": {"pdm-backend", "pdm-pep517", "pdm"},
+                  "mesonpy": {"meson-python", "meson_python"}, "scikit_build_core": {"scikit-build-core"},
+                  "maturin": {"maturin"}, "wheel": {"wheel"}, "enscons": {"enscons"}, "sipbuild": {"sip"}}
+
+
+def _declared_build_requires(root: Path | None) -> set[str] | None:
+    """Normalised names in ``[build-system] requires``; None when there is no pyproject.toml (a legacy setup.py
+    project, built with setuptools by default) or it cannot be read."""
+    if root is None or not (root / "pyproject.toml").is_file():
+        return None
+    try:
+        import tomllib
+        data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    requires = (data.get("build-system") or {}).get("requires")
+    if requires is None:
+        return None          # no build-system table: pip falls back to setuptools, as for a legacy project
+    return {re.split(r"[<>=!~;\[\s]", str(r), 1)[0].strip().lower().replace("_", "-") for r in requires}
+
+
+def environment_build_cause(failed_checks, root: Path | None) -> dict | None:
+    """Attribute an artifact build failure to the environment when the build could not import a backend the
+    project declares.
+
+    VozNativa dogfood (2026-11-18): with build isolation disabled in the environment (``PIP_NO_BUILD_ISOLATION``,
+    which pip reads as *disable*), ``pip wheel`` used the project interpreter, which had no ``setuptools``; the report
+    said "fix packaging" for a project whose own package gate builds the same wheel. Decided only when every failed
+    check is a missing build-backend module that is not one of the project's own top-level packages **and** that the
+    project declares in ``build-system.requires`` (or implies, without a build-system table). A backend the project
+    does not declare is the project's configuration (``origin: PROJECT_CONFIGURATION``), not the environment; anything
+    else stays undecided (``None``)."""
+    missing = set()
+    for check in failed_checks:
+        match = _MISSING_MODULE.search(str(check.detail or ""))
+        if match is None:
+            return None
+        top = match.group(1).split(".", 1)[0]
+        if top not in BUILD_BACKENDS:
+            return None
+        if root is not None and any((base / top).exists() or (base / f"{top}.py").exists() for base in (root, root / "src")):
+            return None
+        missing.add(top)
+    if not missing:
+        return None
+    declared = _declared_build_requires(root)
+    undeclared = sorted(m for m in missing if declared is not None and not
+                        ({d.replace("_", "-") for d in _BACKEND_DISTS.get(m, {m})} & declared))
+    if undeclared:
+        return {"origin": "PROJECT_CONFIGURATION", "missing_build_backends": sorted(missing),
+                "undeclared_build_backends": undeclared,
+                "basis": "the build needs a backend that build-system.requires does not declare; with isolation the "
+                         "build would fail the same way"}
+    return {"origin": "ENVIRONMENT", "missing_build_backends": sorted(missing),
+            "basis": "the build could not import a backend the project declares from the interpreter that ran it; the "
+                     "project's packaging was never reached"}
+
+
+def _artifact_findings(current: StateEvidence, root: Path | None = None) -> list[Finding]:
     findings = []
     for a in current.artifacts:
         if a.status is not StageStatus.PASS:
             failed = [c for c in a.checks if c.status is not StageStatus.PASS]
+            evidence = {"artifact": a.artifact, "status": a.status.value,
+                        "checks": [f"{c.name}: {c.status.value}: {c.detail}" for c in failed]}
+            cause = environment_build_cause(failed, root)
+            recommendation = None
+            if cause is not None and cause["origin"] == "PROJECT_CONFIGURATION":
+                evidence["dominant_cause"] = cause
+                recommendation = ("build-system.requires does not declare the backend the build imports ("
+                                  + ", ".join(cause["undeclared_build_backends"]) + "); declare it in pyproject.toml.")
+            elif cause is not None:
+                evidence["dominant_cause"] = cause
+                backends = ", ".join(cause["missing_build_backends"])
+                recommendation = (
+                    f"the interpreter that built the artifact lacks the build backend ({backends}); with build isolation "
+                    "disabled (for example PIP_NO_BUILD_ISOLATION set in the environment) pip uses that interpreter. "
+                    "Install the backend there or enable isolation before reading this as a packaging defect.")
             findings.append(
                 Finding(
                     "ARTIFACT_QUALIFICATION_FAILED" if a.status is StageStatus.FAIL else "ARTIFACT_QUALIFICATION_INCOMPLETE",
                     "The built artifact was not verified as working; source-tree results do not cover it.",
-                    {"artifact": a.artifact, "status": a.status.value, "checks": [f"{c.name}: {c.status.value}: {c.detail}" for c in failed]},
+                    evidence, recommendation=recommendation,
                 )
             )
         if a.omitted_files:
@@ -531,7 +611,7 @@ def run_audit(
             findings.extend(dependency_findings(dependency_view))
         effectiveness = _effectiveness(root, current)
         findings.extend(_effectiveness_findings(effectiveness))
-        findings.extend(_artifact_findings(current))
+        findings.extend(_artifact_findings(current, root))
         findings.extend(surface_findings(surface))
         declared: dict[str, dict] = {}
         for adapter in adapters:

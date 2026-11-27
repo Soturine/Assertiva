@@ -89,7 +89,10 @@ def test_assertiva_feedback_is_deduplicated_kept_apart_and_needs_evidence_to_clo
     assert code == 2 and "commit SHA" in err  # no closing on assertion alone
     code, moved, _ = run(capsys, "move", first["feedback_id"], "FIXED_IN_ASSERTIVA_BRANCH", "--evidence", "fixed in 3a821ac")
     assert code == 0 and moved["history"][-1]["evidence"] == "fixed in 3a821ac"
-    _, seen, _ = run(capsys, *args)  # seen again after the fix: a regression, history kept
+    assert moved["history"][-1]["verification"] == "CLAIMED"  # text that looks like a SHA is a claim, not verification
+    _, seen, _ = run(capsys, *args)  # seen again on the same engine version: the known defect before the fix shipped
+    assert seen["state"] == "FIXED_IN_ASSERTIVA_BRANCH" and seen["sightings"][-1]["before_fix"] is True
+    _, seen, _ = run(capsys, *args, "--engine-version", "99.0.0")  # seen on a newer engine: a regression, history kept
     assert seen["state"] == "REGRESSION" and [h["to"] for h in seen["history"]] == ["FIXED_IN_ASSERTIVA_BRANCH", "REGRESSION"]
     report = portfolio.report()
     assert report["assertiva_feedback"][0]["rule"] == "SWALLOWED_EXCEPTION"

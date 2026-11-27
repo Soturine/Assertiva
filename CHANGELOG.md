@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-27 — Context-Aware, Adaptive & Continuous Test Assurance
+
+[Release notes](docs/releases/v1.1.0.md). Released from the candidate `1.1.0rc1` (PR #13). Integrates PR #11 (build backend attributed to the environment) and PR #12 (oracle and evidence review). Evidence: [V1_1_DOGFOOD](docs/assurance/V1_1_DOGFOOD.md); readiness: [V1_1_RELEASE_READINESS](docs/assurance/V1_1_RELEASE_READINESS.md); contract changes: [MIGRATION_V1_1](docs/MIGRATION_V1_1.md).
+
+### Added
+
+- **Documentary context and traceability** (`sources`, `behaviors` in the assessment; report section `context`, schema `assertiva-context/1`). Method and completeness are separate dimensions; labels (INVENTORIED, READ_NATIVE, READ_VISUAL, READ_PARTIAL, TEXT_ONLY, STALE, …) are derived. The engine checks path containment, SHA-256 (STALE when the digest read no longer matches), PDF page counts without a dependency, reviewed ranges, citations inside what was read, a visual modality only with a visual method, test ids, and status strength against evidence. Private sources are never read.
+- **Selective invalidation**: a new audit reports `previous_traceability`, each earlier behavior VALID_PENDING_REATTACH or STALE when a cited source or a linked test file changed; a replaced assessment is archived under `assessments/`.
+- **External execution receipts** (`external_executions`): runs the agent made outside the engine, recorded only — artifact digests, JUnit/CTRF/Allure counts and revision checked; provenance `AGENT_EXTERNAL`; lint never counted as tests; zero tests is `NO_TESTS`; a run without consent is refused.
+- **Independent reviews** (`reviews`): second opinions with relation to the author, derived independence, transmission mode and consent; they change no fact or status. The engine calls no provider.
+- **Portable dogfood**: every audit and improve writes `<name>.dogfood.json` / `.md` beside its report and `dogfood/DF-<id>.json` per run (schema `assertiva-dogfood/1`); engine-only runs carry mechanical observations with `semantic_review: NOT_RUN`; agent-led feedback is validated (strong statuses need evidence and a reproducer); sanitized and `LOCAL_ONLY`; `ASSERTIVA_DOGFOOD=off` disables it.
+- **Portfolio**: `import-feedback FILE [--origin] [--dry-run]` (no registration, idempotent per report, remote statuses kept as reported); `move … --repo PATH` resolves the commit; `report` includes `feedback_overview`.
+- Report: "Context and traceability", "External executions", "Independent reviews", "Earlier traceability" and "Feedback about Assertiva" on the same canonical page (en/pt-BR).
+- Skill: look for what defines the intended behavior before judging protection; the adaptive-tool protocol; the closing review. References `DOCUMENTS.md`, `ADAPTIVE_TOOLS.md`, `DOGFOOD.md`.
+- Examples: `examples/document-assurance` (a rule only in a PDF figure) and `examples/adaptive-tools` (Ruby and .NET 10).
+
+### Changed
+
+- A sighting of fixed feedback reopens it as REGRESSION only from an engine newer than the fix; the same version or older is a recurrence before the fix shipped. `VERIFIED_AT_SHA` requires a resolved commit; other fixed states record `CLAIMED` or `COMMIT_RESOLVED`.
+- `PIP_NO_BUILD_ISOLATION` is treated as an override only when pip reads its value as disabling isolation (`0`/`false`; `1`/`true` keep isolation).
+
+### Fixed
+
+- A mutation report written in another root (a container, a CI checkout) is tied to the project by trailing path and identical content instead of `MUTATION_REPORT_SOURCE_MISMATCH` (found dogfooding Stryker.NET in a container).
+- A behavior linked to a misnamed external test is refused with the closest names instead of being accepted as UNKNOWN.
+- Protection evidence (final addendum): `detected` must be a JSON boolean (the string `"false"` counted as true); an `ENGINE_MUTATION` claim must name the specific mutant this run detected with the named tests (any kill by the test was enough); a `NEGATIVE_CONTROL` is verified only through a cited improve report bound to the audited tree (`improve_report`), and an unverified break — invented prose, an own mutant — caps the behavior at `OBSERVED_PASS` with `status_limited_by` while keeping the claim. Mutation summaries carry per-mutant `detections`.
+- Receipts and improve reports are read only under evidence roots (`ASSERTIVA_HOME`, `ASSERTIVA_EVIDENCE_ROOTS`), never through links or special files; a receipt on the audited commit with a dirty tree is `SAME_REVISION_DIRTY_TREE`, not tied.
+- Portfolio: versions order pre-releases (`1.1.0rc1` < `1.1.0`); `--fixed-in`; an imported sighting only marks a regression suspected; fixed states record `proof`; `VERIFIED_AT_SHA` needs `--retest-results` with every test passing as well as a resolved commit.
+- An artifact build that could not import its build backend is attributed to the environment:
+  `ARTIFACT_QUALIFICATION_FAILED` keeps its code and severity but gets a `dominant_cause` with origin `ENVIRONMENT`
+  and the missing backends, and its recommendation points at the interpreter (install the backend there, or enable
+  build isolation) instead of "fix packaging". Decided only when every failed check is a missing build-backend module
+  (`setuptools`, `hatchling`, `flit_core`, `poetry`, `pdm`, …) that is not one of the project's own packages; a real
+  packaging failure keeps the packaging recommendation. Found in the VozNativa v0.10 dogfood (2026-11-18): with
+  `PIP_NO_BUILD_ISOLATION=0` in the environment (pip reads it as *disable* isolation), `pip wheel` ran in a project
+  interpreter without `setuptools`, and the report asked to fix the packaging of a project whose own package gate
+  builds the same wheel.
+
+### Documentation
+
+- Quick start: `pip install -e .` failing with `No module named 'setuptools'` (or another build backend) usually
+  means `PIP_NO_BUILD_ISOLATION` is set in the environment; unset it for the install. Reproduced in a new virtual
+  environment during the same dogfood.
+
 ## [1.0.1] — 2026-11-16 — Dogfood Reliability Fixes
 
 [Release notes](docs/releases/v1.0.1.md).

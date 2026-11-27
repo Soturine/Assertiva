@@ -182,7 +182,9 @@ def test_cli_attaches_the_assessment_to_the_same_canonical_page(two_weak, tmp_pa
         "evidence": ["tests/test_calc.py:3", "tests/test_more.py:3"], "scope": {"reviewed": 2, "of": 2}}]))
     assert cli.main(["audit", str(two_weak), "--assessment", path, "--output", "json"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["report_path"] == str(page) and sorted(p.name for p in page.parent.iterdir()) == ["audit.html", "audit.json"]
+    # one canonical page per run; the dogfood files (v1.1) are data beside it, never a second HTML page
+    assert out["report_path"] == str(page) and sorted(p.name for p in page.parent.glob("*.html")) == ["audit.html"]
+    assert sorted(p.name for p in page.parent.iterdir()) == ["audit.dogfood.json", "audit.dogfood.md", "audit.html", "audit.json", "dogfood"]
     stored = json.loads((page.parent / "audit.json").read_text(encoding="utf-8"))
     assert stored["run_id"] == report["run_id"] and _weak(stored)["assessment"]["disposition"] == "CONFIRMED"
     assert "Both assert only" in page.read_text(encoding="utf-8")

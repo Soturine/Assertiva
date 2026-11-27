@@ -309,3 +309,16 @@ def test_a_misnamed_external_test_is_refused_not_left_unknown(project, tmp_path,
                 "status": "WEAK", "rationale": "Mistyped id: the parser names it PriceTest::PriceTest::test_total."}
     with pytest.raises(AssessmentError, match="did you mean PriceTest::PriceTest::test_total"):
         apply_assessment(report, _assess(report, external_executions=[_receipt(report, path, sha)], behaviors=[behavior]), project)
+
+
+def test_an_artifact_directory_is_bounded_and_holds_no_links(project, tmp_path, capsys, monkeypatch):
+    import assertiva.receipts as receipts
+
+    report = _audit(project, capsys)
+    results = tmp_path / "allure"
+    for i in range(3):
+        write(results / f"r{i}-result.json", "{}")
+    monkeypatch.setattr(receipts, "MAX_ARTIFACT_FILES", 2)
+    entry = _receipt(report, results, "0" * 64, results=None, artifacts=[{"path": str(results), "sha256": "0" * 64, "kind": "log"}])
+    with pytest.raises(AssessmentError, match="more than 2 files"):
+        apply_assessment(report, _assess(report, external_executions=[entry]), project)

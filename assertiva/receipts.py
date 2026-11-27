@@ -64,14 +64,40 @@ def _count(value: Any, what: str) -> int:
     return value
 
 
+MAX_ARTIFACT_BYTES = 256 * 1024 * 1024
+MAX_ARTIFACT_FILES = 5000
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def _sha256(path: Path) -> str:
+    """Digest of a result file, or of a results directory (relative names and contents), within fixed bounds: an
+    artifact is a tool's output, not a tree to walk without limit."""
     if path.is_dir():
+        files = []
+        for child in path.rglob("*"):
+            if child.is_symlink():
+                raise ReceiptError(f"{path.name} contains a link ({child.name}); a results directory is plain files")
+            if child.is_file():
+                files.append(child)
+                if len(files) > MAX_ARTIFACT_FILES:
+                    raise ReceiptError(f"{path.name} holds more than {MAX_ARTIFACT_FILES} files; cite the result files themselves")
+        if sum(f.stat().st_size for f in files) > MAX_ARTIFACT_BYTES:
+            raise ReceiptError(f"{path.name} is larger than {MAX_ARTIFACT_BYTES} bytes")
         digest = hashlib.sha256()
-        for child in sorted(p for p in path.rglob("*") if p.is_file()):
+        for child in sorted(files):
             digest.update(child.relative_to(path).as_posix().encode() + b"\0")
-            digest.update(hashlib.sha256(child.read_bytes()).digest())
+            digest.update(bytes.fromhex(_file_sha256(child)))
         return digest.hexdigest()
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    if path.stat().st_size > MAX_ARTIFACT_BYTES:
+        raise ReceiptError(f"{path.name} is larger than {MAX_ARTIFACT_BYTES} bytes")
+    return _file_sha256(path)
 
 
 def _artifact(entry: Any, root: Path, what: str) -> dict:

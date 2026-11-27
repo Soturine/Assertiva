@@ -1,8 +1,8 @@
-# v1.1.0rc1 release readiness
+# v1.1.0 release readiness
 
-Branch `integration/v1.1-foundation`, candidate version `1.1.0rc1`. Not tagged, not released, not merged. Recorded 2026-11-27.
+Branch `integration/v1.1-foundation` (PR #13), candidate `1.1.0rc1`, released as `1.1.0` on 2026-11-27 after the owner authorized merging everything into `main`, tagging and releasing.
 
-**Recommendation: CONDITIONAL.** The engine contracts, the demos and the local qualification hold; publishing 1.1.0 still needs (1) the GitHub CI full qualification of the final SHA green, (2) the owner's decision on the agent evaluations that were not run (blind multimodal reading, PR #12's cases), and (3) explicit authorization to merge, tag and release.
+**Recommendation at the candidate: CONDITIONAL; publication authorized by the owner with the evaluation limitation recorded.** The engine contracts, the demos and the local qualification hold; publishing 1.1.0 still needs (1) the GitHub CI full qualification of the final SHA green, (2) the owner's decision on the agent evaluations that were not run (blind multimodal reading, PR #12's cases), and (3) explicit authorization to merge, tag and release.
 
 ## Checkpoints
 

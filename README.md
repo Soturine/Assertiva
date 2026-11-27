@@ -212,7 +212,7 @@ The Skill is this repository's `SKILL.md` and its [references](references/); put
 
 ## Current status
 
-### 1.1 (release candidate): context, adaptive tools and feedback about Assertiva
+### 1.1: context, adaptive tools and feedback about Assertiva
 
 - **Documentary context and traceability** — sources and behaviors in the assessment, verified against the run ([DOCUMENTS](references/DOCUMENTS.md)).
 - **Stacks without an adapter** — the agent finds the project's own tools, runs them in confinement with consent, imports standard results and records each run as an external execution receipt (`AGENT_EXTERNAL`, never engine-executed) ([ADAPTIVE_TOOLS](references/ADAPTIVE_TOOLS.md)). Demonstrated on Ruby (minitest) and .NET 10 (xUnit, Stryker.NET) in [examples/adaptive-tools](examples/adaptive-tools/README.md); no native adapter was added.

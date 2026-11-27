@@ -2,9 +2,9 @@
 
 ## [Unreleased]
 
-## [1.1.0rc1] — release candidate (not released) — Context-Aware, Adaptive & Continuous Test Assurance
+## [1.1.0] — 2026-11-27 — Context-Aware, Adaptive & Continuous Test Assurance
 
-Integrates PR #11 (build backend attributed to the environment) and PR #12 (oracle and evidence review). Evidence: [V1_1_DOGFOOD](docs/assurance/V1_1_DOGFOOD.md); readiness: [V1_1_RELEASE_READINESS](docs/assurance/V1_1_RELEASE_READINESS.md); contract changes: [MIGRATION_V1_1](docs/MIGRATION_V1_1.md).
+[Release notes](docs/releases/v1.1.0.md). Released from the candidate `1.1.0rc1` (PR #13). Integrates PR #11 (build backend attributed to the environment) and PR #12 (oracle and evidence review). Evidence: [V1_1_DOGFOOD](docs/assurance/V1_1_DOGFOOD.md); readiness: [V1_1_RELEASE_READINESS](docs/assurance/V1_1_RELEASE_READINESS.md); contract changes: [MIGRATION_V1_1](docs/MIGRATION_V1_1.md).
 
 ### Added
 

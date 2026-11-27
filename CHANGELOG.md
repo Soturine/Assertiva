@@ -2,8 +2,31 @@
 
 ## [Unreleased]
 
+## [1.1.0rc1] — release candidate (not released) — Context-Aware, Adaptive & Continuous Test Assurance
+
+Integrates PR #11 (build backend attributed to the environment) and PR #12 (oracle and evidence review). Evidence: [V1_1_DOGFOOD](docs/assurance/V1_1_DOGFOOD.md); readiness: [V1_1_RELEASE_READINESS](docs/assurance/V1_1_RELEASE_READINESS.md); contract changes: [MIGRATION_V1_1](docs/MIGRATION_V1_1.md).
+
+### Added
+
+- **Documentary context and traceability** (`sources`, `behaviors` in the assessment; report section `context`, schema `assertiva-context/1`). Method and completeness are separate dimensions; labels (INVENTORIED, READ_NATIVE, READ_VISUAL, READ_PARTIAL, TEXT_ONLY, STALE, …) are derived. The engine checks path containment, SHA-256 (STALE when the digest read no longer matches), PDF page counts without a dependency, reviewed ranges, citations inside what was read, a visual modality only with a visual method, test ids, and status strength against evidence. Private sources are never read.
+- **Selective invalidation**: a new audit reports `previous_traceability`, each earlier behavior VALID_PENDING_REATTACH or STALE when a cited source or a linked test file changed; a replaced assessment is archived under `assessments/`.
+- **External execution receipts** (`external_executions`): runs the agent made outside the engine, recorded only — artifact digests, JUnit/CTRF/Allure counts and revision checked; provenance `AGENT_EXTERNAL`; lint never counted as tests; zero tests is `NO_TESTS`; a run without consent is refused.
+- **Independent reviews** (`reviews`): second opinions with relation to the author, derived independence, transmission mode and consent; they change no fact or status. The engine calls no provider.
+- **Portable dogfood**: every audit and improve writes `<name>.dogfood.json` / `.md` beside its report and `dogfood/DF-<id>.json` per run (schema `assertiva-dogfood/1`); engine-only runs carry mechanical observations with `semantic_review: NOT_RUN`; agent-led feedback is validated (strong statuses need evidence and a reproducer); sanitized and `LOCAL_ONLY`; `ASSERTIVA_DOGFOOD=off` disables it.
+- **Portfolio**: `import-feedback FILE [--origin] [--dry-run]` (no registration, idempotent per report, remote statuses kept as reported); `move … --repo PATH` resolves the commit; `report` includes `feedback_overview`.
+- Report: "Context and traceability", "External executions", "Independent reviews", "Earlier traceability" and "Feedback about Assertiva" on the same canonical page (en/pt-BR).
+- Skill: look for what defines the intended behavior before judging protection; the adaptive-tool protocol; the closing review. References `DOCUMENTS.md`, `ADAPTIVE_TOOLS.md`, `DOGFOOD.md`.
+- Examples: `examples/document-assurance` (a rule only in a PDF figure) and `examples/adaptive-tools` (Ruby and .NET 10).
+
+### Changed
+
+- A sighting of fixed feedback reopens it as REGRESSION only from an engine newer than the fix; the same version or older is a recurrence before the fix shipped. `VERIFIED_AT_SHA` requires a resolved commit; other fixed states record `CLAIMED` or `COMMIT_RESOLVED`.
+- `PIP_NO_BUILD_ISOLATION` is treated as an override only when pip reads its value as disabling isolation (`0`/`false`; `1`/`true` keep isolation).
+
 ### Fixed
 
+- A mutation report written in another root (a container, a CI checkout) is tied to the project by trailing path and identical content instead of `MUTATION_REPORT_SOURCE_MISMATCH` (found dogfooding Stryker.NET in a container).
+- A behavior linked to a misnamed external test is refused with the closest names instead of being accepted as UNKNOWN.
 - An artifact build that could not import its build backend is attributed to the environment:
   `ARTIFACT_QUALIFICATION_FAILED` keeps its code and severity but gets a `dominant_cause` with origin `ENVIRONMENT`
   and the missing backends, and its recommendation points at the interpreter (install the backend there, or enable

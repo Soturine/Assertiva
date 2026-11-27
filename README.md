@@ -154,6 +154,8 @@ Requirement
 
 Useful relations include `depends_on`, `validates`, `covers`, `kills_mutant`, `reproduces`, `isolates`, and `composes_into`.
 
+Since 1.1 a useful slice of this graph is materialized per audit, without a graph database: the agent attaches the sources it read (with method, completeness and digest) and the behavior slices it traced to tests; the engine verifies paths, digests, PDF page counts, that every citation falls inside what was read, and that no behavior is claimed stronger than its evidence (`PROVEN_IN_SCOPE` needs a STRONG validating test that passed and a break it detected). Counts are of behavior slices, never a functional coverage percentage. See [references/DOCUMENTS.md](references/DOCUMENTS.md) and the demo in [examples/document-assurance](examples/document-assurance/README.md), whose key rule exists only as an image in a PDF.
+
 ## User-facing workflow
 
 Assertiva keeps the interface intentionally small:
@@ -210,6 +212,14 @@ The Skill is this repository's `SKILL.md` and its [references](references/); put
 
 ## Current status
 
+### 1.1 (release candidate): context, adaptive tools and feedback about Assertiva
+
+- **Documentary context and traceability** — sources and behaviors in the assessment, verified against the run ([DOCUMENTS](references/DOCUMENTS.md)).
+- **Stacks without an adapter** — the agent finds the project's own tools, runs them in confinement with consent, imports standard results and records each run as an external execution receipt (`AGENT_EXTERNAL`, never engine-executed) ([ADAPTIVE_TOOLS](references/ADAPTIVE_TOOLS.md)). Demonstrated on Ruby (minitest) and .NET 10 (xUnit, Stryker.NET) in [examples/adaptive-tools](examples/adaptive-tools/README.md); no native adapter was added.
+- **Feedback about Assertiva** — every run writes `audit.dogfood.json`/`.md` beside its report, local and sanitized, with no Portfolio, account or network; `assertiva portfolio import-feedback` consolidates files from any installation ([DOGFOOD](references/DOGFOOD.md)).
+- Evidence and limits: [V1_1_DOGFOOD](docs/assurance/V1_1_DOGFOOD.md), [V1_1_RELEASE_READINESS](docs/assurance/V1_1_RELEASE_READINESS.md), migration notes in [MIGRATION_V1_1](docs/MIGRATION_V1_1.md).
+
+
 ### Capabilities and what was executed (1.0.0)
 
 | Ecosystem / capability | Level | Executed in qualification |
@@ -222,6 +232,7 @@ The Skill is this repository's `SKILL.md` and its [references](references/); put
 | JUnit XML, CTRF, Allure, mutation reports, coverage reports, Pact, axe-core | IMPORT_ONLY | parsed in the suites; counted as `imported_*`, never as executed |
 | CI providers (GitHub Actions, GitLab, Azure Pipelines, Jenkins), pre-commit, package scripts | DECLARED evidence (static) | static readers in the suites; dogfood on Randomizer |
 | .NET, Go, Rust, PHP, Ruby, Lua | UNKNOWN (portable results only) | — (executors deferred, see [ROADMAP](ROADMAP.md)) |
+| .NET, Ruby (1.1) | AGENT_EXTERNAL (receipts; no native adapter) | .NET 10 xUnit + Stryker.NET 5.1.0 and Ruby minitest run in containers by the agent, imported and recorded (1.1 dogfood) |
 
 Contract changes since 0.10.1: [docs/MIGRATION_V1.md](docs/MIGRATION_V1.md).
 

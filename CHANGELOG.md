@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- An artifact build that could not import its build backend is attributed to the environment:
+  `ARTIFACT_QUALIFICATION_FAILED` keeps its code and severity but gets a `dominant_cause` with origin `ENVIRONMENT`
+  and the missing backends, and its recommendation points at the interpreter (install the backend there, or enable
+  build isolation) instead of "fix packaging". Decided only when every failed check is a missing build-backend module
+  (`setuptools`, `hatchling`, `flit_core`, `poetry`, `pdm`, …) that is not one of the project's own packages; a real
+  packaging failure keeps the packaging recommendation. Found in the VozNativa v0.10 dogfood (2026-11-18): with
+  `PIP_NO_BUILD_ISOLATION=0` in the environment (pip reads it as *disable* isolation), `pip wheel` ran in a project
+  interpreter without `setuptools`, and the report asked to fix the packaging of a project whose own package gate
+  builds the same wheel.
+
+### Documentation
+
+- Quick start: `pip install -e .` failing with `No module named 'setuptools'` (or another build backend) usually
+  means `PIP_NO_BUILD_ISOLATION` is set in the environment; unset it for the install. Reproduced in a new virtual
+  environment during the same dogfood.
+
 ## [1.0.1] — 2026-11-16 — Dogfood Reliability Fixes
 
 [Release notes](docs/releases/v1.0.1.md).

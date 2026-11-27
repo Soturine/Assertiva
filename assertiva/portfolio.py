@@ -348,22 +348,38 @@ def add_feedback(project: str, kind: str, rule: str, signature: str, reproducer:
 FIXED_STATES = ("FIXED_IN_ASSERTIVA_BRANCH", "RETESTED_WITH_ASSERTIVA", "VERIFIED_AT_SHA")
 
 
-def _version(text) -> tuple[int, ...] | None:
-    match = re.match(r"^v?(\d+(?:\.\d+)*)", str(text or "").strip())
-    return tuple(int(p) for p in match.group(1).split(".")) if match else None
+_PHASES = {"dev": 0, "a": 1, "alpha": 1, "b": 2, "beta": 2, "rc": 3, "c": 3, "": 4, "post": 5}
 
 
-def _resighted(entry: dict, sighting: dict, why: str) -> None:
+def _version(text) -> tuple | None:
+    """An orderable key for a version: the release numbers padded, then the pre-release phase (dev < a < b < rc <
+    final < post) and its number, so 1.1.0rc1 < 1.1.0. None when the text is not a version."""
+    match = re.match(r"^v?(\d+(?:\.\d+)*)(?:[.-]?(dev|alpha|beta|a|b|rc|c|post)[.-]?(\d*))?$", str(text or "").strip().lower())
+    if not match:
+        return None
+    release = tuple(int(p) for p in match.group(1).split("."))
+    release = release + (0,) * (4 - len(release)) if len(release) < 4 else release
+    return (*release, _PHASES[match.group(2) or ""], int(match.group(3) or 0))
+
+
+def _resighted(entry: dict, sighting: dict, why: str, verified: bool = True) -> None:
     """A sighting of fixed feedback is a regression only when it comes from an engine newer than the one the fix was
     recorded against; the same issue seen on that version or an older one is the known defect recurring before the
     fix shipped (kept as a sighting, state unchanged). Versions that cannot be compared keep the cautious reading:
     REGRESSION, to be triaged."""
     if entry["state"] not in FIXED_STATES:
         return
-    fixed_after = _version(entry.get("fixed_after_version"))
     seen = _version(sighting.get("engine_version"))
-    if fixed_after is not None and seen is not None and seen <= fixed_after:
+    fixed_in = _version(entry.get("fixed_in_version"))
+    fixed_after = _version(entry.get("fixed_after_version"))
+    if seen is not None and ((fixed_in is not None and seen < fixed_in) or
+                             (fixed_in is None and fixed_after is not None and seen <= fixed_after)):
         sighting["before_fix"] = True
+        return
+    if not verified:
+        # a report from elsewhere is a lead: it can make a regression suspected, never reproduced
+        sighting["regression_suspected"] = True
+        entry["regression_suspected"] = True
         return
     entry["history"].append({"from": entry["state"], "to": "REGRESSION", "at": _now(), "evidence": why,
                              "engine_version": sighting.get("engine_version")})
@@ -382,12 +398,18 @@ def _resolve_commit(repo: str | Path, sha: str) -> str | None:
 
 
 @_serialized
-def move_feedback(fid: str, state: str, evidence: str, repo: str | Path | None = None) -> dict:
+def move_feedback(fid: str, state: str, evidence: str, repo: str | Path | None = None, fixed_in: str | None = None,
+                  retest_results: str | Path | None = None) -> dict:
     """Move feedback to ``state`` with the evidence for it (a test, a commit, a run); no state is ever erased.
 
     FIXED or later needs a commit or run reference in the evidence. The reference is CLAIMED until it is resolved:
     with ``repo`` (a local Assertiva checkout) the SHA must exist there (``COMMIT_RESOLVED``: identity, not proof that
-    it fixes the issue). VERIFIED_AT_SHA requires a resolved commit: text that looks like a SHA is not verification."""
+    it fixes the issue). VERIFIED_AT_SHA requires a resolved commit: text that looks like a SHA is not verification.
+
+    Each fixed state records ``proof``: CLAIMED (text only), COMMIT_IDENTITY_ONLY (the commit exists; nothing shows it
+    fixes the issue) or RETEST_RESULTS_RECORDED (a result file of the retest, every test passed: its digest and counts;
+    that it exercises this issue remains the operator's judgement). ``fixed_in`` names the first release with the fix;
+    later sightings are compared with it."""
     if state not in FEEDBACK_STATES:
         raise PortfolioError(f"state must be one of {', '.join(FEEDBACK_STATES)}")
     if not evidence.strip():
@@ -406,6 +428,18 @@ def move_feedback(fid: str, state: str, evidence: str, repo: str | Path | None =
         if state == "VERIFIED_AT_SHA" and record["verification"] != "COMMIT_RESOLVED":
             raise PortfolioError("VERIFIED_AT_SHA needs the commit resolved in a local Assertiva checkout (--repo PATH); "
                                  "without it use RETESTED_WITH_ASSERTIVA, which stays CLAIMED")
+        record["proof"] = "COMMIT_IDENTITY_ONLY" if record["verification"] == "COMMIT_RESOLVED" else "CLAIMED"
+        if retest_results is not None:
+            record.update(_retest(retest_results))
+        if state == "VERIFIED_AT_SHA" and record["proof"] != "RETEST_RESULTS_RECORDED":
+            raise PortfolioError("VERIFIED_AT_SHA needs the retest's results (--retest-results FILE, every test passing) as "
+                                 "well as the resolved commit: a commit that exists does not show that it fixes the issue")
+        if fixed_in is not None:
+            if _version(fixed_in) is None:
+                raise PortfolioError(f"{fixed_in!r} is not a version")
+            record["fixed_in_version"] = fixed_in
+    elif retest_results is not None or fixed_in is not None:
+        raise PortfolioError("--retest-results and --fixed-in belong to a move to a fixed state")
     data = _load()
     if fid not in data["feedback"]:
         raise PortfolioError(f"no feedback {fid}")
@@ -414,10 +448,32 @@ def move_feedback(fid: str, state: str, evidence: str, repo: str | Path | None =
         versions = [v for v in (s.get("engine_version") for s in entry["sightings"]) if _version(v) is not None]
         if versions:
             entry["fixed_after_version"] = max(versions, key=_version)
+    if record.get("fixed_in_version"):
+        entry["fixed_in_version"] = record["fixed_in_version"]
     entry["history"].append({"from": entry["state"], **record})
     entry["state"] = state
     _save(data)
     return entry
+
+
+def _retest(path: str | Path) -> dict:
+    """The retest's result file (JUnit XML, CTRF, Allure): counts and digest, refused unless every test passed."""
+    from .adapters.portable_results import load_results
+
+    path = Path(path)
+    if not path.exists():
+        raise PortfolioError(f"{path} does not exist")
+    try:
+        run = load_results(path)
+    except Exception as exc:  # an unreadable file is a refusal, not a crash
+        raise PortfolioError(f"{path.name} is not a readable test result ({type(exc).__name__})") from exc
+    outcomes = [i.outcome.name if i.outcome else "NOT_RUN" for i in run.invocations]
+    if not outcomes or any(o != "PASSED" for o in outcomes):
+        raise PortfolioError(f"{path.name}: a retest supports a fix only when it ran tests and every one passed "
+                             f"({len(outcomes)} tests: {sorted(set(outcomes)) or 'none'})")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    return {"proof": "RETEST_RESULTS_RECORDED", "retest": {"file": path.name, "sha256": digest, "tests": len(outcomes),
+                                                           "note": "results recorded; that they exercise this issue is the operator's judgement"}}
 
 
 # --- portable dogfood import ---------------------------------------------------------------------------------------
@@ -470,7 +526,7 @@ def _import(doc: dict, origin: str, dry_run: bool) -> dict:
                     "review_mode": doc.get("review_mode"), "reported_status": item["status"],
                     "provenance": item["provenance"], "verification": "IMPORTED_UNVERIFIED", "note": item["title"]}
         entry["sightings"].append(sighting)
-        _resighted(entry, sighting, f"seen again in {origin} ({doc['report_id']})")
+        _resighted(entry, sighting, f"seen again in {origin} ({doc['report_id']})", verified=False)
         data["feedback"][fid] = entry
     summary = {"report_id": doc["report_id"], "origin": origin, "review_mode": doc.get("review_mode"),
                "review_status": doc.get("review_status"), "dry_run": dry_run, "entries": plan,

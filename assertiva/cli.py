@@ -403,6 +403,9 @@ def _parser() -> argparse.ArgumentParser:
     p_mv.add_argument("--evidence", required=True)
     p_mv.add_argument("--repo", metavar="PATH", help="a local Assertiva checkout where the evidence's commit must resolve "
                                                      "(required for VERIFIED_AT_SHA; otherwise the reference stays CLAIMED)")
+    p_mv.add_argument("--fixed-in", metavar="VERSION", help="the first Assertiva release that contains the fix")
+    p_mv.add_argument("--retest-results", metavar="FILE", help="the retest's results (JUnit XML, CTRF, Allure): recorded "
+                                                               "with their digest when every test passed")
     p_imp = acts.add_parser("import-feedback", help="import a portable dogfood file (audit.dogfood.json) from any installation; "
                                                     "no project registration needed, nothing executed or fetched")
     p_imp.add_argument("file")
@@ -460,8 +463,10 @@ def _portfolio(args: argparse.Namespace) -> int:
                                          args.engine_version or __version__, run_id=args.run_id, note=args.note or "")
         lines = [f"{payload['feedback_id']}: {payload['state']} ({len(payload['sightings'])} sightings)"]
     elif action == "move":
-        payload = portfolio.move_feedback(args.feedback_id, args.state, args.evidence, repo=args.repo)
-        lines = [f"{payload['feedback_id']}: {payload['state']} ({payload['history'][-1].get('verification', 'n/a')})"]
+        payload = portfolio.move_feedback(args.feedback_id, args.state, args.evidence, repo=args.repo, fixed_in=args.fixed_in,
+                                          retest_results=args.retest_results)
+        last = payload["history"][-1]
+        lines = [f"{payload['feedback_id']}: {payload['state']} (verification {last.get('verification', 'n/a')}, proof {last.get('proof', 'n/a')})"]
     elif action == "import-feedback":
         payload = portfolio.import_feedback(args.file, origin=args.origin, dry_run=args.dry_run)
         lines = [f"{payload['report_id']} from {payload['origin']}" + (" (dry run: nothing written)" if payload["dry_run"] else "")]

@@ -1,8 +1,8 @@
 # v1.1.0 release readiness
 
-Branch `integration/v1.1-foundation` (PR #13), candidate `1.1.0rc1`, released as `1.1.0` on 2026-11-27 after the owner authorized merging everything into `main`, tagging and releasing.
+Branch `integration/v1.1-foundation` (PR #13), candidate `1.1.0rc1`, version `1.1.0` on this branch. The owner authorized merging everything into `main`, tagging and releasing on 2026-11-27; the final addendum (CP-FINAL-A/B/C) was applied before publication. The publication record (merge and tag SHAs, CI runs, asset checksums) is the GitHub Release `v1.1.0`, not this file.
 
-**Recommendation at the candidate: CONDITIONAL; publication authorized by the owner with the evaluation limitation recorded.** The engine contracts, the demos and the local qualification hold; publishing 1.1.0 still needs (1) the GitHub CI full qualification of the final SHA green, (2) the owner's decision on the agent evaluations that were not run (blind multimodal reading, PR #12's cases), and (3) explicit authorization to merge, tag and release.
+**Recommendation: CONDITIONAL** — engine, demos and CI qualification hold; the agent evaluations are NOT_RUN and need the owner's explicit decision (accept as a documented limitation, or approve a budget) before publication. The engine contracts, the demos and the local qualification hold; publishing 1.1.0 still needs (1) the GitHub CI full qualification of the final SHA green, (2) the owner's decision on the agent evaluations that were not run (blind multimodal reading, PR #12's cases), and (3) explicit authorization to merge, tag and release.
 
 ## Checkpoints
 

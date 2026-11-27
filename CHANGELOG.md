@@ -27,6 +27,9 @@
 
 - A mutation report written in another root (a container, a CI checkout) is tied to the project by trailing path and identical content instead of `MUTATION_REPORT_SOURCE_MISMATCH` (found dogfooding Stryker.NET in a container).
 - A behavior linked to a misnamed external test is refused with the closest names instead of being accepted as UNKNOWN.
+- Protection evidence (final addendum): `detected` must be a JSON boolean (the string `"false"` counted as true); an `ENGINE_MUTATION` claim must name the specific mutant this run detected with the named tests (any kill by the test was enough); a `NEGATIVE_CONTROL` is verified only through a cited improve report bound to the audited tree (`improve_report`), and an unverified break — invented prose, an own mutant — caps the behavior at `OBSERVED_PASS` with `status_limited_by` while keeping the claim. Mutation summaries carry per-mutant `detections`.
+- Receipts and improve reports are read only under evidence roots (`ASSERTIVA_HOME`, `ASSERTIVA_EVIDENCE_ROOTS`), never through links or special files; a receipt on the audited commit with a dirty tree is `SAME_REVISION_DIRTY_TREE`, not tied.
+- Portfolio: versions order pre-releases (`1.1.0rc1` < `1.1.0`); `--fixed-in`; an imported sighting only marks a regression suspected; fixed states record `proof`; `VERIFIED_AT_SHA` needs `--retest-results` with every test passing as well as a resolved commit.
 - An artifact build that could not import its build backend is attributed to the environment:
   `ARTIFACT_QUALIFICATION_FAILED` keeps its code and severity but gets a `dominant_cause` with origin `ENVIRONMENT`
   and the missing backends, and its recommendation points at the interpreter (install the backend there, or enable

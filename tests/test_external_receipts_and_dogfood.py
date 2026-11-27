@@ -26,6 +26,13 @@ JUNIT = """<?xml version="1.0" encoding="UTF-8"?>
 </testsuite></testsuites>"""
 
 
+@pytest.fixture(autouse=True)
+def evidence_root(tmp_path, monkeypatch):
+    """The user's declared evidence root for these runs (the artifacts below are written under tmp_path)."""
+    monkeypatch.setenv("ASSERTIVA_EVIDENCE_ROOTS", str(tmp_path))
+    return tmp_path
+
+
 @pytest.fixture
 def project(tmp_path):
     root = tmp_path / "pricing"
@@ -273,13 +280,39 @@ def test_an_old_report_does_not_reopen_a_fix_but_a_newer_engine_does(project, tm
     assert code == 2 and "is not a commit" in err
     code, moved, _ = _port(capsys, "move", fid, "FIXED_IN_ASSERTIVA_BRANCH", "--evidence", f"fixed in {head[:12]}", "--repo", str(repo))
     assert code == 0 and moved["history"][-1]["verification"] == "COMMIT_RESOLVED" and moved["history"][-1]["commit"] == head
+    assert moved["history"][-1]["proof"] == "COMMIT_IDENTITY_ONLY"  # the commit exists; nothing shows it fixes the issue
+    code, _, err = _port(capsys, "move", fid, "VERIFIED_AT_SHA", "--evidence", f"retested at {head[:12]}", "--repo", str(repo))
+    assert code == 2 and "--retest-results" in err  # an irrelevant but real commit is not verification
+    failing, _ = _artifact(tmp_path, JUNIT, "retest-failing.xml")
+    code, _, err = _port(capsys, "move", fid, "VERIFIED_AT_SHA", "--evidence", f"retested at {head[:12]}", "--repo", str(repo),
+                         "--retest-results", str(failing))
+    assert code == 2 and "every one passed" in err
+    passing, _ = _artifact(tmp_path, JUNIT.replace('failures="1"', 'failures="0"').replace(
+        '<failure message="expected 10.01">boom</failure>', ""), "retest.xml")
+    code, verified, _ = _port(capsys, "move", fid, "VERIFIED_AT_SHA", "--evidence", f"retested at {head[:12]}", "--repo", str(repo),
+                              "--retest-results", str(passing), "--fixed-in", "1.1.0")
+    assert code == 0 and verified["history"][-1]["proof"] == "RETEST_RESULTS_RECORDED" and verified["history"][-1]["retest"]["tests"] == 3
     doc = json.loads(shipped.read_text(encoding="utf-8"))
-    for report_id, version in (("DF-0000000000aa", doc["engine"]["version"]), ("DF-0000000000bb", "99.0.0")):
+
+    def sighted(report_id, version):
         copy = tmp_path / f"{report_id}.json"
         copy.write_text(json.dumps({**doc, "report_id": report_id, "engine": {"version": version}}), encoding="utf-8")
         _port(capsys, "import-feedback", str(copy))
-        state = next(f for f in portfolio.report()["assertiva_feedback"] if f["feedback_id"] == fid)["state"]
-        assert state == ("FIXED_IN_ASSERTIVA_BRANCH" if version != "99.0.0" else "REGRESSION")
+        return next(f for f in portfolio.report()["assertiva_feedback"] if f["feedback_id"] == fid)
+
+    before = sighted("DF-0000000000aa", "1.1.0rc1")  # the candidate before the release that has the fix
+    assert before["state"] == "VERIFIED_AT_SHA" and before["sightings"][-1]["before_fix"] is True
+    after = sighted("DF-0000000000bb", "1.2.0")  # an imported report is a lead: suspected, never a reproduced regression
+    assert after["state"] == "VERIFIED_AT_SHA" and after["sightings"][-1]["regression_suspected"] is True
+    unknown = sighted("DF-0000000000cc", "unknown-build")
+    assert unknown["state"] == "VERIFIED_AT_SHA" and unknown["regression_suspected"] is True
+    assert [h["to"] for h in unknown["history"]] == ["FIXED_IN_ASSERTIVA_BRANCH", "VERIFIED_AT_SHA"]  # history only appended
+
+
+def test_versions_order_pre_releases_before_the_release():
+    assert portfolio._version("1.1.0rc1") < portfolio._version("1.1.0") < portfolio._version("1.1.1") < portfolio._version("v1.2")
+    assert portfolio._version("1.1.0.dev1") < portfolio._version("1.1.0a1") < portfolio._version("1.1.0b2") < portfolio._version("1.1.0rc1")
+    assert portfolio._version("unknown-build") is None and portfolio._version("dev") is None
 
 
 def test_invalid_or_hostile_imports_are_refused_and_change_nothing(tmp_path, capsys, assertiva_home):
@@ -325,3 +358,28 @@ def test_an_artifact_directory_is_bounded_and_holds_no_links(project, tmp_path, 
     entry = _receipt(report, results, "0" * 64, results=None, artifacts=[{"path": str(results), "sha256": "0" * 64, "kind": "log"}])
     with pytest.raises(AssessmentError, match="more than 2 files"):
         apply_assessment(report, _assess(report, external_executions=[entry]), project)
+
+
+def test_artifacts_are_read_only_under_evidence_roots_and_never_through_links(project, tmp_path, capsys, monkeypatch):
+    report = _audit(project, capsys)
+    path, sha = _artifact(tmp_path)
+    monkeypatch.setenv("ASSERTIVA_EVIDENCE_ROOTS", str(tmp_path / "somewhere-else"))
+    with pytest.raises(AssessmentError, match="outside the evidence roots"):
+        apply_assessment(report, _assess(report, external_executions=[_receipt(report, path, sha)]), project)
+    monkeypatch.setenv("ASSERTIVA_EVIDENCE_ROOTS", str(tmp_path))
+    link = tmp_path / "out" / "link.xml"
+    try:
+        link.symlink_to(path)
+    except OSError:
+        pytest.skip("this machine cannot create symbolic links")
+    with pytest.raises(AssessmentError, match="is a link"):
+        apply_assessment(report, _assess(report, external_executions=[_receipt(report, link, sha)]), project)
+
+
+def test_a_dirty_tree_on_the_declared_commit_is_not_a_tied_revision(project, tmp_path, capsys):
+    write(project / "lib" / "price.rb", "def total(items) = items.sum + 0\n")  # local change after the commit
+    report = _audit(project, capsys)
+    assert report["project"]["dirty"] is True
+    path, sha = _artifact(tmp_path)
+    receipt = apply_assessment(report, _assess(report, external_executions=[_receipt(report, path, sha)]), project)["external_executions"][0]
+    assert receipt["revision_link"] == "SAME_REVISION_DIRTY_TREE" and receipt["link"] == "UNVERIFIED"

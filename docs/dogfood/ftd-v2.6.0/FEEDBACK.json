@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "title": "Functional Test Designer v2.6.0 -> Assertiva 1.1.0 dogfood feedback",
+  "status": "INTAKE_ONLY_NOT_IMPLEMENTED",
+  "observation_date": "2026-11-27",
+  "assertiva_tested_revision": "8ff4048",
+  "assertiva_version": "1.1.0",
+  "project": "https://github.com/Soturine/functional-test-designer",
+  "project_revisions": {
+    "baseline": "314e8d6",
+    "candidate": "c8dfb7f",
+    "release_tag": "v2.6.0"
+  },
+  "canonical_narrative": "docs/dogfood/ftd-v2.6.0/README.md",
+  "authority": "Same agent built the FTD release, ran Assertiva, wrote the assessment and this intake: self-review plus tool evidence, not an independent qualification. Every engine behaviour listed was re-run on a synthetic reproducer with the published 1.1.0.",
+  "source_feedback_file": {
+    "path": "docs/dogfood/ftd-v2.6.0/evidence/audit.dogfood.json",
+    "schema": "assertiva-dogfood/1",
+    "report_id": "DF-e94d5b26acc4",
+    "entries": 8,
+    "review_mode": "AGENT_LED"
+  },
+  "entry_mapping": [
+    {
+      "entry": 1,
+      "signature": "unresolved-base-fake-with-test-prefixed-method",
+      "consolidated": "AXF-FTD-03",
+      "class": "PRECISION_GAP"
+    },
+    {
+      "entry": 2,
+      "signature": "mutation-budget-whole-module",
+      "consolidated": "AXF-FTD-02",
+      "class": "CAPABILITY_GAP_RECURRENCE"
+    },
+    {
+      "entry": 3,
+      "signature": "skill-engine-version-drift",
+      "consolidated": "AXF-FTD-06",
+      "class": "WITHDRAWN_AGENT_ERROR"
+    },
+    {
+      "entry": 4,
+      "signature": "cosmic-ray-unittest-module-invocation-import",
+      "consolidated": "AXF-FTD-01",
+      "class": "DEFECT"
+    },
+    {
+      "entry": 5,
+      "signature": "TEST_CLASS_COLLECTION_UNKNOWN false positive",
+      "consolidated": "AXF-FTD-03",
+      "class": "DUPLICATE",
+      "duplicate_of_entry": 1
+    },
+    {
+      "entry": 6,
+      "signature": "external tests python pytest 9.2.0",
+      "consolidated": "AXF-FTD-05",
+      "class": "MISATTRIBUTION"
+    },
+    {
+      "entry": 7,
+      "signature": "external tests python pytest 9.2.0",
+      "consolidated": "AXF-FTD-05",
+      "class": "DUPLICATE",
+      "duplicate_of_entry": 6
+    },
+    {
+      "entry": 8,
+      "signature": "external mutation python Cosmic Ray",
+      "consolidated": "AXF-FTD-05",
+      "class": "MISATTRIBUTION",
+      "caused_by": [
+        "AXF-FTD-01",
+        "AXF-FTD-02"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "AXF-FTD-01",
+      "priority": "P1",
+      "kind": "DEFECT",
+      "status": "REPRODUCED",
+      "component": "adapter",
+      "rule": "--mutate-tests (unittest adapter, test_command_for)",
+      "related": [
+        "AXF-VN-01"
+      ],
+      "summary": "a test file in a non-package tests/ directory becomes `python -m unittest --failfast tests.test_x`; discovery's sys.path entry is lost, a sibling-helper import fails, the pre-run fails and no mutant runs",
+      "reproducer": "docs/dogfood/ftd-v2.6.0/reproducers/sibling-helper: assertiva audit . --execute --mutate calc.py --mutate-tests tests/test_calc.py",
+      "observed": {
+        "run_id": "f5865120f1e5447b",
+        "evaluated": 0,
+        "finding": "MUTATION_RUN_NOT_COMPLETED"
+      },
+      "control": {
+        "selection": "--mutate-tests tests",
+        "run_id": "fe4e2f4ca27948da",
+        "command": "unittest discover --failfast -s tests",
+        "evaluated": 42,
+        "killed": 36,
+        "survived": 6
+      },
+      "suggested_fix": "keep discovery semantics for files in a non-package discovery directory (discover -s DIR -p FILE, refusing ambiguous patterns) or prepend DIR to the subprocess PYTHONPATH; package layouts unchanged",
+      "acceptance": [
+        "the reproducer's file selection runs exactly its 2 tests and evaluates mutants",
+        "AXF-VN-01 layouts keep their commands",
+        "ambiguous names are still refused",
+        "a regression test fails on 1.1.0"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-FTD-02",
+      "priority": "P2",
+      "kind": "CAPABILITY_GAP",
+      "status": "REPRODUCED",
+      "component": "engine",
+      "rule": "MAX_MUTANTS = 300 (adapters/cosmic_ray.py)",
+      "related": [
+        "DG-0101-12",
+        "IDEA-02"
+      ],
+      "summary": "the fixed MAX_MUTANTS = 300 refuses any target whose planned population is larger, whatever the user authorized or the machine can do; no function, line-range or changed-lines scope exists either",
+      "observed": {
+        "ftd_reading_py": {
+          "planned": 2058,
+          "stage": "budget"
+        },
+        "synthetic_big_py": {
+          "run_id": "acb8e7a2f3de41e9",
+          "planned": 7082,
+          "stage": "budget"
+        }
+      },
+      "proof_of_concept": {
+        "tool": "Cosmic Ray 8.9.0 cr-filter-lines",
+        "config": "[cosmic-ray.filters.line-filter] lines = {\"big.py\" = [\"3-6\"]}",
+        "left_to_run": 236,
+        "planned": 7082
+      },
+      "suggested_fix": "remove the fixed ceiling; adaptive execution policy with population accounting and derived run modes, estimate plus authorization gate, optional time/mutant/worker/memory budgets, native selectors, parallelism, shards and resumable sessions, keyed incremental reuse, capability discovery, and comparisons only for equal mode, scope rule and plan digest",
+      "acceptance": [
+        "no run is refused only because of its planned count",
+        "an authorized full run of the synthetic 7082-mutant module evaluates every mutant or reports the remainder as not_run",
+        "without authorization and above the threshold, the run stops after planning with the estimate; nothing executes",
+        "every score is shown with its populations; PARTIAL shows bounds; SAMPLED shows an interval",
+        "filters, samples, shards, budgets and reuse cannot change the universe or make runs comparable when they are not",
+        "qualification scenarios Q1-Q14 of the proposal pass"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false,
+      "design": "docs/dogfood/MUTATION_EXECUTION_POLICY_PROPOSAL.md"
+    },
+    {
+      "id": "AXF-FTD-03",
+      "priority": "P3",
+      "kind": "FALSE_POSITIVE",
+      "status": "REPRODUCED",
+      "component": "engine",
+      "rule": "TEST_CLASS_COLLECTION_UNKNOWN",
+      "summary": "a helper double whose plain base is imported from another project test module, with an API method named test_*, is reported although the same audit's native run did not collect it",
+      "reproducer": "docs/dogfood/ftd-v2.6.0/reproducers/helper-fakes: assertiva audit . --execute",
+      "observed": {
+        "run_id": "acb8e7a2f3de41e9",
+        "classes": [
+          "tests/test_history.py::HistoryTransport"
+        ],
+        "native_invocations": 2
+      },
+      "suggested_fix": "resolve project-local imports when reading bases (bounded depth) and reconcile with the executed test ids: absent and without a TestCase ancestor is not a test class",
+      "acceptance": [
+        "no UNKNOWN entry for the reproducer's double after --execute",
+        "an imported TestCase subclass the runner skips is still reported"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-FTD-04",
+      "priority": "P2",
+      "kind": "EVIDENCE_INCONSISTENCY",
+      "status": "REPRODUCED",
+      "component": "report",
+      "rule": "dogfood derivation + portfolio import-feedback --dry-run",
+      "summary": "two derived entries with the same signature are both written; a derived entry and the agent entry about the same finding are not linked; the dry run plans CREATE twice for one AFB id while the real import skips the second",
+      "observed": {
+        "same_signature_entries": [
+          6,
+          7
+        ],
+        "unlinked_pair": [
+          1,
+          5
+        ],
+        "dry_run": "CREATE AFB-6499b06a8b x2",
+        "import": "CREATE once, SKIP_ALREADY_IMPORTED once; re-import skips all 8"
+      },
+      "suggested_fix": "dedup derived entries by signature at write time; relates_to on derived entries; the dry run applies the import's idempotence",
+      "acceptance": [
+        "the run's file holds each issue once, with explicit links",
+        "dry run and import print the same plan",
+        "true second reports still add sightings"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-FTD-05",
+      "priority": "P3",
+      "kind": "FALSE_POSITIVE",
+      "status": "OBSERVED",
+      "component": "report",
+      "rule": "derived external-tool entries",
+      "summary": "external runs on a stack the engine executed are recorded as UNSUPPORTED/capability_gap; they covered another dependency profile, another OS, and a mutation the engine could not complete",
+      "suggested_fix": "derive 'unsupported' only when no adapter was recognized for that purpose; otherwise record an external complement linked to its reason (profile, platform, engine failure)",
+      "acceptance": [
+        "no UNSUPPORTED entry for an executed stack",
+        "an external mutation after MUTATION_RUN_NOT_COMPLETED links to that finding"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-FTD-06",
+      "priority": "P3",
+      "kind": "IMPROVEMENT_OPPORTUNITY",
+      "status": "WITHDRAWN_AS_REPORTED",
+      "component": "skill",
+      "summary": "the reported Skill/engine drift was an agent error (CRLF from core.autocrlf; files identical to v1.1.0 ignoring CR). Residual: no declared Skill version to compare with the engine, and no Portfolio state to withdraw a disproved entry",
+      "suggested_fix": "a version field in SKILL.md frontmatter and an offline check that compares declared versions; Portfolio WITHDRAWN and DUPLICATE_OF states with evidence",
+      "acceptance": [
+        "a mismatch is reported from declared versions",
+        "line endings cannot produce one",
+        "a withdrawn entry stops counting as open"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    },
+    {
+      "id": "AXF-FTD-07",
+      "priority": "P3",
+      "kind": "IMPROVEMENT_OPPORTUNITY",
+      "status": "OBSERVED",
+      "component": "ux",
+      "rule": "audit --assessment summary, references/ADAPTIVE_TOOLS.md",
+      "summary": "4 of 5 receipts UNVERIFIED for contract-correct reasons (plain text logs, other revision); the attach summary shows counts but not each receipt's link and reason",
+      "observed": {
+        "VERIFIED": [
+          "cosmic-ray-common"
+        ],
+        "UNVERIFIED": {
+          "no_structured_results": [
+            "windows-no-pypdf",
+            "linux-container"
+          ],
+          "different_revision": [
+            "fault-injection-before",
+            "fault-injection-after"
+          ]
+        }
+      },
+      "suggested_fix": "print link and blocking reason per receipt when attaching; ADAPTIVE_TOOLS.md: write JUnit/CTRF for external test runs and import Cosmic Ray results with --mutation-report",
+      "acceptance": [
+        "attaching the same assessment shows the four reasons without opening audit.json"
+      ],
+      "owner_repo": "Soturine/Assertiva",
+      "implemented": false
+    }
+  ],
+  "not_counted": [
+    "CI_PYTEST_NOT_OBSERVED on stdlib-unittest reproducers without CI (possibly AXF-VN-05); not investigated"
+  ]
+}

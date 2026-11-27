@@ -1,0 +1,291 @@
+{
+ "schema": "assertiva-dogfood/1",
+ "report_id": "DF-e94d5b26acc4",
+ "run_id": "ffab1e3426364c37",
+ "workflow": "audit",
+ "generated_at": "2026-11-27T17:38:16+00:00",
+ "review_mode": "AGENT_LED",
+ "review_status": "COMPLETED_IN_SCOPE",
+ "semantic_review": "DONE",
+ "scope": "audit --execute baseline e release, cobertura, mutação Cosmic Ray, assessment e recibos externos sobre o FTD",
+ "engine": {
+  "version": "1.1.0",
+  "revision": null
+ },
+ "skill": {
+  "revision": null,
+  "digest": null
+ },
+ "agent": {
+  "host": "Claude Code",
+  "provider": "unknown",
+  "model": "unknown",
+  "capabilities": {
+   "pdf_visual": "OBSERVED",
+   "web": "UNAVAILABLE",
+   "shell": "OBSERVED"
+  }
+ },
+ "environment": {
+  "os": "Windows",
+  "runtime": "CPython 3.12"
+ },
+ "provenance": "AGENT_REPORTED",
+ "feedback": [
+  {
+   "kind": "FALSE_POSITIVE",
+   "component": "engine",
+   "observation_kind": "defect_candidate",
+   "status": "REPRODUCED",
+   "title": "TEST_CLASS_COLLECTION_UNKNOWN em fake de transporte com método test_*",
+   "rule": "TEST_CLASS_COLLECTION_UNKNOWN",
+   "signature": "unresolved-base-fake-with-test-prefixed-method",
+   "expected": "uma classe que não herda de TestCase (base resolvível no mesmo projeto) não é candidata a coleta",
+   "observed": "o fake é reportado porque tem um método test_case_history e a base vem de outro módulo de teste",
+   "scope": "uma classe",
+   "evidence": [
+    "tests/test_adr_azure.py:24-45"
+   ],
+   "provenance": "AGENT_REPORTED",
+   "cause_hypothesis": "a base importada de outro arquivo de teste não é resolvida e o prefixo test_ basta para marcar a classe",
+   "cause_proven": false,
+   "priority": "low",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "reproducer": {
+    "description": "módulo A define class Fake: def get(self) ...; módulo B importa Fake e define class F2(Fake): def test_history(self) ...",
+    "command": "assertiva audit <copy>",
+    "result": "TEST_CLASS_COLLECTION_UNKNOWN cita F2"
+   },
+   "research": [],
+   "feedback_id": "AFB-f118827039"
+  },
+  {
+   "kind": "COST",
+   "component": "engine",
+   "observation_kind": "capability_gap",
+   "status": "OBSERVED",
+   "title": "Orçamento de mutação impede alvos de tamanho médio sem filtro por função",
+   "rule": "MUTATION_RUN_NOT_COMPLETED",
+   "signature": "mutation-budget-whole-module",
+   "expected": "um modo de restringir a mutação às funções alteradas ou a um subconjunto amostrado",
+   "observed": "2058 mutantes planejados para um módulo de 880 linhas, recusado pelo orçamento de 300; não há flag para restringir",
+   "scope": "um módulo",
+   "evidence": [
+    "audit 4eb622fe44464e71"
+   ],
+   "provenance": "AGENT_REPORTED",
+   "cause_hypothesis": "Cosmic Ray mutates whole modules and the engine's budget counts every planned mutant",
+   "cause_proven": true,
+   "priority": "medium",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "research": [],
+   "feedback_id": "AFB-5df54d1c5b"
+  },
+  {
+   "kind": "MISSING_ANALYSIS",
+   "component": "skill",
+   "observation_kind": "improvement_opportunity",
+   "status": "OBSERVED",
+   "title": "Cópia local da Skill diferente da versão do engine instalado",
+   "rule": "Skill: Boundaries / installation",
+   "signature": "skill-engine-version-drift",
+   "expected": "aviso quando SKILL.md/referências carregadas não correspondem à versão do engine",
+   "observed": "a Skill carregada do projeto diferia dos arquivos da tag v1.1.0 enquanto o engine era 1.1.0; nada sinalizou",
+   "scope": "ambiente local",
+   "evidence": [
+    "diff entre a cópia local e git show v1.1.0:SKILL.md"
+   ],
+   "provenance": "AGENT_REPORTED",
+   "cause_hypothesis": "the project-local Skill copy was installed from an earlier release and nothing compares it with the engine version",
+   "cause_proven": true,
+   "priority": "low",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "research": [],
+   "feedback_id": "AFB-21c16ff3a4"
+  },
+  {
+   "kind": "ADAPTER_ERROR",
+   "component": "adapter",
+   "observation_kind": "defect_candidate",
+   "status": "REPRODUCED",
+   "title": "Mutation pre-run invokes a test module the project only runs through discovery",
+   "rule": "MUTATION_RUN_NOT_COMPLETED",
+   "signature": "cosmic-ray-unittest-module-invocation-import",
+   "expected": "the mutation baseline runs the selected tests the way the project's runner does (unittest discover -s tests), as the audit's own execution did",
+   "observed": "--mutate-tests tests/test_expansion.py ran 'python -m unittest --failfast tests.test_expansion'; the module imports a sibling helper found only when tests/ is on sys.path, so the pre-run errored and no mutant ran",
+   "scope": "one target",
+   "evidence": [
+    "audit 0d74d0dea5e440ec"
+   ],
+   "provenance": "AGENT_REPORTED",
+   "cause_hypothesis": "the mutation command is built as a dotted module path instead of reusing the discovery start directory of the execution run",
+   "cause_proven": false,
+   "priority": "medium",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": true,
+   "reproducer": {
+    "description": "tests/helper.py plus tests/test_a.py doing 'from helper import x'; suite green with 'unittest discover -s tests'",
+    "command": "assertiva audit <copy> --execute --mutate src/m.py --mutate-tests tests/test_a.py",
+    "result": "selected tests do not pass before mutation; no mutant run"
+   },
+   "research": [],
+   "feedback_id": "AFB-805cd0de4c"
+  },
+  {
+   "kind": "FALSE_POSITIVE",
+   "component": "engine",
+   "observation_kind": "defect_candidate",
+   "status": "OBSERVED",
+   "title": "TEST_CLASS_COLLECTION_UNKNOWN disposed as a false positive",
+   "rule": "TEST_CLASS_COLLECTION_UNKNOWN",
+   "signature": "TEST_CLASS_COLLECTION_UNKNOWN false positive",
+   "expected": "The engine signal holds for the items it names",
+   "observed": "The auditing agent reviewed the items and rejected the claim: HistoryAzure é um fake de transporte Azure (base FakeAzure, não TestCase); test_case_history é um método da API simulada, não um teste. A execução nativa do unittest corretamente não o coleta.",
+   "scope": "1 item(s) reviewed in this run",
+   "evidence": [
+    "tests/test_adr_azure.py:24-45"
+   ],
+   "provenance": "ENGINE_DERIVED_FROM_ASSESSMENT",
+   "cause_hypothesis": "heuristic signal outside its validity (see rationale)",
+   "cause_proven": false,
+   "priority": "unknown",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "research": [],
+   "feedback_id": "AFB-b61e87e066"
+  },
+  {
+   "kind": "UNSUPPORTED",
+   "component": "tooling_discovery",
+   "observation_kind": "capability_gap",
+   "status": "OBSERVED",
+   "title": "Agent used pytest 9.2.0 for python tests outside the engine",
+   "rule": "external-execution",
+   "signature": "external tests python pytest 9.2.0",
+   "expected": "Native engine evidence, or none needed",
+   "observed": "External run recorded (PASS, link UNVERIFIED)",
+   "scope": "this run",
+   "evidence": [
+    "external execution windows-no-pypdf"
+   ],
+   "provenance": "ENGINE_DERIVED_FROM_RECEIPT",
+   "cost_benefit": "unknown: decide on frequency across audits before adding a native adapter",
+   "cause_proven": false,
+   "priority": "unknown",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "tool": {
+    "name": "pytest 9.2.0",
+    "version": "9.2.0"
+   },
+   "research": [],
+   "feedback_id": "AFB-6499b06a8b"
+  },
+  {
+   "kind": "UNSUPPORTED",
+   "component": "tooling_discovery",
+   "observation_kind": "capability_gap",
+   "status": "OBSERVED",
+   "title": "Agent used pytest 9.2.0 for python tests outside the engine",
+   "rule": "external-execution",
+   "signature": "external tests python pytest 9.2.0",
+   "expected": "Native engine evidence, or none needed",
+   "observed": "External run recorded (PASS, link UNVERIFIED)",
+   "scope": "this run",
+   "evidence": [
+    "external execution linux-container"
+   ],
+   "provenance": "ENGINE_DERIVED_FROM_RECEIPT",
+   "cost_benefit": "unknown: decide on frequency across audits before adding a native adapter",
+   "cause_proven": false,
+   "priority": "unknown",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "tool": {
+    "name": "pytest 9.2.0",
+    "version": "9.2.0"
+   },
+   "research": [],
+   "feedback_id": "AFB-6499b06a8b"
+  },
+  {
+   "kind": "UNSUPPORTED",
+   "component": "tooling_discovery",
+   "observation_kind": "capability_gap",
+   "status": "OBSERVED",
+   "title": "Agent used Cosmic Ray for python mutation outside the engine",
+   "rule": "external-execution",
+   "signature": "external mutation python Cosmic Ray",
+   "expected": "Native engine evidence, or none needed",
+   "observed": "External run recorded (PASS, link VERIFIED)",
+   "scope": "this run",
+   "evidence": [
+    "external execution cosmic-ray-common"
+   ],
+   "provenance": "ENGINE_DERIVED_FROM_RECEIPT",
+   "cost_benefit": "unknown: decide on frequency across audits before adding a native adapter",
+   "cause_proven": false,
+   "priority": "unknown",
+   "alternatives": [],
+   "acceptance": [],
+   "regression_required": false,
+   "tool": {
+    "name": "Cosmic Ray",
+    "version": "8.9.0"
+   },
+   "research": [],
+   "feedback_id": "AFB-748c2fdba4"
+  }
+ ],
+ "mechanical_observations": [],
+ "confirmed_capabilities": [
+  {
+   "capability": "execução nativa da suíte completa numa cópia verificada somente leitura, com identidade de revisão",
+   "component": "engine",
+   "scope": "FTD baseline e release",
+   "evidence": [
+    "audit 4902aed0e7b04dd6",
+    "audit ffab1e3426364c37"
+   ]
+  },
+  {
+   "capability": "cobertura de ramos medida e separada entre produto e testes",
+   "component": "engine",
+   "scope": "FTD",
+   "evidence": [
+    "states.current.coverage"
+   ]
+  },
+  {
+   "capability": "retenção de variáveis de ambiente semelhantes a credenciais",
+   "component": "engine",
+   "scope": "execução",
+   "evidence": [
+    "claim_boundary.limitations"
+   ]
+  }
+ ],
+ "not_evaluated": [
+  "assertiva improve",
+  "--changed-since",
+  "artifact qualification"
+ ],
+ "unknowns": [
+  "se o orçamento de mutação é configurável fora da CLI"
+ ],
+ "sharing": {
+  "classification": "LOCAL_ONLY",
+  "reviewed_for_export": false,
+  "note": "sanitized automatically; review it before sharing: a scan is not a privacy guarantee"
+ }
+}

@@ -216,6 +216,8 @@ NARRATIVE: list[tuple[str, str]] = [
     # artifact adapter
     ("only the wheel was built and verified; the sdist was not", "apenas o wheel foi construído e verificado; o sdist não"),
     ("no clean install from a package index was performed (offline)", "nenhuma instalação limpa a partir de um índice de pacotes foi feita (offline)"),
+    ("report paths from another root were matched to the project by path suffix and identical content: {paths}",
+     "caminhos do relatório de outra raiz foram associados ao projeto por sufixo de caminho e conteúdo idêntico: {paths}"),
     ("build backend not importable locally: isolated build may need network access",
      "o backend de build não é importável localmente: o build isolado pode precisar de acesso à rede"),
     ("PIP_NO_BUILD_ISOLATION is set in the environment: pip may have built without isolation, in the project interpreter",

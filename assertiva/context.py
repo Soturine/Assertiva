@@ -39,6 +39,7 @@ UNITS = ("page", "slide", "sheet", "section", "line", "file", "minute")
 RELATIONS = ("validates", "covers", "observes", "simulates", "characterizes", "reproduces")
 ORACLES = ("STRONG", "PARTIAL", "WEAK", "NONE")
 PROTECTION_KINDS = ("NEGATIVE_CONTROL", "MUTANT", "ENGINE_MUTATION")
+VERIFIED_BASES = ("ENGINE_VERIFIED", "IMPROVE_REPORT_VERIFIED")
 # Coverage states a behavior can be claimed in, strongest first; STALE is the engine's, never claimed.
 COVERAGE_STATES = ("PROVEN_IN_SCOPE", "OBSERVED_PASS", "PARTIAL", "WEAK", "CHARACTERIZATION_ONLY", "NOT_EVIDENCED",
                    "UNKNOWN", "BLOCKED", "NOT_APPLICABLE")
@@ -367,17 +368,75 @@ def _file_digest(root: Path, test_id: str) -> str | None:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
-def _mutation_detectors(report: dict) -> set[str]:
-    """Tests an engine-run mutation tool named as detecting a mutant of this state (imported reports do not count)."""
-    detectors: set[str] = set()
+def _mutation_detectors(report: dict) -> dict[str, set[str]]:
+    """Each mutant an engine-run mutation tool detected on this state, by id and by label -> the tests it named as
+    detecting that mutant. Imported reports and runs not tied to the state do not count; a kill of another mutant
+    says nothing about this one."""
+    detectors: dict[str, set[str]] = {}
     for run in ((report.get("states") or {}).get("current") or {}).get("mutation") or []:
-        if run.get("provenance") == "ENGINE_EXECUTED" and run.get("matches_state") is True:
-            detectors.update((run.get("kills_by_test") or {}).keys())
+        if run.get("provenance") != "ENGINE_EXECUTED" or run.get("matches_state") is not True:
+            continue
+        for detection in run.get("detections") or []:
+            killers = set(detection.get("killed_by") or [])
+            for key in (detection.get("mutant_id"), detection.get("mutant")):
+                if key:
+                    detectors.setdefault(str(key), set()).update(killers)
     return detectors
 
 
+def _improve_binding(proof: dict, root: Path, what: str) -> tuple[str, str]:
+    """(basis, why) for a negative control said to come from an ``assertiva improve`` report. VERIFIED only when the
+    report file (under an evidence root, with the declared SHA-256) records this control as protection gained, detected
+    by the named tests, and the audited tree is exactly that improve run's baseline plus its candidate changes."""
+    import json
+
+    from .receipts import ReceiptError, _sha256, authorized_evidence
+    from .workspace import Baseline, capture_baseline
+
+    cited = proof.get("improve_report")
+    if not isinstance(cited, dict) or not cited.get("path"):
+        return "AGENT_REPORTED", "no improve report cited"
+    declared = str(cited.get("sha256") or "").lower().removeprefix("sha256:")
+    try:
+        path = authorized_evidence(str(cited["path"]), root, what)
+    except ReceiptError as exc:
+        raise ContextError(str(exc)) from exc
+    if not path.is_file():
+        return "AGENT_REPORTED", "the cited improve report is not available"
+    if path.stat().st_size > 64 * 1024 * 1024:
+        raise ContextError(f"{what}: the cited improve report is larger than 64 MiB")
+    if _sha256(path) != declared:
+        raise ContextError(f"{what}: the improve report no longer has the declared SHA-256; it cannot vouch for the control")
+    try:
+        improve = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ContextError(f"{what}: the cited improve report is not readable JSON ({type(exc).__name__})") from exc
+    if improve.get("workflow") != "improve":
+        raise ContextError(f"{what}: the cited report is not an improve report")
+    gained = ((improve.get("candidate_qualification") or {}).get("protection") or {}).get("gained") or []
+    match = [g for g in gained if g.get("kind") == "negative_control" and g.get("id") == proof["ref"]]
+    if not match:
+        return "AGENT_REPORTED", f"the improve report records no protection gained by control {proof['ref']}"
+    named = {g.get("detected_by") for g in match}
+    if not set(proof["detected_by"]) <= named:
+        return "AGENT_REPORTED", "the improve report names other detecting tests: " + ", ".join(sorted(str(n) for n in named))
+    baseline_digest = (improve.get("project") or {}).get("baseline_digest")
+    files = dict(capture_baseline(root).files)
+    for change in (improve.get("change_set") or {}).get("changes") or []:
+        rel = change.get("path") or change.get("change_id")
+        if files.get(rel) != change.get("candidate_fingerprint"):
+            return "AGENT_REPORTED", f"the audited {rel} is not the candidate the improve run qualified"
+        if change.get("original_fingerprint"):
+            files[rel] = change["original_fingerprint"]
+        else:
+            files.pop(rel, None)
+    if not baseline_digest or Baseline(root=str(root), revision=None, dirty=None, files=files).digest != baseline_digest:
+        return "AGENT_REPORTED", "the audited tree minus the candidate changes is not the improve run's baseline"
+    return "IMPROVE_REPORT_VERIFIED", "control recorded as protection gained by these tests; tree = improve baseline + candidate"
+
+
 def _behavior(entry: Any, sources: dict[str, dict], tests: dict[str, dict], root: Path, receipts: dict[str, dict],
-              detectors: set[str]) -> dict:
+              detectors: dict[str, set[str]]) -> dict:
     if not isinstance(entry, dict):
         raise ContextError("each behavior must be an object")
     bid = _ident(entry.get("id"), "behavior id")
@@ -449,25 +508,51 @@ def _behavior(entry: Any, sources: dict[str, dict], tests: dict[str, dict], root
         unknown = [t for t in detected_by if t not in {x["test"] for x in linked}]
         if unknown:
             raise ContextError(f"{what}: protection names tests not linked to the behavior: {', '.join(unknown)}")
+        if not isinstance(proof.get("detected"), bool):
+            raise ContextError(f"{what}: protection detected must be true or false (JSON boolean), not {proof.get('detected')!r}")
         item = {"kind": kind, "ref": _text(proof.get("ref"), f"{what}: protection ref"),
-                "detected": bool(proof.get("detected")), "detected_by": detected_by,
+                "detected": proof["detected"], "detected_by": detected_by,
                 "evidence": [_text(v, f"{what}: protection evidence") for v in (proof.get("evidence") or [])]}
+        if item["detected"] and not detected_by:
+            raise ContextError(f"{what}: a detected break names the linked tests that detected it")
         if kind == "ENGINE_MUTATION":
-            confirmed = [t for t in detected_by if t in detectors or _base(t) in {_base(d) for d in detectors}]
-            item["basis"] = "ENGINE_EXECUTED" if confirmed and item["detected"] else "NOT_IN_THIS_RUN"
-            if item["detected"] and not confirmed:
-                raise ContextError(f"{what}: ENGINE_MUTATION {item['ref']} is not a detection in this run's mutation evidence")
+            killers = detectors.get(item["ref"])
+            if killers is None:
+                raise ContextError(f"{what}: ENGINE_MUTATION {item['ref']} is not a mutant this run's engine mutation detected "
+                                   "(name it by mutant id or label)")
+            wrong = [t for t in detected_by if t not in killers and _base(t) not in {_base(k) for k in killers}]
+            if item["detected"] and wrong:
+                raise ContextError(f"{what}: mutant {item['ref']} was not detected by {', '.join(wrong)} in this run "
+                                   f"(the tool named {', '.join(sorted(killers)) or 'no test'})")
+            item["basis"], item["verification"] = ("ENGINE_VERIFIED", "this mutant, detected by these tests in this run")
         else:
             if not item["evidence"]:
                 raise ContextError(f"{what}: a {kind} needs its evidence (command, revision, output) to be rerun")
-            item["basis"] = "AGENT_OBSERVED"
+            if kind == "NEGATIVE_CONTROL" and proof.get("improve_report") is not None:
+                item["basis"], item["verification"] = _improve_binding({**proof, "ref": item["ref"], "detected_by": detected_by}, root, what)
+                item["improve_report"] = {"name": Path(str(proof["improve_report"].get("path"))).name,
+                                          "sha256": str(proof["improve_report"].get("sha256") or "")}
+            else:
+                item["basis"], item["verification"] = ("AGENT_REPORTED", "the agent's own break; not verified by the engine")
         protection.append(item)
     out["protection"] = protection
     out["evidence"] = [_text(v, f"{what}: evidence") for v in (entry.get("evidence") or [])]
     _check_strength(out, what)
     out["dimensions"] = _dimensions(out)
-    out["status"] = "STALE" if any(s.get("stale") for s in out["sources"]) else out["claimed_status"]
+    status = out["claimed_status"]
+    if status == "PROVEN_IN_SCOPE" and not _verified_detection(out):
+        # the agent's analysis stays (claimed_status, protection entries); the mechanical status does not go beyond
+        # what the engine could tie to this tree
+        status = "OBSERVED_PASS"
+        out["status_limited_by"] = ("no detected break is verified by the engine (an engine mutation of this run, or an "
+                                    "improve report bound to this tree); the agent's report is kept as claimed")
+    out["status"] = "STALE" if any(s.get("stale") for s in out["sources"]) else status
     return out
+
+
+def _verified_detection(behavior: dict) -> bool:
+    strong = {t["test"] for t in behavior["tests"] if _passing(t) and t["oracle"] == "STRONG" and t["relation"] in ("validates", "reproduces")}
+    return any(p["detected"] and p["basis"] in VERIFIED_BASES and strong & set(p["detected_by"]) for p in behavior["protection"])
 
 
 def _passing(test: dict) -> bool:
@@ -513,7 +598,8 @@ def _dimensions(behavior: dict) -> dict:
         "executed": sum(1 for t in tests if t["observed_in"] != "SOURCE_ONLY"),
         "passed": sum(1 for t in tests if t["outcome"] in ("PASSED", "PASS", "passed")),
         "failed": sum(1 for t in tests if t["outcome"] in ("FAILED", "ERROR", "FAIL", "MIXED")),
-        "fault_sensitivity": ("DEMONSTRATED" if any(p["detected"] for p in behavior["protection"])
+        "fault_sensitivity": ("DEMONSTRATED" if any(p["detected"] and p["basis"] in VERIFIED_BASES for p in behavior["protection"])
+                              else "AGENT_REPORTED" if any(p["detected"] for p in behavior["protection"])
                               else "NOT_DETECTED" if behavior["protection"] else "NOT_CHALLENGED"),
     }
 

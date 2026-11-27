@@ -23,6 +23,7 @@ nothing is ``NO_TESTS``, never a pass.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,39 @@ def _sha256(path: Path) -> str:
     return _file_sha256(path)
 
 
+def evidence_roots() -> list[Path]:
+    """Where cited evidence may be read from: ``ASSERTIVA_HOME`` and the directories the user lists in
+    ``ASSERTIVA_EVIDENCE_ROOTS`` (os.pathsep-separated). An absolute path elsewhere is not authorization to read a
+    file: the engine hashes what it reads, and a hash of a private file can itself be sensitive."""
+    from .workspace import assertiva_home
+
+    roots = [assertiva_home()]
+    for item in os.environ.get("ASSERTIVA_EVIDENCE_ROOTS", "").split(os.pathsep):
+        if item.strip():
+            roots.append(Path(item.strip()))
+    return [r.resolve() for r in roots]
+
+
+def authorized_evidence(raw: str, project: Path, what: str) -> Path:
+    """The resolved path of a cited evidence file or results directory, or a refusal: absolute, outside the project,
+    under an evidence root, not a link, a regular file or a directory (never a device, pipe or socket)."""
+    path = Path(raw)
+    if not path.is_absolute():
+        raise ReceiptError(f"{what}: evidence paths are absolute (the tool wrote them outside the project)")
+    if path.is_symlink():
+        raise ReceiptError(f"{what}: {path.name} is a link; cite the file itself")
+    resolved = path.resolve()
+    if resolved == project.resolve() or resolved.is_relative_to(project.resolve()):
+        raise ReceiptError(f"{what}: {path.name} is inside the project; an audit never runs tools in the project tree, so "
+                           "cited evidence lives outside it")
+    if not any(resolved == r or resolved.is_relative_to(r) for r in evidence_roots()):
+        raise ReceiptError(f"{what}: {path.name} is outside the evidence roots (ASSERTIVA_HOME, or a directory listed in "
+                           "ASSERTIVA_EVIDENCE_ROOTS by the user); it is not read")
+    if resolved.exists() and not (resolved.is_file() or resolved.is_dir()):
+        raise ReceiptError(f"{what}: {path.name} is not a regular file or directory")
+    return resolved
+
+
 def _artifact(entry: Any, root: Path, what: str) -> dict:
     if not isinstance(entry, dict):
         raise ReceiptError(f"{what}: each artifact is an object with path, sha256 and kind")
@@ -109,12 +143,7 @@ def _artifact(entry: Any, root: Path, what: str) -> dict:
         raise ReceiptError(f"{what}: each artifact declares the SHA-256 of what the tool wrote (64 hex characters)")
     raw = _text(entry.get("path"), f"{what}: artifact path")
     path = Path(raw)
-    if not path.is_absolute():
-        raise ReceiptError(f"{what}: artifact paths are absolute (the tool wrote them outside the project)")
-    resolved = path.resolve()
-    if resolved == root.resolve() or resolved.is_relative_to(root.resolve()):
-        raise ReceiptError(f"{what}: {raw} is inside the project; an audit never runs tools in the project tree, so a "
-                           "receipt's artifacts live outside it")
+    resolved = authorized_evidence(raw, root, what)
     out = {"kind": kind, "name": path.name, "declared_sha256": declared}
     if not resolved.exists():
         out["integrity"] = "UNAVAILABLE"
@@ -275,6 +304,9 @@ def receipt(entry: Any, report: dict, root: Path) -> dict:
         out["revision_link"] = "SAME_REVISION"
     elif tree and tree == project.get("digest"):
         out["revision_link"] = "SAME_TREE_DIGEST"
+    elif revision and revision == project.get("revision") and project.get("dirty"):
+        # the audited tree had local changes: the commit names the base, not the code the run saw
+        out["revision_link"] = "SAME_REVISION_DIRTY_TREE"
     elif revision or tree:
         out["revision_link"] = "DIFFERENT"
     else:

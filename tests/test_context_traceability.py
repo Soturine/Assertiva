@@ -166,7 +166,9 @@ def test_mapped_executed_and_proven_are_different_claims(warehouse, capsys):
     ok = apply_assessment(report, _assess(report, sources=[_source()], behaviors=[{**strong, "protection": [
         {"kind": "NEGATIVE_CONTROL", "ref": "drop-approval", "detected": True, "detected_by": [success],
          "evidence": ["improve run X: control drop-approval detected by the candidate"]}]}]), warehouse)
-    assert ok["context"]["behaviors"][0]["dimensions"]["fault_sensitivity"] == "DEMONSTRATED"
+    # the agent's own control is kept, but only an engine-verified break proves protection (tests/test_protection_evidence.py)
+    assert ok["context"]["behaviors"][0]["dimensions"]["fault_sensitivity"] == "AGENT_REPORTED"
+    assert ok["context"]["behaviors"][0]["status"] == "OBSERVED_PASS"
 
 
 def test_a_test_that_is_only_in_the_source_tree_is_not_executed(warehouse, capsys):

@@ -621,6 +621,8 @@ UI: dict[str, tuple[str, str]] = {
     "ctx.beh.status": ("Status", "Situação"),
     "ctx.beh.tests": ("Tests (executed/linked, passed, failed)", "Testes (executados/vinculados, passaram, falharam)"),
     "ctx.beh.fault": ("Fault sensitivity", "Sensibilidade a falhas"),
+    "ctx.limited": ("Status capped: no detected break is verified by the engine; the agent's claim is kept.",
+                    "Status limitado: nenhuma quebra detectada foi verificada pelo engine; a afirmação do agente é mantida."),
     "ctx.beh.none": ("No behaviors were traced.", "Nenhum comportamento foi rastreado."),
     "ctx.conflicts": ("Conflicting behaviors (both kept; they need a decision):", "Comportamentos em conflito (ambos mantidos; precisam de decisão):"),
     "ctx.claim": ("A mapped test is not an executed one, and an executed pass is not demonstrated protection. Counts are of behavior slices the agent identified, never a functional coverage percentage.",

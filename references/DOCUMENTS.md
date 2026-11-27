@@ -45,7 +45,7 @@ Statuses, strongest first (a weaker one is always allowed):
 
 | Status | Needs |
 | --- | --- |
-| `PROVEN_IN_SCOPE` | a linked test that *validates* the behavior with a STRONG oracle, passed in an engine run or a verified external receipt, and a break it detected; a cited source unless the behavior is observed/characterized |
+| `PROVEN_IN_SCOPE` | a linked test that *validates* the behavior with a STRONG oracle, passed in an engine run or a verified external receipt, and a break it detected **that the engine can verify** (below); a cited source unless the behavior is observed/characterized. Claimed with only your own report of the break, it is kept as `claimed_status` and the status is capped at `OBSERVED_PASS` (`status_limited_by`) |
 | `OBSERVED_PASS` | a linked test that passed in an engine run or a verified external receipt |
 | `PARTIAL`, `WEAK`, `CHARACTERIZATION_ONLY` | the linked tests they rest on (`characterizes` for the last) |
 | `NOT_EVIDENCED` | a search that found no test (say what you read) |
@@ -72,7 +72,8 @@ Statuses, strongest first (a weaker one is always allowed):
      "tests": [{"test": "tests/test_transfer_approval.py::test_large_transfer_without_approval", "relation": "validates", "oracle": "STRONG"}],
      "protection": [{"kind": "NEGATIVE_CONTROL", "ref": "drop-approval", "detected": true,
                      "detected_by": ["tests/test_transfer_approval.py::test_large_transfer_without_approval"],
-                     "evidence": ["improve run: protection gained drop-approval"]}],
+                     "evidence": ["improve run: protection gained drop-approval"],
+                     "improve_report": {"path": "<ASSERTIVA_HOME>/reports/…/improve.json", "sha256": "<sha256 of that file>"}}],
      "status": "PROVEN_IN_SCOPE", "rationale": "…"}
   ]
 }
@@ -81,7 +82,7 @@ Statuses, strongest first (a weaker one is always allowed):
 - Source fields: `availability` (AVAILABLE, MISSING, INACCESSIBLE, PRIVATE, OUT_OF_SCOPE, UNSUPPORTED_FORMAT, BLOCKED), `authority` (APPROVED, POLICY, REGULATION, DRAFT, PROPOSAL, SUPERSEDED, CONFLICTING, OBSERVED_BEHAVIOR, CHARACTERIZATION, RISK_HYPOTHESIS, EXPLORATORY, UNKNOWN), `review.methods` (HOST_NATIVE_TEXT, HOST_NATIVE_VISUAL, RENDERED_PAGES, TEXT_EXTRACTION, OCR, STRUCTURED_PARSE, SPREADSHEET_FORMULAS, PROVIDER_REVIEW, USER_PROVIDED_SUMMARY), `review.unit` (page, slide, sheet, section, line, file, minute). A source outside the project is `"external": true` with a `uri` or label; it is not read by the engine.
 - Locators: `page:2`, `pages:1-3`, `slide:4`, `line:10-20`, `sheet:Name!A1:B9`, `section:3.2`, `figure:1`, `table:2`, `node:ID`, `time:00:01:30`.
 - Test ids: as the run names them (`file::name`), a file of the project (then NOT_RUN), or `external:<receipt id>::<name>` for a test in an external execution receipt (ADAPTIVE_TOOLS.md).
-- Relations: validates, covers, observes, simulates, characterizes, reproduces. Oracles: STRONG, PARTIAL, WEAK, NONE. Protection kinds: NEGATIVE_CONTROL, MUTANT (yours, with evidence), ENGINE_MUTATION (checked against this run's mutation evidence).
+- Relations: validates, covers, observes, simulates, characterizes, reproduces. Oracles: STRONG, PARTIAL, WEAK, NONE. Protection kinds: NEGATIVE_CONTROL, MUTANT, ENGINE_MUTATION; `detected` is a JSON boolean. A protection is VERIFIED only as `ENGINE_MUTATION` naming a specific mutant (id or label) that this run's engine mutation detected with the named tests, or as a `NEGATIVE_CONTROL` with `improve_report`: the improve report (under `ASSERTIVA_HOME` or `ASSERTIVA_EVIDENCE_ROOTS`, unchanged since cited) must record this control as protection gained by these tests, and the audited tree must be exactly that run's baseline plus its candidate changes (the engine recomputes the baseline digest). Anything else — your own break, a mutant you describe, a control from another tree — is kept as `AGENT_REPORTED` and never proves protection by itself.
 - Behavior links: `conflicts_with`, `supersedes`, `depends_on` (ids of other behaviors).
 
 ## What the engine checks and what it cannot

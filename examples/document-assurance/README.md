@@ -16,7 +16,7 @@ assertiva audit . --execute                      # 2 passed; no signal about the
 1. Read `docs/requirements.pdf` with the host's own PDF reading, pages 1–2 including the image. Attach an assessment with the source (`HOST_NATIVE_VISUAL`, pages 1–2, modalities text and diagram) and the behavior `BHV-approval` cited at `page:2`, status `NOT_EVIDENCED` (see `references/DOCUMENTS.md`). A citation of page 2 after reading only page 1 is refused; a text-only read is labeled `TEXT_ONLY`.
 2. `assertiva improve .` and add `tests/test_transfer_approval.py` in the candidate workspace: 101 units without approval → `409 APPROVAL_REQUIRED`, stock unchanged, no event; exactly 100 → moved with one event.
 3. Qualify with two negative controls (`controls.json` below): the original suite misses both, the candidate detects both — `candidate_qualification.protection.gained` lists `drop-approval` and `off-by-one-threshold`.
-4. After a human approves the change, a new audit can carry `BHV-approval` as `PROVEN_IN_SCOPE`: a STRONG validating test that passed in the engine run, plus a detected break. Without the break the engine refuses anything stronger than `OBSERVED_PASS`.
+4. After a human approves the change, a new audit can carry `BHV-approval` as `PROVEN_IN_SCOPE`: a STRONG validating test that passed in the engine run, plus a break the engine can verify — each control cites the improve report (`"improve_report": {"path": …, "sha256": …}`), which must record it as protection gained by that test for a tree equal to the improve baseline plus the approved change. Controls described only in prose are kept as the agent's claim and the status is capped at `OBSERVED_PASS`.
 
 ```json
 [

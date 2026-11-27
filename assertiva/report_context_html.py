@@ -59,7 +59,9 @@ def context_panel(r: _R) -> str:
             f'<td {r.label_attr("ctx.beh.status")}>{_badge(r, b["status"])}'
             + (f'<br><span class="muted">claimed {_e(b["claimed_status"])}</span>' if b["status"] != b["claimed_status"] else "")
             + f'</td><td {r.label_attr("ctx.beh.tests")}>{d["executed"]}/{d["linked_tests"]} · {d["passed"]} ✓ · {d["failed"]} ✗<br>{tests}</td>'
-            f'<td {r.label_attr("ctx.beh.fault")}><code>{_e(d["fault_sensitivity"])}</code></td></tr>')
+            f'<td {r.label_attr("ctx.beh.fault")}><code>{_e(d["fault_sensitivity"])}</code>'
+            + "".join(f'<br><code class="muted">{_e(p["ref"])}: {_e(p["basis"])}</code>' for p in b.get("protection") or [])
+            + (f'<br>{r.t("ctx.limited", cls="muted")}' if b.get("status_limited_by") else "") + '</td></tr>')
     summary = context["summary"]
     counts = ", ".join(f"{k} {v}" for k, v in sorted(summary["behaviors_by_status"].items())) or "—"
     body = (_table(r, "ctx.src.caption", ["ctx.src.id", "ctx.src.authority", "ctx.src.read", "ctx.src.state"], source_rows)

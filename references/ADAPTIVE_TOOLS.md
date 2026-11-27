@@ -55,9 +55,9 @@ Offline: use what is installed, say OFFLINE / NOT_RUN, and weaken the conclusion
 
 - `purpose`: tests, lint, format, typecheck, coverage, mutation, fuzz, security, build, contract, accessibility, other. Only `tests` carries `results` and `test_outcomes`.
 - `isolation`: CONTAINER, VM, DISPOSABLE_COPY, NONE. `network`: NONE, DOWNLOAD_STAGE_ONLY, ALLOWED, UNKNOWN. `consent`: USER_AUTHORIZED, PREAUTHORIZED_SCOPE, NOT_NEEDED (a run with NOT_GIVEN is refused: record it as a proposal instead).
-- Artifacts are absolute paths outside the project, each with the SHA-256 of what the tool wrote. Structured results (`junit`, `ctrf`, `allure`) are parsed and must agree with `results`.
+- Artifacts are absolute paths outside the project and under an evidence root — `ASSERTIVA_HOME` or a directory the user lists in `ASSERTIVA_EVIDENCE_ROOTS` (path-separated) — each with the SHA-256 of what the tool wrote. Links, devices and oversized files are refused. Structured results (`junit`, `ctrf`, `allure`) are parsed and must agree with `results`.
 
-The engine records, never runs, the command. It checks the artifacts' digests (refused when changed), the counts against the files, and the revision (`SAME_REVISION`, `SAME_TREE_DIGEST`, `DIFFERENT`, `NOT_DECLARED`). `link` is VERIFIED only with the same revision, every artifact verified and, for tests, agreeing structured results. Provenance stays `AGENT_EXTERNAL`; a behavior can rest on `external:<id>::<test>` only through a VERIFIED receipt. Integrity is not authenticity: the engine did not watch the run.
+The engine records, never runs, the command. It checks the artifacts' digests (refused when changed), the counts against the files, and the revision (`SAME_REVISION`, `SAME_TREE_DIGEST`, `SAME_REVISION_DIRTY_TREE` when the audited tree had local changes on that commit, `DIFFERENT`, `NOT_DECLARED`). `link` is VERIFIED only with the same revision, every artifact verified and, for tests, agreeing structured results. Provenance stays `AGENT_EXTERNAL`; a behavior can rest on `external:<id>::<test>` only through a VERIFIED receipt. Integrity is not authenticity: the engine did not watch the run.
 
 ## Reconciliation and what not to claim
 

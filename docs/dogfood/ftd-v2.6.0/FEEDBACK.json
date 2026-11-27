@@ -123,7 +123,7 @@
         "DG-0101-12",
         "IDEA-02"
       ],
-      "summary": "the budget applies to a whole target; no function, line-range or changed-lines selection exists, so medium safety modules cannot be measured",
+      "summary": "the fixed MAX_MUTANTS = 300 refuses any target whose planned population is larger, whatever the user authorized or the machine can do; no function, line-range or changed-lines scope exists either",
       "observed": {
         "ftd_reading_py": {
           "planned": 2058,
@@ -141,15 +141,18 @@
         "left_to_run": 236,
         "planned": 7082
       },
-      "suggested_fix": "--mutate FILE::QUALNAME, --mutate FILE:A-B and --mutate-changed-since REV implemented with Cosmic Ray's line filter between init and the budget check; the budget counts only mutants left to run; report planned_total, selected, evaluated and scope; a targeted score is never presented as the module's",
+      "suggested_fix": "remove the fixed ceiling; adaptive execution policy with population accounting and derived run modes, estimate plus authorization gate, optional time/mutant/worker/memory budgets, native selectors, parallelism, shards and resumable sessions, keyed incremental reuse, capability discovery, and comparisons only for equal mode, scope rule and plan digest",
       "acceptance": [
-        "a region selection runs under the budget and reports both populations",
-        "survivors carry their line",
-        "whole-module behaviour unchanged",
-        "IDEA-02's full-denominator rule kept for whole-module claims"
+        "no run is refused only because of its planned count",
+        "an authorized full run of the synthetic 7082-mutant module evaluates every mutant or reports the remainder as not_run",
+        "without authorization and above the threshold, the run stops after planning with the estimate; nothing executes",
+        "every score is shown with its populations; PARTIAL shows bounds; SAMPLED shows an interval",
+        "filters, samples, shards, budgets and reuse cannot change the universe or make runs comparable when they are not",
+        "qualification scenarios Q1-Q14 of the proposal pass"
       ],
       "owner_repo": "Soturine/Assertiva",
-      "implemented": false
+      "implemented": false,
+      "design": "docs/dogfood/MUTATION_EXECUTION_POLICY_PROPOSAL.md"
     },
     {
       "id": "AXF-FTD-03",

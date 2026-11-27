@@ -330,7 +330,12 @@ def _resolve_test(test_id: str, index: dict[str, dict], root: Path, receipts: di
         receipt = receipts.get(receipt_id)
         if receipt is None:
             raise ContextError(f"test {test_id!r} names no external execution receipt {receipt_id!r}")
-        outcome = (receipt.get("test_outcomes") or {}).get(name)
+        known = receipt.get("test_outcomes") or {}
+        outcome = known.get(name)
+        if outcome is None and known:
+            near = sorted(k for k in known if k.endswith(name.split("::")[-1]))[:3]
+            raise ContextError(f"test {test_id!r}: receipt {receipt_id} has no test {name!r}"
+                               + (f" (did you mean {', '.join(near)}?)" if near else ""))
         return {"test": test_id, "observed_in": "EXTERNAL_RECEIPT", "outcome": outcome or "UNKNOWN",
                 "provenance": receipt["provenance"]}
     exact = index.get(test_id)

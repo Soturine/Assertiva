@@ -299,3 +299,13 @@ def test_invalid_or_hostile_imports_are_refused_and_change_nothing(tmp_path, cap
     code, done, _ = _port(capsys, "import-feedback", str(bad))
     assert code == 0 and done["entries"][0]["action"] == "CREATE"  # stored as text; nothing in it is executed
     validate_document(hostile)
+
+
+def test_a_misnamed_external_test_is_refused_not_left_unknown(project, tmp_path, capsys):
+    report = _audit(project, capsys)
+    path, sha = _artifact(tmp_path)
+    behavior = {"id": "BHV-total", "title": "Total sums the items", "authority": "OBSERVED_BEHAVIOR", "slice": {"expected": "sum"},
+                "tests": [{"test": "external:rb-minitest::PriceTest::test_total", "relation": "covers", "oracle": "WEAK"}],
+                "status": "WEAK", "rationale": "Mistyped id: the parser names it PriceTest::PriceTest::test_total."}
+    with pytest.raises(AssessmentError, match="did you mean PriceTest::PriceTest::test_total"):
+        apply_assessment(report, _assess(report, external_executions=[_receipt(report, path, sha)], behaviors=[behavior]), project)

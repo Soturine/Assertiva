@@ -1,0 +1,91 @@
+{
+  "note": "Run identities and outcomes without local paths. Versions: assertiva 1.1.0 (tag v1.1.0), Cosmic Ray 8.9.0, CPython 3.12.10, Windows 11.",
+  "ftd_runs": [
+    {
+      "run_id": "4902aed0e7b04dd6",
+      "what": "audit --execute --ctrf",
+      "revision": "314e8d6",
+      "result": "ENGINE_EXECUTED unittest PASS, 824 invocations, branch 78.6% (3140/3994)"
+    },
+    {
+      "run_id": "ffab1e3426364c37",
+      "what": "audit --execute --ctrf + agent assessment",
+      "revision": "c8dfb7f",
+      "result": "ENGINE_EXECUTED unittest PASS, 891 invocations, branch 79.4% (3388/4266); 4 dispositions, 3 agent findings, 5 receipts"
+    },
+    {
+      "run_id": "4eb622fe44464e71",
+      "what": "--mutate scripts/reading.py --mutate-tests tests/test_native_first.py",
+      "revision": "c8dfb7f",
+      "result": "MUTATION_RUN_NOT_COMPLETED: 2058 planned > 300"
+    },
+    {
+      "run_id": "0d74d0dea5e440ec",
+      "what": "--mutate scripts/common.py --mutate-tests tests/test_expansion.py",
+      "revision": "c8dfb7f",
+      "result": "MUTATION_RUN_NOT_COMPLETED: selected tests do not pass before mutation (import), 0 mutants"
+    }
+  ],
+  "receipts": [
+    {
+      "id": "windows-no-pypdf",
+      "purpose": "tests",
+      "link": "UNVERIFIED",
+      "reason": "plain text log, no structured results",
+      "result": "644 passed, 4 skipped"
+    },
+    {
+      "id": "linux-container",
+      "purpose": "tests",
+      "link": "UNVERIFIED",
+      "reason": "plain text log, no structured results",
+      "result": "648 passed (644 passed + 4 skipped without the optional dependency)"
+    },
+    {
+      "id": "fault-injection-before",
+      "purpose": "other",
+      "link": "UNVERIFIED",
+      "reason": "different revision",
+      "result": "14 hand-made faults, 11 detected"
+    },
+    {
+      "id": "fault-injection-after",
+      "purpose": "other",
+      "link": "UNVERIFIED",
+      "reason": "different revision",
+      "result": "the 3 former survivors detected"
+    },
+    {
+      "id": "cosmic-ray-common",
+      "purpose": "mutation",
+      "link": "VERIFIED",
+      "result": "262 mutants, 129 killed, 133 survived with 4 selected tests; new guard: 14 of 20 killed, 4 survivors equivalent in use"
+    }
+  ],
+  "synthetic_reproductions": [
+    {
+      "run_id": "f5865120f1e5447b",
+      "project": "reproducers/sibling-helper",
+      "args": "--execute --mutate calc.py --mutate-tests tests/test_calc.py",
+      "result": "0 mutants: selected tests do not pass before mutation"
+    },
+    {
+      "run_id": "fe4e2f4ca27948da",
+      "project": "reproducers/sibling-helper",
+      "args": "--execute --mutate calc.py --mutate-tests tests",
+      "result": "42 mutants: 36 killed, 6 survived"
+    },
+    {
+      "run_id": "acb8e7a2f3de41e9",
+      "project": "reproducers/helper-fakes",
+      "args": "--execute --mutate big.py --mutate-tests tests",
+      "result": "TEST_CLASS_COLLECTION_UNKNOWN [tests/test_history.py::HistoryTransport] with 2 native invocations; 7082 planned > 300"
+    }
+  ],
+  "portfolio_import": {
+    "home": "disposable ASSERTIVA_HOME",
+    "dry_run": "8 CREATE lines, AFB-6499b06a8b twice",
+    "import_1": "7 CREATE, 1 SKIP_ALREADY_IMPORTED",
+    "import_2": "8 SKIP_ALREADY_IMPORTED"
+  }
+}
